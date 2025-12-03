@@ -14,6 +14,8 @@ export class Canvas {
         // optional state
         this.drawing = false;
         this.currentStroke = null;
+        this.strokeColor = 'black'
+        this.strokeWidth = 2
 
         // bind events
         this.setupEvents();
@@ -38,11 +40,19 @@ export class Canvas {
         return { x: e.clientX - rect.left, y: e.clientY - rect.top };
     }
 
+    setStrokeColor(strokeColor) {
+        this.strokeColor = strokeColor
+    }
+    
+    setStrokeWidth(strokeWidth) {
+        this.strokeWidth = strokeWidth
+    }
+
     startDraw(e) {
         e.preventDefault();
         this.drawing = true;
         const p = this.getPos(e);
-        this.currentStroke = { points: [p], color: 'black', width: 2 };
+        this.currentStroke = { points: [p], color: this.strokeColor, width: this.strokeWidth + 3 };
     }
 
     draw(e) {

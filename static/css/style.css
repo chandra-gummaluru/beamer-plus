@@ -94,23 +94,21 @@ justify-content: center; /* center its children */
 #control-panel input[type=range], #control-panel label.file-uploader { background:#444; border:none; color:white; padding:6px 10px; font-size:14px; border-radius:4px; width: 60px; cursor:pointer; }
 #control-panel label.file-uploader:hover { background:#666; }
 #control-panel input[type=range] { width:100px; }
-
-/* wrap the viewer-wrapper in a scrollable "zoom-container" */
+  
 #pdf-container {
-    position: relative;
-    margin: 0 auto;
-    overflow: hidden;
-    background: #fff;
-    justify-content:center;
-    align-items:center;
-  }
-    
-  #viewer-wrapper {
-    transform-origin: top left;
-    position: relative; 
-    transition: transform 0.1s ease-out;
-    will-change: transform;
-  }
+  width: 100%;
+  height: calc(100vh - 60px); /* adjust: subtract control bar */
+  position: relative;
+  overflow: hidden;
+}
+
+#viewer-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
 
 .color-swatch {
   width: 24px;
@@ -146,9 +144,14 @@ justify-content: center; /* center its children */
   color: #333;
 }
 
+#pdf-canvas, #ann-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
 
-#pdfCanvas, #annotationCanvas { position:absolute; top:0; left:0; width:100%; height:100%; }
-#annotationCanvas { cursor:crosshair; z-index:30; }
 .slide-video { position:absolute; object-fit:contain; pointer-events:none; z-index:20; }
 .slide-video::-webkit-media-controls-pip-button, .slide-video::-webkit-media-controls-picture-in-picture-button { display:none!important; }
 #color-picker { display:flex; gap:6px; }

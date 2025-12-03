@@ -5,6 +5,7 @@ import { Selector } from './selector.js';
 import { Toggle } from './Toggle.js';
 import { Canvas } from './canvas.js';
 
+window.addEventListener("DOMContentLoaded", () => {
 
 const timerContainer = document.getElementById("timer-container");
 const timer = new Timer(timerContainer);
@@ -27,13 +28,14 @@ const eraser = new Button(toolContainer, {
 });
 
 const toolSelector = new Selector([pen, highlighter, eraser], 'control_panel_btn_selected');
+toolSelector.select(pen);
 
 
 const colors = ['#eeeeee', '#e74c3c', '#f1c40f', '#2ecc71', '#3498db', '#9b59b6', '#333333'];
 const colorContainer = document.getElementById('color-picker');
 
 // Create buttons for each color
-const buttons = colors.map(color => {
+const colorBtns = colors.map(color => {
     const btn = new Button(colorContainer, {
         className: 'color-swatch',
     });
@@ -42,13 +44,10 @@ const buttons = colors.map(color => {
 });
 
 // Use Selector to manage selection
-const colorSelector = new Selector(buttons, 'color-selected');
+const colorSelector = new Selector(colorBtns, 'color-selected');
 
 // Optionally, select default color
-colorSelector.select(buttons[0]);
-
-// Get current color:
-console.log(colorSelector.getSelected().el.style.background);
+colorSelector.select(colorBtns[6]);
 
 /* Navigation */
 
@@ -77,7 +76,7 @@ const brushMinusBtn = new Button(brushContainer, {
 const brushSizeLbl = new Label(brushContainer, {
     id: 'brush_size_scroll',
     className: 'brush_size_scroll',
-    initial: '5'
+    initial: '2'
 });
 
 const brushPlusBtn = new Button(brushContainer, {
@@ -120,8 +119,6 @@ const displayTog = new Toggle(displayControls, {
 const ann_canvas_container = document.getElementById('ann-canvas');
 const annCvs = new Canvas(ann_canvas_container);
 
-
-
 /* ----------------------
    Tool Buttons
 ---------------------- */
@@ -137,19 +134,18 @@ function onToolSelected(selected) {
     else if (selected === eraser) annCvs.setPointerMode('eraser');
 }
 
-toolSelector.items.forEach(item => {
+toolSelector.buttons.forEach(item => {
     item.el.addEventListener('click', () => onToolSelected(item));
 });
 
 /* ----------------------
    Color Swatches
 ---------------------- */
-/*
-colorSelector.onSelect(btn => {
-    annCvs.setColor(btn.el.style.background);
-    console.log('Selected color:', btn.el.style.background);
+colorBtns.forEach(btn => {
+  btn.onClick(() => {
+    annCvs.setStrokeColor(getComputedStyle(btn.el).backgroundColor);
+  });
 });
-*/
 
 /* ----------------------
    Navigation Buttons
@@ -164,15 +160,14 @@ brushMinusBtn.onClick(() => {
     let val = parseInt(brushSizeLbl.get());
     if (val > 1) val--;
     brushSizeLbl.set(String(val));
-    annCvs.setBrushSize(val);
+    annCvs.setStrokeWidth(val);
 });
 
 brushPlusBtn.onClick(() => {
     let val = parseInt(brushSizeLbl.get());
     if (val < 9) val++;
     brushSizeLbl.set(String(val));
-    annCvs.setBrushSize(val);
-    console.log("test");
+    annCvs.setStrokeWidth(val);
 });
 
 /* ----------------------
@@ -207,3 +202,5 @@ displayTog.onToggle(async state => {
 });
 */
 
+console.log("Canvas size:", annCvs.width, annCvs.height);
+});
