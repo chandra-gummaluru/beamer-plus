@@ -3,7 +3,6 @@
   "scale": 5,
   "slides": [1,2,3],
   "videos": {
-    "2": [{ "path":"video.mp4","x":"20%","y":"10%","width":"30%","height":"30%","mode":"click" },
-    { "path":"video2.mp4","x":"20%","y":"10%","width":"30%","height":"30%","mode":"click" }]
+    "2": [{ "path":"video.mp4","x":"10%","y":"10%","width":"50%","height":"30%","mode":"click" }]
   }
 }

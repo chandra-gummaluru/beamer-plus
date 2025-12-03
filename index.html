@@ -7,60 +7,41 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.0/jszip.min.js"></script>
   <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
-  <script src="/static/js/shared.js" defer></script>
-  <script src="/static/js/main.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
 
 </head>
 <body>
   <div id="control-panel">
     <div class="controls-left">
-    <button id="errBtn1", class="control_panel_btn"><i class="fa-solid fa-info"></i></button>
-    <label for="upload-zip" class="control_panel_btn"><i class="fa-solid fa-upload"></i></label>
-    <button id="show-lan-url", class="control_panel_btn"><i class="fa-solid fa-eye"></i></button>
+    <div id="display-controls"></div>
     <input type="file" id="upload-zip" accept=".zip">
-    <button id="prev-slide", class="control_panel_btn"><i class="fa-solid fa-arrow-left"></i></button>
-    <button id="next-slide" class="control_panel_btn"><i class="fa-solid fa-arrow-right"></i></button>  
+    <div id="nav-container"></div>
     </div>
 
   <div class="controls-right">
 
-    <button id="pen-tool", class="control_panel_btn_selected"><i class="fa-solid fa-pen"></i></button>
-    <button id="highlight-tool", class="control_panel_btn"><i class="fa-solid fa-highlighter"></i></button>
-    <div id="color-picker">
-      <span class="color-swatch" data-color="#ffffff" style="background:#eeeeee"></span>
-      <span class="color-swatch" data-color="#e74c3c" style="background:#e74c3c"></span>
-      <span class="color-swatch" data-color="#f1c40f" style="background:#f1c40f"></span>
-      <span class="color-swatch" data-color="#2ecc71" style="background:#2ecc71"></span>
-      <span class="color-swatch" data-color="#3498db" style="background:#3498db"></span>
-      <span class="color-swatch" data-color="#9b59b6" style="background:#9b59b6"></span>
-      <span class="color-swatch" data-color="#111111" style="background:#333333"></span>
-    </div>
-    <button id="eraser-tool" class="control_panel_btn"><i class="fa-solid fa-eraser"></i></button>
-    <button id="brush_size_decrease" class="control_panel_btn"><i class="fa-solid fa-minus"></i></button>
-    <label id="brush_size_scroll" class="brush_size_scroll">5</label>
-    <button id="brush_size_increase" class="control_panel_btn"><i class="fa-solid fa-plus"></i></button>
-    <button id="clear-annotations" class="control_panel_btn"><i class="fa-solid fa-broom"></i></button>
-    <div class="timer-container">
-      <span id="timer_display">00:00</span>
-    </div>
+    <div id="tool-container"></div>
+    <div id="color-picker"></div>
+    <div id="brush-controls"></div>
+    <div id="other-controls"></div>
+    <div id="timer-container"></div>
   </div>
 </div>
 
   <div id="pdf-container">
     <div id="viewer-wrapper">
-      <canvas id="pdfCanvas"></canvas>
-      <canvas id="annotationCanvas"></canvas>
+      <div id="pdF-canvas"></div>
+      <div id="ann-canvas"></div>
     </div>
   </div>
 
-
+  <script type="module" src="/static/js/main.js"></script>
 </body>
 </html>

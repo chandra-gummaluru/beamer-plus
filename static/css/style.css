@@ -112,6 +112,20 @@ justify-content: center; /* center its children */
     will-change: transform;
   }
 
+.color-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid #ccc;
+  cursor: pointer;
+  display: inline-block;
+  margin-right: 4px;
+}
+
+.color-swatch.color-selected {
+  border: 3px solid #000;
+}
+
 .color_picker_view_only {
   gap: 8px;
   display: inline-block;
@@ -140,13 +154,69 @@ justify-content: center; /* center its children */
 #color-picker { display:flex; gap:6px; }
 .color-swatch { width:20px; height:20px; border-radius:50%; border:2px solid #666; cursor:pointer;}
 .color-swatch.selected { border: 2px solid #eee; }
-.timer-container { margin-left:auto; display:flex; gap:8px; align-items:center;}
-#timer_display {
-  cursor:pointer; font-family:monospace; font-size:14px; padding:4px 8px; background:#eee; color:#bbb; border-radius:4px; height:27px; line-height: 27px; border:2px solid #aaa;
+
+.timer-container { 
+  margin-left: auto; 
+  display: flex; 
+  gap: 8px; 
+  align-items: center; 
 }
-#timer_display.timer_running { color:#666; }
-#timer_reset { background:#555; }
-#timer_reset:hover { background:#777; }
+
+/* the Timer class element */
+.timer_display {
+  cursor: pointer;
+  font-family: monospace;
+  font-size: 14px;
+  padding: 4px 8px;
+  background: #eee;
+  color: #bbb;
+  border-radius: 4px;
+  height: 27px;
+  line-height: 27px;
+  border: 2px solid #aaa;
+  user-select: none;
+}
+
+.timer_display.timer_running {
+  color: #666;
+  background: #ddd; /* optional: slightly change background when running */
+}
+
+#tool-container {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+#nav-container {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+#display-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+#brush-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.toggle_on {
+    background-color: #666;
+    color: white;
+}
+
+.toggle_off {
+    background-color: #eee;
+    color: #666;
+}
+
+
 input[type=file] { display:none; }
 #lan-url,
 #lan-url a {
