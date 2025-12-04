@@ -15,23 +15,16 @@ def index():
 def viewer():
     return render_template("viewer.html")
 
-# Receive PDF from presenter and broadcast to all viewers
-@socketio.on("load_pdf")
-def handle_load_pdf(data):
-    # data = ArrayBuffer from client (bytes)
-    emit("load_pdf", data, broadcast=True, include_self=False)
-
-
 # Presenter changed slide → broadcast
-@socketio.on("slide_changed")
+@socketio.on("slide_event")
 def handle_slide_changed(slide_index):
-    emit("slide_changed", slide_index, broadcast=True, include_self=False)
+    emit("slide_event", slide_index, broadcast=True, include_self=False)
 
 
 # Presenter drew or erased → broadcast
-@socketio.on("annotation_event")
+@socketio.on("ann_event")
 def handle_annotation_event(event):
-    emit("annotation_event", event, broadcast=True, include_self=False)
+    emit("ann_event", event, broadcast=True, include_self=False)
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, debug=True)

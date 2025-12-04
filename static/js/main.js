@@ -248,8 +248,8 @@ fileInput.addEventListener("change", async (e) => {
         annCvs.canvas.style.width  = pdfCvs.canvas.style.width;
         annCvs.canvas.style.height = pdfCvs.canvas.style.height;
 
-        socket.emit("load_pdf", pdfData);
         await renderSlide(currentSlide);
+        socket.emit("slide_event", pdfCvs.canvas.toDataURL('image/png'));
     }
 
 });
@@ -299,24 +299,28 @@ async function renderSlide(slideIndex) {
 prevBtn.onClick(async () => {
     if (currentSlide > 0) {
 
-        annotations[currentSlide] = annCvs.get_annotations()
-        
+        annotations[currentSlide] = annCvs.get_annotations();
         currentSlide--;
         await renderSlide(currentSlide);
-        socket.emit("slide_changed", currentSlide);
+
+        const pdfImage = pdfCvs.canvas.toDataURL("image/png");
+        socket.emit('slide_event', {
+            slide: pdfImage
+        });
     }
 });
 
 nextBtn.onClick(async () => {
-    if (currentSlide < config.slides.length) {
-
-        annotations[currentSlide] = annCvs.get_annotations()
-
+    if (currentSlide < config.slides.length - 1) {
+        annotations[currentSlide] = annCvs.get_annotations();
         currentSlide++;
         await renderSlide(currentSlide);
-        socket.emit("slide_changed", currentSlide);
+
+        const pdfImage = pdfCvs.canvas.toDataURL("image/png");
+        socket.emit('slide_event', {
+            slide: pdfImage
+        });
     }
 });
-
 
 });

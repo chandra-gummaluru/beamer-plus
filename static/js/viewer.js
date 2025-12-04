@@ -1,77 +1,76 @@
 // static/viewer.js
-import { Timer } from './timer.js';
-import { Label } from './label.js';
-import { Button } from './button.js';
-import { Selector } from './selector.js';
-import { Toggle } from './Toggle.js';
 import { Canvas } from './canvas.js';
 
 
-// ------------------------------
-// 1. Connect to the socket
-// ------------------------------
 const socket = io();
 
-// Canvas wrappers (same class you already use)
+// Canvas wrappers
 const pdfContainer = document.getElementById("pdf-canvas");
 const annContainer = document.getElementById("ann-canvas");
 
-const pdfCvs = new Canvas(pdfContainer, false);  // no drawing
-const annCvs = new Canvas(annContainer, false);  // no drawing
-
-// Disable pointer events completely so viewer cannot edit
-annContainer.style.pointerEvents = "none";
-
-let pdfDoc = null;
+const pdfCvs = new Canvas(pdfContainer, false);  // no drawing in viewer
+const annCvs = new Canvas(annContainer, false);  // no drawing in viewer
 
 
-// ------------------------------
-// 2. Receive PDF on first load
-// ------------------------------
-// Your presenter page must send the PDF buffer once
-socket.on("load_pdf", async (arrayBuffer) => {
-    const loadingTask = pdfjsLib.getDocument(arrayBuffer);
-    pdfDoc = await loadingTask.promise;
+// --- Slide update ---
+socket.on('slide_event', ({ slide  }) => {
+    const pdfImg = new Image();
+    pdfImg.onload = () => {
+        const ctx = pdfCvs.canvas.getContext('2d');
+        ctx.clearRect(0, 0, pdfCvs.canvas.width, pdfCvs.canvas.height);
+        ctx.drawImage(pdfImg, 0, 0, pdfCvs.canvas.width, pdfCvs.canvas.height);
+    };
+    pdfImg.src = slide;
+
+    const ctxAnn = annCvs.canvas.getContext('2d');
+    ctxAnn.clearRect(0, 0, annCvs.canvas.width, annCvs.canvas.height);
 });
 
-// ------------------------------
-// 3. Sync slide navigation
-// ------------------------------
-socket.on("slide_changed", async (slideIndex) => {
-    if (!pdfDoc) return;
-
-    const page = await pdfDoc.getPage(slideIndex + 1);
-
-    // 1. Get actual PDF page size (unscaled)
-    const unscaled = page.getViewport({ scale: 1 });
-
-    // 2. Fit height to viewer
-    const containerHeight = pdfContainer.clientHeight;
-    const scale = containerHeight / unscaled.height;
-
-    const viewport = page.getViewport({ scale });
-
-    // 3. Resize canvases to match PDF
-    pdfCvs.resize(viewport.width, viewport.height);
-    annCvs.resize(viewport.width, viewport.height);
-
-    // 4. Render PDF
-    await page.render({
-        canvasContext: pdfCvs.ctx,
-        viewport
-    }).promise;
-
-    // 5. Reset annotation layer
-    annCvs.clear();
+socket.on('ann_event', ({ ann }) => {
+    const annImg = new Image();
+    annImg.onload = () => {
+        const ctx = annCvs.canvas.getContext('2d');
+        ctx.clearRect(0, 0, annCvs.canvas.width, annCvs.canvas.height);
+        ctx.drawImage(annImg, 0, 0, annCvs.canvas.width, annCvs.canvas.height);
+    };
+    annImg.src = ann;
 });
 
 
-// ------------------------------
-// 4. Sync annotations in real time
-// ------------------------------
-socket.on("annotation_event", (data) => {
-    // `data` should be the same object the presenter page sends:
-    // { slide: number, strokes: [...] } OR { type: 'erase', ... } etc.
+function resizeCanvasTo4by3(canvas) {
+    const container = canvas.parentElement;
+    const maxHeight = container.clientHeight;
+    const maxWidth = container.clientWidth;
 
-    annCvs.apply_remote_event(data);
+    maxHeight = '500px';
+
+    // Calculate 4:3 dimensions that fit
+    let height = maxHeight;
+    let width = (4 / 3) * height;
+
+    if (width > maxWidth) {
+        width = maxWidth;
+        height = (3 / 4) * width;
+    }
+
+    // Set canvas drawing buffer
+    canvas.width = width;
+    canvas.height = height;
+
+    // Center the canvas inside container
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    canvas.style.left = `${(maxWidth - width) / 2}px`;
+    canvas.style.top = `${(maxHeight - height) / 2}px`;
+}
+
+// Apply to both canvases
+resizeCanvasTo4by3(pdfCvs.canvas);
+resizeCanvasTo4by3(annCvs.canvas);
+
+// Recalculate on window resize
+window.addEventListener('resize', () => {
+    resizeCanvasTo4by3(pdfCvs.canvas);
+    resizeCanvasTo4by3(annCvs.canvas);
 });
+

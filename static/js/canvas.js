@@ -12,6 +12,9 @@ export class Canvas {
         // get 2D context
         this.ctx = this.canvas.getContext('2d');
 
+        this.buffer = document.createElement("canvas");
+        this.bufferCtx = this.buffer.getContext("2d");
+
         // optional state
         this.drawing = false;
         this.currentStroke = null;
@@ -37,6 +40,43 @@ export class Canvas {
             this.canvas.addEventListener('touchmove', e => this.draw(e), { passive: false });
             this.canvas.addEventListener('touchend', e => this.stopDraw(e), { passive: false });
         }
+    }
+
+    onMouseDown(fn) {
+        this.canvas.addEventListener("mousedown", e => fn(e));
+    }
+
+    onMouseMove(fn) {
+        this.canvas.addEventListener("mousemove", e => fn(e));
+    }
+
+    onMouseUp(fn) {
+        this.canvas.addEventListener("mouseup", e => fn(e));
+    }
+
+    onMouseLeave(fn) {
+        this.canvas.addEventListener("mouseleave", e => fn(e));
+    }
+
+    onTouchStart(fn) {
+        this.canvas.addEventListener("touchstart", e => {
+            e.preventDefault(); // keep drawing smooth
+            fn(e);
+        }, { passive: false });
+    }
+
+    onTouchMove(fn) {
+        this.canvas.addEventListener("touchmove", e => {
+            e.preventDefault();
+            fn(e);
+        }, { passive: false });
+    }
+
+    onTouchEnd(fn) {
+        this.canvas.addEventListener("touchend", e => {
+            e.preventDefault();
+            fn(e);
+        }, { passive: false });
     }
 
     getPos(e) {
@@ -161,4 +201,38 @@ export class Canvas {
             viewport: scaledViewport
         }).promise;
     }
+
+    resize(width, height) {
+        // Update canvas size attributes
+        this.canvas.width = width;
+        this.canvas.height = height;
+
+        // Optionally, update CSS to fit container
+        this.canvas.style.width = width + 'px';
+        this.canvas.style.height = height + 'px';
+
+        // Clear canvas after resize
+        this.clear();
+    }
+
+    drawImageSmooth(img) {
+        // Resize buffer if needed
+        if (this.buffer.width !== this.canvas.width ||
+            this.buffer.height !== this.canvas.height) {
+            this.buffer.width = this.canvas.width;
+            this.buffer.height = this.canvas.height;
+        }
+
+        // Draw onto offscreen
+        // this.bufferCtx.clearRect(0, 0, this.buffer.width, this.buffer.height);
+        this.bufferCtx.drawImage(img, 0, 0, this.buffer.width, this.buffer.height);
+
+        // Swap onto visible canvas
+        this.ctx.drawImage(this.buffer, 0, 0);
+    }
+
+    getImage() {
+        return this.canvas.toDataURL("image/png");
+    }
+
 }
