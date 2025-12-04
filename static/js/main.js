@@ -245,9 +245,6 @@ fileInput.addEventListener("change", async (e) => {
 
         console.log("All resources loaded:", resources);
 
-        annCvs.canvas.style.width  = pdfCvs.canvas.style.width;
-        annCvs.canvas.style.height = pdfCvs.canvas.style.height;
-
         await renderSlide(currentSlide);
         socket.emit("slide_event", pdfCvs.canvas.toDataURL('image/png'));
     }
@@ -276,7 +273,7 @@ async function renderSlide(slideIndex) {
         video.controls = true;
 
         // attach to pdfCanvas container
-        document.body.appendChild(video);
+        slide_canvas_container.appendChild(video);
     });
 
     // --- Add audio elements ---
@@ -286,7 +283,7 @@ async function renderSlide(slideIndex) {
         audio.src = audioURL;
         audio.volume = a.volume;
         if (a.playMode === "auto") audio.play();
-        document.body.appendChild(audio);
+        slide_canvas_container.appendChild(audio);
     });
 
     if (annotations[slideIndex]) {
@@ -302,7 +299,6 @@ prevBtn.onClick(async () => {
         annotations[currentSlide] = annCvs.get_annotations();
         currentSlide--;
         await renderSlide(currentSlide);
-
         const pdfImage = pdfCvs.canvas.toDataURL("image/png");
         socket.emit('slide_event', {
             slide: pdfImage

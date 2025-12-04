@@ -114,11 +114,26 @@ justify-content: center; /* center its children */
   background: #f0f0f0;
 }
 
-#pdf-canvas, #ann-canvas {
-  position: absolute;       /* allow manual centering via JS */
-  border: 2px solid #333;   /* outline */
+#pdf-canvas {
+  position: absolute;
+  z-index: 1; /* bottom */
+  border: 2px solid #333;
   border-radius: 4px;
   box-sizing: border-box;
+
+  height: 100%;
+  aspect-ratio: 4 / 3;
+}
+
+#ann-canvas {
+  position: absolute;
+  z-index: 2; /* top */
+  pointer-events: auto; /* allow drawing */
+  border: 2px solid transparent; /* optional, no visible border */
+  box-sizing: border-box;
+
+  height: 100%;
+  aspect-ratio: 4 / 3;
 }
 
 .color-swatch {

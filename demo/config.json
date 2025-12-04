@@ -17,10 +17,10 @@
       "videos": [
         {
           "id": "v1",
-          "x": 0.05,
+          "x": -10,
           "y": 0.05,
-          "width": 0.9,
-          "height": 0.4,
+          "width": 0.2,
+          "height": 0.1,
           "playbackRate": 1.0,
           "zIndex": 10,
           "volume": 0.8,

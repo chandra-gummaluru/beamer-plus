@@ -234,5 +234,4 @@ export class Canvas {
     getImage() {
         return this.canvas.toDataURL("image/png");
     }
-
 }
