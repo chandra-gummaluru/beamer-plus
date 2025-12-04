@@ -1,0 +1,27 @@
+<!-- templates/viewer.html -->
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Beamer+ Viewer</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.0/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+  <div id="nav-bar"></div> <!-- intentionally empty -->
+
+  <div id="viewer-wrapper">
+    <div id="pdf-canvas"></div>
+    <div id="ann-canvas"></div>
+  </div>
+
+  <script type="module" src="/static/js/viewer.js"></script>
+</body>
+</html>

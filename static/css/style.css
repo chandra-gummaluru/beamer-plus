@@ -100,6 +100,8 @@ justify-content: center; /* center its children */
   height: calc(100vh - 60px); /* adjust: subtract control bar */
   position: relative;
   overflow: hidden;
+  display: flex;
+  justify-content: center;
 }
 
 #viewer-wrapper {
@@ -144,7 +146,16 @@ justify-content: center; /* center its children */
   color: #333;
 }
 
-#pdf-canvas, #ann-canvas {
+#ann-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+}
+
+#pdf-canvas {
   position: absolute;
   top: 0;
   left: 0;

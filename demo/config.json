@@ -1,0 +1,62 @@
+{
+  "version": "1.0",
+
+  "resources": {
+    "videos": {
+      "v1": "video/video.mp4",
+      "v2": "video/video.mp4"
+    },
+    "audio": {
+      "a1": "audio/audio.mp3"
+    }
+  },
+
+  "slides": [
+    {
+      "page": 1,
+      "videos": [
+        {
+          "id": "v1",
+          "x": 0.05,
+          "y": 0.05,
+          "width": 0.9,
+          "height": 0.4,
+          "playbackRate": 1.0,
+          "zIndex": 10,
+          "volume": 0.8,
+          "playMode": "auto"
+        }
+      ],
+      "audio": [
+        {
+          "id": "a1",
+          "volume": 0.5,
+          "playMode": "auto"
+        }
+      ]
+    },
+    {
+      "page": 2,
+      "videos": [
+        {
+          "id": "v2",
+          "x": 0.05,
+          "y": 0.55,
+          "width": 0.4,
+          "height": 0.35,
+          "playbackRate": 1.0,
+          "zIndex": 5,
+          "volume": 1.0,
+          "playMode": "click"
+        }
+      ],
+      "audio": [
+        {
+          "id": "a1",
+          "volume": 1.0,
+          "playMode": "auto"
+        }
+      ]
+    }
+  ]
+}

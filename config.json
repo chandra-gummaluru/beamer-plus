@@ -1,8 +1,0 @@
-{
-  "pdf": "beamer_plus_demo.pdf",
-  "scale": 5,
-  "slides": [1,2,3],
-  "videos": {
-    "2": [{ "path":"video.mp4","x":"10%","y":"10%","width":"50%","height":"30%","mode":"click" }]
-  }
-}

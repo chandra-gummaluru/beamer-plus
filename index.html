@@ -4,9 +4,13 @@
   <meta charset="utf-8">
   <title>Beamer+</title>
   <link rel="stylesheet" href="/static/css/style.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.0/jszip.min.js"></script>
-  <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -37,8 +41,8 @@
 
   <div id="pdf-container">
     <div id="viewer-wrapper">
-      <div id="pdf-canvas"></div>
       <div id="ann-canvas"></div>
+      <div id="pdf-canvas"></div>
     </div>
   </div>
 

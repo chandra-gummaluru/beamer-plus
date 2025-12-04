@@ -5,6 +5,8 @@ import { Selector } from './selector.js';
 import { Toggle } from './Toggle.js';
 import { Canvas } from './canvas.js';
 
+const socket = io();
+
 window.addEventListener("DOMContentLoaded", () => {
 
 const timerContainer = document.getElementById("timer-container");
@@ -116,22 +118,26 @@ const displayTog = new Toggle(displayControls, {
     initialState: false
 });
 
+
 const ann_canvas_container = document.getElementById('ann-canvas');
 const annCvs = new Canvas(ann_canvas_container);
+const slide_canvas_container = document.getElementById('pdf-canvas');
+const pdfCvs = new Canvas(slide_canvas_container, false);
+
 
 /* ----------------------
    Tool Buttons
 ---------------------- */
 pen.onClick(() => annCvs.setPointerMode('draw'));
 highlighter.onClick(() => annCvs.setPointerMode('highlight'));
-eraser.onClick(() => annCvs.setPointerMode('eraser'));
+eraser.onClick(() => annCvs.setPointerMode('erase'));
 
 function onToolSelected(selected) {
     console.log("Selected tool:", selected);
 
     if (selected === pen) annCvs.setPointerMode('draw');
     else if (selected === highlighter) annCvs.setPointerMode('highlight');
-    else if (selected === eraser) annCvs.setPointerMode('eraser');
+    else if (selected === eraser) annCvs.setPointerMode('erase');
 }
 
 toolSelector.buttons.forEach(item => {
@@ -150,8 +156,6 @@ colorBtns.forEach(btn => {
 /* ----------------------
    Navigation Buttons
 ---------------------- */
-prevBtn.onClick(() => updateSlide(-1));
-nextBtn.onClick(() => updateSlide(1));
 
 /* ----------------------
    Brush Controls
@@ -178,29 +182,141 @@ clearBtn.onClick(() => annCvs.clear());
 /* ----------------------
    Display Toggle
 ---------------------- */
-/*
-displayTog.onToggle(async state => {
-    const display = document.getElementById('lan-url');
-    displayTog.el.disabled = true;
 
-    const url = state ? '/enable_lan' : '/disable_lan';
-    try {
-        await fetch(url, { method: 'POST' });
+/* ----------------------
+   Upload Button
+---------------------- */
+const fileInput = document.getElementById("upload-zip");
+uploadBtn.onClick(() => {
+    fileInput.click();
+});
 
-        if (state) {
-            const res = await fetch('/local_ip');
-            const { ip } = await res.json();
-            display.innerHTML = `<a href="http://${ip}:5000/viewer" style="color:white">${ip}:5000/viewer</a>`;
-        } else {
-            display.textContent = '';
+
+let zipFile = null;
+let config = null;
+let resources = { videos: {}, audio: {}, slides: {} };
+let annotations = {};
+let currentSlide = 0
+
+fileInput.addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const arrayBuffer = await file.arrayBuffer();
+    zipFile = await JSZip.loadAsync(arrayBuffer);
+
+    // --- Load config.json ---
+    const configFile = zipFile.file("config.json");
+    if (!configFile) {
+        console.error("No config.json found in ZIP!");
+        return;
+    }
+
+    const configText = await configFile.async("string");
+    config = JSON.parse(configText);
+    console.log("Loaded config:", config);
+
+    // --- Preload all resources into memory ---
+    // Videos
+    for (const [id, path] of Object.entries(config.resources.videos)) {
+        const blob = await zipFile.file(path).async("blob");
+        resources.videos[id] = URL.createObjectURL(blob);
+    }
+
+    // Audio
+    for (const [id, path] of Object.entries(config.resources.audio)) {
+        const blob = await zipFile.file(path).async("blob");
+        resources.audio[id] = URL.createObjectURL(blob);
+    }
+
+    // Slides
+    const pdfFile = zipFile.file("slides.pdf");
+    if (!pdfFile) {
+        console.error("slides.pdf not found in ZIP!");
+    } else {
+        const pdfData = await pdfFile.async("arraybuffer");
+        const pdfDoc = await pdfjsLib.getDocument({ data: pdfData }).promise;
+        const numPages = pdfDoc.numPages;
+
+        for (let i = 1; i <= numPages; i++) {  // PDF.js pages are 1-based
+            const page = await pdfDoc.getPage(i);
+            resources.slides[i-1] = page;
         }
-    } catch (err) {
-        console.error('Toggle LAN failed', err);
-    } finally {
-        displayTog.el.disabled = false;
+
+        console.log("All resources loaded:", resources);
+
+        annCvs.canvas.style.width  = pdfCvs.canvas.style.width;
+        annCvs.canvas.style.height = pdfCvs.canvas.style.height;
+
+        socket.emit("load_pdf", pdfData);
+        await renderSlide(currentSlide);
+    }
+
+});
+
+
+async function renderSlide(slideIndex) {
+    // --- Render PDF page on pdfCanvas ---
+    await pdfCvs.renderPDFPage(resources.slides[slideIndex]);
+
+    // --- Add video elements ---
+    config.slides[slideIndex].videos.forEach(v => {
+        const videoURL = resources.videos[v.id];
+        const video = document.createElement("video");
+        video.src = videoURL;
+        video.style.position = "absolute";
+        video.style.left = `${v.x * pdfCvs.width}px`;
+        video.style.top = `${v.y * pdfCvs.height}px`;
+        video.style.width = `${v.width * pdfCvs.width}px`;
+        video.style.height = `${v.height * pdfCvs.height}px`;
+        video.style.zIndex = v.zIndex;
+        video.volume = v.volume;
+        video.playbackRate = v.playbackRate;
+        if (v.playMode === "auto") video.autoplay = true;
+        video.controls = true;
+
+        // attach to pdfCanvas container
+        document.body.appendChild(video);
+    });
+
+    // --- Add audio elements ---
+    config.slides[slideIndex].audio.forEach(a => {
+        const audioURL = resources.audio[a.id];
+        const audio = document.createElement("audio");
+        audio.src = audioURL;
+        audio.volume = a.volume;
+        if (a.playMode === "auto") audio.play();
+        document.body.appendChild(audio);
+    });
+
+    if (annotations[slideIndex]) {
+        annCvs.add_annotations(annotations[slideIndex]);
+    } else {
+        annCvs.clear();
+    }
+}
+
+prevBtn.onClick(async () => {
+    if (currentSlide > 0) {
+
+        annotations[currentSlide] = annCvs.get_annotations()
+        
+        currentSlide--;
+        await renderSlide(currentSlide);
+        socket.emit("slide_changed", currentSlide);
     }
 });
-*/
 
-console.log("Canvas size:", annCvs.width, annCvs.height);
+nextBtn.onClick(async () => {
+    if (currentSlide < config.slides.length) {
+
+        annotations[currentSlide] = annCvs.get_annotations()
+
+        currentSlide++;
+        await renderSlide(currentSlide);
+        socket.emit("slide_changed", currentSlide);
+    }
+});
+
+
 });
