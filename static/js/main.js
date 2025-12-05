@@ -246,7 +246,10 @@ fileInput.addEventListener("change", async (e) => {
         console.log("All resources loaded:", resources);
 
         await renderSlide(currentSlide);
-        socket.emit("slide_event", pdfCvs.canvas.toDataURL('image/png'));
+        const pdfImage = pdfCvs.canvas.toDataURL("image/png");
+        socket.emit('slide_event', {
+            slide: pdfImage
+        });
     }
 
 });
@@ -257,20 +260,24 @@ async function renderSlide(slideIndex) {
     await pdfCvs.renderPDFPage(resources.slides[slideIndex]);
 
     // --- Add video elements ---
+    [...slide_canvas_container.querySelectorAll("video")].forEach(v => v.remove());
+
     config.slides[slideIndex].videos.forEach(v => {
         const videoURL = resources.videos[v.id];
         const video = document.createElement("video");
         video.src = videoURL;
         video.style.position = "absolute";
-        video.style.left = `${v.x * pdfCvs.width}px`;
-        video.style.top = `${v.y * pdfCvs.height}px`;
-        video.style.width = `${v.width * pdfCvs.width}px`;
-        video.style.height = `${v.height * pdfCvs.height}px`;
+        video.style.left = `${v.x * pdfCvs.canvas.width}px`;
+        video.style.top = `${v.y * pdfCvs.canvas.height}px`;
+        video.style.width = `${v.width * pdfCvs.canvas.width}px`;
+        video.style.height = `${v.height * pdfCvs.canvas.height}px`;
         video.style.zIndex = v.zIndex;
         video.volume = v.volume;
+        video.muted = true;
         video.playbackRate = v.playbackRate;
+        video.addEventListener("click", () => video.play());
         if (v.playMode === "auto") video.autoplay = true;
-        video.controls = true;
+        video.controls = false;
 
         // attach to pdfCanvas container
         slide_canvas_container.appendChild(video);

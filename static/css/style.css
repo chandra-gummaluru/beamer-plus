@@ -95,14 +95,6 @@ justify-content: center; /* center its children */
 #control-panel label.file-uploader:hover { background:#666; }
 #control-panel input[type=range] { width:100px; }
   
-#viewer-wrapper {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-}
-
 #pdf-container, #viewer-container {
   width: 100%;
   height: calc(100vh - 60px); /* adjust for control bar */
@@ -114,10 +106,17 @@ justify-content: center; /* center its children */
   background: #f0f0f0;
 }
 
+#pdf-container video {
+    position: absolute;
+    object-fit: contain;
+    pointer-events: auto;
+}
+
 #pdf-canvas {
   position: absolute;
   z-index: 1; /* bottom */
   border: 2px solid #333;
+  background-color: #ffffff;
   border-radius: 4px;
   box-sizing: border-box;
 

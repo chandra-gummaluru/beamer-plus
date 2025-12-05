@@ -14,40 +14,21 @@
   "slides": [
     {
       "page": 1,
-      "videos": [
-        {
-          "id": "v1",
-          "x": -10,
-          "y": 0.05,
-          "width": 0.2,
-          "height": 0.1,
-          "playbackRate": 1.0,
-          "zIndex": 10,
-          "volume": 0.8,
-          "playMode": "auto"
-        }
-      ],
-      "audio": [
-        {
-          "id": "a1",
-          "volume": 0.5,
-          "playMode": "auto"
-        }
-      ]
+      "videos": [],
+      "audio": []
     },
     {
       "page": 2,
       "videos": [
         {
           "id": "v2",
-          "x": 0.05,
-          "y": 0.55,
-          "width": 0.4,
-          "height": 0.35,
+          "x": 0.065,
+          "y": 0.4,
+          "width": 0.25,
           "playbackRate": 1.0,
           "zIndex": 5,
           "volume": 1.0,
-          "playMode": "click"
+          "playMode": "auto"
         }
       ],
       "audio": [
