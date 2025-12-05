@@ -14,6 +14,11 @@ const timer = new Timer(timerContainer);
 
 const toolContainer = document.getElementById('tool-container');
 
+const hand = new Button(toolContainer, {
+    label: '<i class="fa-solid fa-hand-pointer"></i>',
+    className: 'control_panel_btn'
+});
+
 const pen = new Button(toolContainer, {
     label: '<i class="fa-solid fa-pen"></i>',
     className: 'control_panel_btn'
@@ -29,8 +34,8 @@ const eraser = new Button(toolContainer, {
     className: 'control_panel_btn'
 });
 
-const toolSelector = new Selector([pen, highlighter, eraser], 'control_panel_btn_selected');
-toolSelector.select(pen);
+const toolSelector = new Selector([hand, pen, highlighter, eraser], 'control_panel_btn_selected');
+toolSelector.select(hand);
 
 
 const colors = ['#eeeeee', '#e74c3c', '#f1c40f', '#2ecc71', '#3498db', '#9b59b6', '#333333'];
@@ -128,6 +133,7 @@ const pdfCvs = new Canvas(slide_canvas_container, false);
 /* ----------------------
    Tool Buttons
 ---------------------- */
+hand.onClick(() => annCvs.setPointerMode('hand'));
 pen.onClick(() => annCvs.setPointerMode('draw'));
 highlighter.onClick(() => annCvs.setPointerMode('highlight'));
 eraser.onClick(() => annCvs.setPointerMode('erase'));
@@ -194,7 +200,7 @@ uploadBtn.onClick(() => {
 
 let zipFile = null;
 let config = null;
-let resources = { videos: {}, audio: {}, slides: {} };
+let resources = { videos: {}, audio: {}, models: {}, slides: {} };
 let annotations = {};
 let currentSlide = 0
 
@@ -229,6 +235,12 @@ fileInput.addEventListener("change", async (e) => {
         resources.audio[id] = URL.createObjectURL(blob);
     }
 
+    // Models
+    for (const [id, path] of Object.entries(config.resources.models)) {
+        const blob = await zipFile.file(path).async("blob");
+        resources.models[id] = URL.createObjectURL(blob);
+    }
+
     // Slides
     const pdfFile = zipFile.file("slides.pdf");
     if (!pdfFile) {
@@ -261,6 +273,8 @@ async function renderSlide(slideIndex) {
 
     // --- Add video elements ---
     [...slide_canvas_container.querySelectorAll("video")].forEach(v => v.remove());
+    [...slide_canvas_container.querySelectorAll("model-viewer")].forEach(m => m.remove());
+    [...slide_canvas_container.querySelectorAll("audio")].forEach(a => a.remove());
 
     config.slides[slideIndex].videos.forEach(v => {
         const videoURL = resources.videos[v.id];
@@ -276,12 +290,42 @@ async function renderSlide(slideIndex) {
         video.muted = true;
         video.playbackRate = v.playbackRate;
         video.addEventListener("click", () => video.play());
-        if (v.playMode === "auto") video.autoplay = true;
+        if (v.playMode === "once") {
+            video.autoplay = true;
+        }
+
+        if (v.playMode === "loop") {
+            video.autoplay = true;
+            video.loop = true;
+        }
         video.controls = false;
 
         // attach to pdfCanvas container
         slide_canvas_container.appendChild(video);
     });
+
+    // --- Add model elements ---
+    config.slides[slideIndex].models.forEach(m => {
+        const modelURL = resources.models[m.id];
+
+        const mv = document.createElement("model-viewer");
+        mv.src = modelURL;
+        mv.alt = m.alt || "3D model";
+        mv.setAttribute("shadow-intensity", "1");
+        mv.setAttribute("camera-controls", "");
+
+        // absolute positioning
+        mv.style.position = "absolute";
+        mv.style.left = `${m.x * pdfCvs.canvas.width}px`;
+        mv.style.top = `${m.y * pdfCvs.canvas.height}px`;
+        mv.style.width = `${m.width * pdfCvs.canvas.width}px`;
+        mv.style.height = `${m.height * pdfCvs.canvas.height}px`;
+        mv.style.zIndex = m.zIndex;
+
+        // attach to container
+        slide_canvas_container.appendChild(mv);
+    });
+
 
     // --- Add audio elements ---
     config.slides[slideIndex].audio.forEach(a => {

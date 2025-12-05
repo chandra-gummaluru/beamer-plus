@@ -6,7 +6,7 @@ export class Canvas {
         this.canvas = document.createElement('canvas');
         this.canvas.width = container.offsetWidth;
         this.canvas.height = container.offsetHeight;
-        this.pointer_mode = 'draw';
+        this.pointer_mode = 'hand';
         container.appendChild(this.canvas);
 
         // get 2D context
@@ -96,6 +96,10 @@ export class Canvas {
     }
 
     startDraw(e) {
+        if (this.pointer_mode === "hand") {
+            return;
+        }
+
         e.preventDefault();
         this.drawing = true;
 
@@ -148,6 +152,10 @@ export class Canvas {
 
 
     draw(e) {
+        if (this.pointer_mode === "hand") {
+            return;
+        }
+
         if (!this.drawing) return;
         e.preventDefault();
         const p = this.getPos(e);
@@ -166,6 +174,10 @@ export class Canvas {
     }
 
     stopDraw(e) {
+        if (this.pointer_mode === "hand") {
+            return;
+        }
+
         if (!this.drawing) return;
         e.preventDefault();
         this.drawing = false;

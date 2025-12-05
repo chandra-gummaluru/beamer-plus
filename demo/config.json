@@ -8,6 +8,9 @@
     },
     "audio": {
       "a1": "audio/audio.mp3"
+    },
+    "models": {
+      "m1": "models/3dmodel.glb"
     }
   },
 
@@ -15,10 +18,23 @@
     {
       "page": 1,
       "videos": [],
-      "audio": []
+      "audio": [],
+      "models": []
     },
     {
       "page": 2,
+      "videos": [],
+      "audio": [],
+      "models": []
+    },
+    {
+      "page": 3,
+      "videos": [],
+      "audio": [],
+      "models": []
+    },
+    {
+      "page": 4,
       "videos": [
         {
           "id": "v2",
@@ -28,16 +44,59 @@
           "playbackRate": 1.0,
           "zIndex": 5,
           "volume": 1.0,
-          "playMode": "auto"
+          "playMode": "once"
+        },
+        {
+          "id": "v2",
+          "x": 0.37,
+          "y": 0.4,
+          "width": 0.25,
+          "playbackRate": 1.0,
+          "zIndex": 5,
+          "volume": 1.0,
+          "playMode": "loop"
+        },
+        {
+          "id": "v2",
+          "x": 0.68,
+          "y": 0.4,
+          "width": 0.25,
+          "playbackRate": 1.0,
+          "zIndex": 5,
+          "volume": 1.0,
+          "playMode": "click"
         }
       ],
+      "audio": [],
+      "models": []
+    },
+    {
+      "page": 5,
+      "videos": [],
+      "audio": [],
+      "models": [
+        {
+          "id": "m1",
+          "x": 0.3,
+          "y": 0.25,
+          "width": 0.4,
+          "height": 0.5,
+          "zIndex": 20
+        }
+      ]
+    },
+    {
+      "page": 6,
+      "videos": [],
       "audio": [
         {
           "id": "a1",
           "volume": 1.0,
           "playMode": "auto"
         }
-      ]
+      ],
+      "models": []
     }
+    
   ]
 }
