@@ -8,5 +8,10 @@
  * @returns {string[]} - The generated summaries
  */
 function summarize(answers, numSummaries, model) {
-    return model.summarize(answers, numSummaries)
+    allTheSummaries =  model.summarize(answers)
+    topSummaries = []
+    for (i = 0; i < numSummaries; i++) {
+        topSummaries.push(allTheSummaries[i])
+    }
+    return topSummaries
 }
