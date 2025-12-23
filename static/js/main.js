@@ -2,7 +2,7 @@ import { Timer } from './timer.js';
 import { Label } from './label.js';
 import { Button } from './button.js';
 import { Selector } from './selector.js';
-import { Toggle } from './Toggle.js';
+import { Toggle } from './toggle.js';
 import { Canvas } from './canvas.js';
 
 const socket = io();

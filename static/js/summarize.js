@@ -5,13 +5,8 @@
  * @param {string[]} answers - all answers by the viewers
  * @param {number} numSummaries - the number of summaries to generate
  * @param {Model} model - the LLM model
- * @returns {string[]} - The generated summaries
+ * @returns {string} - The generated summaries
  */
 function summarize(answers, numSummaries, model) {
-    allTheSummaries =  model.summarize(answers)
-    topSummaries = []
-    for (i = 0; i < numSummaries; i++) {
-        topSummaries.push(allTheSummaries[i])
-    }
-    return topSummaries
+    return model.summarize(answers, numSummaries)
 }
