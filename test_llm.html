@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Testing the LLM</title>
+    <style>
+        body { font-family: sans-serif; background: #f4f4f9; display: flex; flex-direction: column; align-items: center; height: 100vh; margin: 0; }
+        #chat-container { width: 80%; max-width: 600px; background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top: 50px; display: flex; flex-direction: column; height: 70vh; }
+        #messages { flex: 1; overflow-y: auto; padding: 20px; border-bottom: 1px solid #eee; }
+        .message { margin-bottom: 15px; padding: 10px; border-radius: 5px; }
+        .user { background: #e3f2fd; align-self: flex-end; }
+        .bot { background: #f1f1f1; align-self: flex-start; white-space: pre-wrap; }
+        #input-area { padding: 20px; display: flex; gap: 10px; }
+        input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:disabled { background: #ccc; }
+    </style>
+</head>
+<body>
+    <h1>Testing the LLM</h1>
+    <div id="chat-container">
+        <div id="messages"></div>
+        <div id="input-area">
+            <input type="text" id="userInput" placeholder="Ask the local model..." onkeypress="if(event.key === 'Enter') sendQuery()">
+            <button id="sendBtn" onclick="sendQuery()">Send</button>
+        </div>
+    </div>
+
+    <script>
+        const messagesDiv = document.getElementById('messages');
+        const userInput = document.getElementById('userInput');
+        const sendBtn = document.getElementById('sendBtn');
+
+        function addMessage(text, sender) {
+            const div = document.createElement('div');
+            div.className = `message ${sender}`;
+            div.innerText = text;
+            messagesDiv.appendChild(div);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        async function sendQuery() {
+            const text = userInput.value.trim();
+            if (!text) return;
+
+            // 1. Show user message and clear input
+            addMessage(text, 'user');
+            userInput.value = '';
+            
+            // 2. Disable button while waiting
+            sendBtn.disabled = true;
+            addMessage("Thinking...", 'bot');
+            const lastMsg = messagesDiv.lastChild;
+
+            try {
+                // 3. Call the /ask route in app.py
+                const res = await fetch('/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
+                
+                const data = await res.json();
+                
+                // 4. Replace "Thinking..." with actual response
+                lastMsg.innerText = data.response || "Error: No response from model.";
+            } catch (err) {
+                lastMsg.innerText = "Error: Could not reach the server.";
+            } finally {
+                sendBtn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
