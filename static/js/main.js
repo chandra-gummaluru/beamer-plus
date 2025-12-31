@@ -286,12 +286,32 @@ async function renderSlide(slideIndex) {
     );
 
     const scaledViewport = page.getViewport({ scale });
+    const dpr = window.devicePixelRatio || 1;
 
-    pdfCvs.canvas.width = scaledViewport.width;
-    pdfCvs.canvas.height = scaledViewport.height;
+    // Store old canvas size for scaling annotations
+    const oldWidth = annCvs.canvas.width;
+    const oldHeight = annCvs.canvas.height;
+    
+    // Save current annotations if they exist (before resizing)
+    let currentAnnotations = null;
+    if (oldWidth > 0 && oldHeight > 0) {
+        currentAnnotations = annCvs.canvas.toDataURL("image/png");
+    }
 
-    annCvs.canvas.width = scaledViewport.width;
-    annCvs.canvas.height = scaledViewport.height;
+    // Set canvas internal resolution (accounting for DPR for sharp rendering)
+    pdfCvs.canvas.width = scaledViewport.width * dpr;
+    pdfCvs.canvas.height = scaledViewport.height * dpr;
+    
+    // Get fresh context and scale for DPR
+    pdfCvs.ctx = pdfCvs.canvas.getContext('2d');
+    pdfCvs.ctx.scale(dpr, dpr);
+
+    annCvs.canvas.width = scaledViewport.width * dpr;
+    annCvs.canvas.height = scaledViewport.height * dpr;
+    
+    // Get fresh context and scale for DPR
+    annCvs.ctx = annCvs.canvas.getContext('2d');
+    annCvs.ctx.scale(dpr, dpr);
 
     const renderContext = {
         canvasContext: pdfCvs.ctx,
@@ -300,13 +320,15 @@ async function renderSlide(slideIndex) {
 
     await page.render(renderContext).promise;
 
-    // Load saved annotations
-    if (annotations[slideIndex]) {
+    // Load saved annotations and scale them to new size
+    const annotationToLoad = currentAnnotations || annotations[slideIndex];
+    if (annotationToLoad) {
         const img = new Image();
         img.onload = () => {
-            annCvs.ctx.drawImage(img, 0, 0);
+            annCvs.ctx.clearRect(0, 0, scaledViewport.width, scaledViewport.height);
+            annCvs.ctx.drawImage(img, 0, 0, scaledViewport.width, scaledViewport.height);
         };
-        img.src = annotations[slideIndex];
+        img.src = annotationToLoad;
     } else {
         annCvs.clear();
     }

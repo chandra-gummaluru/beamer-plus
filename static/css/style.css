@@ -123,6 +123,12 @@ justify-content: center; /* center its children */
   aspect-ratio: 4 / 3;
 }
 
+#pdf-canvas canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+
 #ann-canvas {
   position: absolute;
   z-index: 2; /* top */
@@ -131,6 +137,12 @@ justify-content: center; /* center its children */
 
   height: 95%;
   aspect-ratio: 4 / 3;
+}
+
+#ann-canvas canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
 }
 
 .color-swatch {
