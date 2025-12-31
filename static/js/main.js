@@ -164,10 +164,54 @@ uploadBtn.onClick(() => {
 });
 
 let zipFile = null;
-let config = null;
-let resources = { videos: {}, audio: {}, models: {}, slides: {} };
+let slideConfigs = {}; // Store configs per slide
+let mediaCache = {}; // Cache media files as we need them
 let annotations = {};
-let currentSlide = 0
+let currentSlide = 0;
+let totalSlides = 0;
+
+// Load a specific slide's config from the ZIP
+async function loadSlideConfig(slideIndex) {
+    if (slideConfigs[slideIndex]) {
+        return slideConfigs[slideIndex]; // Already loaded
+    }
+    
+    const configFileName = `config/s${slideIndex}.json`;
+    const configFile = zipFile.file(configFileName);
+    
+    if (!configFile) {
+        // No config for this slide = no media
+        slideConfigs[slideIndex] = null;
+        return null;
+    }
+    
+    const configText = await configFile.async("string");
+    const config = JSON.parse(configText);
+    slideConfigs[slideIndex] = config;
+    
+    console.log(`Loaded config for slide ${slideIndex}:`, config);
+    return config;
+}
+
+// Load media file from path (with caching)
+async function loadMediaFromPath(path) {
+    if (mediaCache[path]) {
+        return mediaCache[path]; // Already loaded
+    }
+    
+    const file = zipFile.file(path);
+    if (!file) {
+        console.error(`Media file not found: ${path}`);
+        return null;
+    }
+    
+    const blob = await file.async("blob");
+    const url = URL.createObjectURL(blob);
+    mediaCache[path] = url;
+    
+    console.log(`Loaded media: ${path}`);
+    return url;
+}
 
 // Real-time sync
 let annotationSyncTimeout = null;
@@ -187,7 +231,7 @@ function syncAnnotations() {
 
 // ADDED: Responsive resize
 function resizeCanvases() {
-    if (config && currentSlide !== null) {
+    if (totalSlides > 0 && currentSlide !== null) {
         renderSlide(currentSlide);
     }
 }
@@ -200,246 +244,196 @@ fileInput.addEventListener("change", async (e) => {
     const arrayBuffer = await file.arrayBuffer();
     zipFile = await JSZip.loadAsync(arrayBuffer);
 
-    const configFile = zipFile.file("config.json");
-    if (!configFile) {
-        console.error("No config.json found in ZIP!");
-        return;
-    }
-
-    const configText = await configFile.async("string");
-    config = JSON.parse(configText);
-    console.log("Loaded config:", config);
-
-    for (const [id, path] of Object.entries(config.resources.videos)) {
-        const blob = await zipFile.file(path).async("blob");
-        resources.videos[id] = URL.createObjectURL(blob);
-    }
-
-    for (const [id, path] of Object.entries(config.resources.audio)) {
-        const blob = await zipFile.file(path).async("blob");
-        resources.audio[id] = URL.createObjectURL(blob);
-    }
-
-    for (const [id, path] of Object.entries(config.resources.models)) {
-        const blob = await zipFile.file(path).async("blob");
-        resources.models[id] = URL.createObjectURL(blob);
-    }
+    // Clear previous data
+    slideConfigs = {};
+    mediaCache = {};
+    annotations = {};
+    currentSlide = 0;
 
     const pdfFile = zipFile.file("slides.pdf");
     if (!pdfFile) {
         console.error("slides.pdf not found in ZIP!");
-    } else {
-        const pdfData = await pdfFile.async("arraybuffer");
-        const pdfDoc = await pdfjsLib.getDocument({ data: pdfData }).promise;
-        const numPages = pdfDoc.numPages;
-
-        for (let i = 1; i <= numPages; i++) {
-            const page = await pdfDoc.getPage(i);
-            resources.slides[i-1] = page;
-        }
-
-        console.log("All resources loaded:", resources);
-
-        // Upload ZIP to server for viewers
-        const formData = new FormData();
-        formData.append('file', file);
-        await fetch('/api/presentation/upload', {
-            method: 'POST',
-            body: formData
-        });
-
-        // Notify viewers to load the presentation
-        socket.emit('presentation_loaded', {
-            slideCount: config.slides.length
-        });
-
-        console.log("About to render slide:", currentSlide);
-        await renderSlide(currentSlide);
-        console.log("Finished rendering slide");
-        
-        // Send initial slide index to viewers
-        const annImage = annCvs.canvas.toDataURL("image/png");
-        socket.emit('slide_change', {
-            slideIndex: currentSlide,
-            annotations: annImage
-        });
+        return;
     }
 
+    const pdfData = await pdfFile.async("arraybuffer");
+    const pdfDoc = await pdfjsLib.getDocument({ data: pdfData }).promise;
+    totalSlides = pdfDoc.numPages;
+    
+    console.log(`Loaded presentation with ${totalSlides} slides`);
+
+    // Store PDF for rendering
+    window.pdfDoc = pdfDoc;
+
+    renderSlide(0);
+    
+    // Notify viewers
+    socket.emit('presentation_loaded', { totalSlides });
 });
 
 
 async function renderSlide(slideIndex) {
-    console.log("renderSlide called with index:", slideIndex);
-    console.log("PDF slide exists?", !!resources.slides[slideIndex]);
-    console.log("Config exists?", !!config);
-    
-    await pdfCvs.renderPDFPage(resources.slides[slideIndex]);
-    console.log("PDF rendered");
+    const page = await window.pdfDoc.getPage(slideIndex + 1);
 
-    [...slide_canvas_container.querySelectorAll("video")].forEach(v => v.remove());
-    [...slide_canvas_container.querySelectorAll("model-viewer")].forEach(m => m.remove());
-    [...slide_canvas_container.querySelectorAll("audio")].forEach(a => a.remove());
+    const container = document.getElementById('pdf-canvas');
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
 
-    console.log("Rendering", config.slides[slideIndex].videos.length, "videos");
-    
-    // FIXED: Better video handling with sync
-    config.slides[slideIndex].videos.forEach(v => {
-        const videoURL = resources.videos[v.id];
-        const video = document.createElement("video");
-        video.src = videoURL;
-        video.dataset.videoId = v.id; // Add ID for syncing
-        video.style.position = "absolute";
-        video.style.left = `${v.x * pdfCvs.getDisplayWidth()}px`;
-        video.style.top = `${v.y * pdfCvs.getDisplayHeight()}px`;
-        video.style.width = `${v.width * pdfCvs.getDisplayWidth()}px`;
-        video.style.height = `${v.height * pdfCvs.getDisplayHeight()}px`;
-        video.style.zIndex = v.zIndex;
-        video.style.cursor = 'pointer';
-        video.style.objectFit = "contain";
-        video.style.pointerEvents = 'auto';
-        video.volume = v.volume;
-        video.muted = false;
-        video.playbackRate = v.playbackRate;
-    
-        // Click handler for ALL videos - broadcast to viewers
-        video.addEventListener("click", (e) => {
-            e.stopPropagation();
-            console.log('Video clicked, video ID:', v.id);
-            if (video.paused) {
-                video.play().catch(err => console.log('Play failed:', err));
-                console.log('Emitting video_action: play');
-                socket.emit('video_action', {
-                    slideIndex: currentSlide,
-                    videoId: v.id,
-                    action: 'play',
-                    currentTime: video.currentTime
-                });
-            } else {
-                video.pause();
-                console.log('Emitting video_action: pause');
-                socket.emit('video_action', {
-                    slideIndex: currentSlide,
-                    videoId: v.id,
-                    action: 'pause',
-                    currentTime: video.currentTime
-                });
-            }
-        });
+    const viewport = page.getViewport({ scale: 1 });
+    const scale = Math.min(
+        containerWidth / viewport.width,
+        containerHeight / viewport.height
+    );
 
-        if (v.playMode === "click") {
-            video.autoplay = false;
-        }
+    const scaledViewport = page.getViewport({ scale });
 
-        if (v.playMode === "once") {
-            video.autoplay = true;
-            video.loop = false;
-            // Emit play action when video autoplays
-            video.addEventListener('play', () => {
-                socket.emit('video_action', {
-                    slideIndex: currentSlide,
-                    videoId: v.id,
-                    action: 'play',
-                    currentTime: video.currentTime
-                });
-            }, { once: true });
-        }
+    pdfCvs.canvas.width = scaledViewport.width;
+    pdfCvs.canvas.height = scaledViewport.height;
 
-        if (v.playMode === "loop") {
-            video.autoplay = true;
-            video.loop = true;
-            // Emit play action when video autoplays
-            video.addEventListener('play', () => {
-                socket.emit('video_action', {
-                    slideIndex: currentSlide,
-                    videoId: v.id,
-                    action: 'play',
-                    currentTime: video.currentTime
-                });
-            }, { once: true });
-        }
+    annCvs.canvas.width = scaledViewport.width;
+    annCvs.canvas.height = scaledViewport.height;
 
-        video.controls = false;
+    const renderContext = {
+        canvasContext: pdfCvs.ctx,
+        viewport: scaledViewport
+    };
 
-        slide_canvas_container.appendChild(video);
-    });
+    await page.render(renderContext).promise;
 
-    // FIXED: 3D models with interactivity and sync
-    config.slides[slideIndex].models.forEach(m => {
-        const modelURL = resources.models[m.id];
-
-        const mv = document.createElement("model-viewer");
-        mv.src = modelURL;
-        mv.alt = m.alt || "3D model";
-        mv.dataset.modelId = m.id; // Add ID for syncing
-        mv.setAttribute("shadow-intensity", "1");
-        mv.setAttribute("camera-controls", "");
-        mv.setAttribute("touch-action", "pan-y");
-        mv.setAttribute("auto-rotate", "");
-
-        mv.style.position = "absolute";
-        mv.style.left = `${m.x * pdfCvs.getDisplayWidth()}px`;
-        mv.style.top = `${m.y * pdfCvs.getDisplayHeight()}px`;
-        mv.style.width = `${m.width * pdfCvs.getDisplayWidth()}px`;
-        mv.style.height = `${m.height * pdfCvs.getDisplayHeight()}px`;
-        mv.style.zIndex = m.zIndex;
-        mv.style.pointerEvents = 'auto';
-
-        // Sync camera changes to viewers
-        mv.addEventListener('camera-change', () => {
-            const camera = mv.getCameraOrbit();
-            const target = mv.getCameraTarget();
-            socket.emit('model_interaction', {
-                slideIndex: currentSlide,
-                modelId: m.id,
-                camera: {
-                    theta: camera.theta,
-                    phi: camera.phi,
-                    radius: camera.radius
-                },
-                target: {
-                    x: target.x,
-                    y: target.y,
-                    z: target.z
-                }
-            });
-        });
-
-        slide_canvas_container.appendChild(mv);
-    });
-
-
-    config.slides[slideIndex].audio.forEach(a => {
-        const audioURL = resources.audio[a.id];
-        const audio = document.createElement("audio");
-        audio.src = audioURL;
-        audio.volume = a.volume;
-        if (a.playMode === "auto") audio.play();
-        slide_canvas_container.appendChild(audio);
-    });
-
+    // Load saved annotations
     if (annotations[slideIndex]) {
-        annCvs.ctx.clearRect(0, 0, annCvs.canvas.width, annCvs.canvas.height);
-        annCvs.ctx.putImageData(annotations[slideIndex], 0, 0);
+        const img = new Image();
+        img.onload = () => {
+            annCvs.ctx.drawImage(img, 0, 0);
+        };
+        img.src = annotations[slideIndex];
     } else {
         annCvs.clear();
     }
 
+    // Load and render slide-specific config
+    const slideConfig = await loadSlideConfig(slideIndex);
+    await renderSlideMedia(slideConfig, scaledViewport);
+}
+
+async function renderSlideMedia(config, viewport) {
+    // Clean up previous media
+    cleanupSlideMedia();
+
+    if (!config) {
+        return; // No media for this slide
+    }
+
+    const container = document.getElementById('pdf-canvas');
+
+    // Render videos
+    if (config.videos) {
+        for (const videoConfig of config.videos) {
+            const url = await loadMediaFromPath(videoConfig.path);
+            if (!url) continue;
+
+            const video = document.createElement('video');
+            video.src = url;
+            video.style.position = 'absolute';
+            video.style.left = `${videoConfig.x * viewport.width}px`;
+            video.style.top = `${videoConfig.y * viewport.height}px`;
+            video.style.width = `${videoConfig.width * viewport.width}px`;
+            video.style.height = `${videoConfig.height * viewport.height}px`;
+            video.style.zIndex = videoConfig.zIndex || 5;
+            video.volume = videoConfig.volume || 1.0;
+            video.playbackRate = videoConfig.playbackRate || 1.0;
+
+            if (videoConfig.playMode === 'auto' || videoConfig.playMode === 'once') {
+                video.play();
+            } else if (videoConfig.playMode === 'loop') {
+                video.loop = true;
+                video.play();
+            } else if (videoConfig.playMode === 'click') {
+                video.addEventListener('click', () => {
+                    if (video.paused) video.play();
+                    else video.pause();
+                });
+            }
+
+            container.appendChild(video);
+        }
+    }
+
+    // Render audio
+    if (config.audio) {
+        for (const audioConfig of config.audio) {
+            const url = await loadMediaFromPath(audioConfig.path);
+            if (!url) continue;
+
+            const audio = new Audio(url);
+            audio.volume = audioConfig.volume || 1.0;
+
+            if (audioConfig.playMode === 'auto') {
+                audio.play();
+            }
+
+            container.appendChild(audio);
+        }
+    }
+
+    // Render 3D models
+    if (config.models) {
+        for (const modelConfig of config.models) {
+            const url = await loadMediaFromPath(modelConfig.path);
+            if (!url) continue;
+
+            const modelViewer = document.createElement('model-viewer');
+            modelViewer.src = url;
+            modelViewer.style.position = 'absolute';
+            modelViewer.style.left = `${modelConfig.x * viewport.width}px`;
+            modelViewer.style.top = `${modelConfig.y * viewport.height}px`;
+            modelViewer.style.width = `${modelConfig.width * viewport.width}px`;
+            modelViewer.style.height = `${modelConfig.height * viewport.height}px`;
+            modelViewer.style.zIndex = modelConfig.zIndex || 20;
+            modelViewer.setAttribute('camera-controls', '');
+            modelViewer.setAttribute('auto-rotate', '');
+
+            container.appendChild(modelViewer);
+        }
+    }
+
     // Render widgets
-    cleanupWidgets(slide_canvas_container);
-    renderWidgets(
-        config.slides[slideIndex],
-        slide_canvas_container,
-        () => pdfCvs.getDisplayWidth(),
-        () => pdfCvs.getDisplayHeight(),
-        zipFile  // ← Important: pass the zipFile!
-    );
+    if (config.widgets) {
+        renderWidgets(
+            config,
+            container,
+            () => viewport.width,
+            () => viewport.height,
+            zipFile
+        );
+    }
+}
+
+function cleanupSlideMedia() {
+    const container = document.getElementById('pdf-canvas');
+    
+    // Remove all video elements
+    container.querySelectorAll('video').forEach(el => {
+        el.pause();
+        el.remove();
+    });
+    
+    // Remove all audio elements
+    container.querySelectorAll('audio').forEach(el => {
+        el.pause();
+        el.remove();
+    });
+    
+    // Remove all model-viewer elements
+    container.querySelectorAll('model-viewer').forEach(el => el.remove());
+    
+    // Clean up widgets
+    cleanupWidgets(container);
 }
 
 prevBtn.onClick(async () => {
     if (currentSlide > 0) {
-        annotations[currentSlide] = annCvs.ctx.getImageData(
-            0, 0, annCvs.canvas.width, annCvs.canvas.height
-        );
+        annotations[currentSlide] = annCvs.canvas.toDataURL("image/png");
         currentSlide--;
         await renderSlide(currentSlide);
         const annImage = annCvs.canvas.toDataURL("image/png");
@@ -451,12 +445,12 @@ prevBtn.onClick(async () => {
 });
 
 document.addEventListener('keydown', async (event) => {
+    if (resultsOverlayVisible) return; // Don't navigate if overlay is visible
+    
     if (event.key === 'ArrowLeft') {
         if (currentSlide > 0) {
             // Save current annotations
-            annotations[currentSlide] = annCvs.ctx.getImageData(
-                0, 0, annCvs.canvas.width, annCvs.canvas.height
-            );
+            annotations[currentSlide] = annCvs.canvas.toDataURL("image/png");
             currentSlide--;
             await renderSlide(currentSlide);
 
@@ -471,10 +465,8 @@ document.addEventListener('keydown', async (event) => {
 });
 
 nextBtn.onClick(async () => {
-    if (currentSlide < config.slides.length - 1) {
-        annotations[currentSlide] = annCvs.ctx.getImageData(
-            0, 0, annCvs.canvas.width, annCvs.canvas.height
-        );
+    if (currentSlide < totalSlides - 1) {
+        annotations[currentSlide] = annCvs.canvas.toDataURL("image/png");
         currentSlide++;
         await renderSlide(currentSlide);
 
@@ -487,12 +479,12 @@ nextBtn.onClick(async () => {
 });
 
 document.addEventListener('keydown', async (event) => {
+    if (resultsOverlayVisible) return; // Don't navigate if overlay is visible
+    
     if (event.key === 'ArrowRight') {
-        if (currentSlide < config.slides.length - 1) {
+        if (currentSlide < totalSlides - 1) {
             // Save current annotations
-            annotations[currentSlide] = annCvs.ctx.getImageData(
-                0, 0, annCvs.canvas.width, annCvs.canvas.height
-            );
+            annotations[currentSlide] = annCvs.canvas.toDataURL("image/png");
             currentSlide++;
             await renderSlide(currentSlide);
 

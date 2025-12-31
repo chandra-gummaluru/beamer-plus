@@ -1,0 +1,25 @@
+{
+  "widgets": [
+    {
+      "id": "exponential_demo",
+      "type": "function-plotter",
+      "x": 0.05,
+      "y": 0.1,
+      "width": 0.9,
+      "height": 0.8,
+      "zIndex": 10,
+      "functions": [
+        "e^x",
+        "log(x)",
+        ""
+      ],
+      "xmin": -3,
+      "xmax": 5,
+      "ymin": -3,
+      "ymax": 10,
+      "showGrid": true,
+      "autoPlot": true,
+      "interactive": true
+    }
+  ]
+}
