@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Survey Not Found</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Georgia', 'Times New Roman', serif;
+      background: #fcfcfc;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .survey-container {
+      background: #eeeeee;
+      border: 2px solid #666;
+      border-radius: 4px;
+      padding: 2rem;
+      max-width: 600px;
+      width: 100%;
+      text-align: center;
+    }
+    .icon {
+      font-size: 3rem;
+      color: #999;
+      margin-bottom: 1rem;
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 1rem;
+      font-size: 1.5rem;
+      font-weight: normal;
+    }
+    .message {
+      color: #666;
+      font-size: 1rem;
+      margin-bottom: 1.5rem;
+      line-height: 1.6;
+    }
+    .suggestion {
+      color: #888;
+      font-size: 0.9rem;
+      font-style: italic;
+      margin-bottom: 1.5rem;
+    }
+    a.back-link {
+      display: inline-block;
+      background: #666;
+      color: #eee;
+      border: 2px solid #666;
+      padding: 0.75rem 1.5rem;
+      border-radius: 4px;
+      font-size: 1rem;
+      font-family: 'Georgia', 'Times New Roman', serif;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    a.back-link:hover {
+      background: #555;
+      border-color: #555;
+    }
+  </style>
+</head>
+<body>
+  <div class="survey-container">
+    <h1>Survey Not Found</h1>
+    <p class="message">
+      The survey you're looking for doesn't exist or may have been removed.
+    </p>
+    <p class="suggestion">
+      Please check the link and try again.
+    </p>
+  </div>
+</body>
+</html>
