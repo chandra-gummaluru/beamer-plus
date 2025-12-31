@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Function Plotter Widget</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Open Sans', sans-serif;
+    }
+
+    #widget-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      background: #ffffff;
+      border: 2px solid #666;
+      border-radius: 4px;
+    }
+
+    #toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      background: #eee;
+      border-bottom: 2px solid #666;
+      flex-wrap: wrap;
+    }
+
+    #function-inputs {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1;
+      min-width: 300px;
+    }
+
+    .function-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .color-indicator {
+      width: 20px;
+      height: 20px;
+      border: 2px solid #666;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      padding: 6px 10px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      border: 2px solid #666;
+      border-radius: 4px;
+      background: white;
+    }
+
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #3498db;
+    }
+
+    button {
+      padding: 0.5em 1em;
+      font-family: 'Georgia', 'Times New Roman', serif;
+      font-size: 0.9rem;
+      color: #666;
+      background-color: #ffffff;
+      border: 2px solid #666;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      white-space: nowrap;
+    }
+
+    button:hover {
+      background-color: #bbbbbb;
+    }
+
+    button.active {
+      background-color: #3498db;
+      color: white;
+      border-color: #3498db;
+    }
+
+    #plot-btn {
+      background-color: #2ecc71;
+      color: white;
+      font-weight: bold;
+    }
+
+    #plot-btn:hover {
+      background-color: #27ae60;
+    }
+
+    #controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    label {
+      font-size: 0.85rem;
+      color: #666;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    input[type="number"] {
+      width: 60px;
+      padding: 4px 6px;
+      border: 2px solid #666;
+      border-radius: 4px;
+      font-size: 0.85rem;
+    }
+
+    #canvas-container {
+      flex: 1;
+      position: relative;
+      background: #fafafa;
+      overflow: hidden;
+    }
+
+    #canvas {
+      display: block;
+      cursor: grab;
+    }
+
+    #canvas.dragging {
+      cursor: grabbing;
+    }
+
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 8px 12px;
+      border: 1px solid #666;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      color: #666;
+      font-family: 'Courier New', monospace;
+      pointer-events: none;
+    }
+
+    #zoom-hint {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 6px 10px;
+      border: 1px solid #666;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      color: #666;
+      pointer-events: none;
+    }
+
+    .error {
+      color: #e74c3c;
+      font-size: 0.85rem;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div id="widget-container">
+    <div id="toolbar">
+      <div id="function-inputs">
+        <div class="function-row">
+          <div class="color-indicator" style="background: #e74c3c;" data-index="0"></div>
+          <input type="text" id="func1" placeholder="e.g., sin(x), x^2, sqrt(x)" value="sin(x)">
+        </div>
+        <div class="function-row">
+          <div class="color-indicator" style="background: #3498db;" data-index="1"></div>
+          <input type="text" id="func2" placeholder="Second function (optional)" value="">
+        </div>
+        <div class="function-row">
+          <div class="color-indicator" style="background: #2ecc71;" data-index="2"></div>
+          <input type="text" id="func3" placeholder="Third function (optional)" value="">
+        </div>
+        <div id="error" class="error"></div>
+      </div>
+
+      <div id="controls">
+        <button id="plot-btn">Plot</button>
+        <button id="clear-btn">Clear</button>
+        <button id="grid-btn" class="active">Grid</button>
+        <button id="reset-btn">Reset View</button>
+        <label>
+          X: <input type="number" id="xmin" value="-10" step="1"> to <input type="number" id="xmax" value="10" step="1">
+        </label>
+        <label>
+          Y: <input type="number" id="ymin" value="-10" step="1"> to <input type="number" id="ymax" value="10" step="1">
+        </label>
+      </div>
+    </div>
+
+    <div id="canvas-container">
+      <canvas id="canvas"></canvas>
+      <div id="info">x: 0.00, y: 0.00</div>
+      <div id="zoom-hint">Scroll to zoom • Drag to pan</div>
+    </div>
+  </div>
+
+  <!-- Math.js for expression evaluation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
+
+  <script>
+    class FunctionPlotter {
+      constructor() {
+        this.canvas = document.getElementById('canvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.info = document.getElementById('info');
+        this.error = document.getElementById('error');
+        
+        this.func1Input = document.getElementById('func1');
+        this.func2Input = document.getElementById('func2');
+        this.func3Input = document.getElementById('func3');
+        
+        this.xminInput = document.getElementById('xmin');
+        this.xmaxInput = document.getElementById('xmax');
+        this.yminInput = document.getElementById('ymin');
+        this.ymaxInput = document.getElementById('ymax');
+        
+        this.plotBtn = document.getElementById('plot-btn');
+        this.clearBtn = document.getElementById('clear-btn');
+        this.gridBtn = document.getElementById('grid-btn');
+        this.resetBtn = document.getElementById('reset-btn');
+        
+        this.colors = ['#e74c3c', '#3498db', '#2ecc71'];
+        this.showGrid = true;
+        
+        // Default view
+        this.xmin = -10;
+        this.xmax = 10;
+        this.ymin = -10;
+        this.ymax = 10;
+        
+        // Pan/zoom state
+        this.isDragging = false;
+        this.dragStartX = 0;
+        this.dragStartY = 0;
+        this.dragStartXmin = 0;
+        this.dragStartXmax = 0;
+        this.dragStartYmin = 0;
+        this.dragStartYmax = 0;
+        
+        this.config = {};
+        
+        this.init();
+      }
+
+      init() {
+        this.setupCanvas();
+        this.setupEvents();
+        this.plot();
+      }
+
+      setupCanvas() {
+        const container = this.canvas.parentElement;
+        const rect = container.getBoundingClientRect();
+        
+        this.canvas.width = rect.width;
+        this.canvas.height = rect.height;
+        
+        window.addEventListener('resize', () => {
+          const rect = container.getBoundingClientRect();
+          this.canvas.width = rect.width;
+          this.canvas.height = rect.height;
+          this.plot();
+        });
+      }
+
+      setupEvents() {
+        this.plotBtn.addEventListener('click', () => this.plot());
+        this.clearBtn.addEventListener('click', () => this.clear());
+        this.gridBtn.addEventListener('click', () => this.toggleGrid());
+        this.resetBtn.addEventListener('click', () => this.resetView());
+        
+        // Plot on Enter key
+        [this.func1Input, this.func2Input, this.func3Input].forEach(input => {
+          input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.plot();
+          });
+        });
+        
+        // Update view on input change
+        [this.xminInput, this.xmaxInput, this.yminInput, this.ymaxInput].forEach(input => {
+          input.addEventListener('change', () => this.updateView());
+        });
+        
+        // Mouse move to show coordinates
+        this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+        
+        // Pan with mouse drag
+        this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
+        this.canvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+        this.canvas.addEventListener('mouseleave', (e) => this.handleMouseUp(e));
+        
+        // Zoom with mouse wheel
+        this.canvas.addEventListener('wheel', (e) => this.handleWheel(e), { passive: false });
+        
+        // Touch events for mobile
+        this.canvas.addEventListener('touchstart', (e) => this.handleTouchStart(e), { passive: false });
+        this.canvas.addEventListener('touchmove', (e) => this.handleTouchMove(e), { passive: false });
+        this.canvas.addEventListener('touchend', (e) => this.handleTouchEnd(e), { passive: false });
+        
+        // Track touch distance for pinch zoom
+        this.lastTouchDistance = null;
+      }
+
+      handleMouseDown(e) {
+        this.isDragging = true;
+        this.canvas.classList.add('dragging');
+        this.dragStartX = e.clientX;
+        this.dragStartY = e.clientY;
+        this.dragStartXmin = this.xmin;
+        this.dragStartXmax = this.xmax;
+        this.dragStartYmin = this.ymin;
+        this.dragStartYmax = this.ymax;
+      }
+
+      handleMouseMove(e) {
+        this.showCoordinates(e);
+        
+        if (this.isDragging) {
+          const rect = this.canvas.getBoundingClientRect();
+          const dx = e.clientX - this.dragStartX;
+          const dy = e.clientY - this.dragStartY;
+          
+          const xRange = this.dragStartXmax - this.dragStartXmin;
+          const yRange = this.dragStartYmax - this.dragStartYmin;
+          
+          const xShift = -(dx / this.canvas.width) * xRange;
+          const yShift = (dy / this.canvas.height) * yRange;
+          
+          this.xmin = this.dragStartXmin + xShift;
+          this.xmax = this.dragStartXmax + xShift;
+          this.ymin = this.dragStartYmin + yShift;
+          this.ymax = this.dragStartYmax + yShift;
+          
+          this.updateInputs();
+          this.plot();
+        }
+      }
+
+      handleMouseUp(e) {
+        this.isDragging = false;
+        this.canvas.classList.remove('dragging');
+      }
+
+      handleWheel(e) {
+        e.preventDefault();
+        
+        const rect = this.canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        
+        // Convert mouse position to graph coordinates
+        const graphX = this.xmin + (mouseX / this.canvas.width) * (this.xmax - this.xmin);
+        const graphY = this.ymax - (mouseY / this.canvas.height) * (this.ymax - this.ymin);
+        
+        // Zoom factor
+        const zoomFactor = e.deltaY > 0 ? 1.1 : 0.9;
+        
+        // Calculate new ranges
+        const xRange = (this.xmax - this.xmin) * zoomFactor;
+        const yRange = (this.ymax - this.ymin) * zoomFactor;
+        
+        // Zoom centered on mouse position
+        const xRatio = (graphX - this.xmin) / (this.xmax - this.xmin);
+        const yRatio = (graphY - this.ymin) / (this.ymax - this.ymin);
+        
+        this.xmin = graphX - xRange * xRatio;
+        this.xmax = graphX + xRange * (1 - xRatio);
+        this.ymin = graphY - yRange * yRatio;
+        this.ymax = graphY + yRange * (1 - yRatio);
+        
+        this.updateInputs();
+        this.plot();
+      }
+
+      handleTouchStart(e) {
+        if (e.touches.length === 1) {
+          // Single touch - pan
+          this.isDragging = true;
+          this.dragStartX = e.touches[0].clientX;
+          this.dragStartY = e.touches[0].clientY;
+          this.dragStartXmin = this.xmin;
+          this.dragStartXmax = this.xmax;
+          this.dragStartYmin = this.ymin;
+          this.dragStartYmax = this.ymax;
+        } else if (e.touches.length === 2) {
+          // Two touches - pinch zoom
+          const dx = e.touches[0].clientX - e.touches[1].clientX;
+          const dy = e.touches[0].clientY - e.touches[1].clientY;
+          this.lastTouchDistance = Math.sqrt(dx * dx + dy * dy);
+        }
+      }
+
+      handleTouchMove(e) {
+        e.preventDefault();
+        
+        if (e.touches.length === 1 && this.isDragging) {
+          // Pan
+          const dx = e.touches[0].clientX - this.dragStartX;
+          const dy = e.touches[0].clientY - this.dragStartY;
+          
+          const xRange = this.dragStartXmax - this.dragStartXmin;
+          const yRange = this.dragStartYmax - this.dragStartYmin;
+          
+          const xShift = -(dx / this.canvas.width) * xRange;
+          const yShift = (dy / this.canvas.height) * yRange;
+          
+          this.xmin = this.dragStartXmin + xShift;
+          this.xmax = this.dragStartXmax + xShift;
+          this.ymin = this.dragStartYmin + yShift;
+          this.ymax = this.dragStartYmax + yShift;
+          
+          this.updateInputs();
+          this.plot();
+        } else if (e.touches.length === 2) {
+          // Pinch zoom
+          const dx = e.touches[0].clientX - e.touches[1].clientX;
+          const dy = e.touches[0].clientY - e.touches[1].clientY;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          if (this.lastTouchDistance) {
+            const zoomFactor = this.lastTouchDistance / distance;
+            
+            const xRange = (this.xmax - this.xmin) * zoomFactor;
+            const yRange = (this.ymax - this.ymin) * zoomFactor;
+            
+            const centerX = (this.xmin + this.xmax) / 2;
+            const centerY = (this.ymin + this.ymax) / 2;
+            
+            this.xmin = centerX - xRange / 2;
+            this.xmax = centerX + xRange / 2;
+            this.ymin = centerY - yRange / 2;
+            this.ymax = centerY + yRange / 2;
+            
+            this.updateInputs();
+            this.plot();
+          }
+          
+          this.lastTouchDistance = distance;
+        }
+      }
+
+      handleTouchEnd(e) {
+        this.isDragging = false;
+        if (e.touches.length < 2) {
+          this.lastTouchDistance = null;
+        }
+      }
+
+      updateInputs() {
+        this.xminInput.value = this.xmin.toFixed(2);
+        this.xmaxInput.value = this.xmax.toFixed(2);
+        this.yminInput.value = this.ymin.toFixed(2);
+        this.ymaxInput.value = this.ymax.toFixed(2);
+      }
+
+      updateView() {
+        this.xmin = parseFloat(this.xminInput.value);
+        this.xmax = parseFloat(this.xmaxInput.value);
+        this.ymin = parseFloat(this.yminInput.value);
+        this.ymax = parseFloat(this.ymaxInput.value);
+        this.plot();
+      }
+
+      resetView() {
+        this.xmin = -10;
+        this.xmax = 10;
+        this.ymin = -10;
+        this.ymax = 10;
+        this.updateInputs();
+        this.plot();
+      }
+
+      toggleGrid() {
+        this.showGrid = !this.showGrid;
+        this.gridBtn.classList.toggle('active', this.showGrid);
+        this.plot();
+      }
+
+      clear() {
+        this.func1Input.value = '';
+        this.func2Input.value = '';
+        this.func3Input.value = '';
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.drawAxes();
+        this.error.textContent = '';
+      }
+
+      showCoordinates(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        const canvasX = e.clientX - rect.left;
+        const canvasY = e.clientY - rect.top;
+        
+        const x = this.xmin + (canvasX / this.canvas.width) * (this.xmax - this.xmin);
+        const y = this.ymax - (canvasY / this.canvas.height) * (this.ymax - this.ymin);
+        
+        this.info.textContent = `x: ${x.toFixed(2)}, y: ${y.toFixed(2)}`;
+      }
+
+      plot() {
+        this.error.textContent = '';
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        if (this.showGrid) {
+          this.drawGrid();
+        }
+        this.drawAxes();
+        
+        const functions = [
+          this.func1Input.value,
+          this.func2Input.value,
+          this.func3Input.value
+        ];
+        
+        functions.forEach((funcStr, index) => {
+          if (funcStr.trim()) {
+            try {
+              this.plotFunction(funcStr, this.colors[index]);
+            } catch (error) {
+              this.error.textContent = `Error in function ${index + 1}: ${error.message}`;
+            }
+          }
+        });
+      }
+
+      plotFunction(funcStr, color) {
+        // Prepare the function using math.js
+        funcStr = funcStr.replace(/\^/g, '^');
+        funcStr = funcStr.replace(/log/g, 'log10');
+        funcStr = funcStr.replace(/ln/g, 'log');
+        
+        const compiledFunc = math.compile(funcStr);
+        
+        this.ctx.strokeStyle = color;
+        this.ctx.lineWidth = 2;
+        this.ctx.beginPath();
+        
+        let firstPoint = true;
+        const step = (this.xmax - this.xmin) / this.canvas.width;
+        
+        for (let x = this.xmin; x <= this.xmax; x += step) {
+          try {
+            const y = compiledFunc.evaluate({ x: x });
+            
+            if (y === undefined || isNaN(y) || !isFinite(y)) continue;
+            if (y < this.ymin || y > this.ymax) continue;
+            
+            const canvasX = ((x - this.xmin) / (this.xmax - this.xmin)) * this.canvas.width;
+            const canvasY = ((this.ymax - y) / (this.ymax - this.ymin)) * this.canvas.height;
+            
+            if (firstPoint) {
+              this.ctx.moveTo(canvasX, canvasY);
+              firstPoint = false;
+            } else {
+              this.ctx.lineTo(canvasX, canvasY);
+            }
+          } catch (error) {
+            firstPoint = true;
+          }
+        }
+        
+        this.ctx.stroke();
+      }
+
+      drawGrid() {
+        this.ctx.strokeStyle = '#e0e0e0';
+        this.ctx.lineWidth = 1;
+        
+        const xStep = (this.xmax - this.xmin) / 10;
+        for (let x = this.xmin; x <= this.xmax; x += xStep) {
+          const canvasX = ((x - this.xmin) / (this.xmax - this.xmin)) * this.canvas.width;
+          this.ctx.beginPath();
+          this.ctx.moveTo(canvasX, 0);
+          this.ctx.lineTo(canvasX, this.canvas.height);
+          this.ctx.stroke();
+        }
+        
+        const yStep = (this.ymax - this.ymin) / 10;
+        for (let y = this.ymin; y <= this.ymax; y += yStep) {
+          const canvasY = ((this.ymax - y) / (this.ymax - this.ymin)) * this.canvas.height;
+          this.ctx.beginPath();
+          this.ctx.moveTo(0, canvasY);
+          this.ctx.lineTo(this.canvas.width, canvasY);
+          this.ctx.stroke();
+        }
+      }
+
+      drawAxes() {
+        this.ctx.strokeStyle = '#666';
+        this.ctx.lineWidth = 2;
+        
+        if (this.ymin <= 0 && this.ymax >= 0) {
+          const y0 = ((this.ymax - 0) / (this.ymax - this.ymin)) * this.canvas.height;
+          this.ctx.beginPath();
+          this.ctx.moveTo(0, y0);
+          this.ctx.lineTo(this.canvas.width, y0);
+          this.ctx.stroke();
+        }
+        
+        if (this.xmin <= 0 && this.xmax >= 0) {
+          const x0 = ((0 - this.xmin) / (this.xmax - this.xmin)) * this.canvas.width;
+          this.ctx.beginPath();
+          this.ctx.moveTo(x0, 0);
+          this.ctx.lineTo(x0, this.canvas.height);
+          this.ctx.stroke();
+        }
+      }
+
+      updateConfig(newConfig) {
+        Object.assign(this.config, newConfig);
+        
+        if (newConfig.functions) {
+          if (newConfig.functions[0]) this.func1Input.value = newConfig.functions[0];
+          if (newConfig.functions[1]) this.func2Input.value = newConfig.functions[1];
+          if (newConfig.functions[2]) this.func3Input.value = newConfig.functions[2];
+        }
+        
+        if (newConfig.xmin !== undefined) {
+          this.xmin = newConfig.xmin;
+          this.xminInput.value = newConfig.xmin;
+        }
+        if (newConfig.xmax !== undefined) {
+          this.xmax = newConfig.xmax;
+          this.xmaxInput.value = newConfig.xmax;
+        }
+        if (newConfig.ymin !== undefined) {
+          this.ymin = newConfig.ymin;
+          this.yminInput.value = newConfig.ymin;
+        }
+        if (newConfig.ymax !== undefined) {
+          this.ymax = newConfig.ymax;
+          this.ymaxInput.value = newConfig.ymax;
+        }
+        
+        if (newConfig.showGrid !== undefined) {
+          this.showGrid = newConfig.showGrid;
+          this.gridBtn.classList.toggle('active', this.showGrid);
+        }
+        
+        if (newConfig.autoPlot) {
+          this.plot();
+        }
+      }
+
+      destroy() {
+        // Cleanup
+      }
+    }
+
+    // Initialize widget
+    const widget = new FunctionPlotter();
+
+    // Receive config from Beamer+
+    window.addEventListener('message', (event) => {
+      if (event.data.type === 'widget-config') {
+        widget.updateConfig(event.data.config);
+      } else if (event.data.type === 'widget-cleanup') {
+        widget.destroy();
+      }
+    });
+  </script>
+</body>
+</html>
