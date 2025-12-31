@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Survey</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Georgia', 'Times New Roman', serif;
+      background: #fcfcfc;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .survey-container {
+      background: #eeeeee;
+      border: 2px solid #666;
+      border-radius: 4px;
+      padding: 2rem;
+      max-width: 600px;
+      width: 100%;
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 1rem;
+      font-size: 1.5rem;
+      font-weight: normal;
+    }
+    .survey-question {
+      color: #666;
+      font-size: 1rem;
+      margin-bottom: 1.5rem;
+      line-height: 1.6;
+    }
+    textarea {
+      width: 100%;
+      min-height: 150px;
+      padding: 0.75rem;
+      border: 2px solid #666;
+      border-radius: 4px;
+      font-family: 'Georgia', 'Times New Roman', serif;
+      font-size: 1rem;
+      resize: vertical;
+      background: white;
+      color: #333;
+    }
+    textarea:focus {
+      outline: none;
+      border-color: #333;
+    }
+    button {
+      background: #666;
+      color: #eee;
+      border: 2px solid #666;
+      padding: 0.75rem 1.5rem;
+      border-radius: 4px;
+      font-size: 1rem;
+      font-family: 'Georgia', 'Times New Roman', serif;
+      cursor: pointer;
+      margin-top: 1rem;
+      width: 100%;
+      transition: all 0.2s;
+    }
+    button:hover {
+      background: #555;
+      border-color: #555;
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .success-message, .error-message {
+      display: none;
+      padding: 1rem;
+      border-radius: 4px;
+      margin-top: 1rem;
+      text-align: center;
+    }
+    .success-message {
+      background: #2ecc71;
+      color: white;
+    }
+    .error-message {
+      background: #e74c3c;
+      color: white;
+    }
+    
+    /* Styled closed state */
+    .closed-container {
+      display: none;
+      text-align: center;
+    }
+    .closed-container .icon {
+      font-size: 3rem;
+      color: #999;
+      margin-bottom: 1rem;
+    }
+    .closed-container h2 {
+      color: #333;
+      margin-bottom: 1rem;
+      font-size: 1.5rem;
+      font-weight: normal;
+    }
+    .closed-container .message {
+      color: #666;
+      font-size: 1rem;
+      margin-bottom: 1.5rem;
+      line-height: 1.6;
+    }
+    .closed-container .suggestion {
+      color: #888;
+      font-size: 0.9rem;
+      font-style: italic;
+      margin-bottom: 1.5rem;
+    }
+    .closed-container a.back-link {
+      display: inline-block;
+      background: #666;
+      color: #eee;
+      border: 2px solid #666;
+      padding: 0.75rem 1.5rem;
+      border-radius: 4px;
+      font-size: 1rem;
+      font-family: 'Georgia', 'Times New Roman', serif;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    .closed-container a.back-link:hover {
+      background: #555;
+      border-color: #555;
+    }
+  </style>
+</head>
+<body>
+  <div class="survey-container">
+    <div id="survey-form">
+      <h1>Share your thoughts...</h1>
+      <textarea id="response" placeholder="Enter your response here..."></textarea>
+      <button id="submit-btn" onclick="submitResponse()">Submit Response</button>
+      
+      <div class="success-message" id="success-message">
+        ✓ Thank you! Your response has been submitted.
+      </div>
+      
+      <div class="error-message" id="error-message">
+        ✗ Error submitting response. Please try again.
+      </div>
+    </div>
+    
+    <div class="closed-container" id="closed-container">
+      <h2>Survey Closed</h2>
+      <p class="message">
+        This survey is no longer accepting responses.
+      </p>
+      <p class="suggestion">
+        Thank you for your interest.
+      </p>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.min.js"></script>
+  <script>
+    const surveyId = window.location.pathname.split('/').pop();
+    let socket;
+    
+    function initSocket() {
+      socket = io();
+      
+      // Join survey room for this specific survey
+      socket.emit('join_survey', { survey_id: surveyId });
+      
+      // Listen for survey close event
+      socket.on('survey_closed', (data) => {
+        if (data.survey_id === surveyId) {
+          showClosedState();
+        }
+      });
+    }
+    
+    async function loadSurvey() {
+      try {
+        const response = await fetch(`/api/survey/${surveyId}`);
+        const data = await response.json();
+        
+        if (!data.active) {
+          showClosedState();
+          return;
+        }
+        
+        if (data.question) {
+          // Update title if custom question exists
+          document.querySelector('#survey-form h1').textContent = data.question;
+        }
+      } catch (error) {
+        console.error('Error loading survey:', error);
+      }
+    }
+    
+    function showClosedState() {
+      document.getElementById('survey-form').style.display = 'none';
+      document.getElementById('closed-container').style.display = 'block';
+    }
+    
+    async function submitResponse() {
+      const responseText = document.getElementById('response').value.trim();
+      
+      if (!responseText) {
+        showError('Please enter a response');
+        return;
+      }
+      
+      const btn = document.getElementById('submit-btn');
+      btn.disabled = true;
+      btn.textContent = 'Submitting...';
+      
+      try {
+        const response = await fetch(`/api/survey/${surveyId}/respond`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ response: responseText })
+        });
+        
+        if (response.ok) {
+          showSuccess();
+          document.getElementById('response').value = '';
+          setTimeout(() => {
+            btn.disabled = false;
+            btn.textContent = 'Submit Another Response';
+            hideMessages();
+          }, 3000);
+        } else if (response.status === 403) {
+          // Survey was closed
+          showClosedState();
+        } else {
+          throw new Error('Submit failed');
+        }
+      } catch (error) {
+        console.error('Error submitting response:', error);
+        showError('Error submitting response. Please try again.');
+        btn.disabled = false;
+        btn.textContent = 'Submit Response';
+      }
+    }
+    
+    function showSuccess() {
+      document.getElementById('success-message').style.display = 'block';
+      document.getElementById('error-message').style.display = 'none';
+    }
+    
+    function showError(message) {
+      document.getElementById('error-message').textContent = message;
+      document.getElementById('error-message').style.display = 'block';
+      document.getElementById('success-message').style.display = 'none';
+    }
+    
+    function hideMessages() {
+      document.getElementById('success-message').style.display = 'none';
+      document.getElementById('error-message').style.display = 'none';
+    }
+    
+    document.addEventListener('DOMContentLoaded', () => {
+      loadSurvey();
+      initSocket();
+      
+      const textarea = document.getElementById('response');
+      textarea.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          submitResponse();
+        }
+      });
+    });
+  </script>
+</body>
+</html>
