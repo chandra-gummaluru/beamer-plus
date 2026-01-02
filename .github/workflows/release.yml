@@ -1,0 +1,91 @@
+name: Build Executables
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Triggers when you push a tag like v1.0.0
+
+permissions:
+  contents: write
+
+jobs:
+  build-executables:
+    name: Build for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            output_name: beamer-plus-linux
+          - os: macos-latest
+            output_name: beamer-plus-macos
+          - os: windows-latest
+            output_name: beamer-plus-windows.exe
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          pip install -r requirements.txt
+
+      - name: Build executable
+        run: |
+          pyinstaller --onefile \
+            --name "${{ matrix.output_name }}" \
+            --add-data "static:static" \
+            --add-data "examples:examples" \
+            --add-data "*.html:." \
+            app.py
+        shell: bash
+
+      - name: Upload executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.output_name }}
+          path: dist/${{ matrix.output_name }}
+
+  create-release:
+    needs: build-executables
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all executables
+        uses: actions/download-artifact@v4
+        with:
+          path: executables
+
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            executables/beamer-plus-linux/beamer-plus-linux
+            executables/beamer-plus-macos/beamer-plus-macos
+            executables/beamer-plus-windows.exe/beamer-plus-windows.exe
+          body: |
+            ## Download and Run
+            
+            Choose the executable for your operating system:
+            - **Linux**: beamer-plus-linux
+            - **macOS**: beamer-plus-macos
+            - **Windows**: beamer-plus-windows.exe
+            
+            No Python installation needed! Just download and run.
+            
+            ### Quick Start
+            1. Download the file for your OS
+            2. Run it
+            3. Browser opens to http://localhost:5000
+            4. Upload and present!
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
