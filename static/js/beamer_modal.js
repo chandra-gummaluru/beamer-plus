@@ -8,23 +8,23 @@ export const Modal = {
         overlay.className = 'custom-modal-overlay';
         
         const iconClass = {
-            info: 'fa-circle-info',
-            error: 'fa-regular-circle-xmark',
-            warning: 'fa-triangle-exclamation',
-            success: 'fa-regular-circle-check',
-            confirm: 'fa-regular-circle-question'
-        }[type] || 'fa-circle-info';
+            info: 'fa-solid fa-circle-info',
+            error: 'fa-solid fa-circle-xmark',
+            warning: 'fa-solid fa-triangle-exclamation',
+            success: 'fa-solid fa-circle-check',
+            confirm: 'fa-solid fa-circle-question'
+        }[type] || 'fa-solid fa-circle-info';
         
         overlay.innerHTML = `
             <div class="custom-modal-content">
                 <div class="custom-modal-icon">
-                    <i class="fas ${iconClass}"></i>
+                    <i class="${iconClass}"></i>
                 </div>
                 <h2 class="custom-modal-title">${title}</h2>
                 <p class="custom-modal-message">${message}</p>
                 <div class="custom-modal-buttons">
                     ${type === 'confirm' ? '<button class="custom-modal-btn custom-modal-btn-cancel">Cancel</button>' : ''}
-                    <button class="custom-modal-btn custom-modal-btn-ok">${type === 'confirm' ? '<i class="fa-solid fa-thumbs-up"></i>' : '<i class="fa-solid fa-thumbs-up"></i>'}</button>
+                    <button class="custom-modal-btn custom-modal-btn-ok">${type === 'confirm' ? 'Okay' : '<i class="fa-solid fa-check"></i>'}</button>
                 </div>
             </div>
         `;

@@ -49,7 +49,7 @@
         <p class="survey-subtitle">(provide your response below)</p>
         <textarea id="response" placeholder="Enter your response here..."></textarea>
         <div style="display:flex; justify-content:flex-end; margin-top:0.75rem;">
-          <button id="submit-btn" class="btn" onclick="submitResponse()">
+          <button id="submit-btn" class="btn">
             <i class="fa-solid fa-paper-plane"></i>
           </button>
         </div>
@@ -59,7 +59,6 @@
       <div id="closed-container" style="display:none; text-align:center;">
         <h2 class="custom-modal-title">Survey Closed</h2>
         <p class="custom-modal-message">This survey is no longer accepting responses.</p>
-        <p class="survey-subtitle">Thank you for your interest.</p>
       </div>
 
       <!-- Survey Not Found State -->
@@ -71,7 +70,9 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.min.js"></script>
-  <script>
+  <script type="module">
+    import { Modal } from '/static/js/beamer_modal.js';
+    
     const surveyId = window.location.pathname.split('/').pop();
     let socket;
     
@@ -96,8 +97,10 @@
         if (!response.ok) {
           if (response.status === 404) {
             showNotFoundState();
+          } else if (response.status === 500) {
+            Modal.error('Server Error', 'An internal server error occurred. Please try again later.');
           } else {
-            showNotFoundState();
+            Modal.error('Error', `Unable to load survey. Server returned status: ${response.status}`);
           }
           return;
         }
@@ -118,27 +121,31 @@
         }
       } catch (error) {
         console.error('Error loading survey:', error);
-        showNotFoundState();
+        Modal.error('Connection Error', 'Unable to connect to the server. Please check your internet connection.');
       }
     }
     
     function showClosedState() {
+      // Hide the survey form
       document.getElementById('survey-form').style.display = 'none';
-      document.getElementById('not-found-container').style.display = 'none';
-      document.getElementById('closed-container').style.display = 'block';
+      
+      // Show a modal instead of inline content
+      Modal.warning('Survey Closed', 'This survey is no longer accepting responses.');
     }
     
     function showNotFoundState() {
+      // Hide the survey form
       document.getElementById('survey-form').style.display = 'none';
-      document.getElementById('closed-container').style.display = 'none';
-      document.getElementById('not-found-container').style.display = 'block';
+      
+      // Show a modal instead of inline content
+      Modal.error('Survey Not Found', 'The survey you\'re looking for doesn\'t exist or may have been removed.');
     }
     
     async function submitResponse() {
       const responseText = document.getElementById('response').value.trim();
 
       if (!responseText) {
-        showError('Please enter a response');
+        Modal.error('Input Required', 'Please enter a response');
         return;
       }
 
@@ -146,7 +153,7 @@
       btn.disabled = true;
 
       const start = Date.now();
-      const loadingModal = showLoadingModal('Submitting Response', 'Please wait while your response is submitted...');
+      const loadingModal = Modal.loading('Submitting Response', 'Please wait while your response is submitted...');
 
       try {
         const response = await fetch(`/api/survey/${surveyId}/respond`, {
@@ -165,7 +172,7 @@
           loadingModal.close();
           
           // Show success modal
-          showSuccessModal('Your response has been recorded.');
+          Modal.success('Success', 'Your response has been recorded. You may close this page.');
           
           // Don't clear or disable form - let user decide via modal buttons
         } else if (response.status === 403) {
@@ -177,89 +184,18 @@
       } catch (error) {
         console.error('Error submitting response:', error);
         loadingModal.close();
-        showError('Error submitting response. Please try again.');
+        Modal.error('Submission Failed', 'Error submitting response. Please try again.');
         btn.disabled = false;
         btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i>';
       }
-    }
-    
-    function showError(message) {
-      const existing = document.querySelector('.custom-modal-overlay.modal-error');
-      if (existing) existing.remove();
-      
-      const overlay = document.createElement('div');
-      overlay.className = 'custom-modal-overlay modal-error';
-      overlay.innerHTML = `
-        <div class="custom-modal-content">
-          <div class="custom-modal-icon">
-            <i class="fa-solid fa-circle-xmark"></i>
-          </div>
-          <h2 class="custom-modal-title">Error</h2>
-          <p class="custom-modal-message">${message}</p>
-          <div class="custom-modal-buttons">
-            <button class="custom-modal-btn custom-modal-btn-ok">
-              <i class="fa-solid fa-check"></i> OK
-            </button>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(overlay);
-      
-      const okBtn = overlay.querySelector('.custom-modal-btn-ok');
-      okBtn.onclick = () => overlay.remove();
-      okBtn.focus();
-      
-      overlay.onclick = (e) => {
-        if (e.target === overlay) overlay.remove();
-      };
-    }
-    
-    function showLoadingModal(title, message) {
-      const existing = document.querySelector('.custom-modal-overlay.modal-loading');
-      if (existing) existing.remove();
-      const overlay = document.createElement('div');
-      overlay.className = 'custom-modal-overlay modal-loading';
-      overlay.innerHTML = `
-        <div class="custom-modal-content">
-          <svg class="custom-modal-squiggle" viewBox="0 0 120 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path d="M2 20 C20 2, 40 38, 58 20 C76 2, 96 38, 118 20" />
-          </svg>
-          <h2 class="custom-modal-title">${title}</h2>
-          <p class="custom-modal-message">${message}</p>
-        </div>
-      `;
-      document.body.appendChild(overlay);
-      return { close: () => overlay.remove() };
-    }
-    
-    function showSuccessModal(message) {
-      const existing = document.querySelector('.custom-modal-overlay.modal-success');
-      if (existing) existing.remove();
-      
-      const overlay = document.createElement('div');
-      overlay.className = 'custom-modal-overlay modal-success';
-      overlay.innerHTML = `
-        <div class="custom-modal-content">
-          <div class="custom-modal-icon">
-            <i class="fa-solid fa-circle-check"></i>
-          </div>
-          <h2 class="custom-modal-title">Success</h2>
-          <p class="custom-modal-message">${message}</p>
-          <p class="survey-subtitle">You may close this window.</p>
-        </div>
-      `;
-      document.body.appendChild(overlay);
-      
-      // Disable the textarea and button to prevent further submissions
-      const textarea = document.getElementById('response');
-      const btn = document.getElementById('submit-btn');
-      textarea.disabled = true;
-      btn.disabled = true;
     }
 
     document.addEventListener('DOMContentLoaded', () => {
       loadSurvey();
       initSocket();
+      
+      const submitBtn = document.getElementById('submit-btn');
+      submitBtn.addEventListener('click', submitResponse);
       
       const textarea = document.getElementById('response');
       textarea.addEventListener('keydown', (e) => {

@@ -490,9 +490,9 @@ fileInput.addEventListener('change', async (e) => {
     
     const pdfFile = zipFile.file("slides.pdf");
     if (!pdfFile) {
-        console.error("No slides.pdf found in ZIP!");
+        console.error("The uploaded package is not a valid Beamer+ presentation (no slides.pdf found).");
         uploadModal.close();
-        Modal.error('Invalid Presentation', 'No slides.pdf found in presentation!');
+        Modal.error('Invalid Presentation', 'The uploaded package is not a valid Beamer+ presentation.');
         return;
     }
     
@@ -819,7 +819,7 @@ surveyResultsBtn.onClick(async () => {
     }
     
     // Show loading modal
-    const loadingModal = Modal.loading('Generating Summaries', 'Please wait while AI analyzes the responses...');
+    const loadingModal = Modal.loading('Generating Summaries', 'Please wait while the responses are analyzed...');
     
     try {
         const response = await fetch(`/api/survey/${currentSurveyData.survey_id}/responses`);
@@ -865,7 +865,7 @@ surveyResultsBtn.onClick(async () => {
     } catch (error) {
         console.error('Error processing responses:', error);
         loadingModal.close();
-        Modal.error('Analysis Failed', error.message);
+        Modal.error('Analysis Failed', "There was an error summarizing the responses.");
     }
 });
 
