@@ -10,16 +10,16 @@ summarizer = pipeline(
     device=-1
 )
 
-def summarize(responses: List[str], num_summaries: int) -> List[Tuple[str, str, int]]:
+def summarize(responses: List[str], num_summaries: int) -> List[Tuple[str, int]]:
     """
-    Summarize survey responses with each summary formatted as '<Title>: <Summary>'.
+    Summarize survey responses.
 
     Args:
         responses: List of response text strings
         num_summaries: Number of summaries to generate
 
     Returns:
-        List of tuples containing (title, summary, num_respondents)
+        List of tuples containing (summary, num_respondents)
     """
     if num_summaries <= 0 or not responses:
         return []
@@ -37,8 +37,8 @@ def summarize(responses: List[str], num_summaries: int) -> List[Tuple[str, str, 
 
         # Instruction for the model
         prompt = (
-            f"Summarize the following survey responses. "
-            f"Always format the output as '<Title>: <Summary>'. "
+            f"Summarize the main theme in these survey responses in one concise sentence. "
+            f"Do not use quotation marks. Be direct and factual. "
             f"Responses:\n{text}"
         )
 
@@ -49,15 +49,10 @@ def summarize(responses: List[str], num_summaries: int) -> List[Tuple[str, str, 
             do_sample=False
         )[0]["summary_text"]
 
-        # Attempt to split title and summary
-        if ":" in result:
-            title, summary_text = result.split(":", 1)
-        else:
-            # fallback if the model ignores the format
-            title = f"Theme {i + 1}"
-            summary_text = result.strip()
-
-        summaries.append((title.strip(), summary_text.strip(), len(chunk)))
+        # Clean up the summary - remove quotes and extra whitespace
+        summary_text = result.strip().strip('"\'')
+        
+        summaries.append((summary_text, len(chunk)))
 
     # Optional: simulate latency
     time.sleep(1)

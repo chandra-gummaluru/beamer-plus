@@ -264,23 +264,22 @@ def analyze_survey(survey_id):
                 'error': f'Model returned {len(summaries)} summaries, expected {num_summaries}'
             }), 500
         
-        # Validate tuple format: (title, summary, num_respondents)
+        # Validate tuple format: (summary, num_respondents)
         for i, item in enumerate(summaries):
-            if not isinstance(item, tuple) or len(item) != 3:
+            if not isinstance(item, tuple) or len(item) != 2:
                 return jsonify({
-                    'error': f'Summary {i} must be a tuple of (title, summary, num_respondents)'
+                    'error': f'Summary {i} must be a tuple of (summary, num_respondents)'
                 }), 500
-            if not isinstance(item[0], str) or not isinstance(item[1], str) or not isinstance(item[2], int):
+            if not isinstance(item[0], str) or not isinstance(item[1], int):
                 return jsonify({
-                    'error': f'Summary {i} has invalid types: expected (str, str, int)'
+                    'error': f'Summary {i} has invalid types: expected (str, int)'
                 }), 500
         
         # Convert tuples to dicts for JSON
         summaries_json = [
             {
-                'title': s[0],
-                'summary': s[1],
-                'num_respondents': s[2]
+                'summary': s[0],
+                'num_respondents': s[1]
             }
             for s in summaries
         ]
