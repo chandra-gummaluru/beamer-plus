@@ -31,7 +31,7 @@
     color: #333;
     font-size: 1.5rem;
     font-weight: normal;
-    font-family: 'Open Sans', sans-serif;
+    font-family: "Computer Modern Sans", sans-serif;
 }
 
 .modal-content h3 {
@@ -39,7 +39,7 @@
     color: #333;
     font-size: 1.2rem;
     font-weight: normal;
-    font-family: 'Open Sans', sans-serif;
+    font-family: "Computer Modern Sans", sans-serif;
 }
 
 /* QR Code */
@@ -66,7 +66,7 @@
 .survey-url input {
     width: 100%;
     padding: 0.5rem;
-    font-family: 'Open Sans', monospace;
+    font-family: "Computer Modern Sans", monospace;
     font-size: 0.9rem;
     border: 2px solid #666;
     border-radius: 4px;
@@ -93,7 +93,7 @@
     align-items: center;
     margin-bottom: 1rem;
     font-size: 1rem;
-    font-family: 'Open Sans', sans-serif;
+    font-family: "Computer Modern Sans", sans-serif;
 }
 
 .response-count {
@@ -115,7 +115,7 @@
     border-radius: 4px;
     font-size: 0.9rem;
     color: #333;
-    font-family: 'Open Sans', sans-serif;
+    font-family: "Computer Modern Sans", sans-serif;
 }
 
 /* Modal Actions */
@@ -125,7 +125,7 @@
     margin: 1.5rem 0;
 }
 
-.modal-actions .control_panel_btn {
+.modal-actions .btn {
     flex: 1;
 }
 
@@ -144,7 +144,7 @@
     text-align: center;
     color: #666;
     font-style: italic;
-    font-family: 'Open Sans', monospace;
+    font-family: "Computer Modern Sans", monospace;
 }
 
 /* Academic loading animation */
@@ -174,8 +174,32 @@
     border: 2px solid #666;
     border-radius: 4px;
     overflow-x: auto;
-    font-family: 'Open Sans', monospace;
+    font-family: "Computer Modern Sans", monospace;
     font-size: 0.9rem;
+}
+
+/* Textarea for survey responses - match presenter's input look */
+.custom-modal-content textarea,
+.survey-container textarea,
+.response-section textarea {
+    width: 100%;
+    min-height: 140px;
+    padding: 0.75rem;
+    font-family: "Computer Modern Sans", sans-serif;
+    font-size: 1rem;
+    border: 2px solid #666;
+    border-radius: 4px;
+    background: white;
+    color: #333;
+    box-sizing: border-box;
+    resize: vertical;
+}
+
+.custom-modal-content textarea:focus,
+.survey-container textarea:focus,
+.response-section textarea:focus {
+    outline: none;
+    border-color: #333;
 }
 
 /* Themes */
@@ -202,7 +226,7 @@
 .theme-header strong {
     font-size: 1.1rem;
     color: #333;
-    font-family: 'Open Sans', sans-serif;
+    font-family: "Computer Modern Sans", sans-serif;
 }
 
 .theme-count {
@@ -211,12 +235,12 @@
     padding: 0.25rem 0.75rem;
     border-radius: 4px;
     font-size: 0.9rem;
-    font-family: 'Open Sans', sans-serif;
+    font-family: "Computer Modern Sans", sans-serif;
 }
 
 .theme-item p {
     margin: 0;
     color: #666;
     line-height: 1.6;
-    font-family: 'Open Sans', sans-serif;
+    font-family: "Computer Modern Sans", sans-serif;
 }

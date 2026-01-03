@@ -1,0 +1,49 @@
+/* General button styles for Beamer+ */
+.btn_view_only {
+    display: inline-block;
+    padding: 0.5em 1em;
+    font-family: "Computer Modern Sans", sans-serif;
+    font-size: 1rem;
+    color: #666;
+    background-color: #eeeeee;
+    border: 2px solid #666;
+    border-radius: 4px;
+    text-decoration: none;
+}
+
+.btn {
+    display: inline-block;
+    padding: 0.5em 1em;
+    font-family: "Computer Modern Sans", sans-serif;
+    font-size: 1rem;
+    color: #666;
+    background-color: #eeeeee;
+    border: 2px solid #666;
+    border-radius: 4px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.btn:hover {
+    background-color: #bbbbbb;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.btn_selected {
+    display: inline-block;
+    padding: 0.5em 1em;
+    font-family: "Computer Modern Sans", sans-serif;
+    font-size: 1rem;
+    color: #eee;
+    background-color: #666;
+    border: 2px solid #eeeeee;
+    border-radius: 4px;
+    text-decoration: none;
+    cursor: pointer;
+}

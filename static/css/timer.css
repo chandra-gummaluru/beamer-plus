@@ -9,7 +9,7 @@
 
 .timer_display {
     cursor: pointer;
-    font-family: 'Open Sans', monospace;
+    font-family: "Computer Modern Sans", monospace;
     font-size: 14px;
     padding: 4px 8px;
     background: #eee;

@@ -1,0 +1,9 @@
+/* Label and brush size styles */
+.brush_size_scroll {
+}
+.brush_size_scroll {
+    font-family: "Computer Modern Sans", sans-serif;
+    font-size: 1rem;
+    font-weight: 400;
+    color: #333;
+}

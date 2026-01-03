@@ -1,0 +1,32 @@
+/* Selector and color picker styles */
+.color-swatch {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid #ccc;
+    cursor: pointer;
+    display: inline-block;
+    margin-right: 4px;
+    transition: border-color 0.2s ease, border-width 0.2s ease;
+}
+
+.color-swatch.color-selected {
+    border: 3px solid #000;
+}
+
+.color_picker_view_only {
+    gap: 8px;
+    display: inline-block;
+}
+
+.color_swatch_view_only {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid #666;
+}
+
+#color-picker {
+    display: flex;
+    gap: 6px;
+}

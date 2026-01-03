@@ -5,15 +5,23 @@
   <title>Survey Closed</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="/static/css/shared.css">
+  <link rel="stylesheet" href="/static/css/survey.css">
+  <link rel="stylesheet" href="/static/css/button.css">
+  <link rel="stylesheet" href="/static/css/selector.css">
+  <link rel="stylesheet" href="/static/css/label.css">
+  <link rel="stylesheet" href="/static/css/toggle.css">
   <link rel="stylesheet" href="/static/css/modal.css">
   <link rel="stylesheet" href="/static/css/control-panel.css">
 </head>
-<body>
-  <div class="survey-container" style="max-width:600px; margin:48px auto; text-align:center;">
-    <div class="icon" style="font-size:3rem; color:#999; margin-bottom:1rem;">📋</div>
-    <h1>Survey Closed</h1>
-    <p class="message">This survey is no longer accepting responses.</p>
-    <p class="suggestion">Thank you for your interest.</p>
+<body style="background: #fcfcfc;">
+  <div class="custom-modal-overlay modal-info" style="background: #fcfcfc;">
+    <div class="custom-modal-content" style="max-width:500px; text-align:center;">
+      <h2 class="custom-modal-title">Survey Closed</h2>
+      <p class="custom-modal-message">This survey is no longer accepting responses.</p>
+      <div style="margin-top:1rem; text-align:center;">
+        <a href="/" class="btn">Back</a>
+      </div>
+    </div>
   </div>
 </body>
 </html>

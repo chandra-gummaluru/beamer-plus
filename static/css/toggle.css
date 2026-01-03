@@ -1,0 +1,10 @@
+/* Toggle switch styles */
+.toggle_on {
+    background-color: #666;
+    color: white;
+}
+
+.toggle_off {
+    background-color: #eee;
+    color: #666;
+}

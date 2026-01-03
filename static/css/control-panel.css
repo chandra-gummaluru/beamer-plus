@@ -34,55 +34,7 @@
     justify-content: flex-end;
 }
 
-/* Button Styles */
-.control_panel_btn_view_only {
-    display: inline-block;
-    padding: 0.5em 1em;
-    font-family: 'Open Sans', sans-serif;
-    font-size: 1rem;
-    color: #666;
-    background-color: #eeeeee;
-    border: 2px solid #666;
-    border-radius: 4px;
-    text-decoration: none;
-}
-
-.control_panel_btn {
-    display: inline-block;
-    padding: 0.5em 1em;
-    font-family: 'Open Sans', sans-serif;
-    font-size: 1rem;
-    color: #666;
-    background-color: #eeeeee;
-    border: 2px solid #666;
-    border-radius: 4px;
-    text-decoration: none;
-    cursor: pointer;
-    transition: background-color 0.2s ease, border-color 0.2s ease;
-}
-
-.control_panel_btn:hover {
-    background-color: #bbbbbb;
-}
-
-.control_panel_btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    pointer-events: none;
-}
-
-.control_panel_btn_selected {
-    display: inline-block;
-    padding: 0.5em 1em;
-    font-family: 'Open Sans', sans-serif;
-    font-size: 1rem;
-    color: #eee;
-    background-color: #666;
-    border: 2px solid #eeeeee;
-    border-radius: 4px;
-    text-decoration: none;
-    cursor: pointer;
-}
+/* Button styling moved to static/css/button.css */
 
 /* Control panel inputs */
 #control-panel input[type=range],
@@ -150,7 +102,7 @@
 
 /* Brush size */
 .brush_size_scroll {
-    font-family: 'Open Sans', sans-serif;
+    font-family: "Computer Modern Sans", sans-serif;
     font-size: 1rem;
     font-weight: 400;
     color: #333;

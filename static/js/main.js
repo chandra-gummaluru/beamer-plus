@@ -5,6 +5,8 @@ import { Selector } from './selector.js';
 import { Toggle } from './toggle.js';
 import { Canvas } from './canvas.js';
 import { renderWidgets, cleanupWidgets } from './iframe-widget-renderer.js';
+import { Modal } from './beamer_modal.js';
+import { setControlsEnabledAfterUpload, disableControlButtons } from './beamer_ui.js';
 
 const socket = io();
 socket.emit('join_presenter');
@@ -14,111 +16,6 @@ let availableModels = [];
 
 window.addEventListener("DOMContentLoaded", () => {
 
-// Custom Modal System
-const Modal = {
-    show(type, title, message, onConfirm = null) {
-        const existingModal = document.querySelector('.custom-modal-overlay');
-        if (existingModal) existingModal.remove();
-        
-        const overlay = document.createElement('div');
-        overlay.className = 'custom-modal-overlay';
-        
-        const iconClass = {
-            info: 'fa-circle-info',
-            error: 'fa-circle-exclamation',
-            warning: 'fa-triangle-exclamation',
-            success: 'fa-circle-check',
-            confirm: 'fa-circle-question'
-        }[type] || 'fa-circle-info';
-        
-        overlay.innerHTML = `
-            <div class="custom-modal-content">
-                <div class="custom-modal-icon">
-                    <i class="fas ${iconClass}"></i>
-                </div>
-                <h2 class="custom-modal-title">${title}</h2>
-                <p class="custom-modal-message">${message}</p>
-                <div class="custom-modal-buttons">
-                    ${type === 'confirm' ? '<button class="custom-modal-btn custom-modal-btn-cancel">Cancel</button>' : ''}
-                    <button class="custom-modal-btn custom-modal-btn-ok">${type === 'confirm' ? '<i class="fa-solid fa-thumbs-up"></i>' : '<i class="fa-solid fa-thumbs-up"></i>'}</button>
-                </div>
-            </div>
-        `;
-        
-        // Add type class for styling
-        overlay.classList.add(`modal-${type}`);
-        
-        document.body.appendChild(overlay);
-        
-        const okBtn = overlay.querySelector('.custom-modal-btn-ok');
-        const cancelBtn = overlay.querySelector('.custom-modal-btn-cancel');
-        
-        const close = (confirmed = false) => {
-            overlay.remove();
-            if (confirmed && onConfirm) onConfirm();
-        };
-        
-        okBtn.onclick = () => close(true);
-        if (cancelBtn) cancelBtn.onclick = () => close(false);
-        overlay.onclick = (e) => {
-            if (e.target === overlay) close(false);
-        };
-        
-        okBtn.focus();
-        
-        const escHandler = (e) => {
-            if (e.key === 'Escape') {
-                close(false);
-                document.removeEventListener('keydown', escHandler);
-            }
-        };
-        document.addEventListener('keydown', escHandler);
-    },
-    
-    loading(title, message) {
-        const existingModal = document.querySelector('.custom-modal-overlay');
-        if (existingModal) existingModal.remove();
-        
-        const overlay = document.createElement('div');
-        overlay.className = 'custom-modal-overlay modal-loading';
-        overlay.innerHTML = `
-            <div class="custom-modal-content">
-                <svg class="custom-modal-squiggle" viewBox="0 0 120 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                    <path d="M2 20 C20 2, 40 38, 58 20 C76 2, 96 38, 118 20" />
-                </svg>
-                <h2 class="custom-modal-title">${title}</h2>
-                <p class="custom-modal-message">${message}</p>
-            </div>
-        `;
-        
-        document.body.appendChild(overlay);
-        
-        return {
-            close: () => overlay.remove()
-        };
-    },
-    
-    info(title, message) {
-        this.show('info', title, message);
-    },
-    
-    error(title, message) {
-        this.show('error', title, message);
-    },
-    
-    warning(title, message) {
-        this.show('warning', title, message);
-    },
-    
-    success(title, message) {
-        this.show('success', title, message);
-    },
-    
-    confirm(title, message, onConfirm) {
-        this.show('confirm', title, message, onConfirm);
-    }
-};
-
 const timerContainer = document.getElementById("timer-container");
 const timer = new Timer(timerContainer);
 
@@ -126,25 +23,25 @@ const toolContainer = document.getElementById('tool-container');
 
 const hand = new Button(toolContainer, {
     label: '<i class="fa-solid fa-hand-pointer"></i>',
-    className: 'control_panel_btn'
+    className: 'btn'
 });
 
 const pen = new Button(toolContainer, {
     label: '<i class="fa-solid fa-pen"></i>',
-    className: 'control_panel_btn'
+    className: 'btn'
 });
 
 const highlighter = new Button(toolContainer, {
     label: '<i class="fa-solid fa-highlighter"></i>',
-    className: 'control_panel_btn'
+    className: 'btn'
 });
 
 const eraser = new Button(toolContainer, {
     label: '<i class="fa-solid fa-eraser"></i>',
-    className: 'control_panel_btn'
+    className: 'btn'
 });
 
-const toolSelector = new Selector([hand, pen, highlighter, eraser], 'control_panel_btn_selected');
+const toolSelector = new Selector([hand, pen, highlighter, eraser], 'btn_selected');
 toolSelector.select(hand);
 
 const colors = ['#eeeeee', '#e74c3c', '#f1c40f', '#2ecc71', '#3498db', '#9b59b6', '#333333'];
@@ -165,19 +62,19 @@ const navContainer = document.getElementById('nav-container');
 
 const prevBtn = new Button(navContainer, {
     label: '<i class="fa-solid fa-arrow-left"></i>',
-    className: 'control_panel_btn'
+    className: 'btn'
 });
 
 const nextBtn = new Button(navContainer, {
     label: '<i class="fa-solid fa-arrow-right"></i>',
-    className: 'control_panel_btn'
+    className: 'btn'
 });
 
 const brushContainer = document.getElementById('brush-controls');
 
 const brushMinusBtn = new Button(brushContainer, {
     label: '<i class="fa-solid fa-minus"></i>',
-    className: 'control_panel_btn'
+    className: 'btn'
 });
 
 const brushSizeLbl = new Label(brushContainer, {
@@ -188,27 +85,27 @@ const brushSizeLbl = new Label(brushContainer, {
 
 const brushPlusBtn = new Button(brushContainer, {
     label: '<i class="fa-solid fa-plus"></i>',
-    className: 'control_panel_btn'
+    className: 'btn'
 });
 
 const otherControlsContainer = document.getElementById('other-controls');
 
 const clearBtn = new Button(otherControlsContainer, {
-    className: 'control_panel_btn',
+    className: 'btn',
     label: '<i class="fa-solid fa-broom"></i>'
 });
 
 clearBtn.el.style.marginRight = '20px';
 
 const surveyBtn = new Button(otherControlsContainer, {
-    className: 'control_panel_btn',
+    className: 'btn',
     label: '<i class="fa-solid fa-clipboard-list"></i>'
 });
 
 surveyBtn.el.style.marginRight = '10px';
 
 const surveyResultsBtn = new Button(otherControlsContainer, {
-    className: 'control_panel_btn',
+    className: 'btn',
     label: '<i class="fa-solid fa-chart-simple"></i>'
 });
 
@@ -220,32 +117,24 @@ surveyResultsBtn.el.style.cursor = 'not-allowed';
 const displayControls = document.getElementById('display-controls');
 
 const uploadBtn = new Button(displayControls, {
-    className: 'control_panel_btn',
+    className: 'btn',
     label: '<i class="fa-solid fa-upload"></i>',
 });
 
-// Keep most controls disabled until a presentation is uploaded.
-function setControlsEnabledAfterUpload(enabled) {
-    const controls = [
-        hand, pen, highlighter, eraser,
-        ...colorBtns,
-        brushMinusBtn, brushPlusBtn,
-        prevBtn, nextBtn,
-        clearBtn, surveyBtn
-    ];
+// Keep list of controls for enabling/disabling (upload button remains enabled)
+const __beamer_controls = [
+    hand, pen, highlighter, eraser,
+    ...colorBtns,
+    brushMinusBtn, brushPlusBtn,
+    prevBtn, nextBtn,
+    clearBtn, surveyBtn
+];
 
-    controls.forEach(btn => {
-        if (btn && btn.el) {
-            btn.el.disabled = !enabled;
-            btn.el.style.opacity = enabled ? '1' : '0.5';
-            btn.el.style.cursor = enabled ? 'pointer' : 'not-allowed';
-            btn.el.style.pointerEvents = enabled ? 'auto' : 'none';
-        }
-    });
-}
+// Disable at startup
+setControlsEnabledAfterUpload(false, __beamer_controls);
 
-// Disable at startup (upload button remains enabled)
-setControlsEnabledAfterUpload(false);
+// Full set used for temporary disabling (includes upload button)
+const __beamer_all_buttons = [...__beamer_controls, uploadBtn];
 
 const ann_canvas_container = document.getElementById('ann-canvas');
 const annCvs = new Canvas(ann_canvas_container);
@@ -624,7 +513,7 @@ fileInput.addEventListener('change', async (e) => {
     });
     // Enable controls now that a presentation is loaded
     uploadModal.close();
-    setControlsEnabledAfterUpload(true);
+    setControlsEnabledAfterUpload(true, __beamer_controls);
 });
 
 async function loadAvailableModels() {
@@ -656,44 +545,44 @@ surveyBtn.onClick(() => {
     modal.className = 'modal-overlay';
     modal.innerHTML = `
         <div class="modal-content" style="max-width: 500px;">
-            <h2 style="margin-bottom: 1.5rem; font-family: 'Open Sans', sans-serif; color: #333;">Survey</h2>
+            <h2 style="margin-bottom: 1.5rem; font-family: 'Computer Modern Sans', sans-serif; color: #333;">Survey</h2>
             
             <div style="margin-bottom: 1.5rem;">
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-family: 'Open Sans', sans-serif; color: #555;">Question (optional):</label>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-family: 'Computer Modern Sans', sans-serif; color: #555;">Question (optional):</label>
                 <input 
                     type="text" 
                     id="survey-question"
                     placeholder="What do you think about...?"
-                    style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; font-family: 'Open Sans', sans-serif; box-sizing: border-box;"
+                    style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; font-family: 'Computer Modern Sans', sans-serif; box-sizing: border-box;"
                 />
-                <div style="margin-top: 0.5rem; font-size: 0.85rem; color: #666; font-family: 'Open Sans', sans-serif;">
+                <div style="margin-top: 0.5rem; font-size: 0.85rem; color: #666; font-family: 'Computer Modern Sans', sans-serif;">
                     Leave blank for generic survey
                 </div>
             </div>
             
             <div style="margin-bottom: 1.5rem;">
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-family: 'Open Sans', sans-serif; color: #555;">Summarizer Script:</label>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-family: 'Computer Modern Sans', sans-serif; color: #555;">Summarizer Script:</label>
                 <select 
                     id="survey-model"
-                    style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; background: white; font-family: 'Open Sans', sans-serif; box-sizing: border-box;"
+                    style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; background: white; font-family: 'Computer Modern Sans', sans-serif; box-sizing: border-box;"
                 >
                 </select>
-                <div style="margin-top: 0.5rem; font-size: 0.85rem; color: #666; font-family: 'Open Sans', sans-serif;">
+                <div style="margin-top: 0.5rem; font-size: 0.85rem; color: #666; font-family: 'Computer Modern Sans', sans-serif;">
                     This script will be used to summarize survey responses
                 </div>
             </div>
             
             <div style="margin-bottom: 1.5rem;">
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-family: 'Open Sans', sans-serif; color: #555;">Number of Summaries:</label>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-family: 'Computer Modern Sans', sans-serif; color: #555;">Number of Summaries:</label>
                 <input 
                     type="number" 
                     id="survey-num-summaries" 
                     min="1" 
                     max="10" 
                     value="3"
-                    style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; font-family: 'Open Sans', sans-serif; box-sizing: border-box;"
+                    style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; font-family: 'Computer Modern Sans', sans-serif; box-sizing: border-box;"
                 />
-                <div style="margin-top: 0.5rem; font-size: 0.85rem; color: #666; font-family: 'Open Sans', sans-serif;">
+                <div style="margin-top: 0.5rem; font-size: 0.85rem; color: #666; font-family: 'Computer Modern Sans', sans-serif;">
                     Generate 1-10 different summary variations
                 </div>
             </div>
@@ -701,15 +590,15 @@ surveyBtn.onClick(() => {
             <div style="display: flex; gap: 1rem; justify-content: flex-end;">
                 <button 
                     id="cancel-survey-modal" 
-                    class="control_panel_btn"
-                    style="font-family: 'Open Sans', sans-serif;"
+                    class="btn"
+                    style="font-family: 'Computer Modern Sans', sans-serif;"
                 >
                     <i class="fa-solid fa-xmark"></i>
                 </button>
                 <button 
                     id="create-survey-btn" 
-                    class="control_panel_btn"
-                    style=" font-family: 'Open Sans', sans-serif;"
+                    class="btn"
+                    style=" font-family: 'Computer Modern Sans', sans-serif;"
                 >
                     <i class="fa-solid fa-share-from-square"></i>
                 </button>
@@ -738,7 +627,7 @@ surveyBtn.onClick(() => {
     };
     
     document.getElementById('create-survey-btn').onclick = async () => {
-        const question = document.getElementById('survey-question').value.trim() || 'Survey Response';
+        const question = document.getElementById('survey-question').value.trim() || 'Survey';
         const model = document.getElementById('survey-model').value;
         const numSummaries = parseInt(document.getElementById('survey-num-summaries').value);
         
@@ -807,7 +696,7 @@ function showSurveyOverlay() {
     if (!currentSurveyData) return;
     
     surveyOverlayVisible = true;
-    disableControlButtons(true);
+    disableControlButtons(true, __beamer_all_buttons, surveyResultsBtn);
     
     const pdfContainer = document.getElementById('pdf-canvas');
     const containerRect = pdfContainer.getBoundingClientRect();
@@ -830,12 +719,14 @@ function showSurveyOverlay() {
     overlay.style.padding = '2rem';
     overlay.style.boxSizing = 'border-box';
     overlay.style.overflow = 'auto';
-    overlay.style.fontFamily = "'Open Sans', sans-serif";
+    overlay.style.fontFamily = "'Computer Modern Sans', sans-serif";
     
     overlay.innerHTML = `
         <div style="max-width: 600px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 2rem;">
-            <h2 style="font-family: 'Open Sans', sans-serif; color: #333; font-size: 2rem; margin: 0; text-align: center;">
-                ${currentSurveyData.question || 'Survey Active'}
+            <h2 style="font-family: 'Computer Modern Sans', sans-serif; color: #333; font-size: 2rem; margin: 0; text-align: center; font-weight: 300;">
+                ${currentSurveyData.question || 'Survey'}
+                <br>
+                <span style="font-size: 0.9rem; color: #666; font-weight: normal;">(scan the QR code below or navigate to the URL to respond)</span>
             </h2>
             
             <div style="background: #f8f9fa; padding: 2rem; border-radius: 8px; display: flex; flex-direction: column; align-items: center; gap: 1.5rem; width: 100%;">
@@ -847,12 +738,12 @@ function showSurveyOverlay() {
                         readonly 
                         value="${surveyUrl}" 
                         onclick="this.select()"
-                        style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-family: 'Open Sans', sans-serif; text-align: center; background: white; font-size: 0.9rem; box-sizing: border-box;"
+                        style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-family: 'Computer Modern Sans', sans-serif; text-align: center; background: white; font-size: 0.9rem; box-sizing: border-box;"
                     />
                 </div>
             </div>
             
-            <div style="font-family: 'Open Sans', sans-serif; color: #666; font-size: 1rem; border: 2px solid #e0e0e0; padding: 0.75rem 1.5rem; background: white;">
+            <div style="font-family: 'Computer Modern Sans', sans-serif; color: #666; font-size: 1rem; border: 2px solid #e0e0e0; padding: 0.75rem 1.5rem; background: white;">
                 <span style="font-weight: 500; color: #333;">Responses:</span> <span id="response-count" style="font-weight: 600; color: #333;">0</span>
             </div>
             
@@ -879,7 +770,7 @@ function showSurveyOverlay() {
 
 function hideSurveyOverlay() {
     surveyOverlayVisible = false;
-    disableControlButtons(false);
+    disableControlButtons(false, __beamer_all_buttons, surveyResultsBtn);
     
     const overlay = document.getElementById('survey-overlay');
     if (overlay) {
@@ -967,32 +858,7 @@ surveyResultsBtn.onClick(async () => {
 
 let currentResultIndex = 0;
 
-function disableControlButtons(disable) {
-    const allButtons = [
-        hand, pen, highlighter, eraser,
-        ...colorBtns,
-        brushMinusBtn, brushPlusBtn,
-        prevBtn, nextBtn,
-        clearBtn, surveyBtn,
-        uploadBtn
-    ];
-    
-    allButtons.forEach(btn => {
-        if (btn && btn.el) {
-            btn.el.disabled = disable;
-            btn.el.style.opacity = disable ? '0.5' : '1';
-            btn.el.style.cursor = disable ? 'not-allowed' : 'pointer';
-            btn.el.style.pointerEvents = disable ? 'none' : 'auto';
-        }
-    });
-    
-    if (surveyResultsBtn && surveyResultsBtn.el) {
-        surveyResultsBtn.el.disabled = false;
-        surveyResultsBtn.el.style.opacity = '1';
-        surveyResultsBtn.el.style.cursor = 'pointer';
-        surveyResultsBtn.el.style.pointerEvents = 'auto';
-    }
-}
+// Use UI helper `disableControlButtons` from beamer_ui.js
 
 function showSurveyResultsOverlay() {
     if (!currentSurveyResults || !currentSurveyResults.summaries || currentSurveyResults.summaries.length === 0) {
@@ -1004,7 +870,7 @@ function showSurveyResultsOverlay() {
     resultsOverlayVisible = true;
     currentResultIndex = 0;
     
-    disableControlButtons(true);
+    disableControlButtons(true, __beamer_all_buttons, surveyResultsBtn);
     
     const pdfContainer = document.getElementById('pdf-canvas');
     const containerRect = pdfContainer.getBoundingClientRect();
@@ -1025,7 +891,7 @@ function showSurveyResultsOverlay() {
     overlay.style.padding = '2rem';
     overlay.style.boxSizing = 'border-box';
     overlay.style.overflow = 'auto';
-    overlay.style.fontFamily = "'Open Sans', sans-serif";
+    overlay.style.fontFamily = "'Computer Modern Sans', sans-serif";
     
     const numSummaries = currentSurveyResults.summaries.length;
     
@@ -1036,13 +902,13 @@ function showSurveyResultsOverlay() {
             </div>
             
             <div style="display: flex; gap: 1rem; align-items: center;">
-                <button id="prev-result" class="control_panel_btn">
+                <button id="prev-result" class="btn">
                     <i class="fa-solid fa-arrow-left"></i>
                 </button>
-                <span id="result-counter" style="font-family: 'Open Sans', sans-serif; color: #666; font-size: 1rem;">
+                <span id="result-counter" style="font-family: 'Computer Modern Sans', sans-serif; color: #666; font-size: 1rem;">
                     1 / ${numSummaries}
                 </span>
-                <button id="next-result" class="control_panel_btn">
+                <button id="next-result" class="btn">
                     <i class="fa-solid fa-arrow-right"></i>
                 </button>
             </div>
@@ -1071,7 +937,7 @@ function showSurveyResultsOverlay() {
 function hideSurveyResultsOverlay() {
     resultsOverlayVisible = false;
     
-    disableControlButtons(false);
+    disableControlButtons(false, __beamer_all_buttons, surveyResultsBtn);
     
     const overlay = document.getElementById('survey-results-overlay');
     if (overlay) {
@@ -1091,13 +957,12 @@ function updateResultDisplay() {
     const totalSummaries = currentSurveyResults.summaries.length;
     
     contentDiv.innerHTML = `
-        <h2 style="font-family: 'Open Sans', sans-serif; color: #333; font-size: 2rem; margin: 0;">
-            ${summaryData.title}
+        <h2 style="font-family: 'Computer Modern Sans', sans-serif; color: #333; font-size: 2rem; margin: 0; font-weight: 300;">
+            ${currentSurveyData.question || 'Survey Response Summaries'}
+            <br>
+            <span style="font-size: 0.9rem; color: #666; font-weight: normal;">(based on ${summaryData.num_respondents} response${summaryData.num_respondents !== 1 ? 's' : ''})</span>
         </h2>
-        <div style="font-family: 'Open Sans', sans-serif; color: #666; font-size: 0.9rem; margin: 1rem 0; text-align: center;">
-            Based on ${summaryData.num_respondents} response${summaryData.num_respondents !== 1 ? 's' : ''} (Total: ${currentSurveyResults.num_responses})
-        </div>
-        <div style="font-family: 'Open Sans', sans-serif; color: #333; font-size: 1.1rem; line-height: 1.8; margin: 1.5rem 0; text-align: left; max-width: 700px; padding: 2rem; background: #f8f9fa; border: 2px solid #666; border-radius: 4px;">
+        <div style="font-family: 'Computer Modern Sans', sans-serif; color: #333; font-size: 1.1rem; line-height: 1.8; margin: 1.5rem 0; text-align: center; max-width: 700px; padding: 2rem; background: #f8f9fa; border: 2px solid #666; border-radius: 4px;">
             ${summaryData.summary}
         </div>
     `;
