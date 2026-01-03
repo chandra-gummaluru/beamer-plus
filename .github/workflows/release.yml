@@ -47,7 +47,7 @@ jobs:
             --add-data "survey_response.html:." \
             --hidden-import=engineio.async_drivers.threading \
             --hidden-import=simple_websocket \
-            app.py
+            launch-beamer-plus.py
         shell: bash
 
       - name: Upload executable

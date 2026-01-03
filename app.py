@@ -11,7 +11,21 @@ from collections import defaultdict
 from typing import List
 import shutil
 
-app = Flask("Beamer+", static_folder='static', template_folder='')
+# Get the correct base path for PyInstaller
+def get_base_path():
+    """Get the base path for resources, works with PyInstaller"""
+    if getattr(sys, 'frozen', False):
+        # Running as compiled executable
+        return sys._MEIPASS
+    else:
+        # Running as normal Python script
+        return os.path.dirname(os.path.abspath(__file__))
+
+BASE_PATH = get_base_path()
+
+app = Flask("Beamer+", 
+            static_folder=os.path.join(BASE_PATH, 'static'), 
+            template_folder=BASE_PATH)
 socketio = SocketIO(app, cors_allowed_origins='*', async_mode='threading')
 
 # Store active surveys and responses
