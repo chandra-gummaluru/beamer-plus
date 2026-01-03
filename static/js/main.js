@@ -1018,6 +1018,11 @@ window.addEventListener('resize', () => {
     if (resultsOverlayVisible) {
         updateSurveyResultsOverlayPosition();
     }
+    
+    // Resize annotation canvas to maintain proper mouse coordinate mapping
+    if (annCvs) {
+        annCvs.resize();
+    }
 });
 
 });

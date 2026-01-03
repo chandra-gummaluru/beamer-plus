@@ -9,10 +9,10 @@ export const Modal = {
         
         const iconClass = {
             info: 'fa-circle-info',
-            error: 'fa-circle-exclamation',
+            error: 'fa-regular-circle-xmark',
             warning: 'fa-triangle-exclamation',
-            success: 'fa-circle-check',
-            confirm: 'fa-circle-question'
+            success: 'fa-regular-circle-check',
+            confirm: 'fa-regular-circle-question'
         }[type] || 'fa-circle-info';
         
         overlay.innerHTML = `

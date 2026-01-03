@@ -358,4 +358,41 @@ export class Canvas {
     getDisplayHeight() {
         return this.pdfDpr ? this.canvas.height / this.pdfDpr : this.canvas.height;
     }
+    
+    // Resize canvas to match container (for annotation canvas on window resize)
+    resize() {
+        const container = this.canvas.parentElement;
+        if (!container) return;
+        
+        // Save current canvas content
+        const imageData = this.canvas.toDataURL();
+        
+        // Get new dimensions
+        const rect = container.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        
+        // Update canvas dimensions
+        this.canvas.width = rect.width * dpr;
+        this.canvas.height = rect.height * dpr;
+        this.canvas.style.width = `${rect.width}px`;
+        this.canvas.style.height = `${rect.height}px`;
+        
+        // Update context and scaling
+        this.ctx = this.canvas.getContext('2d');
+        this.ctx.scale(dpr, dpr);
+        this.ctx.imageSmoothingEnabled = true;
+        this.ctx.imageSmoothingQuality = 'high';
+        this.dpr = dpr;
+        
+        // Restore content if there was any
+        if (imageData && imageData !== 'data:,') {
+            const img = new Image();
+            img.onload = () => {
+                const displayWidth = rect.width;
+                const displayHeight = rect.height;
+                this.ctx.drawImage(img, 0, 0, displayWidth, displayHeight);
+            };
+            img.src = imageData;
+        }
+    }
 }
