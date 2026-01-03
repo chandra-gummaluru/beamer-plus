@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <title>Survey</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/static/css/shared.css">
   <link rel="stylesheet" href="/static/css/survey.css">
   <link rel="stylesheet" href="/static/css/button.css">
@@ -12,20 +13,45 @@
   <link rel="stylesheet" href="/static/css/toggle.css">
   <link rel="stylesheet" href="/static/css/modal.css">
   <link rel="stylesheet" href="/static/css/control-panel.css">
+  <style>
+    /* Add outer padding for better mobile experience */
+    .custom-modal-overlay {
+      padding: 1rem;
+    }
+    
+    /* Ensure content doesn't touch edges on mobile */
+    @media (max-width: 768px) {
+      .custom-modal-overlay {
+        padding: 0.75rem;
+      }
+      
+      .custom-modal-content {
+        max-width: 100% !important;
+      }
+    }
+    
+    /* Subtitle styling */
+    .survey-subtitle {
+      text-align: center;
+      color: #666;
+      font-size: 0.95rem;
+      margin: -0.5rem 0 1rem 0;
+      font-style: italic;
+    }
+  </style>
 </head>
 <body style="background: #fcfcfc;">
   <div class="custom-modal-overlay modal-info" style="background: #fcfcfc;">
     <div class="custom-modal-content" style="max-width:600px;">
       <!-- Active Survey Form -->
       <div id="survey-form" style="display:none;">
-        <h2 class="custom-modal-title" style="margin-bottom:1rem;">Share your thoughts...</h2>
+        <h2 class="custom-modal-title" style="margin-bottom:0.5rem;">Share your thoughts...</h2>
+        <p class="survey-subtitle">(provide your response below)</p>
         <textarea id="response" placeholder="Enter your response here..."></textarea>
         <div style="display:flex; justify-content:flex-end; margin-top:0.75rem;">
-          <button id="submit-btn" class="btn" onclick="submitResponse()"><i class="fa-solid fa-paper-plane"></i></button>
-        </div>
-
-        <div style="margin-top:1rem; display:flex; gap:8px; align-items:center;">
-          <div class="error-message" id="error-message" style="display:none;">✗ Error submitting response. Please try again.</div>
+          <button id="submit-btn" class="btn" onclick="submitResponse()">
+            <i class="fa-solid fa-paper-plane"></i>
+          </button>
         </div>
       </div>
 
@@ -33,7 +59,7 @@
       <div id="closed-container" style="display:none; text-align:center;">
         <h2 class="custom-modal-title">Survey Closed</h2>
         <p class="custom-modal-message">This survey is no longer accepting responses.</p>
-        <p class="suggestion">Thank you for your interest.</p>
+        <p class="survey-subtitle">Thank you for your interest.</p>
       </div>
 
       <!-- Survey Not Found State -->
@@ -158,8 +184,34 @@
     }
     
     function showError(message) {
-      document.getElementById('error-message').textContent = message;
-      document.getElementById('error-message').style.display = 'block';
+      const existing = document.querySelector('.custom-modal-overlay.modal-error');
+      if (existing) existing.remove();
+      
+      const overlay = document.createElement('div');
+      overlay.className = 'custom-modal-overlay modal-error';
+      overlay.innerHTML = `
+        <div class="custom-modal-content">
+          <div class="custom-modal-icon">
+            <i class="fa-solid fa-circle-xmark"></i>
+          </div>
+          <h2 class="custom-modal-title">Error</h2>
+          <p class="custom-modal-message">${message}</p>
+          <div class="custom-modal-buttons">
+            <button class="custom-modal-btn custom-modal-btn-ok">
+              <i class="fa-solid fa-check"></i> OK
+            </button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      
+      const okBtn = overlay.querySelector('.custom-modal-btn-ok');
+      okBtn.onclick = () => overlay.remove();
+      okBtn.focus();
+      
+      overlay.onclick = (e) => {
+        if (e.target === overlay) overlay.remove();
+      };
     }
     
     function showLoadingModal(title, message) {
@@ -183,44 +235,26 @@
     function showSuccessModal(message) {
       const existing = document.querySelector('.custom-modal-overlay.modal-success');
       if (existing) existing.remove();
+      
       const overlay = document.createElement('div');
       overlay.className = 'custom-modal-overlay modal-success';
       overlay.innerHTML = `
         <div class="custom-modal-content">
           <div class="custom-modal-icon">
-            <i class="fas fa-circle-check"></i>
+            <i class="fa-solid fa-circle-check"></i>
           </div>
           <h2 class="custom-modal-title">Success</h2>
           <p class="custom-modal-message">${message}</p>
-          <div class="custom-modal-buttons">
-            <button class="custom-modal-btn custom-modal-btn-close"><i class="fa-solid fa-xmark"></i></button>
-            <button class="custom-modal-btn custom-modal-btn-ok"><i class="fa-solid fa-paper-plane"></i></button>
-          </div>
+          <p class="survey-subtitle">You may close this window.</p>
         </div>
       `;
       document.body.appendChild(overlay);
       
-      const closeBtn = overlay.querySelector('.custom-modal-btn-close');
-      const submitAnotherBtn = overlay.querySelector('.custom-modal-btn-ok');
-      
-      closeBtn.onclick = () => window.close();
-      submitAnotherBtn.onclick = () => {
-        overlay.remove();
-        // Re-enable and clear form for another submission
-        const textarea = document.getElementById('response');
-        const btn = document.getElementById('submit-btn');
-        textarea.disabled = false;
-        textarea.value = '';
-        textarea.focus();
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i>';
-        document.getElementById('error-message').style.display = 'none';
-      };
-      
-      overlay.onclick = (e) => {
-        if (e.target === overlay) overlay.remove();
-      };
-      submitAnotherBtn.focus();
+      // Disable the textarea and button to prevent further submissions
+      const textarea = document.getElementById('response');
+      const btn = document.getElementById('submit-btn');
+      textarea.disabled = true;
+      btn.disabled = true;
     }
 
     document.addEventListener('DOMContentLoaded', () => {
