@@ -26,16 +26,16 @@ def print_header(text):
     print(f"\n{Colors.BOLD}{Colors.CYAN}{text}{Colors.ENDC}")
 
 def print_success(text):
-    print(f"{Colors.GREEN}✅ {text}{Colors.ENDC}")
+    print(f"{Colors.GREEN}{text}{Colors.ENDC}")
 
 def print_info(text):
-    print(f"{Colors.BLUE}ℹ️  {text}{Colors.ENDC}")
+    print(f"{Colors.BLUE}ℹ{text}{Colors.ENDC}")
 
 def print_error(text):
-    print(f"{Colors.RED}❌ {text}{Colors.ENDC}")
+    print(f"{Colors.RED}{text}{Colors.ENDC}")
 
 def print_warning(text):
-    print(f"{Colors.YELLOW}⚠️  {text}{Colors.ENDC}")
+    print(f"{Colors.YELLOW}{text}{Colors.ENDC}")
 
 def get_local_ip():
     """Get the local network IP address"""
@@ -87,7 +87,7 @@ def install_qrcode():
 
 def check_dependencies():
     """Check and install required dependencies"""
-    print_header("📋 Checking dependencies...")
+    print_header("Checking dependencies...")
     
     # Check Flask
     try:
@@ -120,36 +120,21 @@ def check_dependencies():
 
 def display_info(url, local_ip, port, has_qr=True):
     """Display connection information"""
-    print_header("📱 Access your Beamer+ app at:")
+    print_header("Access your Beamer+ instance at:")
     print()
-    print(f"   {Colors.BOLD}Local:{Colors.ENDC}   http://localhost:{port}")
     
     if local_ip != '127.0.0.1':
-        print(f"   {Colors.BOLD}Network:{Colors.ENDC} {url}")
-        print()
-        print_info("The network URL can be accessed by any device on the same WiFi/network")
+        print(f"{Colors.BOLD}{Colors.ENDC}{url}")
     else:
-        print()
         print_info("Network access not available (no network IP detected)")
     
     print()
     
     if has_qr and local_ip != '127.0.0.1':
-        print_header("📲 Scan this QR code with your phone:")
-        print()
         if not generate_qr_ascii(url):
-            print_warning("Could not generate QR code")
-            print(f"   Please enter this URL manually: {url}")
-        print()
-        print(f"   (QR code contains: {url})")
-        print()
+            pass
 
-def main():
-    """Main launcher function"""
-    print(f"\n{Colors.BOLD}{Colors.CYAN}{'='*50}")
-    print("🚀 Beamer+ Launcher")
-    print(f"{'='*50}{Colors.ENDC}\n")
-    
+def main():    
     # Check if app.py exists
     if not os.path.exists("app.py"):
         print_error("app.py not found in current directory")
@@ -160,7 +145,7 @@ def main():
     has_qr = check_dependencies()
     
     # Get network information
-    print_header("🔍 Detecting network configuration...")
+    print_header("Detecting network configuration...")
     local_ip = get_local_ip()
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 5000
     
@@ -176,18 +161,9 @@ def main():
     
     # Display connection info
     display_info(url, local_ip, port, has_qr)
-    
-    # Instructions
-    print(f"{Colors.BOLD}{'━'*50}")
-    print("🎯 Instructions:")
-    print("   • Make sure your phone/device is on the same WiFi network")
-    print("   • Scan the QR code above OR enter the URL manually")
-    print("   • Press Ctrl+C to stop the server")
-    print(f"{'━'*50}{Colors.ENDC}\n")
-    
+        
     # Start the Flask app
-    print_header("🚀 Starting Beamer+ server...")
-    print()
+    print_header("Starting Beamer+ server...")
     
     try:
         # Import and run the Flask app
@@ -195,7 +171,7 @@ def main():
         print(f"{Colors.GREEN}Server is running! Press Ctrl+C to quit.{Colors.ENDC}\n")
         app.run(host='0.0.0.0', port=port, debug=False)
     except KeyboardInterrupt:
-        print(f"\n\n{Colors.YELLOW}👋 Server stopped. Goodbye!{Colors.ENDC}\n")
+        print(f"\n\n{Colors.YELLOW}Server stopped. Goodbye!{Colors.ENDC}\n")
         sys.exit(0)
     except Exception as e:
         print_error(f"Failed to start server: {e}")

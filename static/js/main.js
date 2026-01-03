@@ -9,6 +9,9 @@ import { renderWidgets, cleanupWidgets } from './iframe-widget-renderer.js';
 const socket = io();
 socket.emit('join_presenter');
 
+// Available AI models (loaded from presentation ZIP)
+let availableModels = [];
+
 window.addEventListener("DOMContentLoaded", () => {
 
 const timerContainer = document.getElementById("timer-container");
@@ -229,382 +232,446 @@ function syncAnnotations() {
     }, 100);
 }
 
-// ADDED: Responsive resize
-function resizeCanvases() {
-    if (totalSlides > 0 && currentSlide !== null) {
-        renderSlide(currentSlide);
-    }
+// Navigation
+prevBtn.onClick(() => goToSlide(currentSlide - 1));
+nextBtn.onClick(() => goToSlide(currentSlide + 1));
+
+document.addEventListener('keydown', (e) => {
+    if (resultsOverlayVisible) return;
+    if (e.key === 'ArrowLeft') goToSlide(currentSlide - 1);
+    if (e.key === 'ArrowRight') goToSlide(currentSlide + 1);
+});
+
+async function goToSlide(slideIndex) {
+    if (slideIndex < 0 || slideIndex >= totalSlides) return;
+    
+    currentSlide = slideIndex;
+    await renderSlide(currentSlide);
+    
+    const annData = annCvs.canvas.toDataURL("image/png");
+    socket.emit('slide_change', {
+        slideIndex: currentSlide,
+        annotations: annData
+    });
 }
-window.addEventListener('resize', resizeCanvases);
 
-fileInput.addEventListener("change", async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const arrayBuffer = await file.arrayBuffer();
-    zipFile = await JSZip.loadAsync(arrayBuffer);
-
-    // Clear previous data
-    slideConfigs = {};
-    mediaCache = {};
-    annotations = {};
-    currentSlide = 0;
-
-    const pdfFile = zipFile.file("slides.pdf");
-    if (!pdfFile) {
-        console.error("slides.pdf not found in ZIP!");
+async function renderSlide(slideIndex) {
+    console.log('renderSlide called:', slideIndex);
+    
+    if (!zipFile) {
+        console.log('No ZIP file loaded');
         return;
     }
+    
+    // Load PDF page
+    const pdfFile = zipFile.file("slides.pdf");
+    if (!pdfFile) {
+        console.error("No slides.pdf found in ZIP");
+        return;
+    }
+    
+    const pdfData = await pdfFile.async("arraybuffer");
+    const pdfDoc = await pdfjsLib.getDocument({ data: pdfData }).promise;
+    const page = await pdfDoc.getPage(slideIndex + 1);
+    
+    await pdfCvs.renderPDFPage(page);
+    
+    // Clear previous media elements
+    const existingMedia = slide_canvas_container.querySelectorAll('video, audio, model-viewer');
+    existingMedia.forEach(el => el.remove());
+    
+    // Clean up previous widgets
+    cleanupWidgets(slide_canvas_container);
+    
+    // Load slide config
+    const slideConfig = await loadSlideConfig(slideIndex);
+    
+    if (!slideConfig) {
+        console.log('No config for this slide');
+        return;
+    }
+    
+    console.log('Videos to render:', slideConfig.videos?.length || 0);
+    console.log('Models to render:', slideConfig.models?.length || 0);
+    console.log('Widgets to render:', slideConfig.widgets?.length || 0);
+    
+    // Render videos
+    if (slideConfig.videos) {
+        for (const v of slideConfig.videos) {
+            const videoURL = await loadMediaFromPath(v.path);
+            if (!videoURL) continue;
+            
+            const video = document.createElement("video");
+            video.src = videoURL;
+            video.volume = v.volume || 1.0;
+            video.dataset.videoId = v.id;
+            
+            video.style.position = "absolute";
+            video.style.left = `${v.x * pdfCvs.getDisplayWidth()}px`;
+            video.style.top = `${v.y * pdfCvs.getDisplayHeight()}px`;
+            video.style.width = `${v.width * pdfCvs.getDisplayWidth()}px`;
+            video.style.height = `${v.height * pdfCvs.getDisplayHeight()}px`;
+            video.style.objectFit = "contain";
+            video.style.zIndex = v.zIndex || 5;
+            
+            if (v.playMode === "once") {
+                video.autoplay = true;
+                video.loop = false;
+            }
+            if (v.playMode === "loop") {
+                video.autoplay = true;
+                video.loop = true;
+            }
+            if (v.playMode === "manual") {
+                video.controls = true;
+            }
+            
+            video.addEventListener('play', () => {
+                socket.emit('video_action', {
+                    videoId: v.id,
+                    slideIndex: currentSlide,
+                    action: 'play',
+                    currentTime: video.currentTime
+                });
+            });
+            
+            video.addEventListener('pause', () => {
+                socket.emit('video_action', {
+                    videoId: v.id,
+                    slideIndex: currentSlide,
+                    action: 'pause',
+                    currentTime: video.currentTime
+                });
+            });
+            
+            slide_canvas_container.appendChild(video);
+        }
+    }
+    
+    // Render 3D models
+    if (slideConfig.models) {
+        for (const m of slideConfig.models) {
+            const modelURL = await loadMediaFromPath(m.path);
+            if (!modelURL) continue;
+            
+            const mv = document.createElement("model-viewer");
+            mv.src = modelURL;
+            mv.alt = m.alt || "3D model";
+            mv.dataset.modelId = m.id;
+            mv.setAttribute("camera-controls", "");
+            mv.setAttribute("shadow-intensity", "1");
+            mv.setAttribute("auto-rotate", m.autoRotate ? "true" : "false");
+            
+            mv.style.position = "absolute";
+            mv.style.left = `${m.x * pdfCvs.getDisplayWidth()}px`;
+            mv.style.top = `${m.y * pdfCvs.getDisplayHeight()}px`;
+            mv.style.width = `${m.width * pdfCvs.getDisplayWidth()}px`;
+            mv.style.height = `${m.height * pdfCvs.getDisplayHeight()}px`;
+            mv.style.zIndex = m.zIndex || 5;
+            
+            mv.addEventListener('camera-change', () => {
+                const camera = mv.getCameraOrbit();
+                const target = mv.getCameraTarget();
+                socket.emit('model_interaction', {
+                    modelId: m.id,
+                    slideIndex: currentSlide,
+                    camera: {
+                        theta: camera.theta,
+                        phi: camera.phi,
+                        radius: camera.radius
+                    },
+                    target: {
+                        x: target.x,
+                        y: target.y,
+                        z: target.z
+                    }
+                });
+            });
+            
+            slide_canvas_container.appendChild(mv);
+        }
+    }
+    
+    // Render audio
+    if (slideConfig.audio) {
+        for (const a of slideConfig.audio) {
+            const audioURL = await loadMediaFromPath(a.path);
+            if (!audioURL) continue;
+            
+            const audio = document.createElement("audio");
+            audio.src = audioURL;
+            audio.volume = a.volume || 1.0;
+            if (a.playMode === "auto") audio.play();
+            if (a.playMode === "manual") audio.controls = true;
+            
+            slide_canvas_container.appendChild(audio);
+        }
+    }
+    
+    // Render widgets
+    if (slideConfig.widgets) {
+        renderWidgets(slideConfig, slide_canvas_container, 
+                     () => pdfCvs.getDisplayWidth(), 
+                     () => pdfCvs.getDisplayHeight(), 
+                     zipFile);
+    }
+}
 
+// File upload
+fileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    console.log('File selected:', file.name);
+    
+    // Upload to server
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+        const response = await fetch('/api/presentation/upload', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        console.log('Upload response:', data);
+        
+        if (data.success) {
+            // Load available models
+            await loadAvailableModels();
+            
+            console.log(`Presentation uploaded with ${data.models_found} AI models`);
+            if (data.models && data.models.length > 0) {
+                console.log('Available AI models:', data.models);
+            }
+        }
+    } catch (error) {
+        console.error('Error uploading presentation:', error);
+        alert('Failed to upload presentation');
+        return;
+    }
+    
+    // Load ZIP into memory
+    const arrayBuffer = await file.arrayBuffer();
+    zipFile = await JSZip.loadAsync(arrayBuffer);
+    console.log('ZIP loaded into memory');
+    
+    // Get PDF page count
+    const pdfFile = zipFile.file("slides.pdf");
+    if (!pdfFile) {
+        console.error("No slides.pdf found in ZIP!");
+        alert("No slides.pdf found in presentation!");
+        return;
+    }
+    
     const pdfData = await pdfFile.async("arraybuffer");
     const pdfDoc = await pdfjsLib.getDocument({ data: pdfData }).promise;
     totalSlides = pdfDoc.numPages;
     
-    console.log(`Loaded presentation with ${totalSlides} slides`);
-
-    // Store PDF for rendering
-    window.pdfDoc = pdfDoc;
-
-    renderSlide(0);
+    console.log(`Total slides: ${totalSlides}`);
+    
+    // Reset state
+    currentSlide = 0;
+    slideConfigs = {};
+    mediaCache = {};
+    
+    // Render first slide
+    await renderSlide(0);
     
     // Notify viewers
-    socket.emit('presentation_loaded', { totalSlides });
-});
-
-
-async function renderSlide(slideIndex) {
-    const page = await window.pdfDoc.getPage(slideIndex + 1);
-
-    const container = document.getElementById('pdf-canvas');
-    const containerWidth = container.clientWidth;
-    const containerHeight = container.clientHeight;
-
-    const viewport = page.getViewport({ scale: 1 });
-    const scale = Math.min(
-        containerWidth / viewport.width,
-        containerHeight / viewport.height
-    );
-
-    const scaledViewport = page.getViewport({ scale });
-    const dpr = window.devicePixelRatio || 1;
-
-    // Store old canvas size for scaling annotations
-    const oldWidth = annCvs.canvas.width;
-    const oldHeight = annCvs.canvas.height;
-    
-    // Save current annotations if they exist (before resizing)
-    let currentAnnotations = null;
-    if (oldWidth > 0 && oldHeight > 0) {
-        currentAnnotations = annCvs.canvas.toDataURL("image/png");
-    }
-
-    // Set canvas internal resolution (accounting for DPR for sharp rendering)
-    pdfCvs.canvas.width = scaledViewport.width * dpr;
-    pdfCvs.canvas.height = scaledViewport.height * dpr;
-    
-    // Get fresh context and scale for DPR
-    pdfCvs.ctx = pdfCvs.canvas.getContext('2d');
-    pdfCvs.ctx.scale(dpr, dpr);
-
-    annCvs.canvas.width = scaledViewport.width * dpr;
-    annCvs.canvas.height = scaledViewport.height * dpr;
-    
-    // Get fresh context and scale for DPR
-    annCvs.ctx = annCvs.canvas.getContext('2d');
-    annCvs.ctx.scale(dpr, dpr);
-
-    const renderContext = {
-        canvasContext: pdfCvs.ctx,
-        viewport: scaledViewport
-    };
-
-    await page.render(renderContext).promise;
-
-    // Load saved annotations and scale them to new size
-    const annotationToLoad = currentAnnotations || annotations[slideIndex];
-    if (annotationToLoad) {
-        const img = new Image();
-        img.onload = () => {
-            annCvs.ctx.clearRect(0, 0, scaledViewport.width, scaledViewport.height);
-            annCvs.ctx.drawImage(img, 0, 0, scaledViewport.width, scaledViewport.height);
-        };
-        img.src = annotationToLoad;
-    } else {
-        annCvs.clear();
-    }
-
-    // Load and render slide-specific config
-    const slideConfig = await loadSlideConfig(slideIndex);
-    await renderSlideMedia(slideConfig, scaledViewport);
-}
-
-async function renderSlideMedia(config, viewport) {
-    // Clean up previous media
-    cleanupSlideMedia();
-
-    if (!config) {
-        return; // No media for this slide
-    }
-
-    const container = document.getElementById('pdf-canvas');
-
-    // Render videos
-    if (config.videos) {
-        for (const videoConfig of config.videos) {
-            const url = await loadMediaFromPath(videoConfig.path);
-            if (!url) continue;
-
-            const video = document.createElement('video');
-            video.src = url;
-            video.style.position = 'absolute';
-            video.style.left = `${videoConfig.x * viewport.width}px`;
-            video.style.top = `${videoConfig.y * viewport.height}px`;
-            video.style.width = `${videoConfig.width * viewport.width}px`;
-            video.style.height = `${videoConfig.height * viewport.height}px`;
-            video.style.zIndex = videoConfig.zIndex || 5;
-            video.volume = videoConfig.volume || 1.0;
-            video.playbackRate = videoConfig.playbackRate || 1.0;
-
-            if (videoConfig.playMode === 'auto' || videoConfig.playMode === 'once') {
-                video.play();
-            } else if (videoConfig.playMode === 'loop') {
-                video.loop = true;
-                video.play();
-            } else if (videoConfig.playMode === 'click') {
-                video.addEventListener('click', () => {
-                    if (video.paused) video.play();
-                    else video.pause();
-                });
-            }
-
-            container.appendChild(video);
-        }
-    }
-
-    // Render audio
-    if (config.audio) {
-        for (const audioConfig of config.audio) {
-            const url = await loadMediaFromPath(audioConfig.path);
-            if (!url) continue;
-
-            const audio = new Audio(url);
-            audio.volume = audioConfig.volume || 1.0;
-
-            if (audioConfig.playMode === 'auto') {
-                audio.play();
-            }
-
-            container.appendChild(audio);
-        }
-    }
-
-    // Render 3D models
-    if (config.models) {
-        for (const modelConfig of config.models) {
-            const url = await loadMediaFromPath(modelConfig.path);
-            if (!url) continue;
-
-            const modelViewer = document.createElement('model-viewer');
-            modelViewer.src = url;
-            modelViewer.style.position = 'absolute';
-            modelViewer.style.left = `${modelConfig.x * viewport.width}px`;
-            modelViewer.style.top = `${modelConfig.y * viewport.height}px`;
-            modelViewer.style.width = `${modelConfig.width * viewport.width}px`;
-            modelViewer.style.height = `${modelConfig.height * viewport.height}px`;
-            modelViewer.style.zIndex = modelConfig.zIndex || 20;
-            modelViewer.setAttribute('camera-controls', '');
-            modelViewer.setAttribute('auto-rotate', '');
-
-            container.appendChild(modelViewer);
-        }
-    }
-
-    // Render widgets
-    if (config.widgets) {
-        renderWidgets(
-            config,
-            container,
-            () => viewport.width,
-            () => viewport.height,
-            zipFile
-        );
-    }
-}
-
-function cleanupSlideMedia() {
-    const container = document.getElementById('pdf-canvas');
-    
-    // Remove all video elements
-    container.querySelectorAll('video').forEach(el => {
-        el.pause();
-        el.remove();
+    socket.emit('presentation_loaded', {
+        totalSlides: totalSlides
     });
-    
-    // Remove all audio elements
-    container.querySelectorAll('audio').forEach(el => {
-        el.pause();
-        el.remove();
-    });
-    
-    // Remove all model-viewer elements
-    container.querySelectorAll('model-viewer').forEach(el => el.remove());
-    
-    // Clean up widgets
-    cleanupWidgets(container);
+});
+
+// Load available AI models from server
+async function loadAvailableModels() {
+    try {
+        const response = await fetch('/api/models');
+        const data = await response.json();
+        availableModels = data.models || [];
+        console.log('Available AI models:', availableModels);
+    } catch (error) {
+        console.error('Error loading models:', error);
+        availableModels = [];
+    }
 }
 
-prevBtn.onClick(async () => {
-    if (currentSlide > 0) {
-        annotations[currentSlide] = annCvs.canvas.toDataURL("image/png");
-        currentSlide--;
-        await renderSlide(currentSlide);
-        const annImage = annCvs.canvas.toDataURL("image/png");
-        socket.emit('slide_change', {
-            slideIndex: currentSlide,
-            annotations: annImage
-        });
-    }
-});
-
-document.addEventListener('keydown', async (event) => {
-    if (resultsOverlayVisible) return; // Don't navigate if overlay is visible
-    
-    if (event.key === 'ArrowLeft') {
-        if (currentSlide > 0) {
-            // Save current annotations
-            annotations[currentSlide] = annCvs.canvas.toDataURL("image/png");
-            currentSlide--;
-            await renderSlide(currentSlide);
-
-            // Emit slide change with annotations
-            const annImage = annCvs.canvas.toDataURL("image/png");
-            socket.emit('slide_change', {
-                slideIndex: currentSlide,
-                annotations: annImage
-            });
-        }
-    }
-});
-
-nextBtn.onClick(async () => {
-    if (currentSlide < totalSlides - 1) {
-        annotations[currentSlide] = annCvs.canvas.toDataURL("image/png");
-        currentSlide++;
-        await renderSlide(currentSlide);
-
-        const annImage = annCvs.canvas.toDataURL("image/png");
-        socket.emit('slide_change', {
-            slideIndex: currentSlide,
-            annotations: annImage
-        });
-    }
-});
-
-document.addEventListener('keydown', async (event) => {
-    if (resultsOverlayVisible) return; // Don't navigate if overlay is visible
-    
-    if (event.key === 'ArrowRight') {
-        if (currentSlide < totalSlides - 1) {
-            // Save current annotations
-            annotations[currentSlide] = annCvs.canvas.toDataURL("image/png");
-            currentSlide++;
-            await renderSlide(currentSlide);
-
-            // Emit slide change with annotations
-            const annImage = annCvs.canvas.toDataURL("image/png");
-            socket.emit('slide_change', {
-                slideIndex: currentSlide,
-                annotations: annImage
-            });
-        }
-    }
-});
-
-// ADDED: Survey without prompt
-let currentSurvey = null;
+// Survey functionality
 let currentSurveyResults = null;
 let resultsOverlayVisible = false;
 
 surveyBtn.onClick(async () => {
-    try {
-        const response = await fetch('/api/survey/create', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ question: 'Share your thoughts' })
-        });
-        const data = await response.json();
-        currentSurvey = data;
-        currentSurveyResults = null; // Reset results when new survey starts
-        currentResultIndex = 0; // Reset index when new survey starts
-        
-        // Broadcast survey to viewers
-        socket.emit('survey_show', {
-            survey_id: data.survey_id,
-            url: data.url
-        });
-        
-        showSurveyModal(data);
-    } catch (error) {
-        console.error('Error creating survey:', error);
-    }
-});
-
-// Survey results button handler
-surveyResultsBtn.onClick(() => {
-    if (!currentSurveyResults) {
-        // Generate sample results (will be replaced with real AI results later)
-        currentSurveyResults = getSampleSurveyResults();
+    // Check if models are available
+    if (availableModels.length === 0) {
+        alert('No AI models available. Please upload a presentation with AI models in the ai/ folder.');
+        return;
     }
     
-    if (resultsOverlayVisible) {
-        hideSurveyResultsOverlay();
-    } else {
-        showSurveyResultsOverlay();
-    }
-});
-
-function getSampleSurveyResults() {
-    // Temporary hardcoded sample summaries
-    return {
-        themes: [
-            {
-                title: "Engagement and Interactivity",
-                summary: "Students highly value interactive elements like polls and real-time Q&A. They appreciate when professors use technology to make lectures more engaging rather than passive listening experiences.",
-                count: 12
-            },
-            {
-                title: "Visual Learning Preferences",
-                summary: "Many respondents emphasized the importance of visual aids, diagrams, and videos. They find that multimedia content helps them understand complex concepts better than text-heavy slides alone.",
-                count: 8
-            },
-            {
-                title: "Pace and Time Management",
-                summary: "Several students mentioned that the presentation pace should allow time for questions and reflection. They prefer when presenters pause periodically rather than rushing through all content.",
-                count: 7
-            }
-        ]
-    };
-}
-
-function showSurveyModal(surveyData) {
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 500px;">
+            <h2 style="margin-bottom: 1.5rem; font-family: 'Open Sans', sans-serif;">Create Survey</h2>
+            
+            <div style="margin-bottom: 1.5rem;">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-family: 'Open Sans', sans-serif;">Question:</label>
+                <input 
+                    type="text" 
+                    id="survey-question" 
+                    placeholder="What do you think about...?"
+                    style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; font-family: 'Open Sans', sans-serif; box-sizing: border-box;"
+                />
+            </div>
+            
+            <div style="margin-bottom: 1.5rem;">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-family: 'Open Sans', sans-serif;">AI Model:</label>
+                <select 
+                    id="survey-model"
+                    style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; background: white; font-family: 'Open Sans', sans-serif; box-sizing: border-box;"
+                >
+                    <option value="">Select a model...</option>
+                </select>
+                <div style="margin-top: 0.5rem; font-size: 0.85rem; color: #666; font-family: 'Open Sans', sans-serif;">
+                    Models are loaded from the ai/ folder in your presentation ZIP
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 1.5rem;">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-family: 'Open Sans', sans-serif;">Number of Summaries:</label>
+                <input 
+                    type="number" 
+                    id="num-summaries" 
+                    min="1" 
+                    max="10" 
+                    value="3"
+                    style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; font-family: 'Open Sans', sans-serif; box-sizing: border-box;"
+                />
+                <div style="margin-top: 0.5rem; font-size: 0.85rem; color: #666; font-family: 'Open Sans', sans-serif;">
+                    Generate 1-10 different summary variations
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                <button 
+                    id="cancel-survey" 
+                    class="control_panel_btn"
+                    style="background: #666;"
+                >
+                    Cancel
+                </button>
+                <button 
+                    id="create-survey" 
+                    class="control_panel_btn"
+                    style="background: #3498db;"
+                >
+                    Create Survey
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
     
+    // Populate model dropdown
+    const modelSelect = document.getElementById('survey-model');
+    availableModels.forEach(model => {
+        const option = document.createElement('option');
+        option.value = model;
+        // Format model name nicely
+        option.textContent = model.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        modelSelect.appendChild(option);
+    });
+    
+    // Set default model if available
+    if (availableModels.length > 0) {
+        modelSelect.value = availableModels[0];
+    }
+    
+    // Focus on question input
+    document.getElementById('survey-question').focus();
+    
+    // Cancel button
+    document.getElementById('cancel-survey').onclick = () => {
+        document.body.removeChild(modal);
+    };
+    
+    // Create button
+    document.getElementById('create-survey').onclick = async () => {
+        const question = document.getElementById('survey-question').value.trim();
+        const model = document.getElementById('survey-model').value;
+        const numSummaries = parseInt(document.getElementById('num-summaries').value);
+        
+        if (!question) {
+            alert('Please enter a question');
+            return;
+        }
+        
+        if (!model) {
+            alert('Please select an AI model');
+            return;
+        }
+        
+        if (isNaN(numSummaries) || numSummaries < 1 || numSummaries > 10) {
+            alert('Number of summaries must be between 1 and 10');
+            return;
+        }
+        
+        try {
+            const response = await fetch('/api/survey/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    question,
+                    model,
+                    num_summaries: numSummaries
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (!response.ok) {
+                alert(data.error || 'Failed to create survey');
+                return;
+            }
+            
+            document.body.removeChild(modal);
+            
+            // Show the survey to viewers and display QR code
+            socket.emit('survey_show', data);
+            showSurveyQRCode(data);
+            
+        } catch (error) {
+            console.error('Error creating survey:', error);
+            alert('Failed to create survey');
+        }
+    };
+    
+    // Close on click outside
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            document.body.removeChild(modal);
+        }
+    };
+});
+
+function showSurveyQRCode(surveyData) {
     const surveyUrl = `${window.location.origin}${surveyData.url}`;
     
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
     modal.innerHTML = `
         <div class="modal-content">
+            <h2>Survey Active</h2>
+            <p>Scan this QR code or visit the URL to respond:</p>
             <div class="qr-container">
                 <div id="qrcode"></div>
             </div>
             <div class="survey-url">
                 <input type="text" readonly value="${surveyUrl}" onclick="this.select()">
             </div>
-            <div class="response-section">
-                <div class="response-header">
-                    <span>Responses</span>
-                    <div id="response-count-pill" style="display: inline-block; background: #666; color: #eee; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.9rem; margin-left: 0.5rem;">0</div>
-                </div>
+            <div class="response-count">
+                Responses: <span id="response-count-pill" class="pill">0</span>
             </div>
             <div class="modal-actions">
                 <button id="close-survey" class="control_panel_btn">Close & Analyze</button>
@@ -626,6 +693,7 @@ function showSurveyModal(surveyData) {
             document.getElementById('response-count-pill').textContent = data.total;
         }
     });
+    
     document.getElementById('close-survey').onclick = () => closeSurveyAndAnalyze(surveyData.survey_id, modal);
 }
 
@@ -633,40 +701,50 @@ async function processResponses(surveyId) {
     try {
         const response = await fetch(`/api/survey/${surveyId}/responses`);
         const data = await response.json();
+        
         if (data.responses.length === 0) {
             console.log('No responses to analyze');
-            // Use sample data if no responses
-            currentSurveyResults = getSampleSurveyResults();
+            currentSurveyResults = {
+                summaries: ['No responses collected yet.'],
+                model: 'none',
+                num_responses: 0
+            };
             return;
         }
         
-        // Show loading in console
-        console.log('Analyzing responses...');
+        // Show loading message
+        console.log('Analyzing responses with AI model...');
         
-        const apiResponse = await fetch('https://api.anthropic.com/v1/messages', {
+        // Call the analyze endpoint
+        const analyzeResponse = await fetch(`/api/survey/${surveyId}/analyze`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                model: 'claude-sonnet-4-20250514',
-                max_tokens: 1000,
-                messages: [{role: 'user', content: `Analyze these survey responses and group them into 3-5 main themes. For each theme, provide a title and brief summary.\n\nResponses:\n${data.responses.map((r, i) => `${i+1}. ${r.text}`).join('\n')}\n\nFormat your response as JSON like this:\n{\n  "themes": [\n    {"title": "Theme Name", "summary": "Brief summary", "count": 5},\n    ...\n  ]\n}`}]
-            })
+            headers: { 'Content-Type': 'application/json' }
         });
-        const aiData = await apiResponse.json();
-        const aiText = aiData.content[0].text;
-        const jsonMatch = aiText.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            const summary = JSON.parse(jsonMatch[0]);
-            currentSurveyResults = summary; // Store in currentSurveyResults
-            console.log('Analysis complete');
-        } else {
-            console.log('Could not parse AI response');
-            currentSurveyResults = getSampleSurveyResults();
+        
+        if (!analyzeResponse.ok) {
+            const errorData = await analyzeResponse.json();
+            throw new Error(errorData.error || 'Analysis failed');
         }
+        
+        const analysisData = await analyzeResponse.json();
+        
+        // Store the results
+        currentSurveyResults = {
+            summaries: analysisData.summaries,
+            model: analysisData.model,
+            num_responses: analysisData.num_responses
+        };
+        
+        console.log('Analysis complete:', currentSurveyResults);
+        
     } catch (error) {
         console.error('Error processing responses:', error);
-        // Use sample data on error
-        currentSurveyResults = getSampleSurveyResults();
+        // Show error in results
+        currentSurveyResults = {
+            summaries: [`Error analyzing responses: ${error.message}`],
+            model: 'error',
+            num_responses: 0
+        };
     }
 }
 
@@ -717,7 +795,13 @@ function disableControlButtons(disable) {
 }
 
 function showSurveyResultsOverlay() {
+    if (!currentSurveyResults || !currentSurveyResults.summaries || currentSurveyResults.summaries.length === 0) {
+        alert('No survey results available. Please create and close a survey first.');
+        return;
+    }
+    
     resultsOverlayVisible = true;
+    currentResultIndex = 0;
     
     // Disable all control panel buttons except survey results button
     disableControlButtons(true);
@@ -744,9 +828,11 @@ function showSurveyResultsOverlay() {
     overlay.style.boxSizing = 'border-box';
     overlay.style.overflow = 'auto';
     
+    const numSummaries = currentSurveyResults.summaries.length;
+    
     overlay.innerHTML = `
         <div style="max-width: 800px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 2rem;">
-            <div id="result-content" style="text-align: center; min-height: 300px; display: flex; flex-direction: column; justify-content: center; gap: 1rem;">
+            <div id="result-content" style="text-align: center; min-height: 300px; display: flex; flex-direction: column; justify-content: center; gap: 1rem; width: 100%;">
                 <!-- Content will be inserted here -->
             </div>
             
@@ -755,7 +841,7 @@ function showSurveyResultsOverlay() {
                     <i class="fa-solid fa-arrow-left"></i>
                 </button>
                 <span id="result-counter" style="font-family: 'Open Sans', sans-serif; color: #666; font-size: 1rem;">
-                    1 / 3
+                    1 / ${numSummaries}
                 </span>
                 <button id="next-result" class="control_panel_btn">
                     <i class="fa-solid fa-arrow-right"></i>
@@ -775,7 +861,7 @@ function showSurveyResultsOverlay() {
     });
     
     document.getElementById('next-result').addEventListener('click', () => {
-        if (currentResultIndex < currentSurveyResults.themes.length - 1) {
+        if (currentResultIndex < currentSurveyResults.summaries.length - 1) {
             currentResultIndex++;
             updateResultDisplay();
         }
@@ -802,32 +888,54 @@ function updateResultDisplay() {
     const prevBtn = document.getElementById('prev-result');
     const nextBtn = document.getElementById('next-result');
     
-    if (!contentDiv || !currentSurveyResults) return;
+    if (!contentDiv || !currentSurveyResults || !currentSurveyResults.summaries) return;
     
-    const theme = currentSurveyResults.themes[currentResultIndex];
+    const summary = currentSurveyResults.summaries[currentResultIndex];
+    const totalSummaries = currentSurveyResults.summaries.length;
     
     contentDiv.innerHTML = `
         <h2 style="font-family: 'Open Sans', sans-serif; color: #333; font-size: 2rem; margin: 0;">
-            ${theme.title}
+            Summary ${currentResultIndex + 1}
         </h2>
-        <div style="display: inline-block; background: #666; color: #eee; padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.9rem; margin: 0.5rem 0;">
-            ${theme.count} response${theme.count !== 1 ? 's' : ''}
+        <div style="display: flex; gap: 1rem; justify-content: center; margin: 0.5rem 0; flex-wrap: wrap;">
+            <div style="display: inline-block; background: #3498db; color: white; padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.9rem; font-family: 'Open Sans', sans-serif;">
+                Model: ${currentSurveyResults.model.replace(/_/g, ' ')}
+            </div>
+            <div style="display: inline-block; background: #666; color: #eee; padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.9rem; font-family: 'Open Sans', sans-serif;">
+                ${currentSurveyResults.num_responses} response${currentSurveyResults.num_responses !== 1 ? 's' : ''}
+            </div>
         </div>
-        <p style="font-family: 'Open Sans', sans-serif; color: #666; font-size: 1.2rem; line-height: 1.8; margin: 1.5rem 0;">
-            ${theme.summary}
-        </p>
+        <div style="font-family: 'Open Sans', sans-serif; color: #666; font-size: 1.1rem; line-height: 1.8; margin: 1.5rem 0; text-align: left; max-width: 700px; padding: 1.5rem; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #3498db;">
+            ${summary}
+        </div>
     `;
     
-    counterSpan.textContent = `${currentResultIndex + 1} / ${currentSurveyResults.themes.length}`;
+    counterSpan.textContent = `${currentResultIndex + 1} / ${totalSummaries}`;
     
     // Disable/enable buttons
     prevBtn.disabled = currentResultIndex === 0;
-    nextBtn.disabled = currentResultIndex === currentSurveyResults.themes.length - 1;
+    nextBtn.disabled = currentResultIndex === totalSummaries - 1;
     
     prevBtn.style.opacity = prevBtn.disabled ? '0.5' : '1';
     nextBtn.style.opacity = nextBtn.disabled ? '0.5' : '1';
     prevBtn.style.cursor = prevBtn.disabled ? 'not-allowed' : 'pointer';
     nextBtn.style.cursor = nextBtn.disabled ? 'not-allowed' : 'pointer';
 }
+
+// Survey results button handler
+surveyResultsBtn.onClick(() => {
+    if (resultsOverlayVisible) {
+        hideSurveyResultsOverlay();
+    } else {
+        showSurveyResultsOverlay();
+    }
+});
+
+// ESC key to close results overlay
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && resultsOverlayVisible) {
+        hideSurveyResultsOverlay();
+    }
+});
 
 });

@@ -3,9 +3,15 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 import uuid
 import time
 import os
+import importlib.util
+import sys
+import tempfile
+import zipfile
 from collections import defaultdict
+from typing import List
+import shutil
 
-app = Flask(__name__, static_folder='static', template_folder='')
+app = Flask("Beamer+", static_folder='static', template_folder='')
 socketio = SocketIO(app, cors_allowed_origins='*', async_mode='threading')
 
 # Store active surveys and responses
@@ -15,7 +21,76 @@ survey_responses = defaultdict(list)
 # Store current presentation
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-current_presentation = {'file': None, 'config': None}
+
+current_presentation = {
+    'file': None,
+    'config': None,
+    'models': {},  # Store loaded model functions
+    'available_models': []  # List of available model names
+}
+
+def extract_and_load_models(zip_path):
+    """
+    Extract AI models from the uploaded ZIP file and load them.
+    Models should be in the 'ai/' directory within the ZIP.
+    """
+    models = {}
+    available_models = []
+    
+    try:
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            # Find all .py files in the ai/ directory
+            ai_files = [f for f in zip_ref.namelist() if f.startswith('ai/') and f.endswith('.py')]
+            
+            if not ai_files:
+                print("No AI models found in ZIP file")
+                return models, available_models
+            
+            # Create a temporary directory to extract models
+            temp_dir = tempfile.mkdtemp()
+            
+            for ai_file in ai_files:
+                try:
+                    # Extract the file
+                    zip_ref.extract(ai_file, temp_dir)
+                    
+                    # Get model name from filename
+                    model_name = os.path.splitext(os.path.basename(ai_file))[0]
+                    
+                    # Skip __init__.py and other special files
+                    if model_name.startswith('_'):
+                        continue
+                    
+                    # Full path to the extracted file
+                    model_path = os.path.join(temp_dir, ai_file)
+                    
+                    # Load the model function
+                    spec = importlib.util.spec_from_file_location(model_name, model_path)
+                    module = importlib.util.module_from_spec(spec)
+                    
+                    # Add to sys.modules with unique name
+                    unique_name = f"ai_model_{model_name}_{int(time.time())}"
+                    sys.modules[unique_name] = module
+                    spec.loader.exec_module(module)
+                    
+                    # Check if the summarize function exists
+                    if hasattr(module, 'summarize'):
+                        models[model_name] = getattr(module, 'summarize')
+                        available_models.append(model_name)
+                        print(f"Loaded model: {model_name}")
+                    else:
+                        print(f"Warning: {ai_file} does not define a 'summarize' function")
+                
+                except Exception as e:
+                    print(f"Error loading model {ai_file}: {str(e)}")
+            
+            # Don't delete temp_dir immediately - keep it for the session
+            # We could implement cleanup on server shutdown if needed
+    
+    except Exception as e:
+        print(f"Error extracting models from ZIP: {str(e)}")
+    
+    return models, available_models
 
 @app.route('/')
 def index():
@@ -41,9 +116,21 @@ def upload_presentation():
     file = request.files['file']
     filepath = os.path.join(UPLOAD_FOLDER, 'current.zip')
     file.save(filepath)
-    current_presentation['file'] = filepath
     
-    return jsonify({'success': True})
+    # Extract and load AI models from the ZIP
+    models, available_models = extract_and_load_models(filepath)
+    
+    current_presentation['file'] = filepath
+    current_presentation['models'] = models
+    current_presentation['available_models'] = available_models
+    
+    print(f"Presentation uploaded with {len(available_models)} AI models")
+    
+    return jsonify({
+        'success': True,
+        'models_found': len(available_models),
+        'models': available_models
+    })
 
 @app.route('/api/presentation/current')
 def get_current_presentation():
@@ -51,15 +138,34 @@ def get_current_presentation():
         return send_file(current_presentation['file'], as_attachment=True, download_name='presentation.zip')
     return jsonify({'error': 'No presentation loaded'}), 404
 
+# Model endpoints
+@app.route('/api/models')
+def get_models():
+    """Get list of available AI models from the current presentation"""
+    return jsonify({
+        'models': current_presentation.get('available_models', [])
+    })
+
 # API endpoints for surveys
 @app.route('/api/survey/create', methods=['POST'])
 def create_survey():
     data = request.json
     survey_id = str(uuid.uuid4())[:8]
+    
+    model_name = data.get('model', None)
+    
+    # Validate that the model exists
+    if model_name and model_name not in current_presentation.get('models', {}):
+        return jsonify({
+            'error': f'Model "{model_name}" not found in current presentation'
+        }), 400
+    
     surveys[survey_id] = {
         'question': data.get('question', 'What do you think?'),
         'created_at': time.time(),
-        'active': True
+        'active': True,
+        'model': model_name,
+        'num_summaries': data.get('num_summaries', 3)
     }
     return jsonify({'survey_id': survey_id, 'url': f'/survey/{survey_id}'})
 
@@ -101,6 +207,59 @@ def get_responses(survey_id):
         'responses': survey_responses[survey_id],
         'total': len(survey_responses[survey_id])
     })
+
+@app.route('/api/survey/<survey_id>/analyze', methods=['POST'])
+def analyze_survey(survey_id):
+    """
+    Analyze survey responses using the specified model from the presentation ZIP.
+    """
+    if survey_id not in surveys:
+        return jsonify({'error': 'Survey not found'}), 404
+    
+    survey = surveys[survey_id]
+    responses = survey_responses[survey_id]
+    
+    if len(responses) == 0:
+        return jsonify({'error': 'No responses to analyze'}), 400
+    
+    model_name = survey.get('model')
+    num_summaries = survey.get('num_summaries', 3)
+    
+    if not model_name:
+        return jsonify({'error': 'No model specified for this survey'}), 400
+    
+    # Get the model function from loaded models
+    model_func = current_presentation.get('models', {}).get(model_name)
+    
+    if not model_func:
+        return jsonify({'error': f'Model "{model_name}" not loaded'}), 404
+    
+    try:
+        # Extract response texts
+        response_texts = [r['text'] for r in responses]
+        
+        # Call the summarize function
+        summaries = model_func(response_texts, num_summaries)
+        
+        # Validate the output
+        if not isinstance(summaries, list):
+            return jsonify({'error': 'Model must return a list of summaries'}), 500
+        
+        if len(summaries) != num_summaries:
+            return jsonify({
+                'error': f'Model returned {len(summaries)} summaries, expected {num_summaries}'
+            }), 500
+        
+        return jsonify({
+            'summaries': summaries,
+            'model': model_name,
+            'num_responses': len(responses)
+        })
+    
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Error analyzing responses: {str(e)}'}), 500
 
 @app.route('/api/survey/<survey_id>/close', methods=['POST'])
 def close_survey(survey_id):
