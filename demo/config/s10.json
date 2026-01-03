@@ -1,0 +1,17 @@
+{
+  "widgets": [
+    {
+      "id": "webcam_small",
+      "type": "webcam",
+      "x": 0.05,
+      "y": 0.1,
+      "width": 0.9,
+      "height": 0.8,
+      "zIndex": 10,
+      "defaultZoom": 1.5,
+      "defaultAudio": true,
+      "autoStart": true,
+      "interactive": true
+    }
+  ]
+}

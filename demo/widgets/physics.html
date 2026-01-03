@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Physics Widget</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: "Computer Modern Sans", sans-serif;
+    }
+
+    #widget-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      background: #ffffff;
+      border: 2px solid #666;
+      border-radius: 4px;
+    }
+
+    #canvas {
+      flex: 1;
+      display: block;
+      cursor: grab;
+    }
+
+    #canvas:active {
+      cursor: grabbing;
+    }
+  </style>
+</head>
+<body>
+  <div id="widget-container">
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <script>
+    class Ball {
+      constructor(x, y, radius, color) {
+        this.x = x;
+        this.y = y;
+        this.vx = (Math.random() - 0.5) * 4;
+        this.vy = (Math.random() - 0.5) * 4;
+        this.radius = radius;
+        this.color = color;
+        this.mass = radius * radius;
+        this.dragging = false;
+      }
+
+      draw(ctx) {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.strokeStyle = '#666';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      update(gravity, friction, width, height) {
+        if (!this.dragging) {
+          this.vy += gravity;
+          this.vx *= friction;
+          this.vy *= friction;
+          this.x += this.vx;
+          this.y += this.vy;
+
+          if (this.x - this.radius < 0) {
+            this.x = this.radius;
+            this.vx *= -1;
+          }
+          if (this.x + this.radius > width) {
+            this.x = width - this.radius;
+            this.vx *= -1;
+          }
+          if (this.y - this.radius < 0) {
+            this.y = this.radius;
+            this.vy *= -1;
+          }
+          if (this.y + this.radius > height) {
+            this.y = height - this.radius;
+            this.vy *= -1;
+          }
+        }
+      }
+
+      contains(x, y) {
+        const dx = x - this.x;
+        const dy = y - this.y;
+        return dx * dx + dy * dy < this.radius * this.radius;
+      }
+    }
+
+    class PhysicsWidget {
+      constructor() {
+        this.canvas = document.getElementById('canvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.balls = [];
+        this.draggedBall = null;
+        this.mouseX = 0;
+        this.mouseY = 0;
+        this.lastMouseX = 0;
+        this.lastMouseY = 0;
+        this.animationId = null;
+        this.colors = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c'];
+        
+        // Default config
+        this.config = {
+          gravity: 0.5,
+          elasticity: 0.8,
+          friction: 0.98,
+          initialBalls: 3,
+          interactive: true
+        };
+        
+        this.init();
+      }
+
+      init() {
+        this.setupCanvas();
+        this.setupEvents();
+        this.addInitialBalls();
+        this.animate();
+      }
+
+      setupCanvas() {
+        const container = this.canvas.parentElement;
+        const rect = container.getBoundingClientRect();
+        
+        this.canvas.width = rect.width;
+        this.canvas.height = rect.height;
+        
+        // Handle resize
+        window.addEventListener('resize', () => {
+          const rect = container.getBoundingClientRect();
+          this.canvas.width = rect.width;
+          this.canvas.height = rect.height;
+        });
+      }
+
+      setupEvents() {
+        this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
+        this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+        this.canvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+        this.canvas.addEventListener('mouseleave', (e) => this.handleMouseUp(e));
+
+        this.canvas.addEventListener('touchstart', (e) => {
+          e.preventDefault();
+          this.handleMouseDown(e.touches[0]);
+        }, { passive: false });
+
+        this.canvas.addEventListener('touchmove', (e) => {
+          e.preventDefault();
+          this.handleMouseMove(e.touches[0]);
+        }, { passive: false });
+
+        this.canvas.addEventListener('touchend', (e) => {
+          e.preventDefault();
+          this.handleMouseUp(e);
+        }, { passive: false });
+      }
+
+      getMousePos(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        return {
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top
+        };
+      }
+
+      handleMouseDown(e) {
+        if (!this.config.interactive) return;
+        
+        const pos = this.getMousePos(e);
+        this.mouseX = pos.x;
+        this.mouseY = pos.y;
+        this.lastMouseX = pos.x;
+        this.lastMouseY = pos.y;
+        
+        for (let ball of this.balls) {
+          if (ball.contains(pos.x, pos.y)) {
+            this.draggedBall = ball;
+            ball.dragging = true;
+            ball.vx = 0;
+            ball.vy = 0;
+            return;
+          }
+        }
+      }
+
+      handleMouseMove(e) {
+        if (!this.config.interactive) return;
+        
+        const pos = this.getMousePos(e);
+        this.lastMouseX = this.mouseX;
+        this.lastMouseY = this.mouseY;
+        this.mouseX = pos.x;
+        this.mouseY = pos.y;
+        
+        if (this.draggedBall) {
+          this.draggedBall.x = pos.x;
+          this.draggedBall.y = pos.y;
+        }
+      }
+
+      handleMouseUp(e) {
+        if (!this.config.interactive) return;
+        
+        if (this.draggedBall) {
+          this.draggedBall.vx = (this.mouseX - this.lastMouseX) * 0.5;
+          this.draggedBall.vy = (this.mouseY - this.lastMouseY) * 0.5;
+          this.draggedBall.dragging = false;
+          this.draggedBall = null;
+        }
+      }
+
+      addBall(x, y, radius, color) {
+        this.balls.push(new Ball(x, y, radius, color));
+      }
+
+      addInitialBalls() {
+        for (let i = 0; i < this.config.initialBalls; i++) {
+          const x = Math.random() * (this.canvas.width - 80) + 40;
+          const y = Math.random() * (this.canvas.height - 80) + 40;
+          const radius = Math.random() * 20 + 20;
+          const color = this.colors[Math.floor(Math.random() * this.colors.length)];
+          this.addBall(x, y, radius, color);
+        }
+      }
+
+      checkCollisions() {
+        for (let i = 0; i < this.balls.length; i++) {
+          for (let j = i + 1; j < this.balls.length; j++) {
+            const ball1 = this.balls[i];
+            const ball2 = this.balls[j];
+            
+            if (ball1.dragging || ball2.dragging) continue;
+
+            const dx = ball2.x - ball1.x;
+            const dy = ball2.y - ball1.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const minDist = ball1.radius + ball2.radius;
+
+            if (distance < minDist) {
+              const overlap = minDist - distance;
+              const nx = dx / distance;
+              const ny = dy / distance;
+              
+              const totalMass = ball1.mass + ball2.mass;
+              ball1.x -= nx * overlap * (ball2.mass / totalMass);
+              ball1.y -= ny * overlap * (ball2.mass / totalMass);
+              ball2.x += nx * overlap * (ball1.mass / totalMass);
+              ball2.y += ny * overlap * (ball1.mass / totalMass);
+
+              const dvx = ball2.vx - ball1.vx;
+              const dvy = ball2.vy - ball1.vy;
+              const dvn = dvx * nx + dvy * ny;
+
+              if (dvn >= 0) continue;
+
+              const impulse = (2 * dvn) / totalMass * this.config.elasticity;
+              ball1.vx += impulse * ball2.mass * nx;
+              ball1.vy += impulse * ball2.mass * ny;
+              ball2.vx -= impulse * ball1.mass * nx;
+              ball2.vy -= impulse * ball1.mass * ny;
+            }
+          }
+        }
+      }
+
+      animate() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        for (let ball of this.balls) {
+          ball.update(
+            this.config.gravity,
+            this.config.friction,
+            this.canvas.width,
+            this.canvas.height
+          );
+          ball.draw(this.ctx);
+        }
+        
+        this.checkCollisions();
+        this.animationId = requestAnimationFrame(() => this.animate());
+      }
+
+      updateConfig(newConfig) {
+        Object.assign(this.config, newConfig);
+      }
+
+      destroy() {
+        if (this.animationId) {
+          cancelAnimationFrame(this.animationId);
+        }
+      }
+    }
+
+    // Initialize widget
+    const widget = new PhysicsWidget();
+
+    // Listen for config from parent
+    window.addEventListener('message', (event) => {
+      if (event.data.type === 'widget-config') {
+        widget.updateConfig(event.data.config);
+      } else if (event.data.type === 'widget-cleanup') {
+        widget.destroy();
+      }
+    });
+  </script>
+</body>
+</html>

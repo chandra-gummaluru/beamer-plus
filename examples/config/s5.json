@@ -1,9 +1,0 @@
-{
-  "audio": [
-    {
-      "path": "audio/audio.mp3",
-      "volume": 1.0,
-      "playMode": "auto"
-    }
-  ]
-}
