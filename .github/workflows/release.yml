@@ -43,7 +43,8 @@ jobs:
             --name "${{ matrix.output_name }}" \
             --add-data "static:static" \
             --add-data "demo:demo" \
-            --add-data "*.html:." \
+            --add-data "index.html:." \
+            --add-data "survey_response.html:." \
             --hidden-import=engineio.async_drivers.threading \
             --hidden-import=simple_websocket \
             app.py
