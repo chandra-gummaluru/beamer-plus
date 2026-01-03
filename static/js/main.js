@@ -692,6 +692,19 @@ surveyBtn.onClick(() => {
     };
 });
 
+function updateSurveyOverlayPosition() {
+    const overlay = document.getElementById('survey-overlay');
+    if (!overlay) return;
+    
+    const pdfContainer = document.getElementById('pdf-canvas');
+    const containerRect = pdfContainer.getBoundingClientRect();
+    
+    overlay.style.top = `${containerRect.top}px`;
+    overlay.style.left = `${containerRect.left}px`;
+    overlay.style.width = `${containerRect.width}px`;
+    overlay.style.height = `${containerRect.height}px`;
+}
+
 function showSurveyOverlay() {
     if (!currentSurveyData) return;
     
@@ -860,6 +873,19 @@ let currentResultIndex = 0;
 
 // Use UI helper `disableControlButtons` from beamer_ui.js
 
+function updateSurveyResultsOverlayPosition() {
+    const overlay = document.getElementById('survey-results-overlay');
+    if (!overlay) return;
+    
+    const pdfContainer = document.getElementById('pdf-canvas');
+    const containerRect = pdfContainer.getBoundingClientRect();
+    
+    overlay.style.top = `${containerRect.top}px`;
+    overlay.style.left = `${containerRect.left}px`;
+    overlay.style.width = `${containerRect.width}px`;
+    overlay.style.height = `${containerRect.height}px`;
+}
+
 function showSurveyResultsOverlay() {
     if (!currentSurveyResults || !currentSurveyResults.summaries || currentSurveyResults.summaries.length === 0) {
         Modal.info('No Results', 'No survey results available.');
@@ -981,6 +1007,16 @@ function updateResultDisplay() {
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && resultsOverlayVisible) {
         hideSurveyResultsOverlay();
+    }
+});
+
+// Add resize listener to update overlay positions
+window.addEventListener('resize', () => {
+    if (surveyOverlayVisible) {
+        updateSurveyOverlayPosition();
+    }
+    if (resultsOverlayVisible) {
+        updateSurveyResultsOverlayPosition();
     }
 });
 
