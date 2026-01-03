@@ -2,7 +2,7 @@
 // Renders widgets from HTML files in the zip file
 // Widgets are loaded as blob URLs from the presentation zip
 
-export function renderWidgets(slideConfig, container, getDisplayWidth, getDisplayHeight, zipFile) {
+export function renderWidgets(slideConfig, container, zipFile) {
     if (!slideConfig.widgets || slideConfig.widgets.length === 0) {
         return;
     }
@@ -14,12 +14,23 @@ export function renderWidgets(slideConfig, container, getDisplayWidth, getDispla
         iframe.className = "widget-iframe";
         iframe.dataset.widgetId = w.id;
         
-        // Styling
+        // Store original widget config as percentages (0-1 range) for resize handling
+        iframe.dataset.widgetX = w.x;
+        iframe.dataset.widgetY = w.y;
+        iframe.dataset.widgetWidth = w.width;
+        iframe.dataset.widgetHeight = w.height;
+        iframe.dataset.widgetZIndex = w.zIndex || 10;
+        iframe.dataset.widgetInteractive = w.interactive !== false ? 'true' : 'false';
+        
+        // Get container's actual size
+        const rect = container.getBoundingClientRect();
+        
+        // Styling - position relative to container's actual size
         iframe.style.position = "absolute";
-        iframe.style.left = `${w.x * getDisplayWidth()}px`;
-        iframe.style.top = `${w.y * getDisplayHeight()}px`;
-        iframe.style.width = `${w.width * getDisplayWidth()}px`;
-        iframe.style.height = `${w.height * getDisplayHeight()}px`;
+        iframe.style.left = `${w.x * rect.width}px`;
+        iframe.style.top = `${w.y * rect.height}px`;
+        iframe.style.width = `${w.width * rect.width}px`;
+        iframe.style.height = `${w.height * rect.height}px`;
         iframe.style.zIndex = w.zIndex || 10;
         iframe.style.border = "none";
         iframe.style.background = "transparent";
@@ -57,6 +68,27 @@ export function renderWidgets(slideConfig, container, getDisplayWidth, getDispla
         } catch (error) {
             console.error('Error loading widget:', error);
             iframe.srcdoc = `<div style="padding:20px;font-family:sans-serif;color:#e74c3c;">Error loading widget: ${error.message}</div>`;
+        }
+    });
+}
+
+export function updateWidgetPositions(container) {
+    // Update positions and sizes of all widgets after resize
+    // Use the container's actual bounding rect for accurate positioning
+    const rect = container.getBoundingClientRect();
+    const widgets = container.querySelectorAll('.widget-iframe');
+    
+    widgets.forEach(iframe => {
+        const x = parseFloat(iframe.dataset.widgetX);
+        const y = parseFloat(iframe.dataset.widgetY);
+        const width = parseFloat(iframe.dataset.widgetWidth);
+        const height = parseFloat(iframe.dataset.widgetHeight);
+        
+        if (!isNaN(x) && !isNaN(y) && !isNaN(width) && !isNaN(height)) {
+            iframe.style.left = `${x * rect.width}px`;
+            iframe.style.top = `${y * rect.height}px`;
+            iframe.style.width = `${width * rect.width}px`;
+            iframe.style.height = `${height * rect.height}px`;
         }
     });
 }

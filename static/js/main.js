@@ -4,7 +4,7 @@ import { Button } from './button.js';
 import { Selector } from './selector.js';
 import { Toggle } from './toggle.js';
 import { Canvas } from './canvas.js';
-import { renderWidgets, cleanupWidgets } from './iframe-widget-renderer.js';
+import { renderWidgets, cleanupWidgets, updateWidgetPositions } from './iframe-widget-renderer.js';
 import { Modal } from './beamer_modal.js';
 import { setControlsEnabledAfterUpload, disableControlButtons } from './beamer_ui.js';
 
@@ -252,6 +252,48 @@ function syncAnnotations() {
     }, 100);
 }
 
+// Helper function to update all media element positions after resize
+function updateMediaPositions() {
+    // Get the container's actual size on screen
+    const rect = slide_canvas_container.getBoundingClientRect();
+    
+    // Update videos using stored fractional positions
+    const videos = slide_canvas_container.querySelectorAll('video');
+    videos.forEach(video => {
+        const x = parseFloat(video.dataset.videoX);
+        const y = parseFloat(video.dataset.videoY);
+        const width = parseFloat(video.dataset.videoWidth);
+        const height = parseFloat(video.dataset.videoHeight);
+        
+        if (!isNaN(x) && !isNaN(y) && !isNaN(width) && !isNaN(height)) {
+            video.style.left = `${x * rect.width}px`;
+            video.style.top = `${y * rect.height}px`;
+            video.style.width = `${width * rect.width}px`;
+            video.style.height = `${height * rect.height}px`;
+        }
+    });
+    
+    // Update 3D models using stored fractional positions
+    const models = slide_canvas_container.querySelectorAll('model-viewer');
+    models.forEach(mv => {
+        const x = parseFloat(mv.dataset.modelX);
+        const y = parseFloat(mv.dataset.modelY);
+        const width = parseFloat(mv.dataset.modelWidth);
+        const height = parseFloat(mv.dataset.modelHeight);
+        
+        if (!isNaN(x) && !isNaN(y) && !isNaN(width) && !isNaN(height)) {
+            mv.style.left = `${x * rect.width}px`;
+            mv.style.top = `${y * rect.height}px`;
+            mv.style.width = `${width * rect.width}px`;
+            mv.style.height = `${height * rect.height}px`;
+        }
+    });
+    
+    // Update widgets
+    updateWidgetPositions(slide_canvas_container);
+}
+
+
 prevBtn.onClick(() => goToSlide(currentSlide - 1));
 nextBtn.onClick(() => goToSlide(currentSlide + 1));
 
@@ -320,6 +362,9 @@ async function renderSlide(slideIndex) {
     console.log('Models to render:', slideConfig.models?.length || 0);
     console.log('Widgets to render:', slideConfig.widgets?.length || 0);
     
+    // Get container's actual size for positioning all media elements
+    const containerRect = slide_canvas_container.getBoundingClientRect();
+    
     if (slideConfig.videos) {
         for (const v of slideConfig.videos) {
             const videoURL = await loadMediaFromPath(v.path);
@@ -330,11 +375,17 @@ async function renderSlide(slideIndex) {
             video.volume = v.volume || 1.0;
             video.dataset.videoId = v.id;
             
+            // Store fractional positions for resize handling
+            video.dataset.videoX = v.x;
+            video.dataset.videoY = v.y;
+            video.dataset.videoWidth = v.width;
+            video.dataset.videoHeight = v.height;
+            
             video.style.position = "absolute";
-            video.style.left = `${v.x * pdfCvs.getDisplayWidth()}px`;
-            video.style.top = `${v.y * pdfCvs.getDisplayHeight()}px`;
-            video.style.width = `${v.width * pdfCvs.getDisplayWidth()}px`;
-            video.style.height = `${v.height * pdfCvs.getDisplayHeight()}px`;
+            video.style.left = `${v.x * containerRect.width}px`;
+            video.style.top = `${v.y * containerRect.height}px`;
+            video.style.width = `${v.width * containerRect.width}px`;
+            video.style.height = `${v.height * containerRect.height}px`;
             video.style.objectFit = "contain";
             video.style.zIndex = v.zIndex || 5;
             
@@ -393,15 +444,22 @@ async function renderSlide(slideIndex) {
             mv.src = modelURL;
             mv.alt = m.alt || "3D model";
             mv.dataset.modelId = m.id;
+            
+            // Store fractional positions for resize handling
+            mv.dataset.modelX = m.x;
+            mv.dataset.modelY = m.y;
+            mv.dataset.modelWidth = m.width;
+            mv.dataset.modelHeight = m.height;
+            
             mv.setAttribute("camera-controls", "");
             mv.setAttribute("shadow-intensity", "1");
             mv.setAttribute("auto-rotate", m.autoRotate ? "true" : "false");
             
             mv.style.position = "absolute";
-            mv.style.left = `${m.x * pdfCvs.getDisplayWidth()}px`;
-            mv.style.top = `${m.y * pdfCvs.getDisplayHeight()}px`;
-            mv.style.width = `${m.width * pdfCvs.getDisplayWidth()}px`;
-            mv.style.height = `${m.height * pdfCvs.getDisplayHeight()}px`;
+            mv.style.left = `${m.x * containerRect.width}px`;
+            mv.style.top = `${m.y * containerRect.height}px`;
+            mv.style.width = `${m.width * containerRect.width}px`;
+            mv.style.height = `${m.height * containerRect.height}px`;
             mv.style.zIndex = m.zIndex || 5;
             
             mv.addEventListener('camera-change', () => {
@@ -443,10 +501,7 @@ async function renderSlide(slideIndex) {
     }
     
     if (slideConfig.widgets) {
-        renderWidgets(slideConfig, slide_canvas_container, 
-                     () => pdfCvs.getDisplayWidth(), 
-                     () => pdfCvs.getDisplayHeight(), 
-                     zipFile);
+        renderWidgets(slideConfig, slide_canvas_container, zipFile);
     }
 }
 
@@ -1023,6 +1078,32 @@ window.addEventListener('resize', () => {
     if (annCvs) {
         annCvs.resize();
     }
+    
+    // Update positions of all media elements (videos, models, widgets)
+    if (zipFile && slideConfigs[currentSlide]) {
+        updateMediaPositions();
+    }
+});
+
+// Add fullscreen change listener to handle fullscreen transitions
+document.addEventListener('fullscreenchange', () => {
+    // Need a small delay for the browser to finish the fullscreen transition
+    setTimeout(() => {
+        if (surveyOverlayVisible) {
+            updateSurveyOverlayPosition();
+        }
+        if (resultsOverlayVisible) {
+            updateSurveyResultsOverlayPosition();
+        }
+        
+        if (annCvs) {
+            annCvs.resize();
+        }
+        
+        if (zipFile && slideConfigs[currentSlide]) {
+            updateMediaPositions();
+        }
+    }, 100);
 });
 
 });
