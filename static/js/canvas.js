@@ -30,6 +30,10 @@ export class Canvas {
 
         this.buffer = document.createElement("canvas");
         this.bufferCtx = this.buffer.getContext("2d");
+        
+        // Temporary canvas for drawing current stroke (for proper alpha blending)
+        this.strokeBuffer = document.createElement("canvas");
+        this.strokeBufferCtx = this.strokeBuffer.getContext("2d");
 
         this.drawing = false;
         this.currentStroke = null;
@@ -130,22 +134,41 @@ export class Canvas {
 
         let color = this.strokeColor;
         let width = this.strokeWidth;
+        let mode = this.pointer_mode;
 
         switch (this.pointer_mode) {
             case "draw":
-                this.ctx.globalAlpha = 1
+                this.ctx.globalAlpha = 1;
                 this.ctx.globalCompositeOperation = "source-over";
                 break;
 
             case "highlight":
-                this.ctx.globalCompositeOperation = "multiply";
-                this.ctx.globalAlpha = 0.3
+                // For highlighter, setup a stroke buffer
+                const rect = this.canvas.getBoundingClientRect();
+                this.strokeBuffer.width = rect.width * this.dpr;
+                this.strokeBuffer.height = rect.height * this.dpr;
+                
+                // Get a fresh context after resizing
+                this.strokeBufferCtx = this.strokeBuffer.getContext("2d");
+                this.strokeBufferCtx.scale(this.dpr, this.dpr);
+                this.strokeBufferCtx.lineCap = 'round';
+                this.strokeBufferCtx.lineJoin = 'round';
+                this.strokeBufferCtx.imageSmoothingEnabled = true;
+                this.strokeBufferCtx.imageSmoothingQuality = 'high';
+                
+                // Draw with full opacity on buffer
+                this.strokeBufferCtx.globalAlpha = 1;
+                this.strokeBufferCtx.globalCompositeOperation = "source-over";
+                
+                // Save the current canvas state
+                this.savedCanvasState = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+                
                 width = this.strokeWidth * 8;
                 break;
 
             case "erase":
                 this.ctx.globalCompositeOperation = "destination-out";
-                this.ctx.globalAlpha = 1
+                this.ctx.globalAlpha = 1;
                 width = this.strokeWidth * 12;
                 color = "white";
                 break;
@@ -154,7 +177,8 @@ export class Canvas {
         this.currentStroke = {
             points: [p],
             color,
-            width
+            width,
+            mode
         };
     }
 
@@ -185,7 +209,8 @@ export class Canvas {
         
         pts.push(p);
 
-        const ctx = this.ctx;
+        // Use stroke buffer for highlighter, main context for others
+        const ctx = this.currentStroke.mode === 'highlight' ? this.strokeBufferCtx : this.ctx;
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
         ctx.strokeStyle = this.currentStroke.color;
@@ -238,6 +263,22 @@ export class Canvas {
                 ctx.stroke();
             }
         }
+        
+        // For highlighter, composite the buffer to main canvas in real-time
+        if (this.currentStroke.mode === 'highlight') {
+            // Restore the saved state
+            this.ctx.putImageData(this.savedCanvasState, 0, 0);
+            
+            // Composite the stroke buffer with proper alpha
+            this.ctx.save();
+            this.ctx.globalAlpha = 0.4;
+            this.ctx.globalCompositeOperation = "multiply";
+            
+            const rect = this.canvas.getBoundingClientRect();
+            this.ctx.drawImage(this.strokeBuffer, 0, 0, rect.width, rect.height);
+            
+            this.ctx.restore();
+        }
     }
 
     stopDraw(e) {
@@ -247,6 +288,26 @@ export class Canvas {
 
         if (!this.drawing) return;
         e.preventDefault();
+        
+        // For highlighter, finalize the composite
+        if (this.currentStroke && this.currentStroke.mode === 'highlight') {
+            // Restore the saved canvas state
+            this.ctx.putImageData(this.savedCanvasState, 0, 0);
+            
+            // Composite the final stroke buffer with proper alpha
+            this.ctx.save();
+            this.ctx.globalAlpha = 0.4;
+            this.ctx.globalCompositeOperation = "multiply";
+            
+            const rect = this.canvas.getBoundingClientRect();
+            this.ctx.drawImage(this.strokeBuffer, 0, 0, rect.width, rect.height);
+            
+            this.ctx.restore();
+            
+            // Clear the stroke buffer and saved state
+            this.strokeBufferCtx.clearRect(0, 0, this.strokeBuffer.width, this.strokeBuffer.height);
+            this.savedCanvasState = null;
+        }
         
         // For e-ink: redraw the entire stroke smoothly when pen lifts
         // This creates a cleaner final result
