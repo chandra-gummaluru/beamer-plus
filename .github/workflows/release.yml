@@ -42,7 +42,7 @@ jobs:
           pyinstaller --onefile \
             --name "${{ matrix.output_name }}" \
             --add-data "static:static" \
-            --add-data "examples:examples" \
+            --add-data "demo:demo" \
             --add-data "*.html:." \
             --hidden-import=engineio.async_drivers.threading \
             --hidden-import=simple_websocket \
