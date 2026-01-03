@@ -4,161 +4,32 @@
   <meta charset="utf-8">
   <title>Survey</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: 'Georgia', 'Times New Roman', serif;
-      background: #fcfcfc;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-    .survey-container {
-      background: #eeeeee;
-      border: 2px solid #666;
-      border-radius: 4px;
-      padding: 2rem;
-      max-width: 600px;
-      width: 100%;
-    }
-    h1 {
-      color: #333;
-      margin-bottom: 1rem;
-      font-size: 1.5rem;
-      font-weight: normal;
-    }
-    .survey-question {
-      color: #666;
-      font-size: 1rem;
-      margin-bottom: 1.5rem;
-      line-height: 1.6;
-    }
-    textarea {
-      width: 100%;
-      min-height: 150px;
-      padding: 0.75rem;
-      border: 2px solid #666;
-      border-radius: 4px;
-      font-family: 'Georgia', 'Times New Roman', serif;
-      font-size: 1rem;
-      resize: vertical;
-      background: white;
-      color: #333;
-    }
-    textarea:focus {
-      outline: none;
-      border-color: #333;
-    }
-    button {
-      background: #666;
-      color: #eee;
-      border: 2px solid #666;
-      padding: 0.75rem 1.5rem;
-      border-radius: 4px;
-      font-size: 1rem;
-      font-family: 'Georgia', 'Times New Roman', serif;
-      cursor: pointer;
-      margin-top: 1rem;
-      width: 100%;
-      transition: all 0.2s;
-    }
-    button:hover {
-      background: #555;
-      border-color: #555;
-    }
-    button:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-    .success-message, .error-message {
-      display: none;
-      padding: 1rem;
-      border-radius: 4px;
-      margin-top: 1rem;
-      text-align: center;
-    }
-    .success-message {
-      background: #2ecc71;
-      color: white;
-    }
-    .error-message {
-      background: #e74c3c;
-      color: white;
-    }
-    
-    /* Styled closed state */
-    .closed-container {
-      display: none;
-      text-align: center;
-    }
-    .closed-container .icon {
-      font-size: 3rem;
-      color: #999;
-      margin-bottom: 1rem;
-    }
-    .closed-container h2 {
-      color: #333;
-      margin-bottom: 1rem;
-      font-size: 1.5rem;
-      font-weight: normal;
-    }
-    .closed-container .message {
-      color: #666;
-      font-size: 1rem;
-      margin-bottom: 1.5rem;
-      line-height: 1.6;
-    }
-    .closed-container .suggestion {
-      color: #888;
-      font-size: 0.9rem;
-      font-style: italic;
-      margin-bottom: 1.5rem;
-    }
-    .closed-container a.back-link {
-      display: inline-block;
-      background: #666;
-      color: #eee;
-      border: 2px solid #666;
-      padding: 0.75rem 1.5rem;
-      border-radius: 4px;
-      font-size: 1rem;
-      font-family: 'Georgia', 'Times New Roman', serif;
-      cursor: pointer;
-      text-decoration: none;
-      transition: all 0.2s;
-    }
-    .closed-container a.back-link:hover {
-      background: #555;
-      border-color: #555;
-    }
-  </style>
+  <link rel="stylesheet" href="/static/css/shared.css">
+  <link rel="stylesheet" href="/static/css/modal.css">
+  <link rel="stylesheet" href="/static/css/control-panel.css">
 </head>
 <body>
-  <div class="survey-container">
+  <div class="survey-container" style="max-width:600px; margin:48px auto;">
     <div id="survey-form">
-      <h1>Share your thoughts...</h1>
+      <h1 style="margin-bottom:1rem;">Share your thoughts...</h1>
       <textarea id="response" placeholder="Enter your response here..."></textarea>
-      <button id="submit-btn" onclick="submitResponse()">Submit Response</button>
-      
-      <div class="success-message" id="success-message">
-        ✓ Thank you! Your response has been submitted.
-      </div>
-      
-      <div class="error-message" id="error-message">
-        ✗ Error submitting response. Please try again.
+      <button id="submit-btn" class="control_panel_btn" onclick="submitResponse()">Submit Response</button>
+
+      <div style="margin-top:1rem; display:flex; gap:8px; align-items:center;">
+        <div id="submit-loader" style="display:none;">
+          <svg class="custom-modal-squiggle" viewBox="0 0 120 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M2 20 C20 2, 40 38, 58 20 C76 2, 96 38, 118 20" />
+          </svg>
+        </div>
+        <div class="success-message" id="success-message" style="display:none;">✓ Thank you! Your response has been submitted.</div>
+        <div class="error-message" id="error-message" style="display:none;">✗ Error submitting response. Please try again.</div>
       </div>
     </div>
-    
-    <div class="closed-container" id="closed-container">
+
+    <div class="closed-container" id="closed-container" style="display:none; text-align:center;">
       <h2>Survey Closed</h2>
-      <p class="message">
-        This survey is no longer accepting responses.
-      </p>
-      <p class="suggestion">
-        Thank you for your interest.
-      </p>
+      <p class="message">This survey is no longer accepting responses.</p>
+      <p class="suggestion">Thank you for your interest.</p>
     </div>
   </div>
 
@@ -214,8 +85,9 @@
       }
       
       const btn = document.getElementById('submit-btn');
+      const loader = document.getElementById('submit-loader');
       btn.disabled = true;
-      btn.textContent = 'Submitting...';
+      loader.style.display = 'block';
       
       try {
         const response = await fetch(`/api/survey/${surveyId}/respond`, {
@@ -231,6 +103,7 @@
           document.getElementById('response').value = '';
           setTimeout(() => {
             btn.disabled = false;
+            loader.style.display = 'none';
             btn.textContent = 'Submit Another Response';
             hideMessages();
           }, 3000);
@@ -244,6 +117,7 @@
         console.error('Error submitting response:', error);
         showError('Error submitting response. Please try again.');
         btn.disabled = false;
+        document.getElementById('submit-loader').style.display = 'none';
         btn.textContent = 'Submit Response';
       }
     }

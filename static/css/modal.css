@@ -1,0 +1,203 @@
+/* ============================
+   Beamer+ Alert Modal System
+   ============================ */
+
+/* Overlay */
+.custom-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+
+    font-family: 'Open Sans', sans-serif;
+    font-size: 1rem;
+    font-weight: 400;
+}
+
+/* Modal Box — matches .modal-box + control panel surfaces */
+.custom-modal-content {
+    background: #eee;
+    border: 2px solid #666;
+    border-radius: 6px;
+
+    padding: 1.5rem;
+    max-width: 45%;
+    width: 90%;
+    position: relative;
+
+    box-shadow: none;
+}
+
+/* Icon — same visual weight as UI affordances */
+.custom-modal-icon {
+    font-size: 2rem;
+    text-align: center;
+    color: #666;
+    margin-bottom: 0.5rem;
+}
+
+/* Explicitly neutralize variants */
+.custom-modal-overlay.modal-info .custom-modal-icon,
+.custom-modal-overlay.modal-success .custom-modal-icon,
+.custom-modal-overlay.modal-warning .custom-modal-icon,
+.custom-modal-overlay.modal-error .custom-modal-icon,
+.custom-modal-overlay.modal-confirm .custom-modal-icon {
+    color: #666;
+}
+
+/* Title — same hierarchy as panel labels */
+.custom-modal-title {
+    margin: 0 0 0.75rem 0;
+    text-align: center;
+
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #000;
+}
+
+/* Message — identical tone to control text */
+.custom-modal-message {
+    text-align: center;
+    color: #333;
+    line-height: 1.5;
+    margin-bottom: 1.25rem;
+
+    user-select: text;
+}
+
+/* Buttons container */
+.custom-modal-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+/* Buttons — DIRECTLY mirrors .control_panel_btn */
+.custom-modal-btn {
+    display: inline-block;
+    padding: 0.5em 1em;
+
+    font-family: 'Open Sans', sans-serif;
+    font-size: 1rem;
+
+    color: #666;
+    background-color: #eeeeee;
+
+    border: 2px solid #666;
+    border-radius: 4px;
+
+    cursor: pointer;
+    text-decoration: none;
+
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.custom-modal-btn:hover {
+    background-color: #bbbbbb;
+}
+
+.custom-modal-btn:focus {
+    outline: none;
+    border-color: #000;
+}
+
+/* OK button — analogous to "selected", but less aggressive */
+.custom-modal-btn-ok {
+    font-weight: 600;
+}
+
+/* Cancel button — fully neutral */
+.custom-modal-btn-cancel {
+    color: #666;
+}
+
+/* =====================================
+   Academic Loading Indicator (Writing)
+   ===================================== */
+
+.custom-modal-spinner {
+    text-align: center;
+    margin-bottom: 0.75rem;
+
+    font-family: 'Open Sans', monospace;
+    font-size: 1.1rem;
+    color: #666;
+}
+
+/* Simulated writing line */
+.custom-modal-spinner::after {
+    content: '';
+    display: inline-block;
+    height: 1em;
+    width: 0;
+    border-right: 2px solid #666;
+    animation: write-line 2s steps(18, end) infinite;
+    vertical-align: bottom;
+}
+
+/* Writing animation */
+@keyframes write-line {
+    0% {
+        width: 0;
+        opacity: 1;
+    }
+    70% {
+        width: 12ch;
+        opacity: 1;
+    }
+    100% {
+        width: 12ch;
+        opacity: 0;
+    }
+}
+
+/* Loading state */
+.modal-loading {
+    pointer-events: none;
+}
+
+.modal-loading .custom-modal-content {
+    pointer-events: auto;
+}
+
+/* Squiggle loader */
+.custom-modal-squiggle {
+    width: 120px;
+    height: 40px;
+    display: block;
+    margin: 0 auto 0.75rem auto;
+}
+.custom-modal-squiggle path {
+    fill: none;
+    stroke: #666;
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 150;
+    stroke-dashoffset: 150;
+    animation: draw-squiggle 1.6s ease-in-out infinite;
+}
+
+@keyframes draw-squiggle {
+    0% { stroke-dashoffset: 150; opacity: 0.6; }
+    40% { stroke-dashoffset: 0; opacity: 1; }
+    100% { stroke-dashoffset: -150; opacity: 0.6; }
+}
+
+/* Responsive — mirrors modal-box behavior */
+@media (max-width: 768px) {
+    .custom-modal-content {
+        max-width: 85%;
+    }
+
+    .custom-modal-buttons {
+        flex-direction: column-reverse;
+    }
+
+    .custom-modal-btn {
+        width: 100%;
+    }
+}

@@ -1,0 +1,174 @@
+/* Beamer+ Control Panel Styles */
+
+#control-panel {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px;
+    background: #ccc;
+    color: white;
+    gap: 10px;
+    box-sizing: border-box;
+}
+
+/* Control panel sections */
+.controls-left,
+.controls-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.controls-center {
+    left: 50%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: static;
+    transform: none;
+    flex: 1 1 100%;
+    justify-content: center;
+}
+
+.controls-right {
+    justify-content: flex-end;
+}
+
+/* Button Styles */
+.control_panel_btn_view_only {
+    display: inline-block;
+    padding: 0.5em 1em;
+    font-family: 'Open Sans', sans-serif;
+    font-size: 1rem;
+    color: #666;
+    background-color: #eeeeee;
+    border: 2px solid #666;
+    border-radius: 4px;
+    text-decoration: none;
+}
+
+.control_panel_btn {
+    display: inline-block;
+    padding: 0.5em 1em;
+    font-family: 'Open Sans', sans-serif;
+    font-size: 1rem;
+    color: #666;
+    background-color: #eeeeee;
+    border: 2px solid #666;
+    border-radius: 4px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.control_panel_btn:hover {
+    background-color: #bbbbbb;
+}
+
+.control_panel_btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.control_panel_btn_selected {
+    display: inline-block;
+    padding: 0.5em 1em;
+    font-family: 'Open Sans', sans-serif;
+    font-size: 1rem;
+    color: #eee;
+    background-color: #666;
+    border: 2px solid #eeeeee;
+    border-radius: 4px;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+/* Control panel inputs */
+#control-panel input[type=range],
+#control-panel label.file-uploader {
+    background: #444;
+    border: none;
+    color: white;
+    padding: 6px 10px;
+    font-size: 14px;
+    border-radius: 4px;
+    width: 60px;
+    cursor: pointer;
+}
+
+#control-panel label.file-uploader:hover {
+    background: #666;
+}
+
+#control-panel input[type=range] {
+    width: 100px;
+}
+
+/* Control containers */
+#tool-container,
+#nav-container,
+#display-controls,
+#brush-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+/* Color picker */
+.color-swatch {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid #ccc;
+    cursor: pointer;
+    display: inline-block;
+    margin-right: 4px;
+    transition: border-color 0.2s ease, border-width 0.2s ease;
+}
+
+.color-swatch.color-selected {
+    border: 3px solid #000;
+}
+
+.color_picker_view_only {
+    gap: 8px;
+    display: inline-block;
+}
+
+.color_swatch_view_only {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid #666;
+}
+
+#color-picker {
+    display: flex;
+    gap: 6px;
+}
+
+/* Brush size */
+.brush_size_scroll {
+    font-family: 'Open Sans', sans-serif;
+    font-size: 1rem;
+    font-weight: 400;
+    color: #333;
+}
+
+/* Toggle */
+.toggle_on {
+    background-color: #666;
+    color: white;
+}
+
+.toggle_off {
+    background-color: #eee;
+    color: #666;
+}
+
+/* LAN URL */
+#lan-url,
+#lan-url a {
+    color: white;
+}

@@ -1,0 +1,28 @@
+/* Beamer+ Timer Styles */
+
+.timer-container {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.timer_display {
+    cursor: pointer;
+    font-family: 'Open Sans', monospace;
+    font-size: 14px;
+    padding: 4px 8px;
+    background: #eee;
+    color: #bbb;
+    border-radius: 4px;
+    height: 27px;
+    line-height: 27px;
+    border: 2px solid #aaa;
+    user-select: none;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.timer_display.timer_running {
+    color: #666;
+    background: #ddd;
+}

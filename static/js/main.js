@@ -14,6 +14,111 @@ let availableModels = [];
 
 window.addEventListener("DOMContentLoaded", () => {
 
+// Custom Modal System
+const Modal = {
+    show(type, title, message, onConfirm = null) {
+        const existingModal = document.querySelector('.custom-modal-overlay');
+        if (existingModal) existingModal.remove();
+        
+        const overlay = document.createElement('div');
+        overlay.className = 'custom-modal-overlay';
+        
+        const iconClass = {
+            info: 'fa-circle-info',
+            error: 'fa-circle-exclamation',
+            warning: 'fa-triangle-exclamation',
+            success: 'fa-circle-check',
+            confirm: 'fa-circle-question'
+        }[type] || 'fa-circle-info';
+        
+        overlay.innerHTML = `
+            <div class="custom-modal-content">
+                <div class="custom-modal-icon">
+                    <i class="fas ${iconClass}"></i>
+                </div>
+                <h2 class="custom-modal-title">${title}</h2>
+                <p class="custom-modal-message">${message}</p>
+                <div class="custom-modal-buttons">
+                    ${type === 'confirm' ? '<button class="custom-modal-btn custom-modal-btn-cancel">Cancel</button>' : ''}
+                    <button class="custom-modal-btn custom-modal-btn-ok">${type === 'confirm' ? '<i class="fa-solid fa-thumbs-up"></i>' : '<i class="fa-solid fa-thumbs-up"></i>'}</button>
+                </div>
+            </div>
+        `;
+        
+        // Add type class for styling
+        overlay.classList.add(`modal-${type}`);
+        
+        document.body.appendChild(overlay);
+        
+        const okBtn = overlay.querySelector('.custom-modal-btn-ok');
+        const cancelBtn = overlay.querySelector('.custom-modal-btn-cancel');
+        
+        const close = (confirmed = false) => {
+            overlay.remove();
+            if (confirmed && onConfirm) onConfirm();
+        };
+        
+        okBtn.onclick = () => close(true);
+        if (cancelBtn) cancelBtn.onclick = () => close(false);
+        overlay.onclick = (e) => {
+            if (e.target === overlay) close(false);
+        };
+        
+        okBtn.focus();
+        
+        const escHandler = (e) => {
+            if (e.key === 'Escape') {
+                close(false);
+                document.removeEventListener('keydown', escHandler);
+            }
+        };
+        document.addEventListener('keydown', escHandler);
+    },
+    
+    loading(title, message) {
+        const existingModal = document.querySelector('.custom-modal-overlay');
+        if (existingModal) existingModal.remove();
+        
+        const overlay = document.createElement('div');
+        overlay.className = 'custom-modal-overlay modal-loading';
+        overlay.innerHTML = `
+            <div class="custom-modal-content">
+                <svg class="custom-modal-squiggle" viewBox="0 0 120 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path d="M2 20 C20 2, 40 38, 58 20 C76 2, 96 38, 118 20" />
+                </svg>
+                <h2 class="custom-modal-title">${title}</h2>
+                <p class="custom-modal-message">${message}</p>
+            </div>
+        `;
+        
+        document.body.appendChild(overlay);
+        
+        return {
+            close: () => overlay.remove()
+        };
+    },
+    
+    info(title, message) {
+        this.show('info', title, message);
+    },
+    
+    error(title, message) {
+        this.show('error', title, message);
+    },
+    
+    warning(title, message) {
+        this.show('warning', title, message);
+    },
+    
+    success(title, message) {
+        this.show('success', title, message);
+    },
+    
+    confirm(title, message, onConfirm) {
+        this.show('confirm', title, message, onConfirm);
+    }
+};
+
 const timerContainer = document.getElementById("timer-container");
 const timer = new Timer(timerContainer);
 
@@ -93,15 +198,13 @@ const clearBtn = new Button(otherControlsContainer, {
     label: '<i class="fa-solid fa-broom"></i>'
 });
 
-// Add spacing after clear button
 clearBtn.el.style.marginRight = '20px';
 
 const surveyBtn = new Button(otherControlsContainer, {
     className: 'control_panel_btn',
-    label: '<i class="fa-solid fa-poll"></i>'
+    label: '<i class="fa-solid fa-clipboard-list"></i>'
 });
 
-// Add spacing between survey buttons
 surveyBtn.el.style.marginRight = '10px';
 
 const surveyResultsBtn = new Button(otherControlsContainer, {
@@ -109,12 +212,40 @@ const surveyResultsBtn = new Button(otherControlsContainer, {
     label: '<i class="fa-solid fa-chart-simple"></i>'
 });
 
+// Initially disable results button
+surveyResultsBtn.el.disabled = true;
+surveyResultsBtn.el.style.opacity = '0.5';
+surveyResultsBtn.el.style.cursor = 'not-allowed';
+
 const displayControls = document.getElementById('display-controls');
 
 const uploadBtn = new Button(displayControls, {
     className: 'control_panel_btn',
     label: '<i class="fa-solid fa-upload"></i>',
 });
+
+// Keep most controls disabled until a presentation is uploaded.
+function setControlsEnabledAfterUpload(enabled) {
+    const controls = [
+        hand, pen, highlighter, eraser,
+        ...colorBtns,
+        brushMinusBtn, brushPlusBtn,
+        prevBtn, nextBtn,
+        clearBtn, surveyBtn
+    ];
+
+    controls.forEach(btn => {
+        if (btn && btn.el) {
+            btn.el.disabled = !enabled;
+            btn.el.style.opacity = enabled ? '1' : '0.5';
+            btn.el.style.cursor = enabled ? 'pointer' : 'not-allowed';
+            btn.el.style.pointerEvents = enabled ? 'auto' : 'none';
+        }
+    });
+}
+
+// Disable at startup (upload button remains enabled)
+setControlsEnabledAfterUpload(false);
 
 const ann_canvas_container = document.getElementById('ann-canvas');
 const annCvs = new Canvas(ann_canvas_container);
@@ -158,6 +289,8 @@ brushPlusBtn.onClick(() => {
 
 clearBtn.onClick(() => {
     annCvs.clear();
+    // Clear current slide annotations locally and notify server
+    annotations[currentSlide] = null;
     socket.emit('clear_annotations');
 });
 
@@ -167,23 +300,21 @@ uploadBtn.onClick(() => {
 });
 
 let zipFile = null;
-let slideConfigs = {}; // Store configs per slide
-let mediaCache = {}; // Cache media files as we need them
+let slideConfigs = {};
+let mediaCache = {};
 let annotations = {};
 let currentSlide = 0;
 let totalSlides = 0;
 
-// Load a specific slide's config from the ZIP
 async function loadSlideConfig(slideIndex) {
     if (slideConfigs[slideIndex]) {
-        return slideConfigs[slideIndex]; // Already loaded
+        return slideConfigs[slideIndex];
     }
     
     const configFileName = `config/s${slideIndex}.json`;
     const configFile = zipFile.file(configFileName);
     
     if (!configFile) {
-        // No config for this slide = no media
         slideConfigs[slideIndex] = null;
         return null;
     }
@@ -196,10 +327,9 @@ async function loadSlideConfig(slideIndex) {
     return config;
 }
 
-// Load media file from path (with caching)
 async function loadMediaFromPath(path) {
     if (mediaCache[path]) {
-        return mediaCache[path]; // Already loaded
+        return mediaCache[path];
     }
     
     const file = zipFile.file(path);
@@ -216,7 +346,6 @@ async function loadMediaFromPath(path) {
     return url;
 }
 
-// Real-time sync
 let annotationSyncTimeout = null;
 annCvs.canvas.addEventListener('mouseup', () => syncAnnotations());
 annCvs.canvas.addEventListener('touchend', () => syncAnnotations());
@@ -225,19 +354,20 @@ function syncAnnotations() {
     clearTimeout(annotationSyncTimeout);
     annotationSyncTimeout = setTimeout(() => {
         const annData = annCvs.canvas.toDataURL("image/png");
-        socket.emit('annotation_update', { 
+        // Save annotations locally per-slide and emit to server
+        annotations[currentSlide] = annData;
+        socket.emit('annotation_update', {
             annotations: annData,
-            slideIndex: currentSlide 
+            slideIndex: currentSlide
         });
     }, 100);
 }
 
-// Navigation
 prevBtn.onClick(() => goToSlide(currentSlide - 1));
 nextBtn.onClick(() => goToSlide(currentSlide + 1));
 
 document.addEventListener('keydown', (e) => {
-    if (resultsOverlayVisible) return;
+    if (surveyOverlayVisible || resultsOverlayVisible) return;
     if (e.key === 'ArrowLeft') goToSlide(currentSlide - 1);
     if (e.key === 'ArrowRight') goToSlide(currentSlide + 1);
 });
@@ -263,7 +393,6 @@ async function renderSlide(slideIndex) {
         return;
     }
     
-    // Load PDF page
     const pdfFile = zipFile.file("slides.pdf");
     if (!pdfFile) {
         console.error("No slides.pdf found in ZIP");
@@ -275,15 +404,22 @@ async function renderSlide(slideIndex) {
     const page = await pdfDoc.getPage(slideIndex + 1);
     
     await pdfCvs.renderPDFPage(page);
+
+    // Load per-slide annotations (clear then draw saved image if present)
+    try {
+        annCvs.clear();
+        if (annotations[slideIndex]) {
+            await annCvs.loadAnnotations(annotations[slideIndex]);
+        }
+    } catch (e) {
+        console.warn('Error loading annotations for slide', slideIndex, e);
+    }
     
-    // Clear previous media elements
     const existingMedia = slide_canvas_container.querySelectorAll('video, audio, model-viewer');
     existingMedia.forEach(el => el.remove());
     
-    // Clean up previous widgets
     cleanupWidgets(slide_canvas_container);
     
-    // Load slide config
     const slideConfig = await loadSlideConfig(slideIndex);
     
     if (!slideConfig) {
@@ -295,7 +431,6 @@ async function renderSlide(slideIndex) {
     console.log('Models to render:', slideConfig.models?.length || 0);
     console.log('Widgets to render:', slideConfig.widgets?.length || 0);
     
-    // Render videos
     if (slideConfig.videos) {
         for (const v of slideConfig.videos) {
             const videoURL = await loadMediaFromPath(v.path);
@@ -343,12 +478,23 @@ async function renderSlide(slideIndex) {
                     currentTime: video.currentTime
                 });
             });
+
+            // Allow clicking the video to toggle play/pause
+            video.addEventListener('click', (ev) => {
+                // Only toggle when in hand mode (clicks should pass through otherwise)
+                try {
+                    if (video.paused) video.play();
+                    else video.pause();
+                } catch (e) {
+                    console.error('Error toggling video playback:', e);
+                }
+                ev.stopPropagation();
+            });
             
             slide_canvas_container.appendChild(video);
         }
     }
     
-    // Render 3D models
     if (slideConfig.models) {
         for (const m of slideConfig.models) {
             const modelURL = await loadMediaFromPath(m.path);
@@ -392,7 +538,6 @@ async function renderSlide(slideIndex) {
         }
     }
     
-    // Render audio
     if (slideConfig.audio) {
         for (const a of slideConfig.audio) {
             const audioURL = await loadMediaFromPath(a.path);
@@ -408,7 +553,6 @@ async function renderSlide(slideIndex) {
         }
     }
     
-    // Render widgets
     if (slideConfig.widgets) {
         renderWidgets(slideConfig, slide_canvas_container, 
                      () => pdfCvs.getDisplayWidth(), 
@@ -417,51 +561,49 @@ async function renderSlide(slideIndex) {
     }
 }
 
-// File upload
 fileInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    
     console.log('File selected:', file.name);
-    
-    // Upload to server
+
+    const uploadModal = Modal.loading('Uploading Presentation', 'Please wait while your presentation is uploaded...');
+
     const formData = new FormData();
     formData.append('file', file);
-    
+
     try {
         const response = await fetch('/api/presentation/upload', {
             method: 'POST',
             body: formData
         });
-        
+
         const data = await response.json();
         console.log('Upload response:', data);
-        
+
         if (data.success) {
-            // Load available models
             await loadAvailableModels();
-            
-            console.log(`Presentation uploaded with ${data.models_found} AI models`);
+
+            console.log(`Presentation uploaded with ${data.models_found} Summarizer Script`);
             if (data.models && data.models.length > 0) {
                 console.log('Available AI models:', data.models);
             }
         }
     } catch (error) {
         console.error('Error uploading presentation:', error);
-        alert('Failed to upload presentation');
+        uploadModal.close();
+        Modal.error('Upload Failed', 'Failed to upload presentation. Please try again.');
         return;
     }
     
-    // Load ZIP into memory
     const arrayBuffer = await file.arrayBuffer();
     zipFile = await JSZip.loadAsync(arrayBuffer);
     console.log('ZIP loaded into memory');
     
-    // Get PDF page count
     const pdfFile = zipFile.file("slides.pdf");
     if (!pdfFile) {
         console.error("No slides.pdf found in ZIP!");
-        alert("No slides.pdf found in presentation!");
+        uploadModal.close();
+        Modal.error('Invalid Presentation', 'No slides.pdf found in presentation!');
         return;
     }
     
@@ -471,21 +613,20 @@ fileInput.addEventListener('change', async (e) => {
     
     console.log(`Total slides: ${totalSlides}`);
     
-    // Reset state
     currentSlide = 0;
     slideConfigs = {};
     mediaCache = {};
     
-    // Render first slide
     await renderSlide(0);
     
-    // Notify viewers
     socket.emit('presentation_loaded', {
         totalSlides: totalSlides
     });
+    // Enable controls now that a presentation is loaded
+    uploadModal.close();
+    setControlsEnabledAfterUpload(true);
 });
 
-// Load available AI models from server
 async function loadAvailableModels() {
     try {
         const response = await fetch('/api/models');
@@ -500,12 +641,14 @@ async function loadAvailableModels() {
 
 // Survey functionality
 let currentSurveyResults = null;
+let currentSurveyData = null;
 let resultsOverlayVisible = false;
+let surveyOverlayVisible = false;
 
-surveyBtn.onClick(async () => {
-    // Check if models are available
+// Survey Button - Opens creation modal
+surveyBtn.onClick(() => {
     if (availableModels.length === 0) {
-        alert('No AI models available. Please upload a presentation with AI models in the ai/ folder.');
+        Modal.warning('No Presentation Loaded', 'Please upload a presentation.');
         return;
     }
     
@@ -513,36 +656,38 @@ surveyBtn.onClick(async () => {
     modal.className = 'modal-overlay';
     modal.innerHTML = `
         <div class="modal-content" style="max-width: 500px;">
-            <h2 style="margin-bottom: 1.5rem; font-family: 'Open Sans', sans-serif;">Create Survey</h2>
+            <h2 style="margin-bottom: 1.5rem; font-family: 'Open Sans', sans-serif; color: #333;">Survey</h2>
             
             <div style="margin-bottom: 1.5rem;">
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-family: 'Open Sans', sans-serif;">Question:</label>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-family: 'Open Sans', sans-serif; color: #555;">Question (optional):</label>
                 <input 
                     type="text" 
-                    id="survey-question" 
+                    id="survey-question"
                     placeholder="What do you think about...?"
                     style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; font-family: 'Open Sans', sans-serif; box-sizing: border-box;"
                 />
-            </div>
-            
-            <div style="margin-bottom: 1.5rem;">
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-family: 'Open Sans', sans-serif;">AI Model:</label>
-                <select 
-                    id="survey-model"
-                    style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; background: white; font-family: 'Open Sans', sans-serif; box-sizing: border-box;"
-                >
-                    <option value="">Select a model...</option>
-                </select>
                 <div style="margin-top: 0.5rem; font-size: 0.85rem; color: #666; font-family: 'Open Sans', sans-serif;">
-                    Models are loaded from the ai/ folder in your presentation ZIP
+                    Leave blank for generic survey
                 </div>
             </div>
             
             <div style="margin-bottom: 1.5rem;">
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-family: 'Open Sans', sans-serif;">Number of Summaries:</label>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-family: 'Open Sans', sans-serif; color: #555;">Summarizer Script:</label>
+                <select 
+                    id="survey-model"
+                    style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; background: white; font-family: 'Open Sans', sans-serif; box-sizing: border-box;"
+                >
+                </select>
+                <div style="margin-top: 0.5rem; font-size: 0.85rem; color: #666; font-family: 'Open Sans', sans-serif;">
+                    This script will be used to summarize survey responses
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 1.5rem;">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-family: 'Open Sans', sans-serif; color: #555;">Number of Summaries:</label>
                 <input 
                     type="number" 
-                    id="num-summaries" 
+                    id="survey-num-summaries" 
                     min="1" 
                     max="10" 
                     value="3"
@@ -555,18 +700,18 @@ surveyBtn.onClick(async () => {
             
             <div style="display: flex; gap: 1rem; justify-content: flex-end;">
                 <button 
-                    id="cancel-survey" 
+                    id="cancel-survey-modal" 
                     class="control_panel_btn"
-                    style="background: #666;"
+                    style="font-family: 'Open Sans', sans-serif;"
                 >
-                    Cancel
+                    <i class="fa-solid fa-xmark"></i>
                 </button>
                 <button 
-                    id="create-survey" 
+                    id="create-survey-btn" 
                     class="control_panel_btn"
-                    style="background: #3498db;"
+                    style=" font-family: 'Open Sans', sans-serif;"
                 >
-                    Create Survey
+                    <i class="fa-solid fa-share-from-square"></i>
                 </button>
             </div>
         </div>
@@ -578,42 +723,32 @@ surveyBtn.onClick(async () => {
     availableModels.forEach(model => {
         const option = document.createElement('option');
         option.value = model;
-        // Format model name nicely
         option.textContent = model.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
         modelSelect.appendChild(option);
     });
     
-    // Set default model if available
     if (availableModels.length > 0) {
         modelSelect.value = availableModels[0];
     }
     
-    // Focus on question input
     document.getElementById('survey-question').focus();
     
-    // Cancel button
-    document.getElementById('cancel-survey').onclick = () => {
+    document.getElementById('cancel-survey-modal').onclick = () => {
         document.body.removeChild(modal);
     };
     
-    // Create button
-    document.getElementById('create-survey').onclick = async () => {
-        const question = document.getElementById('survey-question').value.trim();
+    document.getElementById('create-survey-btn').onclick = async () => {
+        const question = document.getElementById('survey-question').value.trim() || 'Survey Response';
         const model = document.getElementById('survey-model').value;
-        const numSummaries = parseInt(document.getElementById('num-summaries').value);
-        
-        if (!question) {
-            alert('Please enter a question');
-            return;
-        }
+        const numSummaries = parseInt(document.getElementById('survey-num-summaries').value);
         
         if (!model) {
-            alert('Please select an AI model');
+            Modal.warning('No Model Selected', 'Please select an AI model.');
             return;
         }
         
         if (isNaN(numSummaries) || numSummaries < 1 || numSummaries > 10) {
-            alert('Number of summaries must be between 1 and 10');
+            Modal.warning('Invalid Number', 'Number of summaries must be between 1 and 10.');
             return;
         }
         
@@ -631,23 +766,36 @@ surveyBtn.onClick(async () => {
             const data = await response.json();
             
             if (!response.ok) {
-                alert(data.error || 'Failed to create survey');
+                Modal.error('Survey Creation Failed', data.error || 'Failed to create survey');
                 return;
             }
             
             document.body.removeChild(modal);
             
-            // Show the survey to viewers and display QR code
+            currentSurveyData = {
+                ...data,
+                model,
+                num_summaries: numSummaries,
+                question
+            };
+            
+            // Reset results when creating new survey
+            currentSurveyResults = null;
+            
+            // Disable results button until we have results
+            surveyResultsBtn.el.disabled = true;
+            surveyResultsBtn.el.style.opacity = '0.5';
+            surveyResultsBtn.el.style.cursor = 'not-allowed';
+            
             socket.emit('survey_show', data);
-            showSurveyQRCode(data);
+            showSurveyOverlay();
             
         } catch (error) {
             console.error('Error creating survey:', error);
-            alert('Failed to create survey');
+            Modal.error('Survey Creation Failed', 'Failed to create survey. Please try again.');
         }
     };
     
-    // Close on click outside
     modal.onclick = (e) => {
         if (e.target === modal) {
             document.body.removeChild(modal);
@@ -655,30 +803,64 @@ surveyBtn.onClick(async () => {
     };
 });
 
-function showSurveyQRCode(surveyData) {
-    const surveyUrl = `${window.location.origin}${surveyData.url}`;
+function showSurveyOverlay() {
+    if (!currentSurveyData) return;
     
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    modal.innerHTML = `
-        <div class="modal-content">
-            <h2>Survey Active</h2>
-            <p>Scan this QR code or visit the URL to respond:</p>
-            <div class="qr-container">
-                <div id="qrcode"></div>
+    surveyOverlayVisible = true;
+    disableControlButtons(true);
+    
+    const pdfContainer = document.getElementById('pdf-canvas');
+    const containerRect = pdfContainer.getBoundingClientRect();
+    
+    const surveyUrl = `${window.location.origin}${currentSurveyData.url}`;
+    
+    const overlay = document.createElement('div');
+    overlay.id = 'survey-overlay';
+    overlay.style.position = 'fixed';
+    overlay.style.top = `${containerRect.top}px`;
+    overlay.style.left = `${containerRect.left}px`;
+    overlay.style.width = `${containerRect.width}px`;
+    overlay.style.height = `${containerRect.height}px`;
+    overlay.style.backgroundColor = '#ffffff';
+    overlay.style.zIndex = '1000';
+    overlay.style.display = 'flex';
+    overlay.style.flexDirection = 'column';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+    overlay.style.padding = '2rem';
+    overlay.style.boxSizing = 'border-box';
+    overlay.style.overflow = 'auto';
+    overlay.style.fontFamily = "'Open Sans', sans-serif";
+    
+    overlay.innerHTML = `
+        <div style="max-width: 600px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 2rem;">
+            <h2 style="font-family: 'Open Sans', sans-serif; color: #333; font-size: 2rem; margin: 0; text-align: center;">
+                ${currentSurveyData.question || 'Survey Active'}
+            </h2>
+            
+            <div style="background: #f8f9fa; padding: 2rem; border-radius: 8px; display: flex; flex-direction: column; align-items: center; gap: 1.5rem; width: 100%;">
+                <div id="qrcode" style="padding: 1rem; background: white; border-radius: 4px;"></div>
+                
+                <div style="width: 100%;">
+                    <input 
+                        type="text" 
+                        readonly 
+                        value="${surveyUrl}" 
+                        onclick="this.select()"
+                        style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-family: 'Open Sans', sans-serif; text-align: center; background: white; font-size: 0.9rem; box-sizing: border-box;"
+                    />
+                </div>
             </div>
-            <div class="survey-url">
-                <input type="text" readonly value="${surveyUrl}" onclick="this.select()">
+            
+            <div style="font-family: 'Open Sans', sans-serif; color: #666; font-size: 1rem; border: 2px solid #e0e0e0; padding: 0.75rem 1.5rem; background: white;">
+                <span style="font-weight: 500; color: #333;">Responses:</span> <span id="response-count" style="font-weight: 600; color: #333;">0</span>
             </div>
-            <div class="response-count">
-                Responses: <span id="response-count-pill" class="pill">0</span>
-            </div>
-            <div class="modal-actions">
-                <button id="close-survey" class="control_panel_btn">Close & Analyze</button>
-            </div>
+            
+
         </div>
     `;
-    document.body.appendChild(modal);
+    
+    document.body.appendChild(overlay);
     
     new QRCode(document.getElementById("qrcode"), {
         text: surveyUrl,
@@ -689,34 +871,63 @@ function showSurveyQRCode(surveyData) {
     });
     
     socket.on('survey_response', (data) => {
-        if (data.survey_id === surveyData.survey_id) {
-            document.getElementById('response-count-pill').textContent = data.total;
+        if (data.survey_id === currentSurveyData.survey_id) {
+            document.getElementById('response-count').textContent = data.total;
         }
     });
-    
-    document.getElementById('close-survey').onclick = () => closeSurveyAndAnalyze(surveyData.survey_id, modal);
 }
 
-async function processResponses(surveyId) {
+function hideSurveyOverlay() {
+    surveyOverlayVisible = false;
+    disableControlButtons(false);
+    
+    const overlay = document.getElementById('survey-overlay');
+    if (overlay) {
+        document.body.removeChild(overlay);
+    }
+}
+
+// Results Button - Toggle between show/hide results
+surveyResultsBtn.onClick(async () => {
+    // If results are already showing, just hide them
+    if (resultsOverlayVisible) {
+        hideSurveyResultsOverlay();
+        return;
+    }
+    
+    // Check if we have a survey
+    if (!currentSurveyData) {
+        Modal.info('No Survey', 'Please create a survey first.');
+        return;
+    }
+    
+    // If we already have results, just show them
+    if (currentSurveyResults) {
+        showSurveyResultsOverlay();
+        return;
+    }
+    
+    // Close the survey if it's still open
+    if (surveyOverlayVisible) {
+        await fetch(`/api/survey/${currentSurveyData.survey_id}/close`, { method: 'POST' });
+        socket.emit('survey_close', { survey_id: currentSurveyData.survey_id });
+        hideSurveyOverlay();
+    }
+    
+    // Show loading modal
+    const loadingModal = Modal.loading('Generating Summaries', 'Please wait while AI analyzes the responses...');
+    
     try {
-        const response = await fetch(`/api/survey/${surveyId}/responses`);
+        const response = await fetch(`/api/survey/${currentSurveyData.survey_id}/responses`);
         const data = await response.json();
         
         if (data.responses.length === 0) {
-            console.log('No responses to analyze');
-            currentSurveyResults = {
-                summaries: ['No responses collected yet.'],
-                model: 'none',
-                num_responses: 0
-            };
+            loadingModal.close();
+            // No responses — survey already closed above; do nothing further.
             return;
         }
         
-        // Show loading message
-        console.log('Analyzing responses with AI model...');
-        
-        // Call the analyze endpoint
-        const analyzeResponse = await fetch(`/api/survey/${surveyId}/analyze`, {
+        const analyzeResponse = await fetch(`/api/survey/${currentSurveyData.survey_id}/analyze`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         });
@@ -728,7 +939,6 @@ async function processResponses(surveyId) {
         
         const analysisData = await analyzeResponse.json();
         
-        // Store the results
         currentSurveyResults = {
             summaries: analysisData.summaries,
             model: analysisData.model,
@@ -737,36 +947,27 @@ async function processResponses(surveyId) {
         
         console.log('Analysis complete:', currentSurveyResults);
         
+        // Close loading modal
+        loadingModal.close();
+        
+        // Enable the results button for future clicks
+        surveyResultsBtn.el.disabled = false;
+        surveyResultsBtn.el.style.opacity = '1';
+        surveyResultsBtn.el.style.cursor = 'pointer';
+        
+        // Show results overlay
+        showSurveyResultsOverlay();
+        
     } catch (error) {
         console.error('Error processing responses:', error);
-        // Show error in results
-        currentSurveyResults = {
-            summaries: [`Error analyzing responses: ${error.message}`],
-            model: 'error',
-            num_responses: 0
-        };
+        loadingModal.close();
+        Modal.error('Analysis Failed', error.message);
     }
-}
+});
 
-async function closeSurvey(surveyId, modal) {
-    await fetch(`/api/survey/${surveyId}/close`, { method: 'POST' });
-    socket.emit('survey_close', { survey_id: surveyId });
-    document.body.removeChild(modal);
-}
-
-async function closeSurveyAndAnalyze(surveyId, modal) {
-    // First, analyze the responses
-    await processResponses(surveyId);
-    
-    // Then close the survey
-    await closeSurvey(surveyId, modal);
-}
-
-// Survey Results Overlay Functions
 let currentResultIndex = 0;
 
 function disableControlButtons(disable) {
-    // Disable/enable all buttons except survey results button
     const allButtons = [
         hand, pen, highlighter, eraser,
         ...colorBtns,
@@ -785,7 +986,6 @@ function disableControlButtons(disable) {
         }
     });
     
-    // Keep survey results button always enabled
     if (surveyResultsBtn && surveyResultsBtn.el) {
         surveyResultsBtn.el.disabled = false;
         surveyResultsBtn.el.style.opacity = '1';
@@ -796,21 +996,19 @@ function disableControlButtons(disable) {
 
 function showSurveyResultsOverlay() {
     if (!currentSurveyResults || !currentSurveyResults.summaries || currentSurveyResults.summaries.length === 0) {
-        alert('No survey results available. Please create and close a survey first.');
+        Modal.info('No Results', 'No survey results available.');
         return;
     }
     
+    // Set this BEFORE disabling buttons to prevent flash
     resultsOverlayVisible = true;
     currentResultIndex = 0;
     
-    // Disable all control panel buttons except survey results button
     disableControlButtons(true);
     
-    // Get the PDF canvas container to match its position and size
     const pdfContainer = document.getElementById('pdf-canvas');
     const containerRect = pdfContainer.getBoundingClientRect();
     
-    // Create overlay
     const overlay = document.createElement('div');
     overlay.id = 'survey-results-overlay';
     overlay.style.position = 'fixed';
@@ -827,6 +1025,7 @@ function showSurveyResultsOverlay() {
     overlay.style.padding = '2rem';
     overlay.style.boxSizing = 'border-box';
     overlay.style.overflow = 'auto';
+    overlay.style.fontFamily = "'Open Sans', sans-serif";
     
     const numSummaries = currentSurveyResults.summaries.length;
     
@@ -852,7 +1051,6 @@ function showSurveyResultsOverlay() {
     
     document.body.appendChild(overlay);
     
-    // Add event listeners
     document.getElementById('prev-result').addEventListener('click', () => {
         if (currentResultIndex > 0) {
             currentResultIndex--;
@@ -873,7 +1071,6 @@ function showSurveyResultsOverlay() {
 function hideSurveyResultsOverlay() {
     resultsOverlayVisible = false;
     
-    // Re-enable all control panel buttons
     disableControlButtons(false);
     
     const overlay = document.getElementById('survey-results-overlay');
@@ -890,29 +1087,23 @@ function updateResultDisplay() {
     
     if (!contentDiv || !currentSurveyResults || !currentSurveyResults.summaries) return;
     
-    const summary = currentSurveyResults.summaries[currentResultIndex];
+    const summaryData = currentSurveyResults.summaries[currentResultIndex];
     const totalSummaries = currentSurveyResults.summaries.length;
     
     contentDiv.innerHTML = `
         <h2 style="font-family: 'Open Sans', sans-serif; color: #333; font-size: 2rem; margin: 0;">
-            Summary ${currentResultIndex + 1}
+            ${summaryData.title}
         </h2>
-        <div style="display: flex; gap: 1rem; justify-content: center; margin: 0.5rem 0; flex-wrap: wrap;">
-            <div style="display: inline-block; background: #3498db; color: white; padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.9rem; font-family: 'Open Sans', sans-serif;">
-                Model: ${currentSurveyResults.model.replace(/_/g, ' ')}
-            </div>
-            <div style="display: inline-block; background: #666; color: #eee; padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.9rem; font-family: 'Open Sans', sans-serif;">
-                ${currentSurveyResults.num_responses} response${currentSurveyResults.num_responses !== 1 ? 's' : ''}
-            </div>
+        <div style="font-family: 'Open Sans', sans-serif; color: #666; font-size: 0.9rem; margin: 1rem 0; text-align: center;">
+            Based on ${summaryData.num_respondents} response${summaryData.num_respondents !== 1 ? 's' : ''} (Total: ${currentSurveyResults.num_responses})
         </div>
-        <div style="font-family: 'Open Sans', sans-serif; color: #666; font-size: 1.1rem; line-height: 1.8; margin: 1.5rem 0; text-align: left; max-width: 700px; padding: 1.5rem; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #3498db;">
-            ${summary}
+        <div style="font-family: 'Open Sans', sans-serif; color: #333; font-size: 1.1rem; line-height: 1.8; margin: 1.5rem 0; text-align: left; max-width: 700px; padding: 2rem; background: #f8f9fa; border: 2px solid #666; border-radius: 4px;">
+            ${summaryData.summary}
         </div>
     `;
     
     counterSpan.textContent = `${currentResultIndex + 1} / ${totalSummaries}`;
     
-    // Disable/enable buttons
     prevBtn.disabled = currentResultIndex === 0;
     nextBtn.disabled = currentResultIndex === totalSummaries - 1;
     
@@ -922,16 +1113,6 @@ function updateResultDisplay() {
     nextBtn.style.cursor = nextBtn.disabled ? 'not-allowed' : 'pointer';
 }
 
-// Survey results button handler
-surveyResultsBtn.onClick(() => {
-    if (resultsOverlayVisible) {
-        hideSurveyResultsOverlay();
-    } else {
-        showSurveyResultsOverlay();
-    }
-});
-
-// ESC key to close results overlay
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && resultsOverlayVisible) {
         hideSurveyResultsOverlay();

@@ -16,6 +16,11 @@ export class Canvas {
         this.pointer_mode = 'hand';
         container.appendChild(this.canvas);
 
+        // Ensure clicks pass through when in hand mode by default
+        if (this.pointer_mode === 'hand') {
+            this.canvas.style.pointerEvents = 'none';
+        }
+
         this.ctx = this.canvas.getContext('2d');
         this.ctx.scale(dpr, dpr);
         
@@ -285,6 +290,29 @@ export class Canvas {
 
     clear() {
         this.ctx.clearRect(0, 0, this.canvas.width / this.dpr, this.canvas.height / this.dpr);
+    }
+
+    // Load annotations from a data URL (image) and draw onto the canvas
+    async loadAnnotations(dataURL) {
+        if (!dataURL) return;
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+                try {
+                    // Clear existing
+                    this.clear();
+                    // Draw image scaled to canvas display size
+                    const dw = this.canvas.width / this.dpr;
+                    const dh = this.canvas.height / this.dpr;
+                    this.ctx.drawImage(img, 0, 0, dw, dh);
+                } catch (e) {
+                    console.error('Error drawing annotations image:', e);
+                }
+                resolve();
+            };
+            img.onerror = () => resolve();
+            img.src = dataURL;
+        });
     }
 
     async renderPDFPage(pdfPage) {
