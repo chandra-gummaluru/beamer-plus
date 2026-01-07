@@ -8,14 +8,39 @@ import { renderWidgets, cleanupWidgets, updateWidgetPositions } from './iframe-w
 import { Modal } from './beamer_modal.js';
 import { setControlsEnabledAfterUpload, disableControlButtons } from './beamer_ui.js';
 
+const isViewer = window.BEAMER_ROLE === "viewer" || location.pathname === "/viewer";
+
 const socket = io();
-socket.emit('join_presenter');
+if (isViewer) socket.emit("join_viewer");
+else socket.emit("join_presenter");
 
 // Available AI models (loaded from presentation ZIP)
 let availableModels = [];
 
 window.addEventListener("DOMContentLoaded", () => {
 
+// Shared features of presenter & viewer
+const ann_canvas_container = document.getElementById('ann-canvas');
+const annCvs = new Canvas(ann_canvas_container);
+const slide_canvas_container = document.getElementById('pdf-canvas');
+const pdfCvs = new Canvas(slide_canvas_container, false);
+
+// UI safety lock
+if (isViewer) {
+  annCvs.canvas.style.pointerEvents = "none";
+}
+
+// Shared presentation state (must be accessible by both presenter + viewer)
+let zipFile = null;
+let slideConfigs = {};
+let mediaCache = {};
+let annotations = {};
+let currentSlide = 0;
+let totalSlides = 0;
+let pdfDoc = null; // cache pdf document so we don't re-parse every render
+
+// Presenter only: UI + event handlers + emits
+if (!isViewer) {
 const timerContainer = document.getElementById("timer-container");
 const timer = new Timer(timerContainer);
 
@@ -136,11 +161,6 @@ setControlsEnabledAfterUpload(false, __beamer_controls);
 // Full set used for temporary disabling (includes upload button)
 const __beamer_all_buttons = [...__beamer_controls, uploadBtn];
 
-const ann_canvas_container = document.getElementById('ann-canvas');
-const annCvs = new Canvas(ann_canvas_container);
-const slide_canvas_container = document.getElementById('pdf-canvas');
-const pdfCvs = new Canvas(slide_canvas_container, false);
-
 hand.onClick(() => annCvs.setPointerMode('hand'));
 pen.onClick(() => annCvs.setPointerMode('draw'));
 highlighter.onClick(() => annCvs.setPointerMode('highlight'));
@@ -239,6 +259,390 @@ let annotationSyncTimeout = null;
 annCvs.canvas.addEventListener('mouseup', () => syncAnnotations());
 annCvs.canvas.addEventListener('touchend', () => syncAnnotations());
 
+prevBtn.onClick(() => goToSlide(currentSlide - 1));
+nextBtn.onClick(() => goToSlide(currentSlide + 1));
+
+document.addEventListener('keydown', (e) => {
+    if (surveyOverlayVisible || resultsOverlayVisible) return;
+    if (e.key === 'ArrowLeft') goToSlide(currentSlide - 1);
+    if (e.key === 'ArrowRight') goToSlide(currentSlide + 1);
+});
+
+fileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    console.log('File selected:', file.name);
+
+    const uploadModal = Modal.loading('Uploading Presentation', 'Please wait while your presentation is uploaded...');
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const response = await fetch('/api/presentation/upload', {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+        console.log('Upload response:', data);
+
+        if (data.success) {
+            await loadAvailableModels();
+
+            console.log(`Presentation uploaded with ${data.models_found} Summarizer Script`);
+            if (data.models && data.models.length > 0) {
+                console.log('Available AI models:', data.models);
+            }
+        }
+    } catch (error) {
+        console.error('Error uploading presentation:', error);
+        uploadModal.close();
+        Modal.error('Upload Failed', 'Failed to upload presentation. Please try again.');
+        return;
+    }
+
+    const arrayBuffer = await file.arrayBuffer();
+    zipFile = await JSZip.loadAsync(arrayBuffer);
+    console.log('ZIP loaded into memory');
+
+    const pdfFile = zipFile.file("slides.pdf");
+    if (!pdfFile) {
+        console.error("The uploaded package is not a valid Beamer+ presentation (no slides.pdf found).");
+        uploadModal.close();
+        Modal.error('Invalid Presentation', 'The uploaded package is not a valid Beamer+ presentation.');
+        return;
+    }
+
+    const pdfData = await pdfFile.async("arraybuffer");
+    pdfDoc = await pdfjsLib.getDocument({ data: pdfData }).promise;
+    totalSlides = pdfDoc.numPages;
+
+    console.log(`Total slides: ${totalSlides}`);
+
+    currentSlide = 0;
+    slideConfigs = {};
+    mediaCache = {};
+
+    await renderSlide(0);
+
+    socket.emit('presentation_loaded', {
+        totalSlides: totalSlides
+    });
+    // Enable controls now that a presentation is loaded
+    uploadModal.close();
+    setControlsEnabledAfterUpload(true, __beamer_controls);
+});
+
+// Survey functionality
+let currentSurveyResults = null;
+let currentSurveyData = null;
+let resultsOverlayVisible = false;
+let surveyOverlayVisible = false;
+
+// Survey Button - Opens creation modal
+surveyBtn.onClick(() => {
+    if (availableModels.length === 0) {
+        Modal.warning('No Presentation Loaded', 'Please upload a presentation.');
+        return;
+    }
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 500px;">
+            <h2 style="margin-bottom: 1.5rem; font-family: 'Computer Modern Sans', sans-serif; color: #333;">Survey</h2>
+
+            <div style="margin-bottom: 1.5rem;">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-family: 'Computer Modern Sans', sans-serif; color: #555;">Question (optional):</label>
+                <input
+                    type="text"
+                    id="survey-question"
+                    placeholder="What do you think about...?"
+                    style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; font-family: 'Computer Modern Sans', sans-serif; box-sizing: border-box;"
+                />
+                <div style="margin-top: 0.5rem; font-size: 0.85rem; color: #666; font-family: 'Computer Modern Sans', sans-serif;">
+                    Leave blank for generic survey
+                </div>
+            </div>
+
+            <div style="margin-bottom: 1.5rem;">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-family: 'Computer Modern Sans', sans-serif; color: #555;">Summarizer Script:</label>
+                <select
+                    id="survey-model"
+                    style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; background: white; font-family: 'Computer Modern Sans', sans-serif; box-sizing: border-box;"
+                >
+                </select>
+                <div style="margin-top: 0.5rem; font-size: 0.85rem; color: #666; font-family: 'Computer Modern Sans', sans-serif;">
+                    This script will be used to summarize survey responses
+                </div>
+            </div>
+
+            <div style="margin-bottom: 1.5rem;">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-family: 'Computer Modern Sans', sans-serif; color: #555;">Number of Summaries:</label>
+                <input
+                    type="number"
+                    id="survey-num-summaries"
+                    min="1"
+                    max="10"
+                    value="3"
+                    style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; font-family: 'Computer Modern Sans', sans-serif; box-sizing: border-box;"
+                />
+                <div style="margin-top: 0.5rem; font-size: 0.85rem; color: #666; font-family: 'Computer Modern Sans', sans-serif;">
+                    Generate 1-10 different summary variations
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                <button
+                    id="cancel-survey-modal"
+                    class="btn"
+                    style="font-family: 'Computer Modern Sans', sans-serif;"
+                >
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+                <button
+                    id="create-survey-btn"
+                    class="btn"
+                    style=" font-family: 'Computer Modern Sans', sans-serif;"
+                >
+                    <i class="fa-solid fa-share-from-square"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    // Populate model dropdown
+    const modelSelect = document.getElementById('survey-model');
+    availableModels.forEach(model => {
+        const option = document.createElement('option');
+        option.value = model;
+        option.textContent = model.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        modelSelect.appendChild(option);
+    });
+
+    if (availableModels.length > 0) {
+        modelSelect.value = availableModels[0];
+    }
+
+    document.getElementById('survey-question').focus();
+
+    document.getElementById('cancel-survey-modal').onclick = () => {
+        document.body.removeChild(modal);
+    };
+
+    document.getElementById('create-survey-btn').onclick = async () => {
+        const question = document.getElementById('survey-question').value.trim() || 'Survey';
+        const model = document.getElementById('survey-model').value;
+        const numSummaries = parseInt(document.getElementById('survey-num-summaries').value);
+
+        if (!model) {
+            Modal.warning('No Model Selected', 'Please select an AI model.');
+            return;
+        }
+
+        if (isNaN(numSummaries) || numSummaries < 1 || numSummaries > 10) {
+            Modal.warning('Invalid Number', 'Number of summaries must be between 1 and 10.');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/survey/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    question,
+                    model,
+                    num_summaries: numSummaries
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                Modal.error('Survey Creation Failed', data.error || 'Failed to create survey');
+                return;
+            }
+
+            document.body.removeChild(modal);
+
+            currentSurveyData = {
+                ...data,
+                model,
+                num_summaries: numSummaries,
+                question
+            };
+
+            // Reset results when creating new survey
+            currentSurveyResults = null;
+
+            // Disable results button until we have results
+            surveyResultsBtn.el.disabled = true;
+            surveyResultsBtn.el.style.opacity = '0.5';
+            surveyResultsBtn.el.style.cursor = 'not-allowed';
+
+            socket.emit('survey_show', data);
+            showSurveyOverlay();
+
+        } catch (error) {
+            console.error('Error creating survey:', error);
+            Modal.error('Survey Creation Failed', 'Failed to create survey. Please try again.');
+        }
+    };
+
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            document.body.removeChild(modal);
+        }
+    };
+});
+
+// Results Button - Toggle between show/hide results
+surveyResultsBtn.onClick(async () => {
+    // If results are already showing, just hide them
+    if (resultsOverlayVisible) {
+        hideSurveyResultsOverlay();
+        return;
+    }
+
+    // Check if we have a survey
+    if (!currentSurveyData) {
+        Modal.info('No Survey', 'Please create a survey first.');
+        return;
+    }
+
+    // If we already have results, just show them
+    if (currentSurveyResults) {
+        showSurveyResultsOverlay();
+        return;
+    }
+
+    // Close the survey if it's still open
+    if (surveyOverlayVisible) {
+        await fetch(`/api/survey/${currentSurveyData.survey_id}/close`, { method: 'POST' });
+        socket.emit('survey_close', { survey_id: currentSurveyData.survey_id });
+        hideSurveyOverlay();
+    }
+
+    // Show loading modal
+    const loadingModal = Modal.loading('Generating Summaries', 'Please wait while the responses are analyzed...');
+
+    try {
+        const response = await fetch(`/api/survey/${currentSurveyData.survey_id}/responses`);
+        const data = await response.json();
+
+        if (data.responses.length === 0) {
+            loadingModal.close();
+            // No responses — survey already closed above; do nothing further.
+            return;
+        }
+
+        const analyzeResponse = await fetch(`/api/survey/${currentSurveyData.survey_id}/analyze`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!analyzeResponse.ok) {
+            const errorData = await analyzeResponse.json();
+            throw new Error(errorData.error || 'Analysis failed');
+        }
+
+        const analysisData = await analyzeResponse.json();
+
+        currentSurveyResults = {
+            summaries: analysisData.summaries,
+            model: analysisData.model,
+            num_responses: analysisData.num_responses
+        };
+
+        console.log('Analysis complete:', currentSurveyResults);
+
+        // Close loading modal
+        loadingModal.close();
+
+        // Enable the results button for future clicks
+        surveyResultsBtn.el.disabled = false;
+        surveyResultsBtn.el.style.opacity = '1';
+        surveyResultsBtn.el.style.cursor = 'pointer';
+
+        // Show results overlay
+        showSurveyResultsOverlay();
+
+    } catch (error) {
+        console.error('Error processing responses:', error);
+        loadingModal.close();
+        Modal.error('Analysis Failed', "There was an error summarizing the responses.");
+    }
+});
+
+let currentResultIndex = 0;
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && resultsOverlayVisible) {
+        hideSurveyResultsOverlay();
+    }
+});
+
+// Add resize listener to update overlay positions
+window.addEventListener('resize', () => {
+    if (surveyOverlayVisible) {
+        updateSurveyOverlayPosition();
+    }
+    if (resultsOverlayVisible) {
+        updateSurveyResultsOverlayPosition();
+    }
+
+    // Resize annotation canvas to maintain proper mouse coordinate mapping
+    if (annCvs) {
+        annCvs.resize();
+    }
+
+    // Update positions of all media elements (videos, models, widgets)
+    if (zipFile && slideConfigs[currentSlide]) {
+        updateMediaPositions();
+    }
+});
+
+// Add fullscreen change listener to handle fullscreen transitions
+document.addEventListener('fullscreenchange', () => {
+    // Need a small delay for the browser to finish the fullscreen transition
+    setTimeout(() => {
+        if (surveyOverlayVisible) {
+            updateSurveyOverlayPosition();
+        }
+        if (resultsOverlayVisible) {
+            updateSurveyResultsOverlayPosition();
+        }
+
+        if (annCvs) {
+            annCvs.resize();
+        }
+
+        if (zipFile && slideConfigs[currentSlide]) {
+            updateMediaPositions();
+        }
+    }, 100);
+});
+}
+
+socket.on("state_sync", (state) => {
+  console.log("state_sync received", state);
+});
+
+socket.on("presentation_loaded", async () => {
+  if (!isViewer) return;
+
+  const resp = await fetch("/api/presentation/current");
+  if (!resp.ok) return;
+
+  const blob = await resp.blob();
+  await loadPresentationFromBlob(blob);
+
+  await renderSlide(0);
+});
+
+
 function syncAnnotations() {
     clearTimeout(annotationSyncTimeout);
     annotationSyncTimeout = setTimeout(() => {
@@ -292,16 +696,6 @@ function updateMediaPositions() {
     // Update widgets
     updateWidgetPositions(slide_canvas_container);
 }
-
-
-prevBtn.onClick(() => goToSlide(currentSlide - 1));
-nextBtn.onClick(() => goToSlide(currentSlide + 1));
-
-document.addEventListener('keydown', (e) => {
-    if (surveyOverlayVisible || resultsOverlayVisible) return;
-    if (e.key === 'ArrowLeft') goToSlide(currentSlide - 1);
-    if (e.key === 'ArrowRight') goToSlide(currentSlide + 1);
-});
 
 async function goToSlide(slideIndex) {
     if (slideIndex < 0 || slideIndex >= totalSlides) return;
@@ -400,24 +794,27 @@ async function renderSlide(slideIndex) {
             if (v.playMode === "manual") {
                 video.controls = true;
             }
-            
-            video.addEventListener('play', () => {
-                socket.emit('video_action', {
-                    videoId: v.id,
-                    slideIndex: currentSlide,
-                    action: 'play',
-                    currentTime: video.currentTime
+
+            // Only presenter can have the access to control videos
+            if (!isViewer) {
+                video.addEventListener('play', () => {
+                    socket.emit('video_action', {
+                        videoId: v.id,
+                        slideIndex: currentSlide,
+                        action: 'play',
+                        currentTime: video.currentTime
+                    });
                 });
-            });
-            
-            video.addEventListener('pause', () => {
-                socket.emit('video_action', {
-                    videoId: v.id,
-                    slideIndex: currentSlide,
-                    action: 'pause',
-                    currentTime: video.currentTime
+
+                video.addEventListener('pause', () => {
+                    socket.emit('video_action', {
+                        videoId: v.id,
+                        slideIndex: currentSlide,
+                        action: 'pause',
+                        currentTime: video.currentTime
+                    });
                 });
-            });
+            }
 
             // Allow clicking the video to toggle play/pause
             video.addEventListener('click', (ev) => {
@@ -461,25 +858,28 @@ async function renderSlide(slideIndex) {
             mv.style.width = `${m.width * containerRect.width}px`;
             mv.style.height = `${m.height * containerRect.height}px`;
             mv.style.zIndex = m.zIndex || 5;
-            
-            mv.addEventListener('camera-change', () => {
-                const camera = mv.getCameraOrbit();
-                const target = mv.getCameraTarget();
-                socket.emit('model_interaction', {
-                    modelId: m.id,
-                    slideIndex: currentSlide,
-                    camera: {
-                        theta: camera.theta,
-                        phi: camera.phi,
-                        radius: camera.radius
-                    },
-                    target: {
-                        x: target.x,
-                        y: target.y,
-                        z: target.z
-                    }
+
+            // Only presenter can have the access to control models
+            if (!isViewer) {
+                mv.addEventListener('camera-change', () => {
+                    const camera = mv.getCameraOrbit();
+                    const target = mv.getCameraTarget();
+                    socket.emit('model_interaction', {
+                        modelId: m.id,
+                        slideIndex: currentSlide,
+                        camera: {
+                            theta: camera.theta,
+                            phi: camera.phi,
+                            radius: camera.radius
+                        },
+                        target: {
+                            x: target.x,
+                            y: target.y,
+                            z: target.z
+                        }
+                    });
                 });
-            });
+            }
             
             slide_canvas_container.appendChild(mv);
         }
@@ -505,72 +905,6 @@ async function renderSlide(slideIndex) {
     }
 }
 
-fileInput.addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    console.log('File selected:', file.name);
-
-    const uploadModal = Modal.loading('Uploading Presentation', 'Please wait while your presentation is uploaded...');
-
-    const formData = new FormData();
-    formData.append('file', file);
-
-    try {
-        const response = await fetch('/api/presentation/upload', {
-            method: 'POST',
-            body: formData
-        });
-
-        const data = await response.json();
-        console.log('Upload response:', data);
-
-        if (data.success) {
-            await loadAvailableModels();
-
-            console.log(`Presentation uploaded with ${data.models_found} Summarizer Script`);
-            if (data.models && data.models.length > 0) {
-                console.log('Available AI models:', data.models);
-            }
-        }
-    } catch (error) {
-        console.error('Error uploading presentation:', error);
-        uploadModal.close();
-        Modal.error('Upload Failed', 'Failed to upload presentation. Please try again.');
-        return;
-    }
-    
-    const arrayBuffer = await file.arrayBuffer();
-    zipFile = await JSZip.loadAsync(arrayBuffer);
-    console.log('ZIP loaded into memory');
-    
-    const pdfFile = zipFile.file("slides.pdf");
-    if (!pdfFile) {
-        console.error("The uploaded package is not a valid Beamer+ presentation (no slides.pdf found).");
-        uploadModal.close();
-        Modal.error('Invalid Presentation', 'The uploaded package is not a valid Beamer+ presentation.');
-        return;
-    }
-    
-    const pdfData = await pdfFile.async("arraybuffer");
-    const pdfDoc = await pdfjsLib.getDocument({ data: pdfData }).promise;
-    totalSlides = pdfDoc.numPages;
-    
-    console.log(`Total slides: ${totalSlides}`);
-    
-    currentSlide = 0;
-    slideConfigs = {};
-    mediaCache = {};
-    
-    await renderSlide(0);
-    
-    socket.emit('presentation_loaded', {
-        totalSlides: totalSlides
-    });
-    // Enable controls now that a presentation is loaded
-    uploadModal.close();
-    setControlsEnabledAfterUpload(true, __beamer_controls);
-});
-
 async function loadAvailableModels() {
     try {
         const response = await fetch('/api/models');
@@ -582,170 +916,6 @@ async function loadAvailableModels() {
         availableModels = [];
     }
 }
-
-// Survey functionality
-let currentSurveyResults = null;
-let currentSurveyData = null;
-let resultsOverlayVisible = false;
-let surveyOverlayVisible = false;
-
-// Survey Button - Opens creation modal
-surveyBtn.onClick(() => {
-    if (availableModels.length === 0) {
-        Modal.warning('No Presentation Loaded', 'Please upload a presentation.');
-        return;
-    }
-    
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    modal.innerHTML = `
-        <div class="modal-content" style="max-width: 500px;">
-            <h2 style="margin-bottom: 1.5rem; font-family: 'Computer Modern Sans', sans-serif; color: #333;">Survey</h2>
-            
-            <div style="margin-bottom: 1.5rem;">
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-family: 'Computer Modern Sans', sans-serif; color: #555;">Question (optional):</label>
-                <input 
-                    type="text" 
-                    id="survey-question"
-                    placeholder="What do you think about...?"
-                    style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; font-family: 'Computer Modern Sans', sans-serif; box-sizing: border-box;"
-                />
-                <div style="margin-top: 0.5rem; font-size: 0.85rem; color: #666; font-family: 'Computer Modern Sans', sans-serif;">
-                    Leave blank for generic survey
-                </div>
-            </div>
-            
-            <div style="margin-bottom: 1.5rem;">
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-family: 'Computer Modern Sans', sans-serif; color: #555;">Summarizer Script:</label>
-                <select 
-                    id="survey-model"
-                    style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; background: white; font-family: 'Computer Modern Sans', sans-serif; box-sizing: border-box;"
-                >
-                </select>
-                <div style="margin-top: 0.5rem; font-size: 0.85rem; color: #666; font-family: 'Computer Modern Sans', sans-serif;">
-                    This script will be used to summarize survey responses
-                </div>
-            </div>
-            
-            <div style="margin-bottom: 1.5rem;">
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; font-family: 'Computer Modern Sans', sans-serif; color: #555;">Number of Summaries:</label>
-                <input 
-                    type="number" 
-                    id="survey-num-summaries" 
-                    min="1" 
-                    max="10" 
-                    value="3"
-                    style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; font-family: 'Computer Modern Sans', sans-serif; box-sizing: border-box;"
-                />
-                <div style="margin-top: 0.5rem; font-size: 0.85rem; color: #666; font-family: 'Computer Modern Sans', sans-serif;">
-                    Generate 1-10 different summary variations
-                </div>
-            </div>
-            
-            <div style="display: flex; gap: 1rem; justify-content: flex-end;">
-                <button 
-                    id="cancel-survey-modal" 
-                    class="btn"
-                    style="font-family: 'Computer Modern Sans', sans-serif;"
-                >
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-                <button 
-                    id="create-survey-btn" 
-                    class="btn"
-                    style=" font-family: 'Computer Modern Sans', sans-serif;"
-                >
-                    <i class="fa-solid fa-share-from-square"></i>
-                </button>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(modal);
-    
-    // Populate model dropdown
-    const modelSelect = document.getElementById('survey-model');
-    availableModels.forEach(model => {
-        const option = document.createElement('option');
-        option.value = model;
-        option.textContent = model.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-        modelSelect.appendChild(option);
-    });
-    
-    if (availableModels.length > 0) {
-        modelSelect.value = availableModels[0];
-    }
-    
-    document.getElementById('survey-question').focus();
-    
-    document.getElementById('cancel-survey-modal').onclick = () => {
-        document.body.removeChild(modal);
-    };
-    
-    document.getElementById('create-survey-btn').onclick = async () => {
-        const question = document.getElementById('survey-question').value.trim() || 'Survey';
-        const model = document.getElementById('survey-model').value;
-        const numSummaries = parseInt(document.getElementById('survey-num-summaries').value);
-        
-        if (!model) {
-            Modal.warning('No Model Selected', 'Please select an AI model.');
-            return;
-        }
-        
-        if (isNaN(numSummaries) || numSummaries < 1 || numSummaries > 10) {
-            Modal.warning('Invalid Number', 'Number of summaries must be between 1 and 10.');
-            return;
-        }
-        
-        try {
-            const response = await fetch('/api/survey/create', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    question,
-                    model,
-                    num_summaries: numSummaries
-                })
-            });
-            
-            const data = await response.json();
-            
-            if (!response.ok) {
-                Modal.error('Survey Creation Failed', data.error || 'Failed to create survey');
-                return;
-            }
-            
-            document.body.removeChild(modal);
-            
-            currentSurveyData = {
-                ...data,
-                model,
-                num_summaries: numSummaries,
-                question
-            };
-            
-            // Reset results when creating new survey
-            currentSurveyResults = null;
-            
-            // Disable results button until we have results
-            surveyResultsBtn.el.disabled = true;
-            surveyResultsBtn.el.style.opacity = '0.5';
-            surveyResultsBtn.el.style.cursor = 'not-allowed';
-            
-            socket.emit('survey_show', data);
-            showSurveyOverlay();
-            
-        } catch (error) {
-            console.error('Error creating survey:', error);
-            Modal.error('Survey Creation Failed', 'Failed to create survey. Please try again.');
-        }
-    };
-    
-    modal.onclick = (e) => {
-        if (e.target === modal) {
-            document.body.removeChild(modal);
-        }
-    };
-});
 
 function updateSurveyOverlayPosition() {
     const overlay = document.getElementById('survey-overlay');
@@ -845,86 +1015,6 @@ function hideSurveyOverlay() {
         document.body.removeChild(overlay);
     }
 }
-
-// Results Button - Toggle between show/hide results
-surveyResultsBtn.onClick(async () => {
-    // If results are already showing, just hide them
-    if (resultsOverlayVisible) {
-        hideSurveyResultsOverlay();
-        return;
-    }
-    
-    // Check if we have a survey
-    if (!currentSurveyData) {
-        Modal.info('No Survey', 'Please create a survey first.');
-        return;
-    }
-    
-    // If we already have results, just show them
-    if (currentSurveyResults) {
-        showSurveyResultsOverlay();
-        return;
-    }
-    
-    // Close the survey if it's still open
-    if (surveyOverlayVisible) {
-        await fetch(`/api/survey/${currentSurveyData.survey_id}/close`, { method: 'POST' });
-        socket.emit('survey_close', { survey_id: currentSurveyData.survey_id });
-        hideSurveyOverlay();
-    }
-    
-    // Show loading modal
-    const loadingModal = Modal.loading('Generating Summaries', 'Please wait while the responses are analyzed...');
-    
-    try {
-        const response = await fetch(`/api/survey/${currentSurveyData.survey_id}/responses`);
-        const data = await response.json();
-        
-        if (data.responses.length === 0) {
-            loadingModal.close();
-            // No responses — survey already closed above; do nothing further.
-            return;
-        }
-        
-        const analyzeResponse = await fetch(`/api/survey/${currentSurveyData.survey_id}/analyze`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        });
-        
-        if (!analyzeResponse.ok) {
-            const errorData = await analyzeResponse.json();
-            throw new Error(errorData.error || 'Analysis failed');
-        }
-        
-        const analysisData = await analyzeResponse.json();
-        
-        currentSurveyResults = {
-            summaries: analysisData.summaries,
-            model: analysisData.model,
-            num_responses: analysisData.num_responses
-        };
-        
-        console.log('Analysis complete:', currentSurveyResults);
-        
-        // Close loading modal
-        loadingModal.close();
-        
-        // Enable the results button for future clicks
-        surveyResultsBtn.el.disabled = false;
-        surveyResultsBtn.el.style.opacity = '1';
-        surveyResultsBtn.el.style.cursor = 'pointer';
-        
-        // Show results overlay
-        showSurveyResultsOverlay();
-        
-    } catch (error) {
-        console.error('Error processing responses:', error);
-        loadingModal.close();
-        Modal.error('Analysis Failed', "There was an error summarizing the responses.");
-    }
-});
-
-let currentResultIndex = 0;
 
 // Use UI helper `disableControlButtons` from beamer_ui.js
 
@@ -1059,51 +1149,25 @@ function updateResultDisplay() {
     nextBtn.style.cursor = nextBtn.disabled ? 'not-allowed' : 'pointer';
 }
 
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && resultsOverlayVisible) {
-        hideSurveyResultsOverlay();
-    }
-});
+async function loadPresentationFromBlob(blob) {
+  const arrayBuffer = await blob.arrayBuffer();
+  zipFile = await JSZip.loadAsync(arrayBuffer);
 
-// Add resize listener to update overlay positions
-window.addEventListener('resize', () => {
-    if (surveyOverlayVisible) {
-        updateSurveyOverlayPosition();
-    }
-    if (resultsOverlayVisible) {
-        updateSurveyResultsOverlayPosition();
-    }
-    
-    // Resize annotation canvas to maintain proper mouse coordinate mapping
-    if (annCvs) {
-        annCvs.resize();
-    }
-    
-    // Update positions of all media elements (videos, models, widgets)
-    if (zipFile && slideConfigs[currentSlide]) {
-        updateMediaPositions();
-    }
-});
+  const pdfFile = zipFile.file("slides.pdf");
+  if (!pdfFile) throw new Error("Invalid presentation: slides.pdf missing");
 
-// Add fullscreen change listener to handle fullscreen transitions
-document.addEventListener('fullscreenchange', () => {
-    // Need a small delay for the browser to finish the fullscreen transition
-    setTimeout(() => {
-        if (surveyOverlayVisible) {
-            updateSurveyOverlayPosition();
-        }
-        if (resultsOverlayVisible) {
-            updateSurveyResultsOverlayPosition();
-        }
-        
-        if (annCvs) {
-            annCvs.resize();
-        }
-        
-        if (zipFile && slideConfigs[currentSlide]) {
-            updateMediaPositions();
-        }
-    }, 100);
-});
+  const pdfData = await pdfFile.async("arraybuffer");
+  pdfDoc = await pdfjsLib.getDocument({ data: pdfData }).promise;
+
+  totalSlides = pdfDoc.numPages;
+  currentSlide = 0;
+
+  slideConfigs = {};
+  mediaCache = {};
+  annotations = {};
+
+  console.log("Viewer loaded presentation. Total slides:", totalSlides);
+}
+
 
 });

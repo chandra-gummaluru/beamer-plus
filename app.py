@@ -43,6 +43,15 @@ current_presentation = {
     'available_models': []  # List of available model names
 }
 
+presentation_state = {
+    "presentation_loaded": None,   # Last payload broadcast in presentation_loaded
+    "current_slide": 0,
+    "annotations": {},             # Store annotationData or list of strokes
+    "video": {},                   # Store video status per slide
+    "models": {},                  # Store 3d camera state per slide
+    "active_survey": None,         # payload broadcast in survey_show
+}
+
 def extract_and_load_models(zip_path):
     """
     Extract AI models from the uploaded ZIP file and load them.
@@ -313,6 +322,13 @@ def join_presenter():
 def join_viewer():
     join_room('viewer')
     emit('joined', {'room': 'viewer'})
+    emit("state_sync", {
+        "presentation_loaded": presentation_state["presentation_loaded"],
+        "current_slide": presentation_state["current_slide"],
+        "annotations": presentation_state["annotations"],
+        "active_survey": presentation_state["active_survey"],
+        # later: "video": ..., "models": ..., "widgets": ...
+    })
 
 @socketio.on('join_survey')
 def join_survey(data):
@@ -324,20 +340,31 @@ def join_survey(data):
 @socketio.on("presentation_loaded")
 def handle_presentation_loaded(data):
     # Broadcast to all viewers that they should load the presentation
+    presentation_state["presentation_loaded"] = data
     emit("presentation_loaded", data, room='viewer')
 
 @socketio.on("slide_change")
 def handle_slide_change(data):
     # Broadcast to all viewers
+    presentation_state["current_slide"] = data.get("slide", 0)
     emit("slide_change", data, room='viewer')
 
 @socketio.on("annotation_update")
 def handle_annotation_update(data):
     # Broadcast to all viewers
+    slide = data.get("slide", presentation_state["current_slide"])
+    presentation_state["annotations"][slide] = data.get("annotation", data)
     emit("annotation_update", data, room='viewer')
 
 @socketio.on("clear_annotations")
-def handle_clear_annotations():
+def handle_clear_annotations(data=None):
+    slide = None
+    if data and "slide" in data:
+        slide = data["slide"]
+    else:
+        slide = presentation_state["current_slide"]
+
+    presentation_state["annotations"].pop(slide, None)
     emit("clear_annotations", room='viewer')
 
 @socketio.on("video_action")
@@ -353,11 +380,13 @@ def handle_model_interaction(data):
 @socketio.on("survey_show")
 def handle_survey_show(data):
     # Broadcast to all viewers
+    presentation_state["active_survey"] = data
     emit("survey_show", data, room='viewer')
 
 @socketio.on("survey_close")
 def handle_survey_close(data=None):
     # Broadcast to all viewers
+    presentation_state["active_survey"] = None
     emit("survey_close", room='viewer')
     
     # Also close the survey and notify respondents
