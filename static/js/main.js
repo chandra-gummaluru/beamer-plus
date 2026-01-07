@@ -208,53 +208,6 @@ uploadBtn.onClick(() => {
     fileInput.click();
 });
 
-let zipFile = null;
-let slideConfigs = {};
-let mediaCache = {};
-let annotations = {};
-let currentSlide = 0;
-let totalSlides = 0;
-
-async function loadSlideConfig(slideIndex) {
-    if (slideConfigs[slideIndex]) {
-        return slideConfigs[slideIndex];
-    }
-    
-    const configFileName = `config/s${slideIndex}.json`;
-    const configFile = zipFile.file(configFileName);
-    
-    if (!configFile) {
-        slideConfigs[slideIndex] = null;
-        return null;
-    }
-    
-    const configText = await configFile.async("string");
-    const config = JSON.parse(configText);
-    slideConfigs[slideIndex] = config;
-    
-    console.log(`Loaded config for slide ${slideIndex}:`, config);
-    return config;
-}
-
-async function loadMediaFromPath(path) {
-    if (mediaCache[path]) {
-        return mediaCache[path];
-    }
-    
-    const file = zipFile.file(path);
-    if (!file) {
-        console.error(`Media file not found: ${path}`);
-        return null;
-    }
-    
-    const blob = await file.async("blob");
-    const url = URL.createObjectURL(blob);
-    mediaCache[path] = url;
-    
-    console.log(`Loaded media: ${path}`);
-    return url;
-}
-
 let annotationSyncTimeout = null;
 annCvs.canvas.addEventListener('mouseup', () => syncAnnotations());
 annCvs.canvas.addEventListener('touchend', () => syncAnnotations());
@@ -642,6 +595,45 @@ socket.on("presentation_loaded", async () => {
   await renderSlide(0);
 });
 
+async function loadSlideConfig(slideIndex) {
+    if (slideConfigs[slideIndex]) {
+        return slideConfigs[slideIndex];
+    }
+
+    const configFileName = `config/s${slideIndex}.json`;
+    const configFile = zipFile.file(configFileName);
+
+    if (!configFile) {
+        slideConfigs[slideIndex] = null;
+        return null;
+    }
+
+    const configText = await configFile.async("string");
+    const config = JSON.parse(configText);
+    slideConfigs[slideIndex] = config;
+
+    console.log(`Loaded config for slide ${slideIndex}:`, config);
+    return config;
+}
+
+async function loadMediaFromPath(path) {
+    if (mediaCache[path]) {
+        return mediaCache[path];
+    }
+
+    const file = zipFile.file(path);
+    if (!file) {
+        console.error(`Media file not found: ${path}`);
+        return null;
+    }
+
+    const blob = await file.async("blob");
+    const url = URL.createObjectURL(blob);
+    mediaCache[path] = url;
+
+    console.log(`Loaded media: ${path}`);
+    return url;
+}
 
 function syncAnnotations() {
     clearTimeout(annotationSyncTimeout);
