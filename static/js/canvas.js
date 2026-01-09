@@ -47,7 +47,19 @@ export class Canvas {
         this.lastDrawTime = 0;
         this.drawThrottle = this.isEink ? 100 : 0; // Throttle drawing on e-ink
 
+        this.history = [];
+        this.redoStack = [];
+        this.maxHistory = 50;
+        this.historyChangeHandler = null;
+        this.shapeLock = null;
+        this.shapeLockTimer = null;
+        this.shapeLockDelay = 2000;
+        this.lastMoveTime = 0;
+        this.lastMovePoint = null;
+        this.savedCanvasState = null;
+
         this.setupEvents(drawable);
+        this.commitHistory();
     }
     
     detectEink() {
@@ -118,6 +130,98 @@ export class Canvas {
         this.strokeWidth = strokeWidth
     }
 
+    setHistoryChangeHandler(fn) {
+        this.historyChangeHandler = fn;
+        this.notifyHistoryChange();
+    }
+
+    notifyHistoryChange() {
+        if (this.historyChangeHandler) {
+            this.historyChangeHandler({
+                canUndo: this.canUndo(),
+                canRedo: this.canRedo()
+            });
+        }
+    }
+
+    getSnapshot() {
+        return this.canvas.toDataURL("image/png");
+    }
+
+    commitHistory() {
+        const snapshot = this.getSnapshot();
+        const last = this.history[this.history.length - 1];
+        if (snapshot === last) return;
+
+        this.history.push(snapshot);
+        if (this.history.length > this.maxHistory) {
+            this.history.shift();
+        }
+        this.redoStack = [];
+        this.notifyHistoryChange();
+    }
+
+    resetHistory(dataURL) {
+        const snapshot = dataURL || this.getSnapshot();
+        this.history = [snapshot];
+        this.redoStack = [];
+        this.notifyHistoryChange();
+    }
+
+    canUndo() {
+        return this.history.length > 1;
+    }
+
+    canRedo() {
+        return this.redoStack.length > 0;
+    }
+
+    async applySnapshot(dataURL) {
+        if (!dataURL) {
+            this.clear();
+            return;
+        }
+
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+                try {
+                    this.ctx.globalCompositeOperation = "source-over";
+                    this.ctx.globalAlpha = 1;
+                    this.clear();
+                    const dw = this.canvas.width / this.dpr;
+                    const dh = this.canvas.height / this.dpr;
+                    this.ctx.drawImage(img, 0, 0, dw, dh);
+                } catch (e) {
+                    console.error('Error drawing annotations image:', e);
+                }
+                resolve();
+            };
+            img.onerror = () => {
+                this.clear();
+                resolve();
+            };
+            img.src = dataURL;
+        });
+    }
+
+    async undo() {
+        if (!this.canUndo()) return;
+        const current = this.history.pop();
+        this.redoStack.push(current);
+        const previous = this.history[this.history.length - 1];
+        await this.applySnapshot(previous);
+        this.notifyHistoryChange();
+    }
+
+    async redo() {
+        if (!this.canRedo()) return;
+        const next = this.redoStack.pop();
+        this.history.push(next);
+        await this.applySnapshot(next);
+        this.notifyHistoryChange();
+    }
+
     startDraw(e) {
         if (this.pointer_mode === "hand") {
             return;
@@ -125,12 +229,20 @@ export class Canvas {
 
         e.preventDefault();
         this.drawing = true;
+        this.shapeLock = null;
+        if (this.shapeLockTimer) {
+            clearTimeout(this.shapeLockTimer);
+            this.shapeLockTimer = null;
+        }
+        this.savedCanvasState = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
 
         const ctx = this.ctx;
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
 
         const p = this.getPos(e);
+        this.lastMoveTime = Date.now();
+        this.lastMovePoint = p;
 
         let color = this.strokeColor;
         let width = this.strokeWidth;
@@ -208,6 +320,20 @@ export class Canvas {
         }
         
         pts.push(p);
+
+        if (!this.shapeLock) {
+            this.lastMoveTime = now;
+            this.lastMovePoint = p;
+            if (this.shapeLockTimer) {
+                clearTimeout(this.shapeLockTimer);
+            }
+            this.shapeLockTimer = setTimeout(() => this.tryLockShape(), this.shapeLockDelay);
+        }
+
+        if (this.shapeLock) {
+            this.drawLockedShape(p);
+            return;
+        }
 
         // Use stroke buffer for highlighter, main context for others
         const ctx = this.currentStroke.mode === 'highlight' ? this.strokeBufferCtx : this.ctx;
@@ -288,6 +414,10 @@ export class Canvas {
 
         if (!this.drawing) return;
         e.preventDefault();
+        if (this.shapeLockTimer) {
+            clearTimeout(this.shapeLockTimer);
+            this.shapeLockTimer = null;
+        }
         
         // For highlighter, finalize the composite
         if (this.currentStroke && this.currentStroke.mode === 'highlight') {
@@ -317,6 +447,60 @@ export class Canvas {
         
         this.drawing = false;
         this.currentStroke = null;
+        this.ctx.globalCompositeOperation = "source-over";
+        this.ctx.globalAlpha = 1;
+        this.savedCanvasState = null;
+        this.commitHistory();
+    }
+
+    tryLockShape() {
+        this.shapeLockTimer = null;
+        if (this.shapeLock || !this.drawing || !this.currentStroke) return;
+        if (Date.now() - this.lastMoveTime < this.shapeLockDelay) return;
+
+        const pts = this.currentStroke.points || [];
+        if (pts.length < 10) return;
+
+        const lockedType = this.detectShape(pts);
+        if (!lockedType) return;
+
+        const lockPoint = this.lastMovePoint || pts[pts.length - 1];
+        this.shapeLock = this.getLockedShapeData(lockedType, pts, lockPoint);
+        if (!this.savedCanvasState) {
+            this.savedCanvasState = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+        }
+        this.drawLockedShape(lockPoint);
+    }
+
+    getLockedShapeData(type, points, center) {
+        const bbox = this.getBoundingBox(points);
+        const width = bbox.maxX - bbox.minX;
+        const height = bbox.maxY - bbox.minY;
+        const shape = {
+            type,
+            center,
+            width,
+            height
+        };
+
+        if (type === 'line') {
+            let dx = points[points.length - 1].x - points[0].x;
+            let dy = points[points.length - 1].y - points[0].y;
+            let norm = Math.sqrt(dx * dx + dy * dy);
+            if (norm < 1) {
+                dx = 1;
+                dy = 0;
+                norm = 1;
+            }
+            const length = Math.max(norm, Math.max(width, height));
+            shape.line = {
+                dx: dx / norm,
+                dy: dy / norm,
+                length
+            };
+        }
+
+        return shape;
     }
     
     redrawStrokeSmooth(stroke) {
@@ -353,27 +537,245 @@ export class Canvas {
         this.ctx.clearRect(0, 0, this.canvas.width / this.dpr, this.canvas.height / this.dpr);
     }
 
+    clearAndCommit() {
+        this.clear();
+        this.commitHistory();
+    }
+
     // Load annotations from a data URL (image) and draw onto the canvas
     async loadAnnotations(dataURL) {
-        if (!dataURL) return;
-        return new Promise((resolve) => {
-            const img = new Image();
-            img.onload = () => {
-                try {
-                    // Clear existing
-                    this.clear();
-                    // Draw image scaled to canvas display size
-                    const dw = this.canvas.width / this.dpr;
-                    const dh = this.canvas.height / this.dpr;
-                    this.ctx.drawImage(img, 0, 0, dw, dh);
-                } catch (e) {
-                    console.error('Error drawing annotations image:', e);
-                }
-                resolve();
-            };
-            img.onerror = () => resolve();
-            img.src = dataURL;
-        });
+        await this.applySnapshot(dataURL);
+        this.resetHistory(dataURL);
+    }
+
+    drawLockedShape(p) {
+        const mode = this.currentStroke.mode;
+        const shape = this.shapeLock;
+        const rect = this.canvas.getBoundingClientRect();
+        const ctx = mode === 'highlight' ? this.strokeBufferCtx : this.ctx;
+
+        if (mode === 'highlight') {
+            this.ctx.putImageData(this.savedCanvasState, 0, 0);
+            this.strokeBufferCtx.clearRect(0, 0, this.strokeBuffer.width, this.strokeBuffer.height);
+        } else if (this.savedCanvasState) {
+            this.ctx.putImageData(this.savedCanvasState, 0, 0);
+        }
+
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = this.currentStroke.color;
+        ctx.lineWidth = this.currentStroke.width;
+        ctx.globalAlpha = 1;
+        if (mode === 'erase') {
+            ctx.globalCompositeOperation = "destination-out";
+        } else {
+            ctx.globalCompositeOperation = "source-over";
+        }
+
+        this.renderLockedShape(ctx, shape);
+
+        if (mode === 'highlight') {
+            this.ctx.save();
+            this.ctx.globalAlpha = 0.4;
+            this.ctx.globalCompositeOperation = "multiply";
+            this.ctx.drawImage(this.strokeBuffer, 0, 0, rect.width, rect.height);
+            this.ctx.restore();
+        }
+    }
+
+    renderLockedShape(ctx, shape) {
+        const type = shape.type;
+        const center = shape.center;
+        const width = shape.width;
+        const height = shape.height;
+        ctx.beginPath();
+        if (type === 'line') {
+            const half = (shape.line ? shape.line.length : Math.max(width, height)) / 2;
+            const dx = (shape.line ? shape.line.dx : 1) * half;
+            const dy = (shape.line ? shape.line.dy : 0) * half;
+            ctx.moveTo(center.x - dx, center.y - dy);
+            ctx.lineTo(center.x + dx, center.y + dy);
+        } else if (type === 'rectangle') {
+            ctx.strokeRect(center.x - width / 2, center.y - height / 2, width, height);
+            return;
+        } else if (type === 'circle') {
+            const radius = Math.max(width, height) / 2;
+            ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+        } else if (type === 'triangle') {
+            const left = center.x - width / 2;
+            const right = center.x + width / 2;
+            const top = center.y - height / 2;
+            const bottom = center.y + height / 2;
+            const apex = { x: center.x, y: top };
+            ctx.moveTo(apex.x, apex.y);
+            ctx.lineTo(right, bottom);
+            ctx.lineTo(left, bottom);
+            ctx.closePath();
+        }
+        ctx.stroke();
+    }
+
+    detectShape(points) {
+        const bbox = this.getBoundingBox(points);
+        const width = bbox.maxX - bbox.minX;
+        const height = bbox.maxY - bbox.minY;
+        const diag = Math.sqrt(width * width + height * height);
+        if (diag < 30) return null;
+
+        const start = points[0];
+        const end = points[points.length - 1];
+        const closeDist = Math.max(10, Math.min(width, height) * 0.2);
+        const isClosed = this.distance(start, end) <= closeDist;
+
+        if (this.isLine(points, bbox, diag)) return 'line';
+        if (!isClosed) return null;
+
+        if (this.isCircle(points, bbox)) return 'circle';
+
+        const simplified = this.simplifyPath(points, Math.max(4, diag * 0.02));
+        const closed = this.closePath(simplified, closeDist);
+        if (closed.length === 4 && this.isRectangle(closed)) return 'rectangle';
+        if (closed.length === 3 && this.isTriangle(closed, bbox)) return 'triangle';
+
+        return null;
+    }
+
+    getBoundingBox(points) {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const p of points) {
+            if (p.x < minX) minX = p.x;
+            if (p.y < minY) minY = p.y;
+            if (p.x > maxX) maxX = p.x;
+            if (p.y > maxY) maxY = p.y;
+        }
+        return { minX, minY, maxX, maxY };
+    }
+
+    distance(a, b) {
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    isLine(points, bbox, diag) {
+        const width = bbox.maxX - bbox.minX;
+        const height = bbox.maxY - bbox.minY;
+        const longSide = Math.max(width, height);
+        const shortSide = Math.min(width, height);
+        if (longSide < 40 || shortSide / longSide > 0.25) return false;
+
+        const start = points[0];
+        const end = points[points.length - 1];
+        const lineDist = this.maxDistanceToLine(points, start, end);
+        return lineDist <= Math.max(6, diag * 0.02);
+    }
+
+    maxDistanceToLine(points, start, end) {
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const denom = Math.sqrt(dx * dx + dy * dy) || 1;
+        let maxDist = 0;
+        for (const p of points) {
+            const dist = Math.abs(dy * p.x - dx * p.y + end.x * start.y - end.y * start.x) / denom;
+            if (dist > maxDist) maxDist = dist;
+        }
+        return maxDist;
+    }
+
+    isCircle(points, bbox) {
+        const width = bbox.maxX - bbox.minX;
+        const height = bbox.maxY - bbox.minY;
+        const ratio = width / (height || 1);
+        if (ratio < 0.8 || ratio > 1.25) return false;
+        if (points.length < 20) return false;
+
+        const cx = (bbox.minX + bbox.maxX) / 2;
+        const cy = (bbox.minY + bbox.maxY) / 2;
+        let sum = 0;
+        for (const p of points) {
+            sum += this.distance(p, { x: cx, y: cy });
+        }
+        const mean = sum / points.length;
+        let variance = 0;
+        for (const p of points) {
+            const d = this.distance(p, { x: cx, y: cy }) - mean;
+            variance += d * d;
+        }
+        const stddev = Math.sqrt(variance / points.length);
+        return stddev / mean < 0.2;
+    }
+
+    simplifyPath(points, epsilon) {
+        if (points.length < 3) return points.slice();
+        const first = points[0];
+        const last = points[points.length - 1];
+
+        let index = -1;
+        let maxDist = 0;
+        for (let i = 1; i < points.length - 1; i++) {
+            const dist = this.perpendicularDistance(points[i], first, last);
+            if (dist > maxDist) {
+                maxDist = dist;
+                index = i;
+            }
+        }
+
+        if (maxDist > epsilon) {
+            const left = this.simplifyPath(points.slice(0, index + 1), epsilon);
+            const right = this.simplifyPath(points.slice(index), epsilon);
+            return left.slice(0, -1).concat(right);
+        }
+
+        return [first, last];
+    }
+
+    perpendicularDistance(p, start, end) {
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        if (dx === 0 && dy === 0) return this.distance(p, start);
+        const t = ((p.x - start.x) * dx + (p.y - start.y) * dy) / (dx * dx + dy * dy);
+        const proj = { x: start.x + t * dx, y: start.y + t * dy };
+        return this.distance(p, proj);
+    }
+
+    closePath(points, closeDist) {
+        if (points.length < 2) return points.slice();
+        const first = points[0];
+        const last = points[points.length - 1];
+        if (this.distance(first, last) <= closeDist) {
+            return points.slice(0, -1);
+        }
+        return points.slice();
+    }
+
+    isRectangle(points) {
+        if (points.length !== 4) return false;
+        for (let i = 0; i < 4; i++) {
+            const prev = points[(i + 3) % 4];
+            const curr = points[i];
+            const next = points[(i + 1) % 4];
+            const v1 = { x: prev.x - curr.x, y: prev.y - curr.y };
+            const v2 = { x: next.x - curr.x, y: next.y - curr.y };
+            const dot = v1.x * v2.x + v1.y * v2.y;
+            const mag1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y) || 1;
+            const mag2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y) || 1;
+            const cos = dot / (mag1 * mag2);
+            if (Math.abs(cos) > 0.3) return false;
+        }
+        return true;
+    }
+
+    isTriangle(points, bbox) {
+        if (points.length !== 3) return false;
+        const area = Math.abs(
+            (points[0].x * (points[1].y - points[2].y) +
+            points[1].x * (points[2].y - points[0].y) +
+            points[2].x * (points[0].y - points[1].y)) / 2
+        );
+        const width = bbox.maxX - bbox.minX;
+        const height = bbox.maxY - bbox.minY;
+        const boxArea = width * height || 1;
+        return area / boxArea > 0.2;
     }
 
     async renderPDFPage(pdfPage) {

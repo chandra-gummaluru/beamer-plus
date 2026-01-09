@@ -90,6 +90,16 @@ const brushPlusBtn = new Button(brushContainer, {
 
 const otherControlsContainer = document.getElementById('other-controls');
 
+const undoBtn = new Button(otherControlsContainer, {
+    className: 'btn',
+    label: '<i class="fa-solid fa-rotate-left"></i>'
+});
+
+const redoBtn = new Button(otherControlsContainer, {
+    className: 'btn',
+    label: '<i class="fa-solid fa-rotate-right"></i>'
+});
+
 const clearBtn = new Button(otherControlsContainer, {
     className: 'btn',
     label: '<i class="fa-solid fa-broom"></i>'
@@ -127,6 +137,7 @@ const __beamer_controls = [
     ...colorBtns,
     brushMinusBtn, brushPlusBtn,
     prevBtn, nextBtn,
+    undoBtn, redoBtn,
     clearBtn, surveyBtn
 ];
 
@@ -140,6 +151,13 @@ const ann_canvas_container = document.getElementById('ann-canvas');
 const annCvs = new Canvas(ann_canvas_container);
 const slide_canvas_container = document.getElementById('pdf-canvas');
 const pdfCvs = new Canvas(slide_canvas_container, false);
+
+const updateHistoryButtons = () => {
+    undoBtn.el.disabled = !annCvs.canUndo();
+    redoBtn.el.disabled = !annCvs.canRedo();
+};
+annCvs.setHistoryChangeHandler(updateHistoryButtons);
+updateHistoryButtons();
 
 hand.onClick(() => annCvs.setPointerMode('hand'));
 pen.onClick(() => annCvs.setPointerMode('draw'));
@@ -177,10 +195,20 @@ brushPlusBtn.onClick(() => {
 });
 
 clearBtn.onClick(() => {
-    annCvs.clear();
+    annCvs.clearAndCommit();
     // Clear current slide annotations locally and notify server
     annotations[currentSlide] = null;
     socket.emit('clear_annotations');
+});
+
+undoBtn.onClick(async () => {
+    await annCvs.undo();
+    syncAnnotations();
+});
+
+redoBtn.onClick(async () => {
+    await annCvs.redo();
+    syncAnnotations();
 });
 
 const fileInput = document.getElementById("upload-zip");
@@ -341,6 +369,8 @@ async function renderSlide(slideIndex) {
         annCvs.clear();
         if (annotations[slideIndex]) {
             await annCvs.loadAnnotations(annotations[slideIndex]);
+        } else {
+            annCvs.resetHistory();
         }
     } catch (e) {
         console.warn('Error loading annotations for slide', slideIndex, e);
@@ -569,6 +599,7 @@ fileInput.addEventListener('change', async (e) => {
     // Enable controls now that a presentation is loaded
     uploadModal.close();
     setControlsEnabledAfterUpload(true, __beamer_controls);
+    updateHistoryButtons();
 });
 
 async function loadAvailableModels() {
