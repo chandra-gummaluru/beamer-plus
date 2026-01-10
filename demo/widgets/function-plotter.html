@@ -467,6 +467,27 @@
         }
       }
 
+      broadcastState() {
+        if (this.config.role === 'viewer') return;
+        const state = {
+            f1: this.func1Input.value, f2: this.func2Input.value, f3: this.func3Input.value,
+            xmin: this.xmin, xmax: this.xmax, ymin: this.ymin, ymax: this.ymax,
+            grid: this.showGrid
+        };
+        window.parent.postMessage({ type: 'widget_sync', action: 'update_plot', data: state }, '*');
+      }
+
+      handleSync(data) {
+          this.func1Input.value = data.f1;
+          this.func2Input.value = data.f2;
+          this.func3Input.value = data.f3;
+          this.xmin = data.xmin; this.xmax = data.xmax;
+          this.ymin = data.ymin; this.ymax = data.ymax;
+          this.showGrid = data.grid;
+          this.updateInputs();
+          this.plot();
+      }
+
       updateInputs() {
         this.xminInput.value = this.xmin.toFixed(2);
         this.xmaxInput.value = this.xmax.toFixed(2);
@@ -660,6 +681,10 @@
         if (newConfig.autoPlot) {
           this.plot();
         }
+
+        if (this.config.role === 'presenter') {
+          setTimeout(() => this.broadcastState(), 500);
+        }
       }
 
       destroy() {
@@ -674,8 +699,14 @@
     window.addEventListener('message', (event) => {
       if (event.data.type === 'widget-config') {
         widget.updateConfig(event.data.config);
-      } else if (event.data.type === 'widget-cleanup') {
+      }
+      else if (event.data.type === 'widget-cleanup') {
         widget.destroy();
+      }
+      else if (event.data.type === 'widget_sync_receive') {
+        if (event.data.action === 'update_plot') {
+          widget.handleSync(event.data.data);
+        }
       }
     });
   </script>

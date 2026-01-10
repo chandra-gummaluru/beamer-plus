@@ -632,6 +632,20 @@ socket.on("slide_change", async ({ slideIndex, annotations: annData }) => {
     await renderSlide(slideIndex);
     });
 
+socket.on("model_interaction", (data) => {
+    const mv = document.querySelector(`model-viewer[data-model-id="${data.modelId}"]`);
+
+    if (mv) {
+        const c = data.camera;
+        const t = data.target;
+
+        mv.cameraOrbit = `${c.theta}rad ${c.phi}rad ${c.radius}m`;
+
+        mv.cameraTarget = `${t.x}m ${t.y}m ${t.z}m`;
+
+        mv.jumpCameraToGoal();
+    }
+});
 
 async function loadSlideConfig(slideIndex) {
     if (slideConfigs[slideIndex]) {

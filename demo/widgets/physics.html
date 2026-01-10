@@ -115,7 +115,8 @@
           elasticity: 0.8,
           friction: 0.98,
           initialBalls: 3,
-          interactive: true
+          interactive: true,
+          role: 'viewer'
         };
         
         this.init();
@@ -124,7 +125,6 @@
       init() {
         this.setupCanvas();
         this.setupEvents();
-        this.addInitialBalls();
         this.animate();
       }
 
@@ -208,17 +208,6 @@
         }
       }
 
-<!--      handleMouseUp(e) {-->
-<!--        if (!this.config.interactive) return;-->
-<!--        -->
-<!--        if (this.draggedBall) {-->
-<!--          this.draggedBall.vx = (this.mouseX - this.lastMouseX) * 0.5;-->
-<!--          this.draggedBall.vy = (this.mouseY - this.lastMouseY) * 0.5;-->
-<!--          this.draggedBall.dragging = false;-->
-<!--          this.draggedBall = null;-->
-<!--        }-->
-<!--      }-->
-
       handleMouseUp(e) {
         if (!this.config.interactive) return;
 
@@ -228,7 +217,6 @@
           this.draggedBall.dragging = false;
           this.draggedBall = null;
 
-          // [NEW] Sync the release so viewer sees the throw
           this.broadcastState();
         }
       }
@@ -236,16 +224,6 @@
       addBall(x, y, radius, color) {
         this.balls.push(new Ball(x, y, radius, color));
       }
-
-<!--      addInitialBalls() {-->
-<!--        for (let i = 0; i < this.config.initialBalls; i++) {-->
-<!--          const x = Math.random() * (this.canvas.width - 80) + 40;-->
-<!--          const y = Math.random() * (this.canvas.height - 80) + 40;-->
-<!--          const radius = Math.random() * 20 + 20;-->
-<!--          const color = this.colors[Math.floor(Math.random() * this.colors.length)];-->
-<!--          this.addBall(x, y, radius, color);-->
-<!--        }-->
-<!--      }-->
 
       addInitialBalls() {
         if (this.config.role === 'viewer') return;
@@ -271,18 +249,29 @@
         });
       }
 
+      broadcast(action, data) {
+        if (this.config.role === 'viewer') return;
+        window.parent.postMessage({ type: 'widget_sync', action: action, data: data }, '*');
+      }
+
       broadcastState() {
         if (this.config.role === 'viewer') return;
-
         const state = this.balls.map(b => ({
             x: b.x, y: b.y, radius: b.radius, color: b.color, vx: b.vx, vy: b.vy
         }));
+        this.broadcast('update_balls', state);
+      }
 
-        window.parent.postMessage({
-            type: 'widget_sync',
-            action: 'update_balls',
-            data: state
-        }, '*');
+      handleSync(payload) {
+          if (payload.action === 'update_balls') {
+              this.setBalls(payload.data);
+          } else if (payload.action === 'drag_move') {
+              const b = this.balls[payload.data.index];
+              if(b) { b.x = payload.data.x; b.y = payload.data.y; b.vx=0; b.vy=0; }
+          } else if (payload.action === 'drag_end') {
+              const b = this.balls[payload.data.index];
+              if(b) { b.vx = payload.data.vx; b.vy = payload.data.vy; }
+          }
       }
 
       checkCollisions() {
@@ -344,6 +333,9 @@
 
       updateConfig(newConfig) {
         Object.assign(this.config, newConfig);
+        if (this.config.role === 'presenter' && this.balls.length === 0) {
+            this.addInitialBalls();
+        }
       }
 
       destroy() {
@@ -360,17 +352,9 @@
     window.addEventListener('message', (event) => {
       if (event.data.type === 'widget-config') {
         widget.updateConfig(event.data.config);
-
-        if (event.data.config.role === 'presenter' && widget.balls.length === 0) {
-            widget.addInitialBalls();
-        }
-      } else if (event.data.type === 'widget-cleanup') {
-        widget.destroy();
       }
       else if (event.data.type === 'widget_sync_receive') {
-          if (event.data.action === 'update_balls') {
-              widget.setBalls(event.data.data);
-          }
+        widget.handleSync(event.data);
       }
     });
   </script>
