@@ -208,14 +208,28 @@
         }
       }
 
+<!--      handleMouseUp(e) {-->
+<!--        if (!this.config.interactive) return;-->
+<!--        -->
+<!--        if (this.draggedBall) {-->
+<!--          this.draggedBall.vx = (this.mouseX - this.lastMouseX) * 0.5;-->
+<!--          this.draggedBall.vy = (this.mouseY - this.lastMouseY) * 0.5;-->
+<!--          this.draggedBall.dragging = false;-->
+<!--          this.draggedBall = null;-->
+<!--        }-->
+<!--      }-->
+
       handleMouseUp(e) {
         if (!this.config.interactive) return;
-        
+
         if (this.draggedBall) {
           this.draggedBall.vx = (this.mouseX - this.lastMouseX) * 0.5;
           this.draggedBall.vy = (this.mouseY - this.lastMouseY) * 0.5;
           this.draggedBall.dragging = false;
           this.draggedBall = null;
+
+          // [NEW] Sync the release so viewer sees the throw
+          this.broadcastState();
         }
       }
 
@@ -223,7 +237,19 @@
         this.balls.push(new Ball(x, y, radius, color));
       }
 
+<!--      addInitialBalls() {-->
+<!--        for (let i = 0; i < this.config.initialBalls; i++) {-->
+<!--          const x = Math.random() * (this.canvas.width - 80) + 40;-->
+<!--          const y = Math.random() * (this.canvas.height - 80) + 40;-->
+<!--          const radius = Math.random() * 20 + 20;-->
+<!--          const color = this.colors[Math.floor(Math.random() * this.colors.length)];-->
+<!--          this.addBall(x, y, radius, color);-->
+<!--        }-->
+<!--      }-->
+
       addInitialBalls() {
+        if (this.config.role === 'viewer') return;
+
         for (let i = 0; i < this.config.initialBalls; i++) {
           const x = Math.random() * (this.canvas.width - 80) + 40;
           const y = Math.random() * (this.canvas.height - 80) + 40;
@@ -231,6 +257,32 @@
           const color = this.colors[Math.floor(Math.random() * this.colors.length)];
           this.addBall(x, y, radius, color);
         }
+
+        this.broadcastState();
+      }
+
+      setBalls(ballData) {
+        this.balls = [];
+        ballData.forEach(b => {
+            const ball = new Ball(b.x, b.y, b.radius, b.color);
+            ball.vx = b.vx;
+            ball.vy = b.vy;
+            this.balls.push(ball);
+        });
+      }
+
+      broadcastState() {
+        if (this.config.role === 'viewer') return;
+
+        const state = this.balls.map(b => ({
+            x: b.x, y: b.y, radius: b.radius, color: b.color, vx: b.vx, vy: b.vy
+        }));
+
+        window.parent.postMessage({
+            type: 'widget_sync',
+            action: 'update_balls',
+            data: state
+        }, '*');
       }
 
       checkCollisions() {
@@ -308,8 +360,17 @@
     window.addEventListener('message', (event) => {
       if (event.data.type === 'widget-config') {
         widget.updateConfig(event.data.config);
+
+        if (event.data.config.role === 'presenter' && widget.balls.length === 0) {
+            widget.addInitialBalls();
+        }
       } else if (event.data.type === 'widget-cleanup') {
         widget.destroy();
+      }
+      else if (event.data.type === 'widget_sync_receive') {
+          if (event.data.action === 'update_balls') {
+              widget.setBalls(event.data.data);
+          }
       }
     });
   </script>

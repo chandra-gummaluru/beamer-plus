@@ -2,7 +2,7 @@
 // Renders widgets from HTML files in the zip file
 // Widgets are loaded as blob URLs from the presentation zip
 
-export function renderWidgets(slideConfig, container, zipFile) {
+export function renderWidgets(slideConfig, container, zipFile, isViewer) {
     if (!slideConfig.widgets || slideConfig.widgets.length === 0) {
         return;
     }
@@ -35,6 +35,10 @@ export function renderWidgets(slideConfig, container, zipFile) {
         iframe.style.border = "none";
         iframe.style.background = "transparent";
         iframe.style.pointerEvents = w.interactive !== false ? 'auto' : 'none';
+
+        if (isViewer) {
+            iframe.style.pointerEvents = "none";
+        }
         
         iframe.allow = "autoplay; fullscreen";
         
@@ -60,9 +64,12 @@ export function renderWidgets(slideConfig, container, zipFile) {
             // Pass config to widget once loaded
             iframe.addEventListener('load', () => {
                 iframe.contentWindow.postMessage({
-                    type: 'widget-config',
-                    config: w
-                }, '*');
+                type: 'widget-config',
+                config: {
+                    ...w,
+                    role: isViewer ? 'viewer' : 'presenter'
+                }
+            }, '*');
             });
             
         } catch (error) {
