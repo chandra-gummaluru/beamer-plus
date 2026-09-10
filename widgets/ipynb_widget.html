@@ -618,7 +618,9 @@ function initSocket() {
     return;
   }
   try {
-    socket = io();
+    // Never io() bare — inside the srcdoc iframe that resolves to
+    // http://about/socket.io/, which an HTTPS deck blocks as mixed content.
+    socket = io(window.BeamerWidget ? BeamerWidget.serverOrigin() : (CFG.socketUrl || ''));
     // Incoming sync events (viewer receives output from presenter)
     socket.on('widget_event', (data) => {
       if (data.id !== WIDGET_ID) return;

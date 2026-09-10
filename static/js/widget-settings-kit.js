@@ -33,19 +33,51 @@
 
     /* ─── schema ────────────────────────────────────────────────── */
 
-    var schema = null;
-    try {
-        var schemaEl = document.getElementById('widget-schema');
-        if (schemaEl) schema = JSON.parse(schemaEl.textContent.trim());
-    } catch (e) { schema = null; }
+    // This script is injected at the TOP of <head> — before the widget's own
+    // <script id="widget-schema"> has been parsed — so the schema cannot be
+    // read at load time. It is read on first use instead, and the parent isn't
+    // told whether we have settings until there is a document to read it from.
+    var schema = null, fields = [], customSettings = false, hasSettings = false;
+    var _schemaRead = false;
 
-    var fields = (schema && Array.isArray(schema.fields))
-        ? schema.fields.filter(function (f) { return f && f.key && RESERVED.indexOf(f.key) === -1; })
-        : [];
-    var customSettings = !!(schema && schema.customSettings);
-    var hasSettings    = !customSettings && fields.length > 0;
+    // Returns false while the document is still parsing and the schema element
+    // hasn't appeared yet — callers should try again once it has.
+    function readSchema() {
+        if (_schemaRead) return true;
+        var el = document.getElementById('widget-schema');
+        if (!el && document.readyState === 'loading') return false;
+        _schemaRead = true;
+        try { schema = el ? JSON.parse(el.textContent.trim()) : null; }
+        catch (e) { schema = null; }
+        fields = (schema && Array.isArray(schema.fields))
+            ? schema.fields.filter(function (f) { return f && f.key && RESERVED.indexOf(f.key) === -1; })
+            : [];
+        customSettings = !!(schema && schema.customSettings);
+        hasSettings = !customSettings && fields.length > 0;
+        return true;
+    }
 
     function cfg() { return window.WIDGET_CONFIG || (window.WIDGET_CONFIG = {}); }
+
+    /**
+     * The origin to talk to the Beamer+ server on — for socket.io, fetch, or
+     * anything else leaving the widget.
+     *
+     * A widget must never call io() or fetch a root-relative URL bare: inside a
+     * srcdoc iframe `location` is about:srcdoc, so location.origin is the string
+     * "null" and socket.io resolves a missing URL to http://about/socket.io/ —
+     * which an HTTPS deck then blocks as mixed content.
+     */
+    function serverOrigin() {
+        var c = cfg();
+        if (c.socketUrl) return c.socketUrl;
+        if (c.serverUrl) return c.serverUrl;
+        try {
+            var po = parent && parent.location && parent.location.origin;
+            if (po && po !== 'null') return po;
+        } catch (e) {}
+        return (location.origin && location.origin !== 'null') ? location.origin : '';
+    }
 
     /* ─── presentation scale ────────────────────────────────────── */
     // A widget that declares a `scale` field gets the room-size control for
@@ -54,6 +86,7 @@
     // Chrome stays fixed, so the furniture doesn't inflate with the content.
 
     function applyScale() {
+        if (!readSchema()) return;
         var f = null;
         for (var i = 0; i < fields.length; i++) if (fields[i].key === 'scale') { f = fields[i]; break; }
         if (!f) return;
@@ -62,7 +95,10 @@
         if (!isNaN(v) && v > 0) document.documentElement.style.setProperty('--u', String(v));
     }
     function post(msg) { try { parent.postMessage(msg, '*'); } catch (e) {} }
-    function announce() { post({ type: 'widget-has-settings', widgetId: cfg().id, has: hasSettings }); }
+    function announce() {
+        if (!readSchema()) return;   // asked again on DOMContentLoaded
+        post({ type: 'widget-has-settings', widgetId: cfg().id, has: hasSettings });
+    }
 
     /* ─── styles ────────────────────────────────────────────────── */
     // Uses the design tokens Beamer+ injects ahead of this script, so the
@@ -448,7 +484,7 @@
     window.addEventListener('message', function (e) {
         if (selfDispatch) return;   // our own local re-broadcast of widget-config
         var d = e.data || {};
-        if (d.type === 'widget-open-settings')  { if (hasSettings) openPanel(); return; }
+        if (d.type === 'widget-open-settings')  { readSchema(); if (hasSettings) openPanel(); return; }
         if (d.type === 'widget-close-settings') { closePanel(true); return; }
         if (d.type === 'widget-asset-saved')    { onAssetSaved(d); return; }
         if (d.type === 'widget-flush-files') {
@@ -466,16 +502,18 @@
     // host goes through here rather than hand-rolled postMessage.
     window.BeamerWidget = {
         config:        cfg,
+        serverOrigin:  serverOrigin,
         saveFile:      saveFile,
         onFlushFiles:  onFlushFiles,
-        openSettings:  function () { if (hasSettings) openPanel(); },
+        openSettings:  function () { readSchema(); if (hasSettings) openPanel(); },
         closeSettings: function () { closePanel(); },
-        hasSettings:   function () { return hasSettings; },
+        hasSettings:   function () { readSchema(); return hasSettings; },
     };
 
-    applyScale();
-    announce();
+    function init() { applyScale(); announce(); }
+
+    init();
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', announce, { once: true });
+        document.addEventListener('DOMContentLoaded', init, { once: true });
     }
 })();

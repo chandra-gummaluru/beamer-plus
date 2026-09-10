@@ -499,7 +499,9 @@ function initSocket(url) {
   }
   try {
     const prev = socket;
-    socket = url ? io(url) : io();
+    // Never io() bare — inside the srcdoc iframe that resolves to
+    // http://about/socket.io/, which an HTTPS deck blocks as mixed content.
+    socket = io(url || (window.BeamerWidget ? BeamerWidget.serverOrigin() : ''));
     if (prev && prev.disconnect) prev.disconnect();
     socket.on('widget_event', ({ id, type, payload }) => {
       if (id !== WIDGET_ID) return;
