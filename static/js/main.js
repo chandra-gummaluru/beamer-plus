@@ -161,6 +161,8 @@ document.addEventListener('DOMContentLoaded', () => {
     wireKeyboardNav();
     wireResizeAndFullscreen();
     wireMenuBtn();
+    wireStageEmptyState();
+    updateStageEmptyState();
 
     // annotation sync + active-pane tracking
     state.activeAnnCvs = state.annCvs;
@@ -1048,6 +1050,36 @@ function saveCurrentAnnotations() {
     }
 }
 
+/* ─── empty stage placeholder ─────────────────────────────────── */
+// Shown only while the deck holds no slides at all (fresh session before any
+// upload, or after the last blank slide is deleted). Called from
+// populateSlideNavigator(), which every structure change funnels through.
+function updateStageEmptyState() {
+    const el = document.getElementById('stage-empty');
+    if (!el) return;
+    const isEmpty = state.slideStructure.length === 0;
+    el.hidden = !isEmpty;
+    if (!isEmpty) return;
+    // Nothing behind the placeholder: drop any ink and hide the slide bitmap
+    // left over from a deck that has just been emptied. The non-empty case is
+    // left alone — renderLogicalSlide() owns canvas visibility from there on
+    // (it keeps the bitmap hidden for blank slides).
+    state.annCvs?.clear();
+    state.annCvs?.resetHistory?.();
+    if (state.pdfCvs?.canvas) state.pdfCvs.canvas.style.visibility = 'hidden';
+}
+
+// Route the placeholder's two actions through the existing buttons so the
+// upload modal and blank-slide insertion keep a single implementation.
+function wireStageEmptyState() {
+    document.getElementById('stage-empty-upload')?.addEventListener('click', () => {
+        document.getElementById('upload-presentation-btn')?.click();
+    });
+    document.getElementById('stage-empty-add-blank')?.addEventListener('click', () => {
+        document.getElementById('add-blank-btn')?.click();
+    });
+}
+
 /* ─── populate slide navigator ────────────────────────────────── */
 function populateSlideNavigator() {
     const labels = getSlideLabels(state.slideStructure);
@@ -1068,6 +1100,7 @@ function populateSlideNavigator() {
         return base;
     }));
     updateSlideNavigator();
+    updateStageEmptyState();
 }
 
 bus.on('nav:refresh', () => populateSlideNavigator());
@@ -1163,6 +1196,8 @@ function sizeSlideCanvases() {
         if (ann) { ann.style.width = `${w}px`; ann.style.height = `${h}px`; }
         const overlay = pane.querySelector('.slide-loading-overlay');
         if (overlay) { overlay.style.width = `${w}px`; overlay.style.height = `${h}px`; }
+        const empty = pane.querySelector('.stage-empty');
+        if (empty) { empty.style.width = `${w}px`; empty.style.height = `${h}px`; }
     }
 }
 

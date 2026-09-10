@@ -67,6 +67,27 @@
         <div id="pdf-container">
             <div id="pdf-canvas"></div>
             <div id="ann-canvas"></div>
+            <!-- Empty-stage placeholder — shown while the deck has no slides at all
+                 (fresh session, nothing uploaded yet). Sized to the slide card by
+                 sizeSlideCanvases(); toggled by updateStageEmptyState() in main.js. -->
+            <div id="stage-empty" class="stage-empty" hidden>
+                <svg class="stage-empty-icon" viewBox="0 0 72 52" fill="none" aria-hidden="true">
+                    <rect class="stage-empty-frame" x="5" y="4" width="62" height="44" rx="4"/>
+                    <path class="stage-empty-squiggle" d="M18 26 Q 27 13, 36 26 T 54 26"/>
+                </svg>
+                <p class="stage-empty-title">Your stage is empty</p>
+                <p class="stage-empty-hint">Upload content or add a slide to get started.</p>
+                <div class="stage-empty-actions">
+                    <button type="button" class="stage-empty-btn stage-empty-btn--primary" id="stage-empty-upload">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        Upload content
+                    </button>
+                    <button type="button" class="stage-empty-btn" id="stage-empty-add-blank">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                        Add a blank slide
+                    </button>
+                </div>
+            </div>
             <div class="slide-loading-overlay">
                 <svg class="slide-squiggle" viewBox="0 0 120 40">
                     <path d="M5 20 Q 15 5, 25 20 T 45 20 T 65 20 T 85 20 T 105 20" />

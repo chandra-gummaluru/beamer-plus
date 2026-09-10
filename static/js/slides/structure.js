@@ -67,13 +67,18 @@ export function shiftSlideData(atIdx, delta) {
 /* ─── blank / view slide management ───────────────────────────── */
 
 function insertBlankAfterCurrent() {
-    const ins = _state.currentSlide + 1;
+    // On an empty deck (fresh session, nothing uploaded) there is no "current"
+    // slide to insert after — the blank becomes slide 0. Otherwise it lands
+    // immediately after the slide on stage.
+    const ins = _state.slideStructure.length === 0 ? 0 : _state.currentSlide + 1;
     const blankId = `b${Date.now()}`;
     adjustViewIndices(ins, +1);
     shiftSlideData(ins, +1);
     _state.slideStructure.splice(ins, 0, { type: 'blank', blankId, parent: null });
-    bus.emit('slide:goto', ins);
+    // Refresh first so totalSlides / the navigator know about the new slide
+    // before anything navigates to it.
     bus.emit('nav:refresh');
+    bus.emit('slide:goto', ins);
 }
 
 function insertViewAfterCurrent() {
@@ -109,8 +114,10 @@ function deleteCurrentBlank() {
     _state.totalSlides = _state.slideStructure.length;
     adjustViewIndices(del, -1);          // fix view slides after deletion
     shiftSlideData(del, -1);             // keep annotations/bookmarks aligned
-    const next = Math.min(del, _state.slideStructure.length - 1);
+    // Deleting the only slide leaves an empty deck — clamp to 0 so the next
+    // insert lands at the start rather than off the front of the array.
+    const next = Math.max(0, Math.min(del, _state.slideStructure.length - 1));
     _state.currentSlide = next;
-    bus.emit('slide:goto', next);
     bus.emit('nav:refresh');
+    bus.emit('slide:goto', next);
 }
