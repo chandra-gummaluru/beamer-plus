@@ -2,35 +2,28 @@
 // ratio for a saved split view, or delete the view slide.
 import { bus } from '../core/events.js';
 import { getSlideLabels } from '../slides/structure.js';
-import { ctx, escAttr, escHtml } from './context.js';
+import { ctx, escAttr, escHtml, setPanelMode, resolvePanelMode } from './context.js';
 
 export function showViewConfig(i) {
     const obj = ctx.state?.slideStructure?.[i];
     if (!obj || obj.type !== 'view') return;
     ctx.selectedViewIdx = i;
 
-    const container = document.getElementById('editor-view');
-    const body      = document.getElementById('editor-view-body');
-    if (!container || !body) return;
+    const body = document.getElementById('editor-view-body');
+    if (!body) return;
 
-    // Hide the regular slide settings panel — the view config is the only UI while
-    // a view slide is selected, so showing both would cause confusion (e.g. "Hide
-    // in presentation" would apply to the left pane slide, not the view).
-    const slideSettings = document.getElementById('editor-slide-settings');
-    if (slideSettings) slideSettings.style.display = 'none';
-
-    container.style.display = 'flex';
+    // The view config is the only UI while a view slide is selected — showing the
+    // regular slide settings alongside it would cause confusion (e.g. "Hide in
+    // presentation" would apply to the left pane slide, not the view).
+    setPanelMode('view');
     body.innerHTML = buildViewConfigHTML(obj, i);
     wireViewConfigHandlers(i, obj);
 }
 
 export function hideViewConfig() {
     ctx.selectedViewIdx = null;
-    const container = document.getElementById('editor-view');
-    if (container) container.style.display = 'none';
-    // Restore the regular slide settings panel now that the view config is dismissed.
-    const slideSettings = document.getElementById('editor-slide-settings');
-    if (slideSettings) slideSettings.style.display = '';
+    // Hand the panel back to whatever is still selected — normally the slide.
+    setPanelMode(resolvePanelMode());
 }
 
 function buildViewConfigHTML(obj, viewIdx) {

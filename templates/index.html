@@ -147,20 +147,24 @@
         <div id="editor-panel-header">
             <span id="editor-panel-title">Edit Presentation</span>
         </div>
-        <div id="editor-panel-body">
+        <div id="editor-panel-body" data-mode="slide">
             <div id="editor-slide-settings">
-                <div class="editor-section-title">Slide</div>
+                <div class="editor-section-heading">Slide Properties</div>
                 <label class="editor-prop-checkbox-row">
                     <input type="checkbox" id="slide-hidden-toggle">
                     Hide in presentation
                 </label>
             </div>
             <div id="editor-properties">
-                <div id="editor-properties-title">Properties</div>
+                <button class="editor-props-back" id="editor-props-back" type="button" title="Back to slide properties">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+                    Slide properties
+                </button>
+                <div id="editor-properties-title" class="editor-section-heading">Properties</div>
                 <div id="editor-properties-body"></div>
             </div>
             <div id="editor-view">
-                <div id="editor-view-title">View Configuration</div>
+                <div id="editor-view-title" class="editor-section-heading">View Configuration</div>
                 <div id="editor-view-body"></div>
             </div>
         </div>

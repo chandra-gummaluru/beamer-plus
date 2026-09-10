@@ -100,6 +100,11 @@ const _WIDGET_BASE_INJECT = `<link rel="preconnect" href="https://fonts.googleap
 })();
 </script>`;
 
+// Loaded after window.WIDGET_CONFIG so it can read the widget's own id on its
+// first tick. srcdoc iframes inherit the parent's origin, so this resolves and
+// caches like any other same-origin script.
+const _SETTINGS_KIT_INJECT = `<script src="/static/js/widget-settings-kit.js"></script>`;
+
 // ── Widget schema protocol ─────────────────────────────────────────────────
 // Each widget HTML file may declare its own editable fields via:
 //
@@ -107,55 +112,15 @@ const _WIDGET_BASE_INJECT = `<link rel="preconnect" href="https://fonts.googleap
 //   { "label": "...", "category": "...", "fields": [ ... ] }
 //   </script>
 //
-// Beamer+ reads this at editor time — no hardcoded field lists needed.
-// The fields array uses the same format as the editor's field builder:
+// The settings kit injected into every widget reads this and renders the
+// widget's own settings panel from it — Beamer+ itself never renders these
+// fields, and the editor panel shows only the widget's geometry. A widget that
+// wants a settings UI of its own declares "customSettings": true and handles
+// the widget-open-settings message itself.
+// The fields array:
 //   { key, label, type, placeholder?, default?, min?, max?, step?, note?,
 //     options?: [{v, l}], rows? }
 // type ∈ text | number | number-nullable | checkbox | select | textarea | textarea-lines
-
-export function extractWidgetSchema(htmlContent) {
-    // Match both attribute orderings of id / type
-    const m = htmlContent.match(
-        /<script[^>]+id=["']widget-schema["'][^>]*>([\s\S]*?)<\/script>/i
-    );
-    if (!m) return null;
-    try { return JSON.parse(m[1].trim()); } catch { return null; }
-}
-
-const _schemaCache = new Map();
-
-/**
- * Load and cache the schema for a widget type.
- * Looks in the ZIP first (for custom widgets), then fetches from /widgets/.
- * Returns null if the widget has no schema declaration.
- */
-export async function loadWidgetSchema(type, zipFile = null) {
-    if (_schemaCache.has(type)) return _schemaCache.get(type);
-    try {
-        let html = null;
-        if (zipFile) {
-            const path  = `widgets/${type}.html`;
-            const entry = zipFile.file(path)
-                || zipFile.filter((p, f) => !f.dir && p.toLowerCase() === path.toLowerCase())[0];
-            if (entry) html = await entry.async('string');
-        }
-        if (!html) {
-            const res = await fetch(`/widgets/${encodeURIComponent(type)}.html`);
-            if (res.ok) html = await res.text();
-        }
-        const schema = html ? extractWidgetSchema(html) : null;
-        _schemaCache.set(type, schema);
-        return schema;
-    } catch {
-        _schemaCache.set(type, null);
-        return null;
-    }
-}
-
-/** Wipe the schema cache — call when a new ZIP is loaded. */
-export function clearSchemaCache() {
-    _schemaCache.clear();
-}
 
 // ── Expand/collapse registry ───────────────────────────────────────────────
 // widgetId → { iframe, container, savedStyle }
@@ -166,7 +131,11 @@ function _ensureExpandListener() {
     if (_expandListenerAttached) return;
     _expandListenerAttached = true;
     window.addEventListener('message', e => {
-        const { type, widgetId } = e.data || {};
+        const { type } = e.data || {};
+        // The registry is keyed by the string form of the id (dataset values are
+        // always strings); a deck whose JSON carries numeric ids would otherwise
+        // miss every lookup here.
+        const widgetId = String(e.data?.widgetId ?? '');
         if (type === 'widget-expand') {
             const entry = _widgetRegistry.get(widgetId);
             if (!entry) return;
@@ -282,7 +251,6 @@ export function clearAllParked() {
     });
     _capturedStates.clear();
     _savedWidgetStates = {};
-    _schemaCache.clear();
 }
 
 /**
@@ -483,9 +451,13 @@ export function renderWidgets(slideConfig, container, zipFile, viewerMode = fals
             };
             const _configJson   = JSON.stringify(_configPayload).replace(/<\/script>/gi, '<\\/script>');
             const _configScript = `<script>window.WIDGET_CONFIG=${_configJson};<\/script>`;
-            // Inject shared base theme + widget config right after <head>.
-            // _WIDGET_BASE_INJECT comes first so each widget's own <style> wins over defaults.
-            const _injectedHtml = htmlContent.replace(/(<head[^>]*>)/i, `$1${_WIDGET_BASE_INJECT}${_configScript}`);
+            // Inject shared base theme + widget config + settings kit right after <head>.
+            // _WIDGET_BASE_INJECT comes first so each widget's own <style> wins over
+            // defaults; the kit comes last because it reads window.WIDGET_CONFIG.
+            const _injectedHtml = htmlContent.replace(
+                /(<head[^>]*>)/i,
+                `$1${_WIDGET_BASE_INJECT}${_configScript}${_SETTINGS_KIT_INJECT}`
+            );
 
             await new Promise(resolve => {
                 let settled = false;
@@ -518,6 +490,33 @@ export function renderWidgets(slideConfig, container, zipFile, viewerMode = fals
     });
 
     return Promise.all(promises);
+}
+
+// ── Talking to one widget ──────────────────────────────────────────────────
+
+export function findWidgetIframe(widgetId) {
+    return document.querySelector(`.widget-iframe[data-widget-id="${CSS.escape(String(widgetId))}"]`);
+}
+
+/** Post a message to one widget. Returns false if that widget isn't live. */
+export function postToWidget(widgetId, message) {
+    const iframe = findWidgetIframe(widgetId);
+    if (!iframe?.contentWindow) return false;
+    try { iframe.contentWindow.postMessage(message, '*'); return true; }
+    catch (_) { return false; }
+}
+
+/**
+ * Identify the widget a postMessage came from. Messages that write to the
+ * presentation are only honoured when the sending window really is the widget
+ * iframe it claims to speak for.
+ */
+export function widgetIdForWindow(win) {
+    if (!win) return null;
+    for (const iframe of document.querySelectorAll('.widget-iframe')) {
+        if (iframe.contentWindow === win) return iframe.dataset.widgetId ?? null;
+    }
+    return null;
 }
 
 // ── Position update ────────────────────────────────────────────────────────

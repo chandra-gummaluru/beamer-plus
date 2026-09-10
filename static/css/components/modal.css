@@ -253,66 +253,6 @@
 }
 .upload-option-btn i { font-size: 20px; color: var(--accent); width: 24px; }
 
-/* ---------- Add-field modal (widget editor) ---------- */
-
-.custom-modal-content:has(.add-field-form) { max-width: 560px; }
-
-.add-field-form {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-5);
-    margin-bottom: var(--sp-2);
-}
-
-/* Form fields read left-to-right; the shared setting-group centres by default. */
-.add-field-form .custom-modal-setting-group { align-items: flex-start; }
-.add-field-form .add-field-type-row,
-.add-field-form .add-field-bool-row { justify-content: flex-start; }
-
-.add-field-form #add-field-value-slot { width: 100%; }
-
-/* Inputs sized to the modal (the panel's .editor-prop-input is deliberately
-   compact for the narrow sidebar and looks undersized here). */
-.add-field-input {
-    width: 100%;
-    box-sizing: border-box;
-    min-height: var(--hit-min);
-    padding: 0.45em 0.7em;
-    font-family: var(--font-sans);
-    font-size: var(--fs-md);
-    color: var(--ink-1);
-    background: var(--surface-paper);
-    border: 1px solid oklch(82% 0.005 260);
-    border-radius: var(--r-md);
-    transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
-}
-.add-field-input:focus {
-    outline: none;
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px oklch(45% 0.005 260 / 0.10);
-}
-.add-field-input::placeholder { color: var(--ink-4); }
-
-.add-field-textarea {
-    resize: vertical;
-    min-height: 170px;
-    padding: var(--sp-3);
-    font-family: var(--font-mono);
-    font-size: var(--fs-sm);
-    line-height: 1.6;
-}
-
-.add-field-type-btn { min-width: 0; padding: 0.4em 0.85em; font-size: var(--fs-sm); }
-.add-field-bool-btn { min-width: 72px; }
-
-.add-field-error {
-    margin: 0;
-    font-family: var(--font-sans);
-    font-size: var(--fs-sm);
-    line-height: 1.45;
-    color: var(--danger);
-}
-
 @media (max-width: 768px) {
     .custom-modal-content { max-width: 92%; padding: var(--sp-5); }
     .custom-modal-buttons { flex-direction: column-reverse; }

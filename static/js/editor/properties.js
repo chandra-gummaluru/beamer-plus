@@ -1,43 +1,28 @@
-// Properties panel — position/size/z-index for the selected overlay plus
-// type-specific fields (video play mode, model animation, widget schema
-// fields). Every change is applied to the in-memory config immediately.
-import { ctx, getSlideEl, getOrCreateConfig, escAttr, escHtml, pickFile } from './context.js';
-import { loadWidgetSchema } from '../core/iframe-widget-renderer.js';
-import { WIDGET_RESERVED, buildWidgetFieldsHTML, applyWidgetFieldValues } from './fields.js';
-import { openAddFieldModal } from './add-field-modal.js';
+// Properties panel — position, size and z-index for the selected overlay,
+// plus the type-specific fields Beamer+ itself owns: video play mode, audio
+// play mode, model animation. Every change is applied to the in-memory
+// config immediately.
+//
+// Widgets deliberately get none of the latter. A widget declares and renders
+// its own settings, behind the gear on its edit overlay (see
+// editor/widget-settings.js), so all this panel shows for a widget is where
+// it sits on the slide.
+import { ctx, getSlideEl, getOrCreateConfig, escAttr, escHtml, setPanelMode, resolvePanelMode } from './context.js';
 import { cleanupEditOverlays, renderEditOverlays, positionOverlay } from './overlays.js';
 import { WIDGET_LABELS } from './widget-picker.js';
-import { sessionUrl, widgetSessionConfig } from '../app/session.js';
+import { widgetHasSettings } from './widget-settings.js';
 
-// Schema loaded from the currently-selected widget's HTML.
-// Set by updatePropertiesPanel; used when applying values back to the item.
-let _currentWidgetSchema = null;
-
-let _propsPanelGen = 0;
-
-export async function updatePropertiesPanel() {
-    const gen = ++_propsPanelGen;
-
+export function updatePropertiesPanel() {
     const panel = document.getElementById('editor-properties');
     if (!panel) return;
-    if (!ctx.selectedOverlay) { panel.classList.remove('visible'); return; }
-    panel.classList.add('visible');
+    // Nothing selected — hand the panel back to the slide (or view) section.
+    if (!ctx.selectedOverlay) { setPanelMode(resolvePanelMode()); return; }
+    setPanelMode('item');
 
     const { arrKey, index } = ctx.selectedOverlay;
     const cfg  = getOrCreateConfig();
     const item = cfg?.[arrKey]?.[index];
     if (!item) return;
-
-    // Load widget schema asynchronously; abort if selection changed while awaiting.
-    let schemaFields = null;
-    if (arrKey === 'widgets') {
-        const schema = await loadWidgetSchema(item.type);
-        if (gen !== _propsPanelGen) return;  // selection changed — discard stale update
-        _currentWidgetSchema = schema;
-        schemaFields = schema?.fields ?? null;
-    } else {
-        _currentWidgetSchema = null;
-    }
 
     const typeLabels = { videos: 'Video', audios: 'Audio', models: '3D Model', widgets: 'Widget' };
     const titleEl = document.getElementById('editor-properties-title');
@@ -45,51 +30,10 @@ export async function updatePropertiesPanel() {
 
     const body = document.getElementById('editor-properties-body');
     if (!body) return;
-    body.innerHTML = buildPropsHTML(arrKey, item, schemaFields);
-    // Stamp what the body currently shows, so applyPropertiesQuiet can refuse
-    // to read fields back off a panel built for a different widget (this
-    // function is async — a fast re-selection can interleave).
-    body.dataset.widgetType = arrKey === 'widgets' ? String(item.type ?? '') : '';
-
-    // Populate ai-model selects from the server's loaded model list
-    const aiModelSelects = body.querySelectorAll('[data-ai-model-select]');
-    if (aiModelSelects.length) {
-        fetch(sessionUrl('/api/models')).then(r => r.json()).then(({ models = [] }) => {
-            if (gen !== _propsPanelGen) return;
-            aiModelSelects.forEach(sel => {
-                const fieldKey = sel.id.replace('prop-widget-', '');
-                const cur = item[fieldKey] ?? '';
-                sel.innerHTML = `<option value="">— no model —</option>` +
-                    models.map(m => `<option value="${escAttr(m)}" ${cur === m ? 'selected' : ''}>${escHtml(m)}</option>`).join('');
-            });
-        }).catch(() => {});
-    }
+    body.innerHTML = buildPropsHTML(arrKey, item);
 
     // Delete button
     body.querySelector('#prop-delete')?.addEventListener('click', () => deleteItem(arrKey, index));
-
-    // Widgets: add / remove extra fields. Available whether or not the widget
-    // declares a schema — schema fields keep their own controls, and anything
-    // the user adds on top is listed below them.
-    if (arrKey === 'widgets') {
-        body.querySelectorAll('.editor-prop-rm-field').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const k = btn.dataset.key;
-                if (k) { delete item[k]; updatePropertiesPanel(); }
-            });
-        });
-        body.querySelector('#prop-custom-add-btn')?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            openAddFieldModal({
-                existingKeys: Object.keys(item).filter(k => !WIDGET_RESERVED.has(k)),
-                onAdd: ({ key, value }) => {
-                    item[key] = value;
-                    updatePropertiesPanel();
-                },
-            });
-        });
-    }
 
     // AR lock: W drives H for video/model
     if (arrKey === 'videos' || arrKey === 'models') {
@@ -101,58 +45,6 @@ export async function updatePropertiesPanel() {
         });
     }
 
-    // File-upload buttons (schema type: "file")
-    body.querySelectorAll('.editor-prop-file-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            const file = await pickFile(btn.dataset.accept);
-            if (!file) return;
-            const folder = btn.dataset.folder || 'assets';
-            const path   = `${folder}/${file.name}`;
-
-            // Store buffer for ZIP inclusion on save
-            ctx.state.editorNewFiles[path] = await file.arrayBuffer();
-
-            // POST to server immediately so the widget can stream the file via
-            // /api/zip-asset/ before the ZIP has been saved.
-            try {
-                const fd = new FormData();
-                fd.append('file', file);
-                fd.append('folder', folder);
-                await fetch(sessionUrl('/api/upload-asset'), { method: 'POST', body: fd });
-            } catch (e) {
-                console.warn('[editor] upload-asset POST failed (widget preview may not work):', e);
-            }
-
-            // Update in-memory config item
-            const cfg = getOrCreateConfig();
-            const itm = cfg?.[arrKey]?.[index];
-            if (itm) itm[btn.dataset.fieldKey] = path;
-
-            // Update the text input so applyPropertiesQuiet reads the new value
-            const el = document.getElementById(btn.dataset.fieldId);
-            if (el) { el.value = path; el.title = path; }
-
-            applyPropertiesQuiet();
-
-            // applyPropertiesQuiet only updates positions; it never postMessages
-            // the iframe.  Push the full updated config to the widget directly so
-            // it can load the file right now without waiting for a save+reload.
-            if (arrKey === 'widgets' && itm?.id) {
-                const iframe = document.querySelector(
-                    `.widget-iframe[data-widget-id="${CSS.escape(String(itm.id))}"]`
-                );
-                if (iframe?.contentWindow) {
-                    try {
-                        iframe.contentWindow.postMessage({
-                            type: 'widget-config',
-                            config: { ...itm, ...widgetSessionConfig(), role: 'presenter' }
-                        }, '*');
-                    } catch (_) {}
-                }
-            }
-        });
-    });
-
     // Auto-apply every change immediately. Property assignment (not
     // addEventListener) because #editor-properties-body persists across panel
     // refreshes — addEventListener here would stack a new listener per refresh.
@@ -160,7 +52,7 @@ export async function updatePropertiesPanel() {
     body.onchange = () => applyPropertiesQuiet();
 }
 
-function buildPropsHTML(arrKey, item, schemaFields = null) {
+function buildPropsHTML(arrKey, item) {
     const lockAR = arrKey === 'videos' || arrKey === 'models';
 
     let html = '';
@@ -175,8 +67,16 @@ function buildPropsHTML(arrKey, item, schemaFields = null) {
                 <div class="editor-prop-label">Widget type</div>
                 <div class="editor-prop-type-badge">${escHtml(typeLabel)}</div>
             </div>
-            <div class="editor-prop-divider"></div>
         `;
+        // Point at where the rest of this widget's configuration now lives.
+        if (widgetHasSettings(item.id)) {
+            html += `
+                <div class="editor-prop-hint">
+                    This widget's own settings live on the widget — use the gear on the slide.
+                </div>
+            `;
+        }
+        html += `<div class="editor-prop-divider"></div>`;
     }
 
     html += `
@@ -251,11 +151,6 @@ function buildPropsHTML(arrKey, item, schemaFields = null) {
                 <input class="editor-prop-input" type="text" id="prop-animName" value="${escAttr(item.animationName ?? '')}">
             </div>
         `;
-    } else if (arrKey === 'widgets') {
-        html += `
-            <div class="editor-prop-divider"></div>
-            ${buildWidgetFieldsHTML(item, schemaFields)}
-        `;
     }
 
     html += `
@@ -305,12 +200,9 @@ export function applyPropertiesQuiet() {
         item.autoRotate    = get('prop-autoRotate')?.checked ?? false;
         item.animate       = get('prop-animate')?.checked ?? true;
         item.animationName = get('prop-animName')?.value || undefined;
-    } else if (arrKey === 'widgets') {
-        const body = document.getElementById('editor-properties-body');
-        if (body?.dataset.widgetType === String(item.type ?? '')) {
-            applyWidgetFieldValues(item, _currentWidgetSchema?.fields ?? null);
-        }
     }
+    // Widgets: nothing beyond geometry — their own settings are written back
+    // by the widget itself, and must not be touched from here.
 
     const container = getSlideEl();
     const cr = container?.getBoundingClientRect();

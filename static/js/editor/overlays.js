@@ -5,6 +5,7 @@
 // functions called after load, so the cycle is harmless.
 import { ctx, getSlideEl, getOrCreateConfig, getConfigItems, arrKeyForType } from './context.js';
 import { updatePropertiesPanel, syncPropertiesPosition } from './properties.js';
+import { openWidgetSettings, widgetHasSettings } from './widget-settings.js';
 
 let _pendingMediaType = null;
 
@@ -38,6 +39,8 @@ function buildOverlay(type, arrKey, item, index, container, rect) {
     handle.className = 'edit-resize-handle';
     div.appendChild(handle);
 
+    if (arrKey === 'widgets') div.appendChild(buildOverlayGear(div, arrKey, index, item));
+
     handle.addEventListener('pointerdown', (e) => {
         e.stopPropagation();
         selectOverlayEl(div, arrKey, index);
@@ -49,6 +52,30 @@ function buildOverlay(type, arrKey, item, index, container, rect) {
         startMove(e, div, arrKey, index, container);
     });
     return div;
+}
+
+const GEAR_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
+
+// A widget's settings belong to the widget — the overlay carries only the
+// affordance. Clicking it asks the widget to show its own panel. Hidden until
+// the widget announces it has one (see widget-settings.js), so widgets with
+// nothing to configure don't sprout a dead button.
+function buildOverlayGear(div, arrKey, index, item) {
+    const gear = document.createElement('button');
+    gear.type = 'button';
+    gear.className = 'edit-overlay-gear';
+    gear.title = 'Widget settings';
+    gear.dataset.widgetId = String(item.id ?? '');
+    gear.innerHTML = GEAR_SVG;
+    gear.hidden = !widgetHasSettings(item.id);
+    // Keep the press off the overlay's drag handler.
+    gear.addEventListener('pointerdown', e => e.stopPropagation());
+    gear.addEventListener('click', e => {
+        e.stopPropagation();
+        selectOverlayEl(div, arrKey, index);
+        openWidgetSettings(item.id);
+    });
+    return gear;
 }
 
 export function positionOverlay(div, item, rect) {
@@ -64,6 +91,14 @@ export function selectOverlayEl(div, arrKey, index) {
     document.querySelectorAll('.edit-overlay.selected').forEach(el => el.classList.remove('selected'));
     div.classList.add('selected');
     ctx.selectedOverlay = { div, arrKey, index };
+    updatePropertiesPanel();
+}
+
+// Clear the selection and return the panel to the slide's own properties.
+export function deselectOverlay() {
+    if (!ctx.selectedOverlay) return;
+    document.querySelectorAll('.edit-overlay.selected').forEach(el => el.classList.remove('selected'));
+    ctx.selectedOverlay = null;
     updatePropertiesPanel();
 }
 

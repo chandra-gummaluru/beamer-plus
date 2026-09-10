@@ -4,18 +4,19 @@
 // - context.js       shared editor state + config helpers
 // - overlays.js      draggable/resizable overlay boxes, add-media picking
 // - properties.js    properties panel (position/size + per-type fields)
-// - fields.js        widget schema field rows (build + apply)
+// - widget-settings.js  parent half of the widget-owned settings protocol
 // - widget-picker.js "Add Widget" modal
 // - view-config.js   view-slide (saved split view) configuration panel
 // - reorder.js       drag & drop slide reordering
 // - save.js          rebuild + download the presentation ZIP
 import { bus } from '../core/events.js';
-import { ctx } from './context.js';
-import { renderEditOverlays, cleanupEditOverlays, pickMediaFile, onMediaFileSelected } from './overlays.js';
+import { ctx, setPanelMode } from './context.js';
+import { renderEditOverlays, cleanupEditOverlays, deselectOverlay, pickMediaFile, onMediaFileSelected } from './overlays.js';
 import { updatePropertiesPanel } from './properties.js';
 import { addWidget } from './widget-picker.js';
 import { showViewConfig, hideViewConfig } from './view-config.js';
 import { applySlideReorder, removeSlideReorder } from './reorder.js';
+import { initWidgetSettings, closeWidgetSettings, isWidgetSettingsOpen } from './widget-settings.js';
 import { savePresentation } from './save.js';
 
 /* ─── init ──────────────────────────────────────────────────── */
@@ -43,10 +44,14 @@ export function initEditor(state) {
     const fileInput = document.getElementById('edit-media-input');
     fileInput?.addEventListener('change', () => onMediaFileSelected(fileInput));
 
+    initWidgetSettings();
+    wireDeselect();
+
     bus.on('slides:loaded', () => { if (ctx.state?.editMode) applySlideReorder(); });
 
     bus.on('slide:changed', () => {
         if (!ctx.state?.editMode) return;
+        closeWidgetSettings();
         ctx.selectedOverlay = null;
         cleanupEditOverlays();
 
@@ -98,6 +103,7 @@ function toggleEditMode() {
 async function enterEditMode() {
     ctx.state.editMode = true;
     document.body.classList.add('edit-mode');
+    setPanelMode('slide');
     const btn = document.getElementById('edit-mode-btn');
     if (btn) {
         btn.classList.add('is-close');
@@ -142,12 +148,45 @@ async function exitEditMode() {
         if (btn.dataset.originalHtml) btn.innerHTML = btn.dataset.originalHtml;
     }
     if (ctx.state.annCvs?.canvas) ctx.state.annCvs.canvas.style.pointerEvents = '';
+    closeWidgetSettings();
     cleanupEditOverlays();
     removeSlideReorder();
     ctx.selectedOverlay = null;
     hideViewConfig();
     updatePropertiesPanel();
     bus.emit('editor:exited');
+}
+
+/* ─── deselecting ───────────────────────────────────────────── */
+
+// An item's properties replace the slide's, so there has to be a way back:
+// the panel's back link, Escape, or a click on empty space on the slide.
+function wireDeselect() {
+    document.getElementById('editor-props-back')?.addEventListener('click', deselectOverlay);
+
+    bus.on('ui:escape', () => {
+        if (!ctx.state?.editMode) return;
+        // A widget showing its settings owns Escape first. (Escape pressed
+        // inside the iframe never reaches this document — the kit handles that
+        // case itself; this covers focus being outside the widget.)
+        if (isWidgetSettingsOpen()) { closeWidgetSettings(); return; }
+        // Escape belongs to whatever is layered on top — a modal or the widget
+        // picker gets it first, and only a bare Escape clears the selection.
+        if (document.querySelector('.custom-modal-overlay, #widget-modal-overlay')) return;
+        deselectOverlay();
+    });
+
+    // Pointerdown rather than click: overlays capture the pointer on
+    // pointerdown, so a click that starts on empty space never reaches here.
+    document.addEventListener('pointerdown', (e) => {
+        if (!ctx.state?.editMode || !ctx.selectedOverlay) return;
+        if (isWidgetSettingsOpen()) return;
+        // Only clicks on the slide stage itself deselect — not the editor
+        // panel, the toolbars, or anything floating above them.
+        if (!e.target.closest('#main-content')) return;
+        if (e.target.closest('.edit-overlay')) return;
+        deselectOverlay();
+    });
 }
 
 /* ─── slide settings panel ─────────────────────────────────── */

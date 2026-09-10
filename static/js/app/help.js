@@ -92,8 +92,8 @@ export function showHelpModal({ onStartTour = null } = {}) {
 <hr class="help-divider">
 <h4 class="help-h">Building a custom widget</h4>
 <p class="help-p">A widget is a single self-contained ${_hic('.html')} file. Beamer+ loads it in an isolated iframe and handles the rest: persistence, resizing, and state saving.</p>
-<h4 class="help-h">1 · Declare editable properties</h4>
-<p class="help-p">Put a schema block at the top of ${_hic('&lt;head&gt;')}. Beamer+ reads it to render your widget's fields in the Properties panel automatically:</p>
+<h4 class="help-h">1 · Declare your settings</h4>
+<p class="help-p">Put a schema block at the top of ${_hic('&lt;head&gt;')}. Beamer+ builds a settings panel inside your widget from it — the presenter opens it with the gear on your widget in edit mode. The editor's own panel only ever shows your widget's position and size:</p>
 <code class="help-code">&lt;script id="widget-schema" type="application/json"&gt;
 {
   "label": "My Widget",
@@ -105,7 +105,8 @@ export function showHelpModal({ onStartTour = null } = {}) {
   ]
 }
 &lt;/script&gt;</code>
-<p class="help-p">Supported types: ${_hic('text')}, ${_hic('number')}, ${_hic('checkbox')}, ${_hic('select')}, ${_hic('textarea')}.</p>
+<p class="help-p">Supported types: ${_hic('text')}, ${_hic('password')}, ${_hic('number')}, ${_hic('number-nullable')}, ${_hic('checkbox')}, ${_hic('select')}, ${_hic('textarea')}, ${_hic('textarea-lines')}, ${_hic('file')}, ${_hic('ai-model')}.</p>
+<p class="help-p">Want your own settings UI instead? Add ${_hic('"customSettings": true')} to the schema and handle ${_hic('widget-open-settings')} yourself — Beamer+ will leave the panel entirely to you.</p>
 <h4 class="help-h">2 · Read configuration</h4>
 <p class="help-p">Beamer+ injects ${_hic('window.WIDGET_CONFIG')} before your widget loads. It contains the field values the presenter set, plus layout info:</p>
 <code class="help-code">const cfg = window.WIDGET_CONFIG || {};
@@ -118,6 +119,9 @@ export function showHelpModal({ onStartTour = null } = {}) {
   <dt>widget-get-state</dt><dd>Received when navigating away. Reply with a ${_hic('widget-state')} message containing serialisable state.</dd>
   <dt>widget-set-state</dt><dd>Received when returning to the slide. Restore your UI from the saved state.</dd>
   <dt>widget-cleanup</dt><dd>Received when the widget is removed. Stop timers and release resources.</dd>
+  <dt>widget-open-settings</dt><dd>Received when the presenter clicks your gear. Handled for you unless you set ${_hic('customSettings')}.</dd>
+  <dt>widget-close-settings</dt><dd>Received when Beamer+ needs your settings closed (slide change, leaving edit mode).</dd>
+  <dt>widget-settings</dt><dd>Post ${_hic('{ widgetId, patch, remove }')} to save settings into your config item, where they persist with the deck.</dd>
 </dl>
 <h4 class="help-h">4 · Shared styles</h4>
 <p class="help-p">Every widget automatically inherits Beamer+'s design tokens, with no setup needed:</p>

@@ -111,20 +111,9 @@ body.edit-mode #editor-panel { display: flex; }
 /* ─── Slide settings section ────────────────────────────────── */
 
 #editor-slide-settings {
-    display: flex;
+    display: none;
     flex-direction: column;
-    gap: var(--sp-2);
-    padding-bottom: var(--sp-3);
-    border-bottom: var(--line-soft);
-}
-
-.editor-section-title {
-    font-size: var(--fs-xs);
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: var(--ink-3);
-    font-family: var(--font-sans);
+    gap: var(--sp-3);
 }
 
 /* ─── Properties section ──────────────────────────────────────── */
@@ -134,7 +123,47 @@ body.edit-mode #editor-panel { display: flex; }
     flex-direction: column;
     gap: var(--sp-4);
 }
-#editor-properties.visible { display: flex; }
+
+/* ─── Panel modes ─────────────────────────────────────────────────
+   The panel shows exactly one section at a time: the slide's own
+   properties by default, an item's properties while an overlay is
+   selected, or the view configuration for a split-view slide. */
+#editor-panel-body[data-mode="slide"] #editor-slide-settings { display: flex; }
+#editor-panel-body[data-mode="item"]  #editor-properties     { display: flex; }
+#editor-panel-body[data-mode="view"]  #editor-view           { display: flex; }
+
+/* Back link to the slide properties, shown above an item's properties. */
+.editor-props-back {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-1);
+    align-self: flex-start;
+    padding: 2px 6px 2px 2px;
+    margin-bottom: calc(-1 * var(--sp-2));
+    background: none;
+    border: none;
+    border-radius: var(--r-sm);
+    cursor: pointer;
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-3);
+    transition: color var(--dur-fast), background var(--dur-fast);
+}
+.editor-props-back:hover {
+    color: var(--ink-1);
+    background: var(--surface-cream-2);
+}
+
+/* Points at where the rest of a widget's configuration lives. */
+.editor-prop-hint {
+    font-size: var(--fs-xs);
+    line-height: 1.45;
+    color: var(--ink-3);
+    font-family: var(--font-sans);
+}
 
 /* Vertical rhythm between property rows — without this, an input sits flush
    against the next field's header. */
@@ -144,7 +173,7 @@ body.edit-mode #editor-panel { display: flex; }
     gap: var(--sp-4);
 }
 
-#editor-properties-title {
+.editor-section-heading {
     font-family: var(--font-serif);
     font-size: var(--fs-md);
     font-weight: 500;
@@ -207,227 +236,6 @@ body.edit-mode #editor-panel { display: flex; }
 .editor-prop-input[readonly] {
     opacity: 0.5;
     cursor: default;
-}
-
-/* File-upload field row */
-.editor-prop-file-row {
-    display: flex;
-    gap: var(--sp-2);
-    align-items: center;
-}
-.editor-prop-file-row .editor-prop-input {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.editor-prop-file-btn {
-    flex-shrink: 0;
-    font-size: var(--fs-xs);
-    padding: 0 var(--sp-3);
-    height: var(--hit-min);
-}
-
-/* JSON config textarea */
-.editor-prop-json {
-    font-family: var(--font-mono);
-    font-size: 11px;
-    line-height: 1.6;
-    resize: vertical;
-    min-height: 80px;
-    white-space: pre;
-    overflow-x: auto;
-}
-
-.editor-prop-json-status { font-style: normal; }
-.editor-prop-json-status.is-error { color: oklch(50% 0.18 25) !important; }
-
-.editor-prop-checkbox-row {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    font-size: var(--fs-sm);
-    font-family: var(--font-sans);
-    color: var(--ink-2);
-    cursor: pointer;
-    user-select: none;
-}
-
-/* ─── Custom checkbox ─────────────────────────────────────────── */
-
-.editor-prop-checkbox-row input[type="checkbox"] {
-    appearance: none;
-    -webkit-appearance: none;
-    flex-shrink: 0;
-    width: 15px;
-    height: 15px;
-    border: 1.5px solid oklch(72% 0.006 260);
-    border-radius: 4px;
-    background: var(--surface-paper);
-    cursor: pointer;
-    position: relative;
-    transition: background var(--dur-fast), border-color var(--dur-fast), box-shadow var(--dur-fast);
-}
-
-.editor-prop-checkbox-row input[type="checkbox"]:hover {
-    border-color: var(--accent);
-}
-
-.editor-prop-checkbox-row input[type="checkbox"]:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 2.5px oklch(45% 0.005 260 / 0.18);
-}
-
-.editor-prop-checkbox-row input[type="checkbox"]:checked {
-    background: var(--accent);
-    border-color: var(--accent);
-}
-
-/* Checkmark via ::after */
-.editor-prop-checkbox-row input[type="checkbox"]:checked::after {
-    content: '';
-    position: absolute;
-    left: 3px;
-    top: 0px;
-    width: 5px;
-    height: 8px;
-    border: 1.5px solid var(--ink-on-accent);
-    border-top: none;
-    border-left: none;
-    transform: rotate(45deg);
-}
-
-[data-theme="dark"] .editor-prop-checkbox-row input[type="checkbox"] {
-    border-color: oklch(40% 0.008 260);
-    background: var(--surface-cream-2);
-}
-[data-theme="dark"] .editor-prop-checkbox-row input[type="checkbox"]:hover {
-    border-color: var(--accent);
-}
-[data-theme="dark"] .editor-prop-checkbox-row input[type="checkbox"]:checked {
-    background: var(--accent);
-    border-color: var(--accent);
-}
-
-/* ─── Widget type badge ───────────────────────────────────────── */
-
-.editor-prop-row--type-header {
-    margin-bottom: var(--sp-2);
-}
-
-.editor-prop-divider {
-    height: 1px;
-    background: oklch(88% 0.004 260);
-    border: none;
-    margin: 0;
-    margin-bottom: var(--sp-2);
-    flex-shrink: 0;
-}
-[data-theme="dark"] .editor-prop-divider {
-    background: oklch(32% 0.006 260);
-}
-
-.editor-prop-type-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 2px 9px;
-    background: var(--surface-cream-2);
-    border: 1px solid oklch(84% 0.005 260);
-    border-radius: 20px;
-    font-size: var(--fs-sm);
-    font-family: var(--font-sans);
-    color: var(--ink-2);
-    font-weight: 500;
-    letter-spacing: 0.01em;
-    width: fit-content;
-}
-
-/* ─── Widget config — field-based UI ─────────────────────────── */
-
-.editor-prop-note {
-    font-size: var(--fs-xs);
-    color: var(--ink-4);
-    font-family: var(--font-sans);
-    font-style: italic;
-    margin: 0;
-    padding: 2px 0;
-}
-
-/* Row for a custom field with text/number input + remove button */
-.editor-prop-custom-val-row {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-1);
-}
-
-.editor-prop-custom-val-row .editor-prop-input {
-    flex: 1;
-    min-width: 0;
-}
-
-/* Label + remove button on its own line (textarea-backed custom fields) */
-.editor-prop-custom-label-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-1);
-}
-
-.editor-prop-custom-textarea {
-    width: 100%;
-    resize: vertical;
-    font-family: var(--font-mono, monospace);
-    line-height: 1.45;
-}
-
-/* Row for a custom boolean field (checkbox + label + remove) */
-.editor-prop-custom-bool-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-1);
-}
-
-/* Remove-field (✕) button */
-.editor-prop-rm-field {
-    flex-shrink: 0;
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    border: 1px solid oklch(84% 0.005 260);
-    border-radius: var(--r-sm);
-    background: transparent;
-    color: var(--ink-3);
-    font-size: 10px;
-    line-height: 1;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background var(--dur-fast), border-color var(--dur-fast), color var(--dur-fast);
-}
-.editor-prop-rm-field:hover {
-    background: oklch(93% 0.04 25);
-    border-color: oklch(75% 0.08 25);
-    color: oklch(40% 0.15 25);
-}
-
-/* Add-field block at the bottom of the custom-field list */
-.editor-prop-add-field-block {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-1);
-    border-top: var(--line-hairline);
-    padding-top: var(--sp-3);
-    margin-top: var(--sp-1);
-}
-
-.editor-prop-add-field-btn {
-    width: 100%;
-    justify-content: center;
-    font-size: var(--fs-sm);
-    font-family: var(--font-sans);
 }
 
 .editor-delete-btn {
@@ -506,6 +314,44 @@ body.edit-mode #editor-panel { display: flex; }
     border-style: solid;
     background: oklch(45% 0.005 260 / 0.15);
     box-shadow: 0 0 0 3px oklch(45% 0.005 260 / 0.20);
+}
+
+/* Gear on a widget's overlay — the widget's own settings live behind it. */
+.edit-overlay-gear {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid oklch(84% 0.005 260);
+    border-radius: 50%;
+    background: var(--surface-paper);
+    color: var(--ink-2);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity var(--dur-fast), color var(--dur-fast), background var(--dur-fast);
+}
+/* The class's own display would otherwise outrank the UA's [hidden] rule,
+   so a gear hidden until its widget announces settings would still show. */
+.edit-overlay-gear[hidden] { display: none; }
+.edit-overlay-gear svg { width: 14px; height: 14px; }
+.edit-overlay:hover .edit-overlay-gear,
+.edit-overlay.selected .edit-overlay-gear { opacity: 1; }
+.edit-overlay-gear:hover {
+    color: var(--ink-1);
+    background: var(--surface-cream-2);
+}
+[data-theme="dark"] .edit-overlay-gear { border-color: oklch(40% 0.008 260); }
+
+/* While a widget is showing its settings it expands to fill the slide, so the
+   overlays step aside — otherwise they'd swallow every click meant for it. */
+body.widget-settings-open .edit-overlay {
+    opacity: 0;
+    pointer-events: none;
 }
 
 .edit-overlay-label {
@@ -753,16 +599,7 @@ body.split-view-active.edit-mode .slide-nav-item.drag-over-after {
 #editor-view {
     display: none;
     flex-direction: column;
-    gap: var(--sp-2);
-}
-
-#editor-view-title {
-    font-size: var(--fs-xs);
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: var(--ink-3);
-    font-family: var(--font-sans);
+    gap: var(--sp-3);
 }
 
 #editor-view-body {
