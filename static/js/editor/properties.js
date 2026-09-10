@@ -7,13 +7,12 @@
 // widget declares in its `widget-schema` block (see editor/widget-schema.js).
 // They are read straight out of the widget's HTML rather than from a live
 // iframe, so they are there the moment a widget is added — before it has ever
-// been rendered. A widget that declares `customSettings` draws its own panel
-// instead and is pointed at the gear on its overlay.
+// been rendered. This panel is the only place a widget is configured from.
 import { ctx, getSlideEl, getOrCreateConfig, escAttr, escHtml, setPanelMode, setPanelTitle,
          resolvePanelMode, WIDGET_RESERVED } from './context.js';
 import { cleanupEditOverlays, renderEditOverlays, positionOverlay } from './overlays.js';
 import { WIDGET_LABELS } from './widget-picker.js';
-import { widgetHasCustomSettings, saveWidgetAsset } from './widget-settings.js';
+import { saveWidgetAsset } from './widget-settings.js';
 import { getWidgetSchema } from './widget-schema.js';
 import { sessionUrl } from '../app/session.js';
 
@@ -246,15 +245,8 @@ async function fillWidgetFields(item, token) {
     if (!host) return;
     host.textContent = '';
 
-    if (schema?.customSettings) {
-        // This widget draws a bespoke panel of its own; there is no field list
-        // to mirror, so point at the gear that opens it.
-        host.appendChild(hintRow(widgetHasCustomSettings(item.id)
-            ? 'This widget draws its own settings — use the gear on the slide.'
-            : 'This widget draws its own settings, reachable once it has rendered.'));
-        return;
-    }
-
+    // `customSettings` is not honoured here: whatever a widget declares as
+    // fields is edited in this panel, so every widget is configured the same way.
     if (!schema || !schema.fields.length) {
         host.appendChild(hintRow('This widget has no settings of its own.'));
         return;

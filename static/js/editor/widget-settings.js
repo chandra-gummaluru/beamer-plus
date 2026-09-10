@@ -1,90 +1,29 @@
 // Widget settings bridge — the parent half of the settings protocol.
 //
-// A widget owns its own settings UI (see static/js/widget-settings-kit.js,
-// injected into every widget iframe). Beamer+ owns three things about it:
-// the gear on the widget's edit overlay, the room the widget needs to draw
-// its panel, and persistence — a widget's settings still belong in its slide
-// config item, so they save and reload like everything else on the slide.
+// A widget declares what it can be configured with in its `widget-schema`
+// block; those fields are edited in the editor's properties panel (see
+// editor/widget-schema.js and editor/properties.js), which is the single place
+// a widget is configured from. What remains here is the other direction: a
+// widget writing its own settings back at runtime, and the files its fields
+// own — a widget's settings belong in its slide config item, so they save and
+// reload like everything else on the slide.
 //
 // Protocol
-//   → widget   widget-open-settings   gear clicked; show your settings
-//   → widget   widget-close-settings  parent is tearing down; hide them
-//   ← widget   widget-has-settings    announced on load; gates the gear
 //   ← widget   widget-settings        { patch, remove } to merge into the item
-//   ← widget   widget-settings-close  the widget closed its own panel
 //   ← widget   widget-asset-upload    a file field picked a file
 //   → widget   widget-asset-saved     …and the path it was stored under
 import { ctx, WIDGET_RESERVED } from './context.js';
-import { postToWidget, widgetIdForWindow, findWidgetIframe } from '../core/iframe-widget-renderer.js';
+import { postToWidget, widgetIdForWindow } from '../core/iframe-widget-renderer.js';
 import { sessionUrl } from '../app/session.js';
-
-// widgetId → whether the settings kit will draw a panel from declared fields.
-const _hasSettings = new Map();
-// widgetId → whether the widget draws a bespoke panel of its own. Only these
-// need the gear: a widget's declared fields are edited in the properties panel
-// (see editor/widget-schema.js), so a gear for those would be a second, more
-// awkward route to the same settings.
-const _customSettings = new Map();
-
-let _openWidgetId = null;
 
 export function initWidgetSettings() {
     window.addEventListener('message', onWidgetMessage);
 }
 
-/* ─── gear state ────────────────────────────────────────────────── */
-
-export function widgetHasSettings(widgetId) {
-    return _hasSettings.get(String(widgetId)) === true;
-}
-
-/** True when the widget draws its own settings UI rather than declaring fields. */
-export function widgetHasCustomSettings(widgetId) {
-    return _customSettings.get(String(widgetId)) === true;
-}
-
-// Overlays are built before a freshly-loaded widget has announced itself, so
-// each gear starts hidden and is revealed when its widget says it has settings.
-function syncGear(widgetId) {
-    const sel = `.edit-overlay-gear[data-widget-id="${CSS.escape(String(widgetId))}"]`;
-    document.querySelectorAll(sel).forEach(btn => { btn.hidden = !widgetHasCustomSettings(widgetId); });
-}
-
-/* ─── settings mode ─────────────────────────────────────────────── */
-
-export function isWidgetSettingsOpen() { return _openWidgetId !== null; }
-
-// While settings are open the widget expands to fill the slide and the edit
-// overlays step aside (body.widget-settings-open) so its panel is clickable —
-// otherwise the overlay, which sits above the iframe to catch drags, would
-// swallow every click meant for the widget.
-export function openWidgetSettings(widgetId) {
-    if (_openWidgetId !== null) closeWidgetSettings();
-    if (!postToWidget(widgetId, { type: 'widget-open-settings' })) return;
-    _openWidgetId = String(widgetId);
-    // Edit mode hides every widget iframe (only the overlay boxes are shown),
-    // which would leave the panel we just asked for invisible. Mark this one
-    // so the stylesheet brings it back for as long as its settings are open.
-    findWidgetIframe(_openWidgetId)?.classList.add('is-settings-open');
-    document.body.classList.add('widget-settings-open');
-}
-
-export function closeWidgetSettings() {
-    if (_openWidgetId === null) return;
-    postToWidget(_openWidgetId, { type: 'widget-close-settings' });
-    endSettingsMode();
-}
-
-function endSettingsMode() {
-    findWidgetIframe(_openWidgetId)?.classList.remove('is-settings-open');
-    _openWidgetId = null;
-    document.body.classList.remove('widget-settings-open');
-}
-
 /* ─── messages ──────────────────────────────────────────────────── */
 
 const _HANDLED = new Set([
-    'widget-has-settings', 'widget-settings', 'widget-settings-close', 'widget-asset-upload',
+    'widget-settings', 'widget-asset-upload',
 ]);
 
 function onWidgetMessage(e) {
@@ -97,14 +36,8 @@ function onWidgetMessage(e) {
     const sourceId = widgetIdForWindow(e.source);
     if (sourceId === null || sourceId !== String(data.widgetId)) return;
 
-    if (data.type === 'widget-has-settings') {
-        _hasSettings.set(sourceId, data.has === true);
-        _customSettings.set(sourceId, data.custom === true);
-        syncGear(sourceId);
-    } else if (data.type === 'widget-settings') {
+    if (data.type === 'widget-settings') {
         mergeSettings(sourceId, data);
-    } else if (data.type === 'widget-settings-close') {
-        if (_openWidgetId === sourceId) endSettingsMode();
     } else if (data.type === 'widget-asset-upload') {
         storeAsset(sourceId, data);
     }

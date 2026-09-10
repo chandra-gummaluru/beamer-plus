@@ -1,8 +1,11 @@
 // Beamer+ widget settings kit — runs INSIDE each widget iframe.
 //
-// Beamer+ itself knows nothing about a widget's settings: the editor panel
-// shows a widget's geometry and nothing else. Everything a widget declares
-// for itself is edited here, in the widget, behind the gear on its overlay.
+// A widget's declared fields are edited in the editor's properties panel, which
+// reads the same schema block from the parent side (see editor/widget-schema.js).
+// What this kit provides to a widget is the rest of the host contract: the
+// server origin, presentation scale, saving files into the deck, and an
+// optional in-widget panel a widget can open for itself via
+// BeamerWidget.openSettings().
 //
 // This file is injected into every widget iframe (see iframe-widget-renderer.js),
 // right after window.WIDGET_CONFIG. It reads the widget's OWN schema block —
@@ -97,11 +100,7 @@
     function post(msg) { try { parent.postMessage(msg, '*'); } catch (e) {} }
     function announce() {
         if (!readSchema()) return;   // asked again on DOMContentLoaded
-        // `has`    — this kit will draw a panel from the declared fields.
-        // `custom` — the widget draws its own instead, so the editor must keep
-        //            an affordance for opening it (the fields it declares are
-        //            otherwise mirrored in the editor's properties panel).
-        post({ type: 'widget-has-settings', widgetId: cfg().id, has: hasSettings, custom: customSettings });
+        post({ type: 'widget-has-settings', widgetId: cfg().id, has: hasSettings });
     }
 
     /* ─── styles ────────────────────────────────────────────────── */
