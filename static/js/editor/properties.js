@@ -3,14 +3,26 @@
 // play mode, model animation. Every change is applied to the in-memory
 // config immediately.
 //
-// Widgets deliberately get none of the latter. A widget declares and renders
-// its own settings, behind the gear on its edit overlay (see
-// editor/widget-settings.js), so all this panel shows for a widget is where
-// it sits on the slide.
-import { ctx, getSlideEl, getOrCreateConfig, escAttr, escHtml, setPanelMode, setPanelTitle, resolvePanelMode } from './context.js';
+// A widget's own fields are shown here too, built from the field list the
+// widget declares in its `widget-schema` block (see editor/widget-schema.js).
+// They are read straight out of the widget's HTML rather than from a live
+// iframe, so they are there the moment a widget is added — before it has ever
+// been rendered. A widget that declares `customSettings` draws its own panel
+// instead and is pointed at the gear on its overlay.
+import { ctx, getSlideEl, getOrCreateConfig, escAttr, escHtml, setPanelMode, setPanelTitle,
+         resolvePanelMode, WIDGET_RESERVED } from './context.js';
 import { cleanupEditOverlays, renderEditOverlays, positionOverlay } from './overlays.js';
 import { WIDGET_LABELS } from './widget-picker.js';
-import { widgetHasSettings } from './widget-settings.js';
+import { widgetHasCustomSettings, saveWidgetAsset } from './widget-settings.js';
+import { getWidgetSchema } from './widget-schema.js';
+import { sessionUrl } from '../app/session.js';
+
+// Controls for the selected widget's declared fields, as { key, node, read() }.
+// Rebuilt whenever the panel is, and read back by applyPropertiesQuiet().
+let _widgetRows = [];
+// Bumped on every panel build so a schema that resolves late can tell whether
+// it is still the selection the user is looking at.
+let _widgetFieldsToken = 0;
 
 export function updatePropertiesPanel() {
     const panel = document.getElementById('editor-properties');
@@ -30,6 +42,12 @@ export function updatePropertiesPanel() {
     const body = document.getElementById('editor-properties-body');
     if (!body) return;
     body.innerHTML = buildPropsHTML(arrKey, item);
+
+    // A widget's own fields need its HTML, so they arrive a tick later and are
+    // appended into the placeholder buildPropsHTML left for them.
+    _widgetRows = [];
+    const fieldsToken = ++_widgetFieldsToken;
+    if (arrKey === 'widgets') fillWidgetFields(item, fieldsToken);
 
     // Delete button
     body.querySelector('#prop-delete')?.addEventListener('click', () => deleteItem(arrKey, index));
@@ -67,14 +85,6 @@ function buildPropsHTML(arrKey, item) {
                 <div class="editor-prop-type-badge">${escHtml(typeLabel)}</div>
             </div>
         `;
-        // Point at where the rest of this widget's configuration now lives.
-        if (widgetHasSettings(item.id)) {
-            html += `
-                <div class="editor-prop-hint">
-                    This widget's own settings live on the widget — use the gear on the slide.
-                </div>
-            `;
-        }
         html += `<div class="editor-prop-divider"></div>`;
     }
 
@@ -152,6 +162,9 @@ function buildPropsHTML(arrKey, item) {
         `;
     }
 
+    // Filled by fillWidgetFields() once the widget's schema has been read.
+    if (arrKey === 'widgets') html += `<div id="widget-fields"></div>`;
+
     html += `
         <button class="btn editor-delete-btn" id="prop-delete" title="Remove this item">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
@@ -199,9 +212,10 @@ export function applyPropertiesQuiet() {
         item.autoRotate    = get('prop-autoRotate')?.checked ?? false;
         item.animate       = get('prop-animate')?.checked ?? true;
         item.animationName = get('prop-animName')?.value || undefined;
+    } else if (arrKey === 'widgets') {
+        // The widget's own declared fields, alongside its geometry.
+        applyWidgetFields(item);
     }
-    // Widgets: nothing beyond geometry — their own settings are written back
-    // by the widget itself, and must not be touched from here.
 
     const container = getSlideEl();
     const cr = container?.getBoundingClientRect();
@@ -217,4 +231,268 @@ function deleteItem(arrKey, index) {
     cleanupEditOverlays();
     renderEditOverlays();
     updatePropertiesPanel();
+}
+
+/* ─── a widget's own declared fields ──────────────────────────────── */
+
+// Read the selected widget's schema and append a control per declared field.
+// Async because the schema comes from the widget's HTML (server or ZIP); the
+// token guards against a slow read landing in a panel the user has since
+// pointed at something else.
+async function fillWidgetFields(item, token) {
+    const schema = await getWidgetSchema(item);
+    if (token !== _widgetFieldsToken) return;
+    const host = document.getElementById('widget-fields');
+    if (!host) return;
+    host.textContent = '';
+
+    if (schema?.customSettings) {
+        // This widget draws a bespoke panel of its own; there is no field list
+        // to mirror, so point at the gear that opens it.
+        host.appendChild(hintRow(widgetHasCustomSettings(item.id)
+            ? 'This widget draws its own settings — use the gear on the slide.'
+            : 'This widget draws its own settings, reachable once it has rendered.'));
+        return;
+    }
+
+    if (!schema || !schema.fields.length) {
+        host.appendChild(hintRow('This widget has no settings of its own.'));
+        return;
+    }
+
+    const divider = document.createElement('div');
+    divider.className = 'editor-prop-divider';
+    host.appendChild(divider);
+
+    const heading = document.createElement('div');
+    heading.className = 'editor-prop-section';
+    heading.textContent = `${schema.label || 'Widget'} settings`;
+    host.appendChild(heading);
+
+    for (const field of schema.fields) {
+        const row = buildFieldRow(field, item);
+        _widgetRows.push(row);
+        host.appendChild(row.node);
+    }
+}
+
+function hintRow(text) {
+    const el = document.createElement('div');
+    el.className = 'editor-prop-hint';
+    el.textContent = text;
+    return el;
+}
+
+// What a control should show: what the presenter set, else the schema's default.
+function fieldValue(item, field) {
+    const v = item[field.key];
+    return v !== undefined ? v : field.default;
+}
+
+function fieldLabel(field) {
+    const lab = document.createElement('div');
+    lab.className = 'editor-prop-label';
+    lab.textContent = field.label || field.key;
+    if (field.note) {
+        const note = document.createElement('span');
+        note.className = 'editor-prop-label-note';
+        note.textContent = field.note;
+        lab.appendChild(note);
+    }
+    return lab;
+}
+
+// One control per declared field. Deliberately mirrors the widget settings
+// kit's field types and its read() semantics — notably that clearing a field
+// drops the key so the widget's own default applies again — so a widget
+// behaves identically whichever surface configured it.
+function buildFieldRow(field, item) {
+    const eff = fieldValue(item, field);
+    const row = document.createElement('div');
+    row.className = 'editor-prop-row';
+    let input;
+
+    if (field.type === 'checkbox') {
+        const lab = document.createElement('label');
+        lab.className = 'editor-prop-checkbox-row';
+        input = document.createElement('input');
+        input.type = 'checkbox';
+        input.checked = eff === true;
+        lab.appendChild(input);
+        lab.appendChild(document.createTextNode(field.label || field.key));
+        row.appendChild(lab);
+
+    } else if (field.type === 'select') {
+        row.appendChild(fieldLabel(field));
+        input = document.createElement('select');
+        input.className = 'editor-prop-select';
+        for (const o of field.options || []) {
+            const isObj = o && typeof o === 'object';
+            const value = isObj ? o.v : o;
+            const label = isObj ? (o.l !== undefined ? o.l : o.v) : o;
+            const opt = document.createElement('option');
+            opt.value = value;
+            opt.textContent = label;
+            // Compared as strings: a deck may hold 1.4 where the schema
+            // declares "1.4", and a strict compare would lose the selection.
+            if (String(eff) === String(value)) opt.selected = true;
+            input.appendChild(opt);
+        }
+        row.appendChild(input);
+
+    } else if (field.type === 'ai-model') {
+        row.appendChild(fieldLabel(field));
+        input = document.createElement('select');
+        input.className = 'editor-prop-select';
+        fillModelOptions(input, eff);
+        row.appendChild(input);
+
+    } else if (field.type === 'textarea' || field.type === 'textarea-lines') {
+        row.appendChild(fieldLabel(field));
+        input = document.createElement('textarea');
+        input.className = 'editor-prop-input editor-prop-area';
+        input.rows = field.rows || (field.type === 'textarea-lines' ? 4 : 3);
+        input.spellcheck = false;
+        if (field.placeholder) input.placeholder = field.placeholder;
+        input.value = Array.isArray(eff) ? eff.join('\n') : (eff == null ? '' : String(eff));
+        row.appendChild(input);
+
+    } else if (field.type === 'file') {
+        row.appendChild(fieldLabel(field));
+        const fileRow = document.createElement('div');
+        fileRow.className = 'editor-prop-file';
+        input = document.createElement('input');
+        input.className = 'editor-prop-input';
+        input.type = 'text';
+        input.readOnly = true;
+        input.placeholder = 'No file selected';
+        input.value = eff == null ? '' : String(eff);
+        input.title = input.value;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn editor-prop-file-btn';
+        btn.textContent = 'Upload';
+        btn.addEventListener('click', () => pickWidgetAsset(field, item, input, btn));
+        fileRow.appendChild(input);
+        fileRow.appendChild(btn);
+        row.appendChild(fileRow);
+
+    } else {
+        row.appendChild(fieldLabel(field));
+        input = document.createElement('input');
+        input.className = 'editor-prop-input';
+        input.type = field.type === 'password' ? 'password'
+                   : (field.type === 'number' || field.type === 'number-nullable') ? 'number'
+                   : 'text';
+        if (field.min  !== undefined) input.min  = field.min;
+        if (field.max  !== undefined) input.max  = field.max;
+        if (field.step !== undefined) input.step = field.step;
+        if (field.placeholder) input.placeholder = field.placeholder;
+        input.value = eff == null ? '' : String(eff);
+        row.appendChild(input);
+    }
+
+    // No per-control listener: #editor-properties-body already auto-applies on
+    // input/change, and these rows sit inside it.
+    return {
+        key: field.key,
+        node: row,
+        read() {
+            if (field.type === 'checkbox') return { value: input.checked };
+            if (field.type === 'number' || field.type === 'number-nullable') {
+                const raw = input.value.trim();
+                if (raw === '') return { remove: true };
+                const n = parseFloat(raw);
+                return isNaN(n) ? { remove: true } : { value: n };
+            }
+            if (field.type === 'textarea-lines') {
+                const lines = input.value.split('\n').map(s => s.trim()).filter(Boolean);
+                return lines.length ? { value: lines } : { remove: true };
+            }
+            return input.value === '' ? { remove: true } : { value: input.value };
+        },
+    };
+}
+
+// The AI models the server can actually reach. main.js loads them at start-up;
+// fall back to asking if that hasn't landed (or failed).
+async function fillModelOptions(select, current) {
+    const render = (models) => {
+        select.textContent = '';
+        const none = document.createElement('option');
+        none.value = '';
+        none.textContent = '— no model —';
+        select.appendChild(none);
+        for (const m of models) {
+            const opt = document.createElement('option');
+            opt.value = m;
+            opt.textContent = m;
+            if (current === m) opt.selected = true;
+            select.appendChild(opt);
+        }
+        // Keep a model the deck names but this server doesn't offer, so simply
+        // opening the panel doesn't silently clear the presenter's choice.
+        if (current && !models.includes(current)) {
+            const opt = document.createElement('option');
+            opt.value = current;
+            opt.textContent = `${current} (unavailable)`;
+            opt.selected = true;
+            select.appendChild(opt);
+        }
+    };
+
+    const known = ctx.state?.availableModels;
+    if (Array.isArray(known) && known.length) { render(known); return; }
+
+    const placeholder = document.createElement('option');
+    placeholder.value = current == null ? '' : String(current);
+    placeholder.textContent = current ? String(current) : '— loading… —';
+    select.appendChild(placeholder);
+    try {
+        const data = await (await fetch(sessionUrl('/api/models'))).json();
+        const models = data?.models || [];
+        if (ctx.state) ctx.state.availableModels = models;
+        render(models);
+    } catch (_) {
+        placeholder.textContent = '— unavailable —';
+    }
+}
+
+// A file field's bytes go into the deck (and up to the server so the widget can
+// read them before any save); the widget's config records only the path.
+function pickWidgetAsset(field, item, input, btn) {
+    const picker = document.createElement('input');
+    picker.type = 'file';
+    if (field.accept) picker.accept = field.accept;
+    picker.addEventListener('change', async () => {
+        const file = picker.files?.[0];
+        if (!file) return;
+        btn.disabled = true;
+        btn.textContent = 'Uploading…';
+        try {
+            const buffer = await file.arrayBuffer();
+            const path = await saveWidgetAsset(item, {
+                key: field.key, name: file.name, folder: field.folder || 'files', buffer,
+            });
+            if (path) { input.value = path; input.title = path; }
+        } catch (err) {
+            console.warn('[editor] widget file upload failed:', err);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Upload';
+        }
+    });
+    picker.click();
+}
+
+// Write every declared field back onto the widget's config item. A cleared
+// field is deleted rather than stored empty, so the widget falls back to its
+// own default exactly as it would through its in-widget panel.
+function applyWidgetFields(item) {
+    for (const row of _widgetRows) {
+        if (WIDGET_RESERVED.has(row.key)) continue;   // a widget can't move itself
+        const res = row.read();
+        if (res.remove) delete item[row.key];
+        else item[row.key] = res.value;
+    }
 }

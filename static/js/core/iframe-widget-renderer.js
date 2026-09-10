@@ -498,7 +498,7 @@ export function updateWidgetPositions(container) {
 
 // ── Path resolution helpers ────────────────────────────────────────────────
 
-function resolveWidgetPath(widget) {
+export function resolveWidgetPath(widget) {
     const candidates = [
         widget?.path, widget?.src, widget?.file, widget?.url,
         widget?.type ? `widgets/${widget.type}.html` : null,
@@ -516,7 +516,7 @@ function resolveWidgetPath(widget) {
     return '';
 }
 
-function findWidgetFile(zipFile, widgetPath) {
+export function findWidgetFile(zipFile, widgetPath) {
     if (!zipFile || !widgetPath) return null;
     let file = zipFile.file(widgetPath);
     if (file) return file;

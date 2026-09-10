@@ -15,11 +15,16 @@
 //   ← widget   widget-asset-upload    a file field picked a file
 //   → widget   widget-asset-saved     …and the path it was stored under
 import { ctx, WIDGET_RESERVED } from './context.js';
-import { postToWidget, widgetIdForWindow } from '../core/iframe-widget-renderer.js';
+import { postToWidget, widgetIdForWindow, findWidgetIframe } from '../core/iframe-widget-renderer.js';
 import { sessionUrl } from '../app/session.js';
 
-// widgetId → whether that widget has anything to show behind the gear.
+// widgetId → whether the settings kit will draw a panel from declared fields.
 const _hasSettings = new Map();
+// widgetId → whether the widget draws a bespoke panel of its own. Only these
+// need the gear: a widget's declared fields are edited in the properties panel
+// (see editor/widget-schema.js), so a gear for those would be a second, more
+// awkward route to the same settings.
+const _customSettings = new Map();
 
 let _openWidgetId = null;
 
@@ -33,11 +38,16 @@ export function widgetHasSettings(widgetId) {
     return _hasSettings.get(String(widgetId)) === true;
 }
 
+/** True when the widget draws its own settings UI rather than declaring fields. */
+export function widgetHasCustomSettings(widgetId) {
+    return _customSettings.get(String(widgetId)) === true;
+}
+
 // Overlays are built before a freshly-loaded widget has announced itself, so
 // each gear starts hidden and is revealed when its widget says it has settings.
 function syncGear(widgetId) {
     const sel = `.edit-overlay-gear[data-widget-id="${CSS.escape(String(widgetId))}"]`;
-    document.querySelectorAll(sel).forEach(btn => { btn.hidden = !widgetHasSettings(widgetId); });
+    document.querySelectorAll(sel).forEach(btn => { btn.hidden = !widgetHasCustomSettings(widgetId); });
 }
 
 /* ─── settings mode ─────────────────────────────────────────────── */
@@ -52,6 +62,10 @@ export function openWidgetSettings(widgetId) {
     if (_openWidgetId !== null) closeWidgetSettings();
     if (!postToWidget(widgetId, { type: 'widget-open-settings' })) return;
     _openWidgetId = String(widgetId);
+    // Edit mode hides every widget iframe (only the overlay boxes are shown),
+    // which would leave the panel we just asked for invisible. Mark this one
+    // so the stylesheet brings it back for as long as its settings are open.
+    findWidgetIframe(_openWidgetId)?.classList.add('is-settings-open');
     document.body.classList.add('widget-settings-open');
 }
 
@@ -62,6 +76,7 @@ export function closeWidgetSettings() {
 }
 
 function endSettingsMode() {
+    findWidgetIframe(_openWidgetId)?.classList.remove('is-settings-open');
     _openWidgetId = null;
     document.body.classList.remove('widget-settings-open');
 }
@@ -84,6 +99,7 @@ function onWidgetMessage(e) {
 
     if (data.type === 'widget-has-settings') {
         _hasSettings.set(sourceId, data.has === true);
+        _customSettings.set(sourceId, data.custom === true);
         syncGear(sourceId);
     } else if (data.type === 'widget-settings') {
         mergeSettings(sourceId, data);
@@ -144,9 +160,24 @@ export function requestWidgetFileFlush() {
 async function storeAsset(widgetId, msg) {
     const item = findWidgetItem(widgetId);
     if (!item) return;
-    const key = msg.key;
-    if (typeof key !== 'string' || WIDGET_RESERVED.has(key)) return;
-    if (!(msg.buffer instanceof ArrayBuffer)) return;
+    const path = await saveWidgetAsset(item, msg);
+    if (path === null) return;
+    postToWidget(widgetId, { type: 'widget-asset-saved', key: msg.key, path });
+}
+
+/**
+ * Stash a widget's file in the deck and record its path on the widget's config
+ * item. Shared by the in-widget file field (above) and the editor panel's own
+ * file rows, so both land the bytes in exactly the same place.
+ *
+ * msg: { key, buffer, name, folder = 'files', serve = true }
+ * Returns the saved path, or null if the request was malformed.
+ */
+export async function saveWidgetAsset(item, msg) {
+    if (!item) return null;
+    const key = msg?.key;
+    if (typeof key !== 'string' || WIDGET_RESERVED.has(key)) return null;
+    if (!(msg.buffer instanceof ArrayBuffer)) return null;
 
     const name   = String(msg.name || 'file').split(/[\\/]/).pop().replace(/^\.+/, '') || 'file';
     const folder = String(msg.folder || 'files').replace(/\.\./g, '').replace(/^\/+|\/+$/g, '') || 'files';
@@ -168,5 +199,5 @@ async function storeAsset(widgetId, msg) {
     }
 
     item[key] = path;
-    postToWidget(widgetId, { type: 'widget-asset-saved', key, path });
+    return path;
 }

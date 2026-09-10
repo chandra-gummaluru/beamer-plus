@@ -57,6 +57,10 @@ body.edit-mode #pdf-canvas audio,
 body.edit-mode #pdf-canvas model-viewer,
 body.edit-mode #pdf-canvas .widget-iframe { display: none !important; }
 
+/* …except the one currently showing its own settings panel, which has to be
+   visible for that panel to be usable at all. */
+body.edit-mode #pdf-canvas .widget-iframe.is-settings-open { display: block !important; }
+
 /* ─── Editor panel ────────────────────────────────────────────── */
 
 #editor-panel {
@@ -228,6 +232,89 @@ body.edit-mode #editor-panel { display: flex; }
 .editor-prop-input[readonly] {
     opacity: 0.5;
     cursor: default;
+}
+
+/* ─── Widget's own declared fields ────────────────────────────── */
+/* Rendered from the widget's `widget-schema` block (editor/widget-schema.js),
+   below the geometry rows the editor owns. */
+
+/* The widget's fields are one child of #editor-properties-body, so they need
+   their own copy of its column rhythm — otherwise every row sits flush. */
+#widget-fields {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+}
+
+.editor-prop-divider {
+    height: 1px;
+    background: oklch(88% 0.004 260);
+    margin: 0;
+}
+[data-theme="dark"] .editor-prop-divider { background: oklch(32% 0.007 260); }
+
+.editor-prop-section {
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    color: var(--ink-2);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-family: var(--font-sans);
+}
+
+.editor-prop-row--type-header { gap: var(--sp-2); }
+
+.editor-prop-type-badge {
+    align-self: flex-start;
+    padding: 2px var(--sp-2);
+    font-size: var(--fs-xs);
+    font-family: var(--font-sans);
+    color: var(--ink-2);
+    background: var(--surface-cream-2);
+    border: 1px solid oklch(88% 0.004 260);
+    border-radius: var(--r-pill);
+}
+[data-theme="dark"] .editor-prop-type-badge { border-color: oklch(32% 0.007 260); }
+
+.editor-prop-checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    font-size: var(--fs-sm);
+    font-family: var(--font-sans);
+    color: var(--ink-1);
+    cursor: pointer;
+}
+.editor-prop-checkbox-row input {
+    width: 15px;
+    height: 15px;
+    accent-color: var(--accent);
+    cursor: pointer;
+    flex: 0 0 auto;
+}
+
+/* Textareas share the input's box, minus its fixed single-line height. */
+.editor-prop-area {
+    min-height: 0;
+    line-height: 1.45;
+    resize: vertical;
+}
+
+.editor-prop-file {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+}
+.editor-prop-file .editor-prop-input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.editor-prop-file-btn {
+    flex: 0 0 auto;
+    min-width: 0;
+    min-height: 30px;
+    padding: 0 var(--sp-3);
+    font-size: var(--fs-xs);
 }
 
 .editor-delete-btn {

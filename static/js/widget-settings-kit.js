@@ -97,7 +97,11 @@
     function post(msg) { try { parent.postMessage(msg, '*'); } catch (e) {} }
     function announce() {
         if (!readSchema()) return;   // asked again on DOMContentLoaded
-        post({ type: 'widget-has-settings', widgetId: cfg().id, has: hasSettings });
+        // `has`    — this kit will draw a panel from the declared fields.
+        // `custom` — the widget draws its own instead, so the editor must keep
+        //            an affordance for opening it (the fields it declares are
+        //            otherwise mirrored in the editor's properties panel).
+        post({ type: 'widget-has-settings', widgetId: cfg().id, has: hasSettings, custom: customSettings });
     }
 
     /* ─── styles ────────────────────────────────────────────────── */
