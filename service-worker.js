@@ -1,6 +1,6 @@
-const CACHE_NAME = 'beamer-plus-v20';
-const STATIC_CACHE_NAME = 'beamer-plus-static-v20';
-const DYNAMIC_CACHE_NAME = 'beamer-plus-dynamic-v20';
+const CACHE_NAME = 'beamer-plus-v21';
+const STATIC_CACHE_NAME = 'beamer-plus-static-v21';
+const DYNAMIC_CACHE_NAME = 'beamer-plus-dynamic-v21';
 
 // The app shell — just enough to boot the presenter offline. These are the real
 // Flask route / entry-point assets; everything they pull in (the ES-module tree
@@ -158,7 +158,28 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
-  // Cache-first strategy for static assets
+  // The app's own code is network-first: it changes with every edit, and a
+  // cache-first copy of it survives a server restart *and* a reload, so the
+  // browser would keep running a stale build with no obvious way out. The
+  // cached copy is still written and still served when the network is gone, so
+  // offline use is unaffected. Vendored libraries and media stay cache-first
+  // below — they're large and only change when their path does.
+  if (url.pathname.startsWith('/static/js/') || url.pathname.startsWith('/static/css/')) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response && response.status === 200 && response.type !== 'error') {
+            const clone = response.clone();
+            caches.open(STATIC_CACHE_NAME).then((cache) => cache.put(request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request))
+    );
+    return;
+  }
+
+  // Cache-first strategy for everything else static (vendored libs, icons, media)
   event.respondWith(
     caches.match(request)
       .then((cachedResponse) => {
