@@ -123,6 +123,20 @@ function mergeSettings(widgetId, msg) {
     }
 }
 
+/* ─── saving ────────────────────────────────────────────────────── */
+
+/**
+ * Ask every live widget to write out any file it owns. Called at the start of
+ * a save: the uploads land while the rest of the ZIP is being built, so this
+ * costs no extra wait, and a notebook edited during the talk is saved as the
+ * notebook rather than as a blob inside the widget's state.
+ */
+export function requestWidgetFileFlush() {
+    document.querySelectorAll('.widget-iframe').forEach(iframe => {
+        try { iframe.contentWindow?.postMessage({ type: 'widget-flush-files' }, '*'); } catch (_) {}
+    });
+}
+
 /* ─── file fields ───────────────────────────────────────────────── */
 
 // A widget's file field hands us the bytes; we stash them for the save ZIP and
@@ -140,13 +154,17 @@ async function storeAsset(widgetId, msg) {
 
     ctx.state.editorNewFiles[path] = msg.buffer;
 
-    try {
-        const fd = new FormData();
-        fd.append('file', new File([msg.buffer], name));
-        fd.append('folder', folder);
-        await fetch(sessionUrl('/api/upload-asset'), { method: 'POST', body: fd });
-    } catch (err) {
-        console.warn('[editor] upload-asset POST failed (widget preview may not work):', err);
+    // Upload so the file is servable over /api/zip-asset/ right away, before
+    // any save. A widget that already holds the content can skip this.
+    if (msg.serve !== false) {
+        try {
+            const fd = new FormData();
+            fd.append('file', new File([msg.buffer], name));
+            fd.append('folder', folder);
+            await fetch(sessionUrl('/api/upload-asset'), { method: 'POST', body: fd });
+        } catch (err) {
+            console.warn('[editor] upload-asset POST failed (widget preview may not work):', err);
+        }
     }
 
     item[key] = path;

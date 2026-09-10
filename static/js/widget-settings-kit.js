@@ -46,6 +46,21 @@
     var hasSettings    = !customSettings && fields.length > 0;
 
     function cfg() { return window.WIDGET_CONFIG || (window.WIDGET_CONFIG = {}); }
+
+    /* ─── presentation scale ────────────────────────────────────── */
+    // A widget that declares a `scale` field gets the room-size control for
+    // free: whatever the presenter picks is applied to --u, which the shared
+    // base stylesheet uses to size everything the audience has to read.
+    // Chrome stays fixed, so the furniture doesn't inflate with the content.
+
+    function applyScale() {
+        var f = null;
+        for (var i = 0; i < fields.length; i++) if (fields[i].key === 'scale') { f = fields[i]; break; }
+        if (!f) return;
+        var raw = cfg().scale !== undefined ? cfg().scale : f.default;
+        var v = parseFloat(raw);
+        if (!isNaN(v) && v > 0) document.documentElement.style.setProperty('--u', String(v));
+    }
     function post(msg) { try { parent.postMessage(msg, '*'); } catch (e) {} }
     function announce() { post({ type: 'widget-has-settings', widgetId: cfg().id, has: hasSettings }); }
 
@@ -136,11 +151,17 @@
         } else if (field.type === 'select') {
             row.appendChild(labelFor(field));
             input = el('select', 'bws-select');
+            // Options may be declared as { v, l } pairs or as plain strings.
+            // Compare as strings: a deck may have stored 1.4 where the schema
+            // declares "1.4", and a strict compare would lose the selection.
             (field.options || []).forEach(function (o) {
+                var isObj = o && typeof o === 'object';
+                var v = isObj ? o.v : o;
+                var l = isObj ? (o.l !== undefined ? o.l : o.v) : o;
                 var opt = el('option');
-                opt.value = o.v;
-                opt.textContent = o.l;
-                if (eff === o.v) opt.selected = true;
+                opt.value = v;
+                opt.textContent = l;
+                if (String(eff) === String(v)) opt.selected = true;
                 input.appendChild(opt);
             });
             row.appendChild(input);
@@ -253,7 +274,37 @@
     // widget can read the file before the deck is saved, and replies with the
     // path to record.
 
-    var _pendingAsset = null;
+    // key → resolve callback for an upload in flight. One per key is plenty:
+    // a second save of the same key supersedes the first.
+    var _pendingAssets = {};
+
+    /**
+     * Save a file into the deck. The bytes go into the presentation ZIP under
+     * <folder>/<name> and the path is written to this widget's config under
+     * <key>, so the file is there again next time the deck is opened — which is
+     * where a file belongs, rather than inlined into the widget's state.
+     *
+     * opts: { key, name, buffer, folder = 'files', serve = true }
+     * serve:false skips the immediate upload, for a widget that already holds
+     * the content and doesn't need to read it back over HTTP.
+     * Resolves with the saved path.
+     */
+    function saveFile(opts) {
+        opts = opts || {};
+        if (!opts.key || !opts.buffer) return Promise.reject(new Error('saveFile needs a key and a buffer'));
+        return new Promise(function (resolve, reject) {
+            _pendingAssets[opts.key] = { resolve: resolve, reject: reject };
+            post({
+                type:     'widget-asset-upload',
+                widgetId: cfg().id,
+                key:      opts.key,
+                folder:   opts.folder || 'files',
+                name:     opts.name || 'file',
+                serve:    opts.serve !== false,
+                buffer:   opts.buffer,
+            });
+        });
+    }
 
     function pickAsset(field, input, btn, onChange) {
         var picker = el('input');
@@ -265,15 +316,13 @@
             btn.disabled = true;
             btn.textContent = 'Uploading…';
             file.arrayBuffer().then(function (buffer) {
-                _pendingAsset = { key: field.key, input: input, btn: btn, onChange: onChange };
-                post({
-                    type:     'widget-asset-upload',
-                    widgetId: cfg().id,
-                    key:      field.key,
-                    folder:   field.folder || 'files',
-                    name:     file.name,
-                    buffer:   buffer,
-                });
+                return saveFile({ key: field.key, name: file.name, folder: field.folder || 'files', buffer: buffer });
+            }).then(function (path) {
+                btn.disabled = false;
+                btn.textContent = 'Upload';
+                input.value = path;
+                input.title = path;
+                onChange();
             }).catch(function () {
                 btn.disabled = false;
                 btn.textContent = 'Upload';
@@ -283,17 +332,20 @@
     }
 
     function onAssetSaved(msg) {
-        var p = _pendingAsset;
-        if (!p || p.key !== msg.key) return;
-        _pendingAsset = null;
-        p.btn.disabled = false;
-        p.btn.textContent = 'Upload';
-        if (msg.path) {
-            p.input.value = msg.path;
-            p.input.title = msg.path;
-            p.onChange();
-        }
+        var p = _pendingAssets[msg.key];
+        if (!p) return;
+        delete _pendingAssets[msg.key];
+        // Keep our own config in step, so a re-read sees the new path.
+        if (msg.path) cfg()[msg.key] = msg.path;
+        p.resolve(msg.path || '');
     }
+
+    // Widgets that own a file register here; Beamer+ asks just before it builds
+    // the ZIP, so an edit made during the talk is written back rather than only
+    // the version originally opened.
+    var _flushHandler = null;
+
+    function onFlushFiles(fn) { _flushHandler = typeof fn === 'function' ? fn : null; }
 
     /* ─── panel ─────────────────────────────────────────────────── */
 
@@ -314,6 +366,7 @@
         var c = cfg();
         remove.forEach(function (k) { delete c[k]; });
         Object.keys(patch).forEach(function (k) { c[k] = patch[k]; });
+        applyScale();
         selfDispatch = true;
         try { window.dispatchEvent(new MessageEvent('message', { data: { type: 'widget-config', config: c } })); }
         catch (e) {}
@@ -398,12 +451,29 @@
         if (d.type === 'widget-open-settings')  { if (hasSettings) openPanel(); return; }
         if (d.type === 'widget-close-settings') { closePanel(true); return; }
         if (d.type === 'widget-asset-saved')    { onAssetSaved(d); return; }
+        if (d.type === 'widget-flush-files') {
+            if (_flushHandler) { try { _flushHandler(); } catch (err) { console.warn('[widget] flush failed', err); } }
+            return;
+        }
         if (d.type === 'widget-config' && d.config) {
             window.WIDGET_CONFIG = d.config;
+            applyScale();
             announce();  // the id may only have arrived with this message
         }
     });
 
+    // Public API for the widget itself. Everything a widget needs from the
+    // host goes through here rather than hand-rolled postMessage.
+    window.BeamerWidget = {
+        config:        cfg,
+        saveFile:      saveFile,
+        onFlushFiles:  onFlushFiles,
+        openSettings:  function () { if (hasSettings) openPanel(); },
+        closeSettings: function () { closePanel(); },
+        hasSettings:   function () { return hasSettings; },
+    };
+
+    applyScale();
     announce();
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', announce, { once: true });

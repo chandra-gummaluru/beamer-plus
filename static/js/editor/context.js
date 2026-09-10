@@ -10,16 +10,29 @@ export const ctx = {
 export function getSlideEl() { return document.getElementById('pdf-canvas'); }
 
 /* ─── panel mode ────────────────────────────────────────────────
-   The editor panel shows one section at a time:
+   The editor panel shows one section at a time, and its header names
+   which one:
      'slide' — the current slide's own properties (the default)
      'item'  — the selected overlay's properties
      'view'  — the split-view configuration for a view slide
-   CSS keys off #editor-panel-body[data-mode], so switching modes is
-   a single attribute write; nothing sets inline display styles. */
+   CSS keys off #editor-panel[data-mode], so switching modes is a single
+   attribute write; nothing sets inline display styles. */
 
-export function setPanelMode(mode) {
-    const body = document.getElementById('editor-panel-body');
-    if (body) body.dataset.mode = mode;
+const PANEL_TITLES = {
+    slide: 'Slide Properties',
+    item:  'Properties',        // replaced with the item's own type by properties.js
+    view:  'View Configuration',
+};
+
+export function setPanelMode(mode, title) {
+    const panel = document.getElementById('editor-panel');
+    if (panel) panel.dataset.mode = mode;
+    setPanelTitle(title ?? PANEL_TITLES[mode] ?? 'Edit Presentation');
+}
+
+export function setPanelTitle(title) {
+    const el = document.getElementById('editor-panel-title');
+    if (el) el.textContent = title;
 }
 
 // The mode implied by the current selection, used whenever a section

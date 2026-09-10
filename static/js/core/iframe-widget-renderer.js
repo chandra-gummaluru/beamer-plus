@@ -12,55 +12,14 @@ import { widgetSessionConfig } from '../app/session.js';
 // This guarantees the iframe never reloads and all JS state is preserved.
 
 // ── Shared widget base theme ───────────────────────────────────────────────
-// Injected into every widget iframe before its own <style> so all widgets
-// share the same design tokens and fonts.  Each widget's own :root block
-// wins over these defaults, so individual overrides still work.
+// Injected into every widget iframe before its own <style>, so all widgets
+// share one design language — tokens, reset, toolbars, buttons, status pills,
+// inputs, banners. See static/css/widget-base.css. A widget's own rules come
+// later in the document and still win, so overriding remains possible.
 
 const _WIDGET_BASE_INJECT = `<link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<style id="widget-base-theme">
-:root {
-  /* ── Palette – light ── */
-  --bg:         #ffffff;
-  --bg-subtle:  #f9f9f8;
-  --bg-output:  #fafaf9;
-  --border:     #e9e9e6;
-  --border-med: #d4d4cf;
-  --text:       #1a1a18;
-  --text-2:     #6b6b65;
-  --text-3:     #aeaea5;
-  --accent:     #52524e;
-  --accent-bg:  #f0f0ee;
-  --ok:         #15803d;
-  --err:        #c0392b;
-  /* ── Typography ── */
-  --radius:     6px;
-  --font-ui:    'DM Sans', system-ui, sans-serif;
-  --font-mono:  'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
-  /* ── Aliases so older widget code using different names still works ── */
-  --font:       var(--font-ui);
-  --mono:       var(--font-mono);
-  --r:          var(--radius);
-  --ink-1:      var(--text);
-  --ink-2:      var(--text-2);
-  --ink-3:      var(--text-3);
-  --ink-4:      var(--text-3);
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg:         #1a1a18;
-    --bg-subtle:  #222220;
-    --bg-output:  #1e1e1c;
-    --border:     #333330;
-    --border-med: #444440;
-    --text:       #f0f0ed;
-    --text-2:     #a0a09a;
-    --text-3:     #6b6b65;
-    --accent:     #a0a09a;
-    --accent-bg:  #2a2a28;
-  }
-}
-</style>
+<link rel="stylesheet" href="/static/css/widget-base.css">
 <script id="widget-nav-bridge">
 (function () {
   // Forwards ArrowLeft/ArrowRight/PageUp/PageDown to the parent frame so the

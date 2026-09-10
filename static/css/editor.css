@@ -86,6 +86,7 @@ body.edit-mode #editor-panel { display: flex; }
     background: var(--surface-cream);
     display: flex;
     align-items: center;
+    gap: var(--sp-2);
     padding: 0 var(--sp-4);
 }
 
@@ -128,30 +129,29 @@ body.edit-mode #editor-panel { display: flex; }
    The panel shows exactly one section at a time: the slide's own
    properties by default, an item's properties while an overlay is
    selected, or the view configuration for a split-view slide. */
-#editor-panel-body[data-mode="slide"] #editor-slide-settings { display: flex; }
-#editor-panel-body[data-mode="item"]  #editor-properties     { display: flex; }
-#editor-panel-body[data-mode="view"]  #editor-view           { display: flex; }
+#editor-panel[data-mode="slide"] #editor-slide-settings { display: flex; }
+#editor-panel[data-mode="item"]  #editor-properties     { display: flex; }
+#editor-panel[data-mode="view"]  #editor-view           { display: flex; }
 
-/* Back link to the slide properties, shown above an item's properties. */
+/* Back to the slide's own properties. Only an item's properties replace the
+   slide's, so only that mode offers a way back. */
 .editor-props-back {
-    display: flex;
+    display: none;
     align-items: center;
-    gap: var(--sp-1);
-    align-self: flex-start;
-    padding: 2px 6px 2px 2px;
-    margin-bottom: calc(-1 * var(--sp-2));
+    justify-content: center;
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    margin-left: calc(-1 * var(--sp-1));
+    padding: 0;
     background: none;
     border: none;
     border-radius: var(--r-sm);
     cursor: pointer;
-    font-family: var(--font-sans);
-    font-size: var(--fs-xs);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
     color: var(--ink-3);
     transition: color var(--dur-fast), background var(--dur-fast);
 }
+#editor-panel[data-mode="item"] .editor-props-back { display: flex; }
 .editor-props-back:hover {
     color: var(--ink-1);
     background: var(--surface-cream-2);
@@ -171,14 +171,6 @@ body.edit-mode #editor-panel { display: flex; }
     display: flex;
     flex-direction: column;
     gap: var(--sp-4);
-}
-
-.editor-section-heading {
-    font-family: var(--font-serif);
-    font-size: var(--fs-md);
-    font-weight: 500;
-    color: var(--ink-1);
-    letter-spacing: -0.01em;
 }
 
 .editor-prop-row {
@@ -354,20 +346,25 @@ body.widget-settings-open .edit-overlay {
     pointer-events: none;
 }
 
+/* Centred in the box rather than tabbed above it: the label reads as the
+   name of the thing you're looking at, and a full-slide widget's tab would
+   otherwise sit off the top of the slide entirely. */
 .edit-overlay-label {
     position: absolute;
-    top: -22px; left: -1px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     background: var(--accent);
     color: var(--ink-on-accent);
-    padding: 2px 7px;
+    padding: 3px 9px;
     font-size: 10px;
     font-weight: 600;
     font-family: var(--font-sans);
-    border-radius: var(--r-sm) var(--r-sm) 0 0;
+    border-radius: var(--r-sm);
     white-space: nowrap;
     pointer-events: none;
     letter-spacing: 0.04em;
-    max-width: 160px;
+    max-width: calc(100% - 16px);
     overflow: hidden;
     text-overflow: ellipsis;
 }

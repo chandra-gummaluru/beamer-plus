@@ -8,7 +8,8 @@
   "fields": [
     { "key": "question",      "label": "Question",                              "type": "textarea",        "placeholder": "Enter the question…", "rows": 3 },
     { "key": "options",       "label": "Answer options (one per line)",         "type": "textarea-lines",  "placeholder": "Option A\nOption B\nOption C", "rows": 4 },
-    { "key": "correctAnswer", "label": "Correct option (1-based, blank=none)", "type": "number-nullable", "min": 1, "step": 1 }
+    { "key": "correctAnswer", "label": "Correct option (1-based, blank=none)", "type": "number-nullable", "min": 1, "step": 1 },
+    { "key": "scale", "label": "Text size", "type": "select", "options": ["1", "1.4", "1.8", "2.2"], "default": "1.4", "note": "1.4 suits a lecture room; 1 is desk size" }
   ]
 }
 </script>
@@ -21,76 +22,25 @@
 <script src="/static/vendor/qrcode.min.js"></script>
 <script src="/static/vendor/socket.io.min.js"></script>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@400;500;600&display=swap');
+/* Tokens, reset, toolbar, buttons and status pills come from the shared
+   widget base (static/css/widget-base.css). What's left here is the poll
+   itself: the question, the choice pills, the QR panel, the result bars. */
 
-:root {
-  --bg:         #ffffff;
-  --bg-subtle:  #f9f9f8;
-  --border:     #e9e9e6;
-  --border-med: #d4d4cf;
-  --text:       #1a1a18;
-  --text-2:     #6b6b65;
-  --text-3:     #aeaea5;
-  --accent:     #52524e;
-  --accent-bg:  #f0f0ee;
-  --green:      #15803d;
-  --red:        #dc2626;
-  --radius:     6px;
-  --font-mono:  'JetBrains Mono', ui-monospace, monospace;
-  --font-ui:    'DM Sans', system-ui, sans-serif;
-}
-
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; overflow: hidden; font-family: var(--font-ui); background: var(--bg); color: var(--text); font-size: 13px; }
-
-#shell { display: flex; flex-direction: column; height: 100%; }
-
-/* ── Toolbar ─────────────────────────────────────────── */
-#toolbar {
-  flex-shrink: 0; height: 42px;
-  border-bottom: 1px solid var(--border);
-  display: flex; align-items: center;
-  padding: 0 14px; gap: 6px;
-}
-.toolbar-title { font-size: 13px; font-weight: 500; flex-shrink: 0; }
-.sep { width: 1px; height: 18px; background: var(--border); margin: 0 2px; flex-shrink: 0; }
-#resp-count {
-  font-family: var(--font-mono); font-size: 11.5px; color: var(--text-3);
-  flex-shrink: 0;
-}
-#resp-count strong { color: var(--text-2); font-weight: 500; }
-.spacer { flex: 1; }
-#close-btn {
-  height: 28px; padding: 0 12px;
-  border: 1px solid var(--text); border-radius: var(--radius);
-  background: var(--text); color: #fff;
-  font-family: var(--font-ui); font-size: 12px; font-weight: 500;
-  cursor: pointer; white-space: nowrap; display: none;
-  transition: background 0.1s;
-}
-#close-btn:hover { background: #2d2d2a; }
+/* Revealed by the JS once the poll is live, and only for the presenter. */
+#close-btn { display: none; }
 
 /* ── Collect view ────────────────────────────────────── */
-#collect-view {
-  flex: 1; display: none;
-  flex-direction: column; overflow: hidden;
-}
+#collect-view { flex: 1; display: none; flex-direction: column; overflow: hidden; min-height: 0; }
 
-/* Question */
 #question-area {
   flex-shrink: 0;
   padding: 22px 32px 16px;
   border-bottom: 1px solid var(--border);
   text-align: center;
 }
-#question-text {
-  font-size: clamp(16px, 3vw, 24px);
-  font-weight: 500; line-height: 1.35; color: var(--text);
-}
-#question-text p { margin: 0; }
-#question-text .katex { font-size: 1em; }
+#question-text { font-size: var(--fs-head); font-weight: 500; line-height: 1.35; }
 
-/* Choices row */
+/* ── Choices ─────────────────────────────────────────── */
 #choices-row {
   flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
@@ -100,82 +50,72 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font-ui); backgr
   display: inline-flex; align-items: center; gap: 7px;
   padding: 6px 14px 6px 8px;
   border: 1px solid var(--border); border-radius: 999px;
-  background: var(--bg-subtle); font-size: 12.5px; color: var(--text-2);
-  line-height: 1.3;
+  background: var(--bg-subtle);
+  font-size: var(--fs-small); color: var(--text-2); line-height: 1.3;
 }
 .choice-pill .letter {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 20px; height: 20px; border-radius: 50%;
+  width: calc(15px * var(--u)); height: calc(15px * var(--u));
+  border-radius: 50%;
   background: var(--accent-bg); border: 1px solid var(--border-med);
-  color: var(--accent); font-size: 10.5px; font-weight: 700;
+  color: var(--accent); font-size: calc(8px * var(--u)); font-weight: 700;
   font-family: var(--font-mono); flex-shrink: 0;
 }
 .choice-pill .choice-label { color: var(--text); }
-.choice-pill .choice-label .katex { font-size: 1em; }
-.choice-pill .choice-label p { margin: 0; display: inline; }
+.choice-pill .choice-label p { display: inline; }
 
-/* QR area — biased slightly above true centre */
-#qr-area {
-  flex: 1; display: flex;
-  flex-direction: column; align-items: center; justify-content: center;
-  gap: 12px; padding: 12px 24px 10%;
-}
-.scan-hint {
-  font-size: 10.5px; font-weight: 500;
-  letter-spacing: 0.08em; text-transform: uppercase;
-  color: var(--text-3); user-select: none;
-}
+/* ── QR panel — biased slightly above true centre ────── */
+#qr-area { padding-bottom: 10%; }
 #qrcode-wrap {
-  padding: 10px; background: white;
+  /* Stays white in dark mode too — a QR code has to keep its contrast to scan. */
+  padding: 10px; background: #fff;
   border: 1px solid var(--border); border-radius: var(--radius); line-height: 0;
 }
 #join-url {
-  font-family: var(--font-mono); font-size: 11px; color: var(--text-3);
+  font-family: var(--font-mono); font-size: var(--fs-chrome-sm); color: var(--text-3);
   text-align: center; max-width: 420px; word-break: break-all;
   cursor: pointer; padding: 3px 8px; border-radius: 4px;
-  transition: color 0.1s, background 0.1s;
+  transition: color var(--dur), background var(--dur);
 }
 #join-url:hover { background: var(--bg-subtle); color: var(--text-2); }
 
-/* ── Results view ────────────────────────────────────── */
+/* ── Results ─────────────────────────────────────────── */
 #results-view {
-  flex: 1; display: none;
-  flex-direction: column; padding: 18px 24px;
-  gap: 4px; overflow-y: auto; justify-content: center;
+  flex: 1; display: none; flex-direction: column;
+  padding: 18px 24px; gap: 4px; overflow-y: auto; justify-content: center;
 }
-.bar-row { display: grid; grid-template-columns: 28px 1fr 56px; align-items: center; gap: 8px; }
-.bar-label { font-size: 11px; font-weight: 700; font-family: var(--font-mono); color: var(--text-2); text-align: center; }
-.bar-label.correct { color: var(--green); }
-.bar-track { height: 28px; background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+.bar-row { display: grid; grid-template-columns: calc(20px * var(--u)) 1fr calc(40px * var(--u)); align-items: center; gap: 8px; }
+.bar-label { font-size: var(--fs-small); font-weight: 700; font-family: var(--font-mono); color: var(--text-2); text-align: center; }
+.bar-label.correct { color: var(--ok); }
+.bar-track { height: calc(20px * var(--u)); background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
 .bar-fill { height: 100%; width: 0%; background: var(--accent); border-radius: 3px; transition: width 0.65s cubic-bezier(.22,1,.36,1); }
-.bar-fill.correct { background: var(--green); }
+.bar-fill.correct { background: var(--ok); }
 .bar-meta { display: flex; flex-direction: column; align-items: flex-end; }
-.bar-pct { font-size: 12px; font-weight: 600; font-family: var(--font-mono); color: var(--text); }
-.bar-votes { font-size: 10px; color: var(--text-3); font-family: var(--font-mono); }
-.bar-text-row { display: grid; grid-template-columns: 28px 1fr 56px; gap: 8px; margin-top: -2px; margin-bottom: 4px; }
-.bar-option-text { grid-column: 2; font-size: 11px; color: var(--text-3); line-height: 1.3; }
-.bar-option-text .katex { font-size: 1em; }
+.bar-pct { font-size: var(--fs-small); font-weight: 600; font-family: var(--font-mono); color: var(--text); }
+.bar-votes { font-size: calc(8px * var(--u)); color: var(--text-3); font-family: var(--font-mono); }
+.bar-text-row { display: grid; grid-template-columns: calc(20px * var(--u)) 1fr calc(40px * var(--u)); gap: 8px; margin-top: -2px; margin-bottom: 4px; }
+.bar-option-text { grid-column: 2; font-size: var(--fs-small); color: var(--text-3); line-height: 1.3; }
 .bar-option-text p { margin: 0; }
 </style>
 </head>
 <body>
-<div id="shell">
+<div id="shell" class="bw-shell">
 
-  <div id="toolbar">
-    <span class="toolbar-title">MCQ Poll</span>
-    <div class="sep"></div>
-    <span id="resp-count"><strong id="resp-n">0</strong> responses</span>
-    <div class="spacer"></div>
-    <button id="close-btn" onclick="closePoll()">Close &amp; Review →</button>
+  <div id="toolbar" class="bw-toolbar">
+    <span class="bw-toolbar-title">Multiple Choice</span>
+    <div class="bw-sep"></div>
+    <span id="resp-count" class="bw-status"><strong id="resp-n">0</strong> responses</span>
+    <div class="bw-spacer"></div>
+    <button id="close-btn" class="bw-btn bw-btn--primary" onclick="closePoll()">Close &amp; Review →</button>
   </div>
 
   <div id="collect-view">
     <div id="question-area">
-      <div id="question-text"></div>
+      <div id="question-text" class="bw-md"></div>
     </div>
     <div id="choices-row"></div>
-    <div id="qr-area">
-      <div class="scan-hint">Scan to respond</div>
+    <div id="qr-area" class="bw-center">
+      <div class="bw-hint">Scan to respond</div>
       <div id="qrcode-wrap"><div id="qrcode"></div></div>
       <div id="join-url" onclick="copyUrl()" title="Click to copy"></div>
     </div>
@@ -219,7 +159,7 @@ function renderChoices() {
     const pill  = document.createElement('div');
     pill.className = 'choice-pill';
     const ls = document.createElement('span'); ls.className = 'letter'; ls.textContent = letter(i);
-    const ts = document.createElement('span'); ts.className = 'choice-label md-content';
+    const ts = document.createElement('span'); ts.className = 'choice-label bw-md';
     pill.appendChild(ls); pill.appendChild(ts); row.appendChild(pill);
     setMd(ts, opt);
   });
@@ -242,7 +182,7 @@ function renderChart() {
       <div class="bar-meta"><span class="bar-pct">${pct}%</span><span class="bar-votes">${n}v</span></div>`;
     view.appendChild(row);
     const tr = document.createElement('div'); tr.className = 'bar-text-row';
-    const te = document.createElement('span'); te.className = 'bar-option-text md-content';
+    const te = document.createElement('span'); te.className = 'bar-option-text bw-md';
     tr.appendChild(document.createElement('span'));
     tr.appendChild(te);
     tr.appendChild(document.createElement('span'));

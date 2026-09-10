@@ -123,7 +123,22 @@ export function showHelpModal({ onStartTour = null } = {}) {
   <dt>widget-close-settings</dt><dd>Received when Beamer+ needs your settings closed (slide change, leaving edit mode).</dd>
   <dt>widget-settings</dt><dd>Post ${_hic('{ widgetId, patch, remove }')} to save settings into your config item, where they persist with the deck.</dd>
 </dl>
-<h4 class="help-h">4 · Shared styles</h4>
+<h4 class="help-h">4 · Save files with the deck</h4>
+<p class="help-p">If your widget opens a file — a notebook, a PDF, a dataset — save it as a <em>file</em> in the presentation rather than stuffing its contents into your state. Beamer+ writes it into the deck and hands you back the path, which it also records in your config:</p>
+<code class="help-code">const path = await BeamerWidget.saveFile({
+  key:    'notebook',           // config key the path is written to
+  name:   'demo.ipynb',
+  folder: 'notebooks',          // → notebooks/demo.ipynb inside the deck
+  buffer: await file.arrayBuffer(),
+  serve:  false                 // skip the upload if you already hold the content
+});</code>
+<p class="help-p">Next time the deck is opened, ${_hic('window.WIDGET_CONFIG.notebook')} is that path — load it the way you would any configured file. If the presenter edits the file during the talk, hand back the current bytes when Beamer+ asks, just before it builds the ZIP:</p>
+<code class="help-code">BeamerWidget.onFlushFiles(() =&gt; {
+  BeamerWidget.saveFile({ key: 'notebook', name: title, folder: 'notebooks',
+                          buffer: currentBytes(), serve: false });
+});</code>
+<p class="help-p">That leaves ${_hic('widget-state')} for what is genuinely ephemeral — scroll position, which cell has focus — and keeps the deck's files openable in the tools they belong to.</p>
+<h4 class="help-h">5 · Shared styles</h4>
 <p class="help-p">Every widget automatically inherits Beamer+'s design tokens, with no setup needed:</p>
 <code class="help-code">var(--bg)        var(--text)      var(--border)
 var(--accent)    var(--font-ui)   var(--font-mono)

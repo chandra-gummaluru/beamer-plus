@@ -1,0 +1,416 @@
+/* ============================================================================
+   Beamer+ widget base — the shared design language for every widget.
+
+   Injected into every widget iframe ahead of the widget's own <style>, so a
+   widget can still override anything, but shouldn't need to: if two widgets
+   both draw a toolbar, they should draw the same toolbar.
+
+   What belongs here: tokens, the reset, and any furniture more than one
+   widget needs — toolbars, buttons, status pills, inputs, banners, empty and
+   loading states. What stays in a widget: whatever is genuinely its own
+   (a keypad, a plot, a QR panel).
+
+   ── Presentation scale ──────────────────────────────────────────────────
+   These widgets are read from the back of a room, not from a desk. --u is
+   the scale for everything the room has to READ; chrome (toolbars, small
+   buttons, meta text) is deliberately fixed, so raising the scale makes the
+   content bigger without inflating the furniture around it.
+
+   A widget opts in by declaring a `scale` field in its schema — the settings
+   kit applies the presenter's choice to --u automatically.
+   ========================================================================= */
+
+:root {
+  /* Palette — light */
+  --bg:         #ffffff;
+  --bg-subtle:  #f9f9f8;
+  --bg-output:  #fafaf9;
+  --border:     #e9e9e6;
+  --border-med: #d4d4cf;
+  --text:       #1a1a18;
+  --text-2:     #6b6b65;
+  --text-3:     #aeaea5;
+  --accent:     #52524e;
+  --accent-bg:  #f0f0ee;
+  --on-accent:  #ffffff;
+
+  /* Status */
+  --ok:     #15803d;
+  --green:  #15803d;
+  --warn:   #b45309;
+  --amber:  #b45309;
+  --err:    #c0392b;
+  --red:    #dc2626;
+  --err-bg: #fef2f2;
+
+  /* Data colours — for anything a widget draws itself: word clouds, plots,
+     result bars. Ordered so the first few carry the most weight, and defined
+     for both themes so a canvas can read them instead of hardcoding ink. */
+  --chart-1: #1a1a18;
+  --chart-2: #3d3d3a;
+  --chart-3: #52524e;
+  --chart-4: #6b6b65;
+  --chart-5: #85857d;
+  --chart-6: #9c9c94;
+
+  /* Shape & motion */
+  --radius:    6px;
+  --radius-lg: 10px;
+  --dur:       0.12s;
+
+  /* Type */
+  --font-ui:   'DM Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+
+  /* Presentation scale — see the note above. */
+  --u: 1.4;
+
+  /* Chrome: fixed, whatever --u is. */
+  --fs-chrome:    12px;
+  --fs-chrome-sm: 11px;
+  --fs-title:     13px;
+
+  /* Content: scales with the room. */
+  --fs-body:  calc(14px * var(--u));
+  --fs-lead:  calc(18px * var(--u));
+  --fs-head:  calc(24px * var(--u));
+  --fs-code:  calc(13px * var(--u));
+  --fs-small: calc(11.5px * var(--u));
+
+  /* Furniture metrics — shared so two widgets' toolbars line up. */
+  --bar-h:  42px;
+  --ctl-h:  28px;
+  --pad-x:  14px;
+
+  /* Aliases kept for widgets written against the older names. */
+  --font:  var(--font-ui);
+  --mono:  var(--font-mono);
+  --r:     var(--radius);
+  --ink-1: var(--text);
+  --ink-2: var(--text-2);
+  --ink-3: var(--text-3);
+  --ink-4: var(--text-3);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:         #1a1a18;
+    --bg-subtle:  #222220;
+    --bg-output:  #1e1e1c;
+    --border:     #333330;
+    --border-med: #444440;
+    --text:       #f0f0ed;
+    --text-2:     #a0a09a;
+    --text-3:     #6b6b65;
+    --accent:     #a0a09a;
+    --accent-bg:  #2a2a28;
+    --on-accent:  #1a1a18;
+    --err-bg:     #2a1c1a;
+    --chart-1:    #f0f0ed;
+    --chart-2:    #d6d6d0;
+    --chart-3:    #b8b8b1;
+    --chart-4:    #9c9c94;
+    --chart-5:    #85857d;
+    --chart-6:    #6b6b65;
+  }
+}
+
+/* ── Reset ────────────────────────────────────────────────────────────── */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { height: 100%; overflow: hidden; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--fs-chrome);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The usual widget shape: a fixed bar on top, everything else filling the rest. */
+.bw-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* ── Toolbar ──────────────────────────────────────────────────────────── */
+
+.bw-toolbar {
+  flex: 0 0 auto;
+  height: var(--bar-h);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 var(--pad-x);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.bw-toolbar-title {
+  font-size: var(--fs-title);
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+  flex-shrink: 0;
+}
+
+.bw-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 3px;
+  flex-shrink: 0;
+}
+
+.bw-spacer { flex: 1 1 auto; }
+
+/* ── Buttons ──────────────────────────────────────────────────────────── */
+
+.bw-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: var(--ctl-h);
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--fs-chrome);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--dur), border-color var(--dur), color var(--dur);
+}
+.bw-btn:hover:not(:disabled) {
+  background: var(--bg-subtle);
+  border-color: var(--border-med);
+}
+.bw-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.bw-btn--primary {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--bg);
+}
+.bw-btn--primary:hover:not(:disabled) {
+  background: var(--text-2);
+  border-color: var(--text-2);
+}
+
+.bw-btn--quiet {
+  border-color: transparent;
+  background: none;
+  color: var(--text-2);
+}
+.bw-btn--quiet:hover:not(:disabled) { background: var(--accent-bg); color: var(--text); }
+
+/* Selected member of a toggle group — view switchers, mode pickers. */
+.bw-btn.is-active {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--bg);
+}
+.bw-btn.is-active:hover:not(:disabled) { background: var(--text-2); border-color: var(--text-2); }
+
+.bw-btn--icon { width: var(--ctl-h); padding: 0; }
+.bw-btn svg   { width: 14px; height: 14px; flex-shrink: 0; }
+
+/* ── Status pill ──────────────────────────────────────────────────────── */
+
+.bw-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-chrome-sm);
+  color: var(--text-2);
+  flex-shrink: 0;
+}
+.bw-status strong { color: var(--text-2); font-weight: 500; }
+
+.bw-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-3);
+  flex-shrink: 0;
+  transition: background 0.3s;
+}
+.bw-dot.is-ready { background: var(--ok); }
+.bw-dot.is-warn  { background: var(--warn); }
+.bw-dot.is-busy  { background: var(--err); animation: bw-blink 0.9s ease-in-out infinite; }
+.bw-dot.is-idle  { background: var(--text-3); }
+
+/* ── Content areas ────────────────────────────────────────────────────── */
+
+.bw-main {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+}
+
+/* A readable measure that grows with the room rather than the viewport. */
+.bw-stage {
+  max-width: calc(760px * var(--u));
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* Centred single-focus content — a question, a timer, a result. */
+.bw-center {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 24px;
+  text-align: center;
+}
+
+/* ── Typography helpers ───────────────────────────────────────────────── */
+
+.bw-head  { font-size: var(--fs-head); font-weight: 500; line-height: 1.3; letter-spacing: -0.01em; }
+.bw-lead  { font-size: var(--fs-lead); font-weight: 500; line-height: 1.35; }
+.bw-body  { font-size: var(--fs-body); line-height: 1.55; }
+.bw-small { font-size: var(--fs-small); color: var(--text-2); }
+.bw-mono  { font-family: var(--font-mono); }
+
+/* Micro caps label — "scan to respond", "waiting for responses". */
+.bw-hint {
+  font-size: var(--fs-chrome-sm);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  user-select: none;
+}
+
+/* Markdown-rendered content shouldn't inherit the reset's stripped margins. */
+.bw-md p { margin: 0; }
+.bw-md p + p { margin-top: 0.6em; }
+.bw-md code { font-family: var(--font-mono); font-size: 0.92em; }
+.bw-md .katex { font-size: 1em; }
+
+/* ── Form controls ────────────────────────────────────────────────────── */
+
+.bw-input,
+.bw-select,
+.bw-textarea {
+  width: 100%;
+  padding: 6px 9px;
+  font-family: var(--font-ui);
+  font-size: var(--fs-chrome);
+  color: var(--text);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-med);
+  border-radius: var(--radius);
+  transition: border-color var(--dur);
+}
+.bw-input:focus,
+.bw-select:focus,
+.bw-textarea:focus { outline: none; border-color: var(--accent); }
+.bw-textarea { font-family: var(--font-mono); line-height: 1.45; resize: vertical; }
+
+/* ── Card ─────────────────────────────────────────────────────────────── */
+/* A block of content set off from the page: a summary, a response, a result. */
+
+.bw-card {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 15px;
+}
+.bw-card--lg { padding: 22px 26px; border-radius: var(--radius-lg); }
+.bw-card-meta {
+  font-family: var(--font-mono);
+  font-size: var(--fs-chrome-sm);
+  color: var(--text-3);
+  margin-top: 8px;
+}
+
+/* ── Banner ───────────────────────────────────────────────────────────── */
+
+.bw-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px 8px 12px;
+  border: 1px solid var(--border-med);
+  border-left: 3px solid var(--text-3);
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+  font-size: var(--fs-chrome);
+  line-height: 1.5;
+  color: var(--text-2);
+}
+.bw-banner--warn  { border-left-color: var(--warn); }
+.bw-banner--error { border-left-color: var(--err); background: var(--err-bg); }
+.bw-banner strong { color: var(--text); font-weight: 600; }
+.bw-banner code   { font-family: var(--font-mono); font-size: 0.92em; color: var(--text); }
+
+/* ── Loading & empty states ───────────────────────────────────────────── */
+
+.bw-boot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 64px 20px;
+  color: var(--text-2);
+  text-align: center;
+}
+.bw-boot-msg { font-size: var(--fs-body); }
+.bw-boot-sub { font-size: var(--fs-chrome-sm); color: var(--text-3); }
+
+.bw-spinner {
+  width: 26px;
+  height: 26px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: bw-spin 0.65s linear infinite;
+}
+
+.bw-empty {
+  font-size: var(--fs-body);
+  color: var(--text-2);
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* ── Scrollbars ───────────────────────────────────────────────────────── */
+
+.bw-main::-webkit-scrollbar { width: 10px; height: 10px; }
+.bw-main::-webkit-scrollbar-thumb {
+  background: var(--border-med);
+  border: 3px solid var(--bg);
+  border-radius: 5px;
+}
+.bw-main::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+.bw-main::-webkit-scrollbar-track { background: transparent; }
+
+/* ── Motion ───────────────────────────────────────────────────────────── */
+
+@keyframes bw-spin  { to { transform: rotate(360deg); } }
+@keyframes bw-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .bw-spinner { animation-duration: 2s; }
+  .bw-dot.is-busy { animation: none; }
+}

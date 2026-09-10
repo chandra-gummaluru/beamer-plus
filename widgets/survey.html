@@ -11,7 +11,8 @@
     { "key": "minResponses", "label": "Min. responses to show", "type": "number",   "min": 1, "step": 1, "default": 1 },
     { "key": "numSummaries", "label": "AI summary count",       "type": "number",   "min": 0, "step": 1, "default": 3 },
     { "key": "model",        "label": "AI model",               "type": "ai-model" },
-    { "key": "apiKey",       "label": "API key",                "type": "password", "placeholder": "Paste API key…" }
+    { "key": "apiKey",       "label": "API key",                "type": "password", "placeholder": "Paste API key…" },
+    { "key": "scale", "label": "Text size", "type": "select", "options": ["1", "1.4", "1.8", "2.2"], "default": "1.4", "note": "1.4 suits a lecture room; 1 is desk size" }
   ]
 }
 </script>
@@ -20,186 +21,89 @@
 <script src="/static/vendor/qrcode.min.js"></script>
 <script src="/static/vendor/socket.io.min.js"></script>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@400;500;600&display=swap');
+/* Tokens, reset, toolbar, buttons, cards and the spinner come from the shared
+   widget base (static/css/widget-base.css). What's left here is the survey
+   itself: the question, the QR panel, the summary carousel, the response list. */
 
-:root {
-  --bg:         #ffffff;
-  --bg-subtle:  #f9f9f8;
-  --border:     #e9e9e6;
-  --border-med: #d4d4cf;
-  --text:       #1a1a18;
-  --text-2:     #6b6b65;
-  --text-3:     #aeaea5;
-  --accent:     #52524e;
-  --accent-bg:  #f0f0ee;
-  --green:      #15803d;
-  --radius:     6px;
-  --font-mono:  'JetBrains Mono', ui-monospace, monospace;
-  --font-ui:    'DM Sans', system-ui, sans-serif;
-}
-
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; overflow: hidden; font-family: var(--font-ui); background: var(--bg); color: var(--text); font-size: 13px; }
-#shell { display: flex; flex-direction: column; height: 100%; }
-
-/* ── Toolbar ─────────────────────────────────────────── */
-#toolbar {
-  flex-shrink: 0; height: 42px;
-  border-bottom: 1px solid var(--border);
-  display: flex; align-items: center; padding: 0 14px; gap: 6px;
-}
-.toolbar-title { font-size: 13px; font-weight: 500; flex-shrink: 0; }
-.sep { width: 1px; height: 18px; background: var(--border); margin: 0 2px; flex-shrink: 0; }
-#resp-count { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-3); flex-shrink: 0; }
-#resp-count strong { color: var(--text-2); font-weight: 500; }
-.spacer { flex: 1; }
-#close-btn {
-  height: 28px; padding: 0 12px;
-  border: 1px solid var(--text); border-radius: var(--radius);
-  background: var(--text); color: #fff;
-  font-family: var(--font-ui); font-size: 12px; font-weight: 500;
-  cursor: pointer; white-space: nowrap; display: none;
-  transition: background 0.1s;
-}
-#close-btn:hover:not(:disabled) { background: #2d2d2a; }
-#close-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+/* Revealed by the JS once the poll is live, and only for the presenter. */
+#close-btn { display: none; }
 
 /* ── Collect view ────────────────────────────────────── */
-#collect-view { flex: 1; display: none; flex-direction: column; overflow: hidden; }
+#collect-view { flex: 1; display: none; flex-direction: column; overflow: hidden; min-height: 0; }
 
 #question-area {
   flex-shrink: 0; padding: 22px 32px 16px;
   border-bottom: 1px solid var(--border); text-align: center;
 }
-#question-text {
-  font-size: clamp(16px, 3vw, 24px);
-  font-weight: 500; line-height: 1.35; color: var(--text);
-}
+#question-text { font-size: var(--fs-head); font-weight: 500; line-height: 1.35; }
 
-#qr-area {
-  flex: 1; display: flex;
-  flex-direction: column; align-items: center; justify-content: center;
-  gap: 12px; padding: 12px 24px 10%;
-}
-.scan-hint {
-  font-size: 10.5px; font-weight: 500;
-  letter-spacing: 0.08em; text-transform: uppercase;
-  color: var(--text-3); user-select: none;
-}
+/* QR panel — biased slightly above true centre */
+#qr-area { padding-bottom: 10%; }
 #qrcode-wrap {
-  padding: 10px; background: white;
+  /* Stays white in dark mode too — a QR code has to keep its contrast to scan. */
+  padding: 10px; background: #fff;
   border: 1px solid var(--border); border-radius: var(--radius); line-height: 0;
 }
 #join-url {
-  font-family: var(--font-mono); font-size: 11px; color: var(--text-3);
+  font-family: var(--font-mono); font-size: var(--fs-chrome-sm); color: var(--text-3);
   text-align: center; max-width: 420px; word-break: break-all;
   cursor: pointer; padding: 3px 8px; border-radius: 4px;
-  transition: color 0.1s, background 0.1s;
+  transition: color var(--dur), background var(--dur);
 }
 #join-url:hover { background: var(--bg-subtle); color: var(--text-2); }
 
 /* ── Loading view ────────────────────────────────────── */
-#loading-view {
-  flex: 1; display: none;
-  align-items: center; justify-content: center;
-  flex-direction: column; gap: 12px;
-}
-.spinner {
-  width: 22px; height: 22px;
-  border: 2px solid var(--border); border-top-color: var(--accent);
-  border-radius: 50%; animation: spin 0.65s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-#loading-msg { font-size: 13px; color: var(--text-3); }
+#loading-view { display: none; }
 
-/* ── Results view ────────────────────────────────────── */
+/* ── Summary carousel ────────────────────────────────── */
 #results-view {
-  flex: 1; display: none;
-  flex-direction: column; align-items: center; justify-content: center;
-  gap: 18px; padding: 24px; overflow-y: auto;
+  flex: 1; display: none; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 18px; padding: 24px; overflow-y: auto; min-height: 0;
 }
-.summary-card {
-  width: 100%; max-width: 580px;
-  background: var(--bg-subtle); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 22px 26px;
-}
-#summary-text { font-size: 14px; line-height: 1.75; color: var(--text-2); }
-#summary-meta { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); margin-top: 14px; }
+.summary-card { width: 100%; max-width: calc(420px * var(--u)); }
+#summary-text { font-size: var(--fs-body); line-height: 1.75; color: var(--text-2); }
 .carousel-nav { display: flex; align-items: center; gap: 12px; }
-#nav-counter { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); }
-.nav-btn {
-  width: 28px; height: 28px;
-  border: 1px solid var(--border); border-radius: var(--radius);
-  background: var(--bg); color: var(--text-2); font-size: 14px;
-  cursor: pointer; display: flex; align-items: center; justify-content: center;
-  transition: background 0.1s, color 0.1s, border-color 0.1s;
-}
-.nav-btn:hover:not(:disabled) { background: var(--bg-subtle); border-color: var(--border-med); color: var(--text); }
-.nav-btn:disabled { opacity: 0.28; cursor: default; }
+#nav-counter { font-family: var(--font-mono); font-size: var(--fs-chrome-sm); color: var(--text-3); }
 
 /* ── Responses view ─────────────────────────────────── */
-#responses-view {
-  flex: 1; display: none;
-  flex-direction: column; overflow: hidden;
-}
+#responses-view { flex: 1; display: none; flex-direction: column; overflow: hidden; min-height: 0; }
 #responses-list {
   flex: 1; overflow-y: auto;
   padding: 16px 20px; display: flex; flex-direction: column; gap: 8px;
 }
-.resp-card {
-  background: var(--bg-subtle); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 11px 14px;
-  font-size: 13px; line-height: 1.55; color: var(--text);
-}
-.resp-card .resp-meta {
-  font-family: var(--font-mono); font-size: 10.5px;
-  color: var(--text-3); margin-top: 6px;
-}
+.resp-card { font-size: var(--fs-body); line-height: 1.55; color: var(--text); }
 #responses-empty {
   flex: 1; display: flex; align-items: center; justify-content: center;
-  color: var(--text-3); font-size: 13px;
-}
-
-/* ── Mode pill ───────────────────────────────────────── */
-.mode-btn {
-  height: 26px; padding: 0 10px;
-  border: 1px solid var(--border); border-radius: var(--radius);
-  background: var(--bg); color: var(--text-2);
-  font-family: var(--font-ui); font-size: 11.5px; font-weight: 500;
-  cursor: pointer; white-space: nowrap;
-  transition: background 0.1s, color 0.1s, border-color 0.1s;
-}
-.mode-btn.active {
-  background: var(--text); color: #fff; border-color: var(--text);
 }
 </style>
 </head>
 <body>
-<div id="shell">
+<div id="shell" class="bw-shell">
 
-  <div id="toolbar">
-    <span class="toolbar-title">Survey</span>
-    <div class="sep"></div>
-    <span id="resp-count"><strong id="resp-n">0</strong> responses</span>
-    <div class="sep"></div>
-    <button class="mode-btn active" id="mode-responses" onclick="setMode('responses')">Responses</button>
-    <button class="mode-btn"        id="mode-summary"   onclick="setMode('summary')">Summary</button>
-    <div class="spacer"></div>
-    <button id="close-btn" onclick="closeAndReview()">Close &amp; Review →</button>
+  <div id="toolbar" class="bw-toolbar">
+    <span class="bw-toolbar-title">Survey</span>
+    <div class="bw-sep"></div>
+    <span id="resp-count" class="bw-status"><strong id="resp-n">0</strong> responses</span>
+    <div class="bw-sep"></div>
+    <button class="bw-btn is-active" id="mode-responses" onclick="setMode('responses')">Responses</button>
+    <button class="bw-btn"           id="mode-summary"   onclick="setMode('summary')">Summary</button>
+    <div class="bw-spacer"></div>
+    <button id="close-btn" class="bw-btn bw-btn--primary" onclick="closeAndReview()">Close &amp; Review →</button>
   </div>
 
   <div id="collect-view">
     <div id="question-area"><div id="question-text"></div></div>
-    <div id="qr-area">
-      <div class="scan-hint">Scan to respond</div>
+    <div id="qr-area" class="bw-center">
+      <div class="bw-hint">Scan to respond</div>
       <div id="qrcode-wrap"><div id="qrcode"></div></div>
       <div id="join-url" onclick="copyUrl()" title="Click to copy"></div>
     </div>
   </div>
 
-  <div id="loading-view">
-    <div class="spinner"></div>
-    <div id="loading-msg">Loading…</div>
+  <div id="loading-view" class="bw-center">
+    <div class="bw-spinner"></div>
+    <div id="loading-msg" class="bw-boot-sub">Loading…</div>
   </div>
 
   <div id="responses-view">
@@ -207,14 +111,14 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font-ui); backgr
   </div>
 
   <div id="results-view">
-    <div class="summary-card">
+    <div class="summary-card bw-card bw-card--lg">
       <div id="summary-text"></div>
-      <div id="summary-meta"></div>
+      <div id="summary-meta" class="bw-card-meta"></div>
     </div>
     <div class="carousel-nav">
-      <button class="nav-btn" id="prev-btn" onclick="prevSummary()" disabled>‹</button>
+      <button class="bw-btn bw-btn--icon" id="prev-btn" onclick="prevSummary()" disabled>‹</button>
       <span id="nav-counter"></span>
-      <button class="nav-btn" id="next-btn" onclick="nextSummary()" disabled>›</button>
+      <button class="bw-btn bw-btn--icon" id="next-btn" onclick="nextSummary()" disabled>›</button>
     </div>
   </div>
 
@@ -250,8 +154,8 @@ function showPhase(p) {
 
 function setMode(m) {
   surveyMode = m;
-  document.getElementById('mode-responses').classList.toggle('active', m === 'responses');
-  document.getElementById('mode-summary').classList.toggle('active', m === 'summary');
+  document.getElementById('mode-responses').classList.toggle('is-active', m === 'responses');
+  document.getElementById('mode-summary').classList.toggle('is-active', m === 'summary');
 }
 
 function showQR(url) {
@@ -358,7 +262,7 @@ function renderResponsesList(responses) {
   const list = document.getElementById('responses-list');
   list.innerHTML = '';
   if (!responses.length) {
-    list.innerHTML = '<div id="responses-empty">No responses yet.</div>';
+    list.innerHTML = '<div id="responses-empty" class="bw-empty">No responses yet.</div>';
     return;
   }
   for (const r of responses) appendResponseCard(r, list);
@@ -369,13 +273,13 @@ function appendResponseCard(r, list) {
   const empty = list.querySelector('#responses-empty');
   if (empty) empty.remove();
   const card = document.createElement('div');
-  card.className = 'resp-card';
+  card.className = 'resp-card bw-card';
   const text = document.createElement('div');
   text.textContent = typeof r === 'string' ? r : (r.response || r.text || JSON.stringify(r));
   card.appendChild(text);
   if (r.timestamp) {
     const meta = document.createElement('div');
-    meta.className = 'resp-meta';
+    meta.className = 'bw-card-meta';
     meta.textContent = new Date(r.timestamp * 1000).toLocaleTimeString();
     card.appendChild(meta);
   }

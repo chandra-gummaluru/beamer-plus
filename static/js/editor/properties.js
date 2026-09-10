@@ -7,7 +7,7 @@
 // its own settings, behind the gear on its edit overlay (see
 // editor/widget-settings.js), so all this panel shows for a widget is where
 // it sits on the slide.
-import { ctx, getSlideEl, getOrCreateConfig, escAttr, escHtml, setPanelMode, resolvePanelMode } from './context.js';
+import { ctx, getSlideEl, getOrCreateConfig, escAttr, escHtml, setPanelMode, setPanelTitle, resolvePanelMode } from './context.js';
 import { cleanupEditOverlays, renderEditOverlays, positionOverlay } from './overlays.js';
 import { WIDGET_LABELS } from './widget-picker.js';
 import { widgetHasSettings } from './widget-settings.js';
@@ -25,8 +25,7 @@ export function updatePropertiesPanel() {
     if (!item) return;
 
     const typeLabels = { videos: 'Video', audios: 'Audio', models: '3D Model', widgets: 'Widget' };
-    const titleEl = document.getElementById('editor-properties-title');
-    if (titleEl) titleEl.textContent = `${typeLabels[arrKey] || arrKey} Properties`;
+    setPanelTitle(`${typeLabels[arrKey] || arrKey} Properties`);
 
     const body = document.getElementById('editor-properties-body');
     if (!body) return;

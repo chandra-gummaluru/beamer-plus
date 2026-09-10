@@ -2,6 +2,7 @@
 // configs, slide order, annotations, widget states, newly added files) and
 // downloads it.
 import { collectWidgetStates } from '../core/iframe-widget-renderer.js';
+import { requestWidgetFileFlush } from './widget-settings.js';
 import { ctx } from './context.js';
 
 // Custom widgets are added with an ephemeral `blob:` URL as their `src` (for
@@ -35,6 +36,9 @@ export async function savePresentation() {
     const modal = window.BeamerModal;
     modal?.show({ kind: 'loading', title: 'Saving…', message: 'Building ZIP…' });
     try {
+        // Ask file-owning widgets to write their files out now; the uploads
+        // arrive while we copy the rest of the ZIP below.
+        requestWidgetFileFlush();
         // Flush the current canvas so the latest strokes are captured.
         if (ctx.state.annCvs?.canvas) {
             ctx.state.annotations[ctx.state.currentSlide] = ctx.state.annCvs.canvas.toDataURL('image/png');
