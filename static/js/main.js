@@ -161,7 +161,6 @@ document.addEventListener('DOMContentLoaded', () => {
     wireKeyboardNav();
     wireResizeAndFullscreen();
     wireMenuBtn();
-    wireStageEmptyState();
     updateStageEmptyState();
 
     // annotation sync + active-pane tracking
@@ -428,7 +427,7 @@ function wireKeyboardNav() {
         if (e.key === sc.hand)             document.querySelector('[data-tool="hand"], #hand-btn')?.click();
         if (e.key === sc.eraser)           document.querySelector('[data-tool="eraser"]')?.click();
         if (e.key === sc.spotlight)        document.querySelector('[data-tool="spotlight"], #spotlight-btn')?.click();
-        if (e.key === sc.bookmark)         toggleBookmark(state.currentSlide);
+        if (e.key === sc.bookmark && state.slideStructure.length) toggleBookmark(state.currentSlide);
         if (e.key === sc.clearAnnotations) document.getElementById('annotation-clear-btn')?.click();
         if (e.key === sc.splitView)        document.getElementById('split-toggle')?.click();
         if (e.key === sc.focusMode)        toggleFocusMode();
@@ -1051,6 +1050,41 @@ function saveCurrentAnnotations() {
 }
 
 /* ─── empty stage placeholder ─────────────────────────────────── */
+// Controls that only mean anything once the deck holds at least one slide:
+// split view, save/download, bookmark, edit mode, and the whole annotation
+// toolbar (tools, pen slots, undo/redo, clear). Disabling the buttons also
+// covers the keyboard shortcuts, which fire by clicking them — a disabled
+// button ignores .click().
+// Upload and "insert blank slide" stay live: they are how you leave the empty
+// state. Pen slots are built once by initPenSlots() during bootstrap, so they
+// are already in the DOM the first time this runs.
+const STAGE_CONTROL_SELECTOR = [
+    '#split-toggle',
+    '#edit-save-btn',
+    '#bookmark-btn',
+    '#floating-annotation-toolbar button',
+].join(', ');
+
+function setStageControlsEnabled(enabled) {
+    document.querySelectorAll(STAGE_CONTROL_SELECTOR).forEach(el => { el.disabled = !enabled; });
+
+    // Edit mode is handled apart from the list above because the same button
+    // doubles as "exit edit mode": disabling it while edit mode is on — say the
+    // user deletes the last slide from inside the editor — would trap them
+    // there. Split view blocks it too, so fold that rule in as well.
+    const editBtn = document.getElementById('edit-mode-btn');
+    if (editBtn && !state.editMode) editBtn.disabled = !enabled || state.splitView;
+
+    if (!enabled) return;
+    // Split view independently blocks save/download (see setSplitActive) —
+    // re-apply that rule so re-enabling here can't quietly override it.
+    const saveBtn = document.getElementById('edit-save-btn');
+    if (saveBtn) saveBtn.disabled = state.splitView;
+    // Undo/redo have their own enabled rule (does the active canvas have
+    // history?) — hand them back to it rather than force-enabling them.
+    updateHistoryBtns();
+}
+
 // Shown only while the deck holds no slides at all (fresh session before any
 // upload, or after the last blank slide is deleted). Called from
 // populateSlideNavigator(), which every structure change funnels through.
@@ -1059,6 +1093,7 @@ function updateStageEmptyState() {
     if (!el) return;
     const isEmpty = state.slideStructure.length === 0;
     el.hidden = !isEmpty;
+    setStageControlsEnabled(!isEmpty);
     if (!isEmpty) return;
     // Nothing behind the placeholder: drop any ink and hide the slide bitmap
     // left over from a deck that has just been emptied. The non-empty case is
@@ -1067,17 +1102,6 @@ function updateStageEmptyState() {
     state.annCvs?.clear();
     state.annCvs?.resetHistory?.();
     if (state.pdfCvs?.canvas) state.pdfCvs.canvas.style.visibility = 'hidden';
-}
-
-// Route the placeholder's two actions through the existing buttons so the
-// upload modal and blank-slide insertion keep a single implementation.
-function wireStageEmptyState() {
-    document.getElementById('stage-empty-upload')?.addEventListener('click', () => {
-        document.getElementById('upload-presentation-btn')?.click();
-    });
-    document.getElementById('stage-empty-add-blank')?.addEventListener('click', () => {
-        document.getElementById('add-blank-btn')?.click();
-    });
 }
 
 /* ─── populate slide navigator ────────────────────────────────── */

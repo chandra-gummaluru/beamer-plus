@@ -251,55 +251,11 @@ model-viewer { pointer-events: auto !important; }
     margin: var(--sp-2) 0 0;
 }
 
-.stage-empty-actions {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: var(--sp-3);
-    margin-top: var(--sp-6);
-}
-
-.stage-empty-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--sp-2);
-    min-height: var(--hit-min);
-    padding: 0 var(--sp-4);
-    font-family: var(--font-sans);
-    font-size: var(--fs-sm);
-    font-weight: 500;
-    color: var(--_ink);
-    background: transparent;
-    border: 1px solid var(--_line);
-    border-radius: var(--r-md);
-    cursor: pointer;
-    transition: background-color var(--dur-fast) var(--ease),
-                border-color var(--dur-fast) var(--ease);
-}
-
-.stage-empty-btn:hover {
-    background: var(--_hover);
-    border-color: var(--_ink-soft);
-}
-
-.stage-empty-btn--primary {
-    color: oklch(99% 0.003 80);
-    background: oklch(45% 0.005 260);
-    border-color: oklch(32% 0.006 260);
-}
-
-.stage-empty-btn--primary:hover {
-    background: oklch(32% 0.006 260);
-    border-color: oklch(32% 0.006 260);
-}
-
 /* Narrow stages (phones, tiny split panes): drop to the icon + one line. */
 @media (max-width: 600px), (max-height: 460px) {
     .stage-empty-icon { width: 68px; height: 49px; margin-bottom: var(--sp-3); }
     .stage-empty-title { font-size: var(--fs-lg); }
     .stage-empty-hint { font-size: var(--fs-sm); }
-    .stage-empty-actions { margin-top: var(--sp-4); }
 }
 
 @media (prefers-reduced-motion: reduce) {
