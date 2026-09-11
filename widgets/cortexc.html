@@ -70,12 +70,11 @@
    CortexC — Beamer+ widget stylesheet
 
    Beamer+ injects its design tokens (--bg, --text, --border, --radius,
-   --font-ui, --font-mono, …) into every widget iframe BEFORE this stylesheet,
-   and its own :root block includes a prefers-color-scheme dark variant.
+   --font-ui, --font-mono, …) into every widget iframe BEFORE this stylesheet.
 
    So we never redefine those tokens — we consume them through `var(--token,
-   fallback)`. In Beamer+ the host values win (including dark mode); opened
-   standalone via index.html the fallbacks kick in and it still looks right.
+   fallback)`. In Beamer+ the host values win; opened standalone via index.html
+   the fallbacks kick in and it still looks right.
    ========================================================================= */
 
 :root {
@@ -130,29 +129,6 @@
   --cx-row-h: 32px;
   --cx-bar-h: 42px;
 }
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --cx-stack: #93c5fd;
-    --cx-stack-line: #1d4ed8;
-    --cx-stack-bg: #16233d;
-    --cx-heap: #86efac;
-    --cx-heap-line: #15803d;
-    --cx-heap-bg: #13291c;
-    --cx-global: #c4b5fd;
-    --cx-global-line: #6d28d9;
-    --cx-global-bg: #211a38;
-    --cx-warn: #fcd34d;
-    --cx-warn-bg: #2a2213;
-    --cx-ptr: #fcd34d;
-    --cx-ptr-line: #b45309;
-    --cx-ptr-bg: #2a2213;
-    --cx-err-bg: #2d1717;
-    --cx-ok-bg: #13291c;
-    --alloc-text-lightness: 74%;
-  }
-}
-
 *,
 *::before,
 *::after {
@@ -5789,9 +5765,8 @@ function initEditor(codeInput, onCommit) {
  * Wires the DOM controls to the interpreter and visualizer.
  *
  * Theming is deliberately NOT handled here. Beamer+ injects its own design
- * tokens (including a prefers-color-scheme dark variant) into every widget
- * iframe, and cortexc.css consumes them — so a local theme toggle would only
- * fight the host.
+ * tokens into every widget iframe and cortexc.css consumes them, so a local
+ * theme toggle would only fight the host.
  *
  * @returns {Object} A control surface used by the Beamer+ bridge.
  */

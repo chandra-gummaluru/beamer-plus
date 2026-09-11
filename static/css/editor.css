@@ -248,8 +248,6 @@ body.edit-mode #editor-panel { display: flex; }
     background: oklch(88% 0.004 260);
     margin: 0;
 }
-[data-theme="dark"] .editor-prop-divider { background: oklch(32% 0.007 260); }
-
 .editor-prop-section {
     font-size: var(--fs-xs);
     font-weight: 600;
@@ -271,8 +269,6 @@ body.edit-mode #editor-panel { display: flex; }
     border: 1px solid oklch(88% 0.004 260);
     border-radius: var(--r-pill);
 }
-[data-theme="dark"] .editor-prop-type-badge { border-color: oklch(32% 0.007 260); }
-
 .editor-prop-checkbox-row {
     display: flex;
     align-items: center;

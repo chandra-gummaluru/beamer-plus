@@ -288,8 +288,6 @@
     padding-bottom: var(--sp-2);
     border-bottom: 1px solid oklch(88% 0.004 260);
 }
-[data-theme="dark"] .help-modal-nav { border-bottom-color: oklch(32% 0.006 260); }
-
 .help-modal-nav-btn {
     text-align: left;
     padding: var(--sp-2) var(--sp-3);
@@ -309,11 +307,6 @@
     color: var(--ink-1);
     font-weight: 500;
 }
-[data-theme="dark"] .help-modal-nav-btn:hover,
-[data-theme="dark"] .help-modal-nav-btn.active {
-    background: oklch(28% 0.006 260);
-}
-
 /* ── Content pane ── */
 .help-modal-pane {
     flex: 1;
@@ -323,8 +316,6 @@
 }
 .help-modal-pane::-webkit-scrollbar { width: 4px; }
 .help-modal-pane::-webkit-scrollbar-thumb { background: oklch(82% 0.005 260); border-radius: 4px; }
-[data-theme="dark"] .help-modal-pane::-webkit-scrollbar-thumb { background: oklch(38% 0.006 260); }
-
 .help-section { display: none; }
 .help-section.active { display: block; }
 
@@ -348,8 +339,6 @@
     border-color: var(--accent);
     transform: translateY(-1px);
 }
-[data-theme="dark"] .help-tour-cta { border-color: oklch(32% 0.006 260); }
-
 .help-tour-cta-icon {
     display: flex;
     align-items: center;
@@ -432,11 +421,6 @@
     margin: 0 0 var(--sp-3) 0;
     display: block;
 }
-[data-theme="dark"] .help-code {
-    background: oklch(20% 0.006 260);
-    border-color: oklch(30% 0.006 260);
-}
-
 .help-ic {
     font-family: var(--font-mono);
     font-size: 11.5px;
@@ -447,11 +431,6 @@
     color: var(--ink-1);
     white-space: nowrap;
 }
-[data-theme="dark"] .help-ic {
-    background: oklch(24% 0.006 260);
-    border-color: oklch(34% 0.006 260);
-}
-
 .help-kv {
     display: grid;
     grid-template-columns: auto 1fr;
@@ -475,8 +454,6 @@
     border-top: 1px solid oklch(88% 0.004 260);
     margin: var(--sp-4) 0;
 }
-[data-theme="dark"] .help-divider { border-top-color: oklch(32% 0.006 260); }
-
 /* ── Inline button icon chip (used by _hbtn() in help text) ── */
 .help-btn-ref {
     display: inline-flex;
@@ -496,11 +473,6 @@
     height: 13px;
     color: var(--ink-2);
 }
-[data-theme="dark"] .help-btn-ref {
-    background: oklch(24% 0.006 260);
-    border-color: oklch(34% 0.006 260);
-}
-
 @media (max-width: 600px) {
     .custom-modal-content.help-modal-content { padding: var(--sp-4); }
     .help-modal-pane { max-height: 340px; }

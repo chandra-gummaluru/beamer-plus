@@ -391,6 +391,7 @@ body {
 .add-row {
   display: flex;
   justify-content: center;
+  gap: 6px;
   padding: 5px 0;
   opacity: 0;
   transition: opacity 0.15s;
@@ -402,7 +403,7 @@ body {
   border: 1px dashed var(--border);
   background: none;
   border-radius: var(--radius);
-  padding: 3px 28px;
+  padding: 3px 18px;
   font-size: calc(11.5px * var(--u));
   color: var(--text-3);
   cursor: pointer;
@@ -502,12 +503,6 @@ body {
 
   <div class="sep"></div>
 
-  <button class="tb-btn" id="btn-add-code" disabled onclick="addCodeCell()">
-    + Code
-  </button>
-  <button class="tb-btn" id="btn-add-md" disabled onclick="addMarkdownCell()">
-    + Markdown
-  </button>
   <button class="tb-btn" id="btn-clear" disabled onclick="clearAllOutputs(true)">
     Clear
   </button>
@@ -587,6 +582,7 @@ const AUTO_IMPORT = CFG.autoImport != null
 // STATE
 // ─────────────────────────────────────────────────────────────────────────────
 let pyodide     = null;
+let bpRunCell   = null;   // PyProxy of _bp_run_cell (see initPyodide)
 let isBusy      = false;
 let execCounter = 0;
 let selectedId  = null;
@@ -595,6 +591,13 @@ const cellMeta  = new Map(); // id → { type: 'code'|'markdown' }
 // bar adopts that element and rewrites it with the widget's own name until a
 // notebook is actually loaded, which is not what a download should be called.
 let notebookName = 'Untitled.ipynb';
+// The file as it arrived. Only the parts the widget doesn't model are kept —
+// see buildIpynb(), which merges them back when the notebook is written out.
+let originalMetadata = null;
+// True once a real file's name is on screen, so a re-sent config can't put
+// the generic widget name back over it (see the widget-config handler).
+let notebookTitleSet = false;
+let originalNbformat = { major: 4, minor: 5 };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MARKDOWN  —  configure marked.js for Jupyter-style rendering
@@ -847,7 +850,26 @@ def _bp_capture_figures():
         imgs.append(_b64.b64encode(buf.read()).decode())
     plt.close('all')
     return imgs
+
+# Running a cell — and saying what its result looks like — is Python's job.
+# Handing the value to JavaScript instead loses the type on the way across:
+# a float 2.0 arrives as the JS number 2 and shows as "2", where print() and
+# Jupyter both say 2.0. True of every scalar — True became "true", 'hi' lost
+# its quotes. So the value never leaves Python; only its repr does.
+import builtins as _bp_builtins
+from pyodide.code import eval_code_async as _bp_eval
+
+async def _bp_run_cell(src):
+    # globals() is __main__'s dict, so names defined in one cell are still
+    # there in the next, exactly as before.
+    value = await _bp_eval(src, globals=globals())
+    if value is None:
+        return None
+    _bp_builtins._ = value      # the last result, as at any Python prompt
+    return repr(value)
 `);
+
+  bpRunCell = pyodide.globals.get('_bp_run_cell');
 
   removeBoot();
   setKernel('ready', 'Python 3 · Pyodide');
@@ -913,6 +935,14 @@ function renderNotebook(nb, filename, withOutputs = true) {
     if (filename) {
       notebookName = filename.split('/').pop();
       document.getElementById('notebook-title').textContent = notebookName;
+      notebookTitleSet = true;
+    }
+    if (nb.metadata) originalMetadata = nb.metadata;
+    if (Number.isInteger(nb.nbformat)) {
+      originalNbformat = {
+        major: nb.nbformat,
+        minor: Number.isInteger(nb.nbformat_minor) ? nb.nbformat_minor : 0,
+      };
     }
     for (const cell of nb.cells || []) {
       const src = Array.isArray(cell.source) ? cell.source.join('') : (cell.source || '');
@@ -1236,7 +1266,11 @@ async function runCell(id) {
       }
     }
 
-    const result = await pyodide.runPythonAsync(code);
+    // Calling the Python coroutine from JS gives back a promise for its
+    // return value: the repr of the cell's last expression, or None.
+    const resultRepr = bpRunCell
+      ? await bpRunCell(code)
+      : await pyodide.runPythonAsync(code);
 
     // Capture matplotlib figures
     const figsProxy = await pyodide.runPythonAsync('_bp_capture_figures()');
@@ -1250,14 +1284,19 @@ async function runCell(id) {
     if (stderrBuf.trim()) outputs.push({ type: 'stderr', text: stderrBuf.trimEnd() });
     for (const img of figList) outputs.push({ type: 'image', data: img });
 
-    // repr of last expression (non-None)
-    if (result !== undefined && result !== null) {
-      const repr = result?.toString ? result.toString() : String(result);
-      if (repr && repr !== 'None') outputs.push({ type: 'result', text: repr });
+    // The last expression's repr, if it had one. A cell ending in None — or
+    // in a statement, or a trailing semicolon — returns nothing and shows no
+    // result line, which is what a notebook does.
+    if (typeof resultRepr === 'string' && resultRepr !== '') {
+      outputs.push({ type: 'result', text: resultRepr });
     }
 
   } catch (e) {
-    const msg = (e.message || String(e)).replace(/\x1b\[[0-9;]*m/g, '');
+    const msg = (e.message || String(e))
+      .replace(/\x1b\[[0-9;]*m/g, '')
+      // The cell is run through _bp_run_cell, whose frame is ours, not the
+      // presenter's — drop it so the traceback reads as it would in Jupyter.
+      .replace(/^ *File "<exec>", line \d+, in _bp_run_cell\n(?: +.*\n)?/gm, '');
     if (stdoutBuf.trim()) outputs.push({ type: 'stream', text: stdoutBuf.trimEnd() });
     outputs.push({ type: 'error', text: msg });
   }
@@ -1448,17 +1487,22 @@ function autoResize(ta) {
   ta.style.height = Math.max(40, ta.scrollHeight) + 'px';
 }
 
+// The gap between two cells is where a new one goes, and the only thing left
+// to say is which kind — so the row offers both rather than assuming code and
+// making the presenter convert it afterwards.
 function refreshAddRows() {
   document.querySelectorAll('.add-row').forEach(r => r.remove());
   if (IS_VIEWER) return;
   document.querySelectorAll('#notebook .cell-block').forEach(b => {
     const row = document.createElement('div');
     row.className = 'add-row';
-    const btn = document.createElement('button');
-    btn.className = 'add-btn';
-    btn.textContent = '+ Add cell';
-    btn.onclick = () => addCodeCell('', b.dataset.id);
-    row.appendChild(btn);
+    for (const [label, add] of [['+ Code', addCodeCell], ['+ Markdown', addMarkdownCell]]) {
+      const btn = document.createElement('button');
+      btn.className = 'add-btn';
+      btn.textContent = label;
+      btn.onclick = () => add('', b.dataset.id);
+      row.appendChild(btn);
+    }
     b.after(row);
   });
 }
@@ -1487,7 +1531,7 @@ function removeBoot() {
 }
 
 function enablePresenterToolbar() {
-  ['btn-run-all', 'btn-run', 'btn-add-code', 'btn-add-md', 'btn-clear',
+  ['btn-run-all', 'btn-run', 'btn-clear',
    'btn-download', 'btn-download-pdf'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.disabled = false;
@@ -1519,7 +1563,7 @@ function splitSource(src) {
 }
 
 // Our internal output objects → the nbformat 4 shapes Jupyter expects.
-function toIpynbOutputs(outputs) {
+function toIpynbOutputs(outputs, execCount) {
   const out = [];
   for (const o of (outputs || [])) {
     if (o.type === 'image') {
@@ -1531,7 +1575,7 @@ function toIpynbOutputs(outputs) {
     } else if (o.type === 'result') {
       out.push({
         output_type: 'execute_result',
-        execution_count: o.execution_count ?? null,
+        execution_count: o.execution_count ?? execCount ?? null,
         data: { 'text/plain': splitSource(o.text || '') },
         metadata: {},
       });
@@ -1564,19 +1608,83 @@ function buildIpynb() {
         metadata: {},
         execution_count: c.execution_count ?? null,
         source: splitSource(c.source),
-        outputs: toIpynbOutputs(c.outputs),
+        outputs: toIpynbOutputs(c.outputs, c.execution_count),
       }));
 
-  const metadata = {
+  // Start from whatever the file arrived with, so the parts this widget
+  // doesn't model — kernelspec, language_info, anything the presenter's own
+  // tools wrote at the top level — survive a round trip through Beamer+.
+  const metadata = Object.assign({
     kernelspec: { name: 'python3', display_name: 'Python 3 (Pyodide)', language: 'python' },
     language_info: { name: 'python' },
-  };
+  }, originalMetadata || {});
+
   // Keep whatever packages this notebook was set up with, so the file brings
   // them along when it's opened again.
   const packages = [...EXTRA_PACKAGES];
-  if (packages.length) metadata.beamerplus = { packages };
+  if (packages.length) {
+    metadata.beamerplus = Object.assign({}, metadata.beamerplus, { packages });
+  }
 
-  return { cells, metadata, nbformat: 4, nbformat_minor: 5 };
+  return {
+    cells,
+    metadata,
+    nbformat: originalNbformat.major,
+    nbformat_minor: originalNbformat.minor,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WRITING THE NOTEBOOK BACK INTO THE DECK
+//
+// Beamer+ asks every widget for the files it owns just before it builds the
+// save ZIP. Answering with the current notebook is what makes an edit made
+// during the talk — a new cell, a corrected line, a fresh output — part of the
+// presentation, instead of something that lived only in this browser tab until
+// the page was closed.
+//
+// What does NOT come back is anything the widget never showed: a notebook with
+// raw cells, or outputs in formats it doesn't render, loses them here, because
+// what gets written is the notebook as it is on screen.
+// ─────────────────────────────────────────────────────────────────────────────
+function flushNotebookToDeck() {
+  if (IS_VIEWER) return;
+  // A notebook fetched from a URL belongs to whoever published it. We show it,
+  // and it can still be downloaded, but we don't write a local copy over the
+  // reference the presenter configured.
+  if (NOTEBOOK_PATH && /^https?:\/\//i.test(NOTEBOOK_PATH)) return;
+
+  let name = notebookFilename();
+  if (!/\.ipynb$/i.test(name)) name += '.ipynb';
+
+  // Nothing was configured, so this notebook is being created here. Two
+  // untitled notebooks on two slides would both claim assets/Untitled.ipynb
+  // and overwrite each other, so the widget's own id makes the name unique —
+  // once, and the title follows it so the deck and the bar agree.
+  if (!NOTEBOOK_PATH && /^untitled\.ipynb$/i.test(name)) {
+    const suffix = String(WIDGET_ID).replace(/[^a-z0-9]/gi, '').slice(-4) || '1';
+    name = `Untitled-${suffix}.ipynb`;
+    notebookName = name;
+    const title = document.getElementById('notebook-title');
+    if (title) title.textContent = name;
+  }
+
+  try {
+    const json = JSON.stringify(buildIpynb(), null, 1);
+    BeamerWidget.saveFile({
+      key:    'notebook',   // the config key the path is recorded under
+      name,
+      folder: 'assets',
+      buffer: new TextEncoder().encode(json).buffer,
+      serve:  false,        // we already hold the content; nothing to fetch back
+    }).catch(e => console.warn('Could not write the notebook into the deck:', e));
+  } catch (e) {
+    console.warn('Could not serialise the notebook:', e);
+  }
+}
+
+if (window.BeamerWidget?.onFlushFiles) {
+  BeamerWidget.onFlushFiles(flushNotebookToDeck);
 }
 
 function saveBlob(blob, filename) {
@@ -1615,7 +1723,7 @@ function escHtml(s) {
 // ─────────────────────────────────────────────────────────────────────────────
 if (IS_VIEWER) {
   document.addEventListener('DOMContentLoaded', () => {
-    ['btn-run-all', 'btn-run', 'btn-add-code', 'btn-add-md', 'btn-clear',
+    ['btn-run-all', 'btn-run', 'btn-clear',
    'btn-download', 'btn-download-pdf'].forEach(id => {
       document.getElementById(id)?.remove();
     });
@@ -1699,6 +1807,7 @@ function _nbSetState(s) {
   if (s.title) {
     notebookName = s.title;
     document.getElementById('notebook-title').textContent = s.title;
+    notebookTitleSet = true;
   }
   for (const cell of s.cells) {
     const src = cell.source || '';
@@ -1725,6 +1834,15 @@ window.addEventListener('message', function(e) {
     window.parent.postMessage({ type: 'widget-state', widgetId: WIDGET_ID, state: _nbGetState() }, '*');
   } else if (e.data.type === 'widget-set-state' && e.data.state != null) {
     _nbSetState(e.data.state);
+  } else if (e.data.type === 'widget-config') {
+    // The shared top bar rewrites its title from the widget's own name each
+    // time the host re-sends the config. Once a file is open, its name is the
+    // more useful thing to show, so put it back. The settings kit registered
+    // its listener first (it is injected into <head>), so this runs after.
+    if (notebookTitleSet) {
+      const title = document.getElementById('notebook-title');
+      if (title) title.textContent = notebookName;
+    }
   }
 });
 </script>

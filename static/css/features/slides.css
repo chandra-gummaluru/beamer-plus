@@ -425,8 +425,6 @@ model-viewer { pointer-events: auto !important; }
     gap: 0;
     overflow: hidden;
 }
-[data-theme="dark"] .slide-preview-view { background: oklch(22% 0.04 200); }
-
 .view-preview-pane {
     flex: 1;
     display: flex;
@@ -438,16 +436,12 @@ model-viewer { pointer-events: auto !important; }
     color: oklch(38% 0.08 200);
     min-width: 0;
 }
-[data-theme="dark"] .view-preview-pane { color: oklch(70% 0.07 200); }
-
 .view-preview-sep {
     flex-shrink: 0;
     width: 2px;
     background: oklch(62% 0.09 200 / 0.5);
     align-self: stretch;
 }
-[data-theme="dark"] .view-preview-sep { background: oklch(55% 0.08 200 / 0.5); }
-
 /* Slide number badge */
 .slide-preview::before {
     content: attr(data-slide-number);
@@ -732,15 +726,6 @@ body.split-view-active .slide-nav-item.is-right-slide {
     border-color: var(--accent);
     box-shadow: 0 0 0 2px oklch(45% 0.005 260 / 0.45), var(--shadow-2);
 }
-
-/* ── Dark theme adjustments ─────────────────────────────────── */
-[data-theme="dark"] body.split-view-active .slide-split-zone.is-active {
-    background: oklch(62% 0.008 260 / 0.2);
-}
-[data-theme="dark"] body.split-view-active .slide-nav-item.is-right-slide {
-    box-shadow: 0 0 0 2px oklch(62% 0.008 260 / 0.55), var(--shadow-2);
-}
-
 /* ── Hidden slide indicator ─────────────────────────────────── */
 .slide-nav-item.is-hidden-slide:not(.active) { opacity: 0.38; }
 /* In edit mode show a subtle dashed teal border so the author can see which are hidden */

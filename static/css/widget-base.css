@@ -91,30 +91,6 @@
   --ink-3: var(--text-3);
   --ink-4: var(--text-3);
 }
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg:         #1a1a18;
-    --bg-subtle:  #222220;
-    --bg-output:  #1e1e1c;
-    --border:     #333330;
-    --border-med: #444440;
-    --text:       #f0f0ed;
-    --text-2:     #a0a09a;
-    --text-3:     #6b6b65;
-    --accent:     #a0a09a;
-    --accent-bg:  #2a2a28;
-    --on-accent:  #1a1a18;
-    --err-bg:     #2a1c1a;
-    --chart-1:    #f0f0ed;
-    --chart-2:    #d6d6d0;
-    --chart-3:    #b8b8b1;
-    --chart-4:    #9c9c94;
-    --chart-5:    #85857d;
-    --chart-6:    #6b6b65;
-  }
-}
-
 /* ── Reset ────────────────────────────────────────────────────────────── */
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }

@@ -30,13 +30,6 @@
         height  280ms var(--ease-out),
         opacity 150ms ease;
 }
-
-[data-theme="dark"] #tour-spotlight {
-    box-shadow:
-        0 0 0 2px oklch(75% 0.006 260 / 0.6),
-        0 0 0 9999px oklch(0% 0 0 / 0.78);
-}
-
 /* ── Popover card ── */
 #tour-popover {
     position: fixed;

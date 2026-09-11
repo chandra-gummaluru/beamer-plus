@@ -1,6 +1,9 @@
-// Settings — theme and rebindable keyboard shortcuts. Exposes a settings panel
-// (built into the combined Help & Settings modal) and owns the preferences
-// persisted in localStorage.
+// Settings — the session code and rebindable keyboard shortcuts. Exposes a
+// settings panel (built into the combined Help & Settings modal) and owns the
+// preferences persisted in localStorage.
+//
+// There is no theme control: Beamer+ is a light-mode app. A projector washes
+// out a dark palette, so the choice was never worth the switch.
 //
 // There is no "install as app" control: Beamer+ caches nothing, and a browser
 // will only offer to install a site that registers a service worker with a
@@ -48,18 +51,6 @@ export function saveShortcuts(sc) {
     localStorage.setItem('beamer-shortcuts', JSON.stringify(sc));
 }
 
-/* ─── theme ───────────────────────────────────────────────────── */
-export function applyTheme(theme) {
-    localStorage.setItem('beamer-theme', theme);
-    const html = document.documentElement;
-    if (theme === 'dark') {
-        html.setAttribute('data-theme', 'dark');
-    } else {
-        // 'light' or any legacy value (e.g. 'system') → light
-        html.removeAttribute('data-theme');
-    }
-}
-
 const NON_BINDABLE = new Set([
     'Tab','Enter','Backspace','Delete','Escape',
     'ArrowLeft','ArrowRight','ArrowUp','ArrowDown','PageUp','PageDown','Home','End',
@@ -93,12 +84,9 @@ function _updateShortcutConflicts(scGrid, sc, hintEl) {
     }
 }
 
-const _SUN_SVG  = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="6.34" y2="6.34"/><line x1="17.66" y1="17.66" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="6.34" y2="17.66"/><line x1="17.66" y1="6.34" x2="19.78" y2="4.22"/></svg>`;
-const _MOON_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
-
-/* ─── settings panel (theme + editable shortcuts, applied live) ──
+/* ─── settings panel (session code + editable shortcuts, applied live) ──
    Built into the combined Help & Settings modal. Changes persist as they are
-   made (theme on click, shortcuts on each rebind), so there is no Save/Cancel —
+   made (on each rebind), so there is no Save/Cancel —
    the caller only needs to block closing while there are shortcut conflicts,
    via the returned hasConflicts(). */
 export function buildSettingsPanel() {
@@ -129,34 +117,6 @@ export function buildSettingsPanel() {
         });
         body.appendChild(codeBtn);
     }
-
-    // ── Theme ──────────────────────────────────────────────────
-    const themeSection = document.createElement('div');
-    themeSection.className = 'settings-section';
-    const rawTheme = localStorage.getItem('beamer-theme') || 'light';
-    // Treat legacy 'system' as 'light'
-    const savedTheme = (rawTheme === 'dark') ? 'dark' : 'light';
-    const themeLabel = document.createElement('div');
-    themeLabel.className = 'settings-label settings-label-center';
-    themeLabel.textContent = 'Theme';
-    themeSection.appendChild(themeLabel);
-
-    const themeRow = document.createElement('div');
-    themeRow.className = 'settings-theme-row';
-    [{ value: 'light', label: 'Light', svg: _SUN_SVG }, { value: 'dark', label: 'Dark', svg: _MOON_SVG }].forEach(({ value, label, svg }) => {
-        const btn = document.createElement('button');
-        btn.className = 'btn settings-theme-btn' + (savedTheme === value ? ' btn_selected' : '');
-        btn.title = label;
-        btn.innerHTML = svg;
-        btn.addEventListener('click', () => {
-            applyTheme(value);
-            themeRow.querySelectorAll('.btn').forEach(b => b.classList.remove('btn_selected'));
-            btn.classList.add('btn_selected');
-        });
-        themeRow.appendChild(btn);
-    });
-    themeSection.appendChild(themeRow);
-    body.appendChild(themeSection);
 
     // ── Keyboard Shortcuts ─────────────────────────────────────
     const scSection = document.createElement('div');
@@ -242,7 +202,9 @@ export function buildSettingsPanel() {
 
 /* ─── init ────────────────────────────────────────────────────── */
 export function initSettings() {
-    // The settings UI now lives inside the combined Help & Settings modal
-    // (see help.js); here we only need to apply the persisted theme on load.
-    applyTheme(localStorage.getItem('beamer-theme') || 'light');
+    // The settings UI lives inside the combined Help & Settings modal (see
+    // help.js), and nothing here needs applying on load — there is one theme.
+    // Clear the key a previous version persisted, so a browser that was left
+    // on dark doesn't carry a preference nothing reads any more.
+    try { localStorage.removeItem('beamer-theme'); } catch (_) {}
 }
