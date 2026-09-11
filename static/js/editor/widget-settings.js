@@ -116,21 +116,37 @@ export async function saveWidgetAsset(item, msg) {
     const folder = String(msg.folder || 'files').replace(/\.\./g, '').replace(/^\/+|\/+$/g, '') || 'files';
     const path   = `${folder}/${name}`;
 
+    // Keep the bytes locally FIRST and unconditionally: they are what gets
+    // written into the deck on save, and what the widget previews from, so they
+    // must survive an upload that fails.
     ctx.state.editorNewFiles[path] = msg.buffer;
+    item[key] = path;
 
-    // Upload so the file is servable over /api/zip-asset/ right away, before
-    // any save. A widget that already holds the content can skip this.
+    // Then upload, so the server can serve the file over /api/zip-asset/ to
+    // anything that isn't this browser — the audience view, another device —
+    // before the deck has been saved.
     if (msg.serve !== false) {
+        const fd = new FormData();
+        fd.append('file', new File([msg.buffer], name));
+        fd.append('folder', folder);
+        let res;
         try {
-            const fd = new FormData();
-            fd.append('file', new File([msg.buffer], name));
-            fd.append('folder', folder);
-            await fetch(sessionUrl('/api/upload-asset'), { method: 'POST', body: fd });
+            res = await fetch(sessionUrl('/api/upload-asset'), { method: 'POST', body: fd });
         } catch (err) {
-            console.warn('[editor] upload-asset POST failed (widget preview may not work):', err);
+            throw new Error(`Could not reach the server to upload "${name}": ${err.message}`);
+        }
+        // fetch only rejects on a network-level failure: a 413 from a proxy that
+        // caps request bodies, or a 502, resolves normally with ok === false.
+        // Not checking this is why a too-large upload used to look like it had
+        // worked and then surfaced later as a missing file.
+        if (!res.ok) {
+            const hint = res.status === 413
+                ? ' The server or a proxy in front of it refused the file for being too large'
+                  + ' (nginx caps request bodies at 1 MB unless client_max_body_size is raised).'
+                : '';
+            throw new Error(`Upload of "${name}" failed: HTTP ${res.status}.${hint}`);
         }
     }
 
-    item[key] = path;
     return path;
 }

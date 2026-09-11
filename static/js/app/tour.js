@@ -69,7 +69,7 @@ const STEPS = [
         sel:   '#bottom-controls',
         place: 'top',
         title: 'Help & settings',
-        body:  'One place for everything else: the full usage guide, plus a Settings tab to see your session code, switch the theme, rebind keyboard shortcuts, and install Beamer+ as an app. You can relaunch this tour from here too.',
+        body:  'One place for everything else: the full usage guide, plus a Settings tab to see your session code, switch the theme, and rebind keyboard shortcuts. You can relaunch this tour from here too.',
     },
 ];
 

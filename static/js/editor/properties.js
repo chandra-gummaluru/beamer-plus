@@ -465,7 +465,16 @@ function pickWidgetAsset(field, item, input, btn) {
             });
             if (path) { input.value = path; input.title = path; }
         } catch (err) {
+            // The file is still recorded and will be written into the deck on
+            // save — it is only the live preview that can't be served. Say so,
+            // rather than leaving a silent failure to resurface later as a
+            // missing file inside the widget.
             console.warn('[editor] widget file upload failed:', err);
+            window.BeamerModal?.show({
+                kind: 'error',
+                title: 'Upload failed',
+                message: `${err.message}\n\nThe file is still part of the presentation and will be included when you save, but the widget can't preview it until the upload succeeds.`,
+            });
         } finally {
             btn.disabled = false;
             btn.textContent = 'Upload';

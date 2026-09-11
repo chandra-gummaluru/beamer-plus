@@ -210,6 +210,7 @@ export function clearAllParked() {
     });
     _capturedStates.clear();
     _savedWidgetStates = {};
+    _revokePendingAssetUrls();   // a new deck's files are its own
 }
 
 /**
@@ -251,6 +252,55 @@ export async function collectWidgetStates(timeoutMs = 1500) {
             try { iframe.contentWindow?.postMessage({ type: 'widget-get-state' }, '*'); } catch (_) {}
         });
     });
+}
+
+// ── Files added this session ───────────────────────────────────────────────
+// A file the presenter uploads in the editor lives in two places until the deck
+// is saved: in the browser (state.editorNewFiles) and, if the POST got through,
+// in the server's per-session memory. Widgets ask for it by path, which the
+// server resolves — so anything that stops the upload (a proxy capping request
+// bodies, a server running more than one worker process) leaves the widget
+// asking for a file the server has never seen.
+//
+// The browser already holds the bytes, so hand the widget a blob URL for them
+// instead. That needs no upload, no server round trip and no shared state
+// between processes, which is why it works on a real deployment and not only on
+// localhost. Once the deck is saved the file is in the ZIP and resolves the
+// normal way.
+const _pendingAssetUrls = new Map();   // deck-relative path → blob: URL
+
+// Layout keys belong to Beamer+ and are never file paths — `src` in particular
+// already carries a blob URL for a custom widget's own HTML.
+const _NOT_ASSET_KEYS = new Set([
+    'id', 'type', 'x', 'y', 'width', 'height', 'zIndex',
+    'builtin', 'src', 'interactive', 'role',
+    'sessionId', 'socketUrl', 'serverUrl', 'publicBaseUrl',
+]);
+
+function _pendingAssetUrl(path) {
+    const buffer = window.beamerState?.editorNewFiles?.[path];
+    if (!buffer) return null;
+    if (!_pendingAssetUrls.has(path)) {
+        _pendingAssetUrls.set(path, URL.createObjectURL(new Blob([buffer])));
+    }
+    return _pendingAssetUrls.get(path);
+}
+
+function _withPendingAssets(payload) {
+    const out = { ...payload };
+    for (const [key, value] of Object.entries(out)) {
+        if (typeof value !== 'string' || _NOT_ASSET_KEYS.has(key)) continue;
+        const url = _pendingAssetUrl(value);
+        if (url) out[key] = url;
+    }
+    return out;
+}
+
+function _revokePendingAssetUrls() {
+    for (const url of _pendingAssetUrls.values()) {
+        try { URL.revokeObjectURL(url); } catch (_) {}
+    }
+    _pendingAssetUrls.clear();
 }
 
 // ── Main render function ───────────────────────────────────────────────────
@@ -402,12 +452,12 @@ export function renderWidgets(slideConfig, container, zipFile, viewerMode = fals
                 }
             }
 
-            const _configPayload = {
+            const _configPayload = _withPendingAssets({
                 ...w,
                 ...widgetSessionConfig(),
                 role: viewerMode ? 'viewer' : 'presenter',
                 ...(notebookContent !== null ? { notebookContent } : {}),
-            };
+            });
             const _configJson   = JSON.stringify(_configPayload).replace(/<\/script>/gi, '<\\/script>');
             const _configScript = `<script>window.WIDGET_CONFIG=${_configJson};<\/script>`;
             // Inject shared base theme + widget config + settings kit right after <head>.

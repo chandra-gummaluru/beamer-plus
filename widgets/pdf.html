@@ -522,7 +522,9 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
     // must be serverUrl, NOT socketUrl — socketUrl is the bare origin for
     // socket.io and produces a 404 here.
     let url = cfg.pdf || '';
-    if (url && !/^https?:/i.test(url)) {
+    // blob: means the renderer handed us a file the presenter added this
+    // session, straight from the browser — already absolute, nothing to prefix.
+    if (url && !/^(?:https?|blob):/i.test(url)) {
       const base = (window.BeamerWidget ? BeamerWidget.serverUrl() : '')
                 || (cfg.serverUrl || cfg.publicBaseUrl || cfg.socketUrl || '').replace(/\/$/, '');
       if (base) url = base + '/api/zip-asset/' + url.replace(/^\//, '');

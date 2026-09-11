@@ -132,6 +132,9 @@ BeamerWidget.topbar.onReset(() =&gt; clearEverything());</code>
   <dt>widget-cleanup</dt><dd>Received when the widget is removed. Stop timers and release resources.</dd>
   <dt>widget-settings</dt><dd>Post ${_hic('{ widgetId, patch, remove }')} to save settings into your config item, where they persist with the deck. Use this if your widget changes its own configuration at run time; the presenter's own edits come from the editor panel.</dd>
 </dl>
+<p class="help-p">Calling a Beamer+ route? Build the URL from ${_hic('BeamerWidget.serverUrl()')}, not from ${_hic('serverOrigin()')}. Every API route lives under this session's ${_hic('/s/&lt;code&gt;')} prefix, which ${_hic('serverUrl()')} includes and ${_hic('serverOrigin()')} does not — the latter is the bare origin, for ${_hic('io()')}. Mixing them up gives a 404 that looks like a missing file:</p>
+<code class="help-code">const res = await fetch(BeamerWidget.serverUrl() + '/api/zip-asset/' + cfg.pdf);
+const socket = io(BeamerWidget.serverOrigin());</code>
 <h4 class="help-h">5 · Save files with the deck</h4>
 <p class="help-p">If your widget opens a file — a notebook, a PDF, a dataset — save it as a <em>file</em> in the presentation rather than stuffing its contents into your state. Beamer+ writes it into the deck and hands you back the path, which it also records in your config:</p>
 <code class="help-code">const path = await BeamerWidget.saveFile({
@@ -147,12 +150,13 @@ BeamerWidget.topbar.onReset(() =&gt; clearEverything());</code>
                           buffer: currentBytes(), serve: false });
 });</code>
 <p class="help-p">That leaves ${_hic('widget-state')} for what is genuinely ephemeral — scroll position, which cell has focus — and keeps the deck's files openable in the tools they belong to.</p>
-<h4 class="help-h">5 · Shared styles</h4>
+<h4 class="help-h">6 · Shared styles</h4>
 <p class="help-p">Every widget automatically inherits Beamer+'s design tokens, with no setup needed:</p>
 <code class="help-code">var(--bg)        var(--text)      var(--border)
 var(--accent)    var(--font-ui)   var(--font-mono)
 var(--radius)    /* …and more */</code>
-<p class="help-p">Your own ${_hic(':root')} block overrides any token you want to customise.</p>`,
+<p class="help-p">Your own ${_hic(':root')} block overrides any token you want to customise.</p>
+<p class="help-p">Size anything the room has to read with the scaling tokens, so the top bar's stepper can grow it — ${_hic('var(--fs-body)')}, ${_hic('var(--fs-lead)')}, ${_hic('var(--fs-head)')}, ${_hic('var(--fs-code)')}, ${_hic('var(--fs-small)')}, or ${_hic('calc(16px * var(--u))')} for a size of your own. Chrome is the opposite: a control in the bar should stay put whatever the scale, so give it a plain ${_hic('px')} size or ${_hic('var(--fs-chrome)')}. That split — content scales, furniture doesn't — is the whole point of ${_hic('--u')}.</p>`,
         },
     ];
 
