@@ -186,7 +186,7 @@ html, body {
   gap: 10px;
   background: var(--bg);
   color: var(--ink-3);
-  font-size: 15px;
+  font-size: calc(15px * var(--u));
   padding: 32px;
   text-align: center;
 }
@@ -203,13 +203,13 @@ html, body {
 }
 
 #overlay .msg-title {
-  font-size: 17px;
+  font-size: calc(17px * var(--u));
   color: var(--ink-2);
   font-weight: 500;
 }
 
 #overlay .msg-sub {
-  font-size: 13px;
+  font-size: calc(13px * var(--u));
   color: var(--ink-4);
   font-family: var(--mono);
   word-break: break-all;
@@ -217,7 +217,7 @@ html, body {
 }
 
 #overlay .msg-hint {
-  font-size: 13px;
+  font-size: calc(13px * var(--u));
   color: var(--ink-4);
   max-width: 360px;
   line-height: 1.5;
@@ -226,7 +226,7 @@ html, body {
 #overlay .open-btn {
   margin-top: 6px;
   font-family: var(--font);
-  font-size: 14px;
+  font-size: calc(14px * var(--u));
   padding: 7px 20px;
   border: none;
   border-radius: var(--r);

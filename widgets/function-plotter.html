@@ -45,7 +45,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: calc(13px * var(--u));
   display: flex;
   flex-direction: column;
 }
@@ -167,7 +167,7 @@ body {
   border: none;
   outline: none;
   font-family: var(--font-mono);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--u));
   color: var(--text);
   background: transparent;
   padding: 1px 0;
@@ -195,7 +195,7 @@ body {
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   border-radius: 3px;
-  font-size: 12px;
+  font-size: calc(12px * var(--u));
   transition: color 0.1s, background 0.1s;
   padding: 0;
   flex-shrink: 0;
@@ -206,7 +206,7 @@ body {
 
 /* Error message */
 .expr-error {
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--u));
   color: var(--red);
   margin-top: 3px;
   padding-left: 21px;
@@ -253,7 +253,7 @@ body {
 
 .slider-val {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: calc(11px * var(--u));
   color: var(--text-2);
   min-width: 38px;
   text-align: right;
@@ -265,14 +265,14 @@ body {
   gap: 5px;
   margin-top: 4px;
 }
-.slider-bound-lbl { font-size: 10.5px; color: var(--text-3); }
+.slider-bound-lbl { font-size: calc(10.5px * var(--u)); color: var(--text-3); }
 .slider-bound-inp {
   width: 44px;
   border: 1px solid var(--border);
   border-radius: 3px;
   padding: 2px 5px;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: calc(11px * var(--u));
   color: var(--text-2);
   background: var(--bg);
   outline: none;
@@ -293,7 +293,7 @@ body {
   background: none;
   border-radius: var(--radius);
   padding: 6px 0;
-  font-size: 12px;
+  font-size: calc(12px * var(--u));
   color: var(--text-3);
   cursor: pointer;
   font-family: var(--font-ui);
@@ -330,7 +330,7 @@ body {
   bottom: 10px;
   left: 10px;
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--u));
   color: var(--text-3);
   pointer-events: none;
   background: rgba(255,255,255,0.88);
@@ -349,7 +349,7 @@ body {
   border-radius: 4px;
   padding: 3px 9px;
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--u));
   color: var(--text);
   box-shadow: 0 1px 6px rgba(0,0,0,0.07);
   white-space: nowrap;
@@ -371,7 +371,7 @@ body {
   border-radius: var(--radius);
   background: rgba(255,255,255,0.9);
   color: var(--text-2);
-  font-size: 15px;
+  font-size: calc(15px * var(--u));
   line-height: 1;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
@@ -387,7 +387,7 @@ body {
   bottom: 14px; right: 14px;
   background: var(--text);
   color: #fff;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--u));
   font-family: var(--font-ui);
   padding: 5px 12px;
   border-radius: 5px;

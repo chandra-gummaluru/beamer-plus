@@ -281,16 +281,13 @@ function fieldValue(item, field) {
     return v !== undefined ? v : field.default;
 }
 
+// Label only — a field says what it is and nothing more. Explanatory blurbs
+// under a control read as clutter in a panel this narrow; anything a presenter
+// genuinely needs to know belongs in the label or the placeholder.
 function fieldLabel(field) {
     const lab = document.createElement('div');
     lab.className = 'editor-prop-label';
     lab.textContent = field.label || field.key;
-    if (field.note) {
-        const note = document.createElement('span');
-        note.className = 'editor-prop-label-note';
-        note.textContent = field.note;
-        lab.appendChild(note);
-    }
     return lab;
 }
 

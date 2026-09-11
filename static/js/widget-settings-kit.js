@@ -110,6 +110,17 @@
         if (!readSchema()) return;
         document.documentElement.style.setProperty('--u', String(currentScale()));
     }
+    /**
+     * The base for Beamer+ API calls: the origin PLUS this session's /s/<code>
+     * prefix. Every asset and survey route lives under that prefix, so a widget
+     * that builds an API URL from serverOrigin() (which is the bare origin, for
+     * socket.io) gets a 404. Use this for fetch, that for io().
+     */
+    function serverUrl() {
+        var c = cfg();
+        return (c.serverUrl || c.publicBaseUrl || serverOrigin() || '').replace(/\/+$/, '');
+    }
+
     function post(msg) { try { parent.postMessage(msg, '*'); } catch (e) {} }
     function announce() {
         if (!readSchema()) return;   // asked again on DOMContentLoaded
@@ -139,7 +150,6 @@
             '.bws-row{display:flex;flex-direction:column;gap:5px}',
             '.bws-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;',
             'color:var(--text-2,#6b6b65);display:flex;align-items:center;gap:6px}',
-            '.bws-note{font-weight:400;text-transform:none;letter-spacing:0;font-size:10px;color:var(--text-3,#aeaea5)}',
             '.bws-input,.bws-select,.bws-area{width:100%;box-sizing:border-box;padding:6px 8px;font-size:13px;',
             'font-family:inherit;color:var(--text,#1a1a18);background:var(--bg-subtle,#f9f9f8);',
             'border:1px solid var(--border-med,#d4d4cf);border-radius:var(--radius,6px)}',
@@ -170,14 +180,10 @@
         return v !== undefined ? v : field.default;
     }
 
+    // Label only — see the matching note in editor/properties.js.
     function labelFor(field) {
         var lab = el('div', 'bws-label');
         lab.textContent = field.label || field.key;
-        if (field.note) {
-            var note = el('span', 'bws-note');
-            note.textContent = field.note;
-            lab.appendChild(note);
-        }
         return lab;
     }
 
@@ -682,13 +688,17 @@
         var own = wrap.querySelector('[data-bw-topbar]') || wrap.querySelector('.bw-toolbar');
         if (!own || !actionsEl) return;
 
-        // A title the widget already wrote becomes the bar's title rather than
-        // sitting next to the one we just put there.
-        var ownTitle = own.querySelector('.bw-toolbar-title, [data-bw-title]');
+        // If the widget already writes a title, its element BECOMES the bar's
+        // title — restyled in place and adopted as what setTitle() writes to —
+        // and ours is dropped. Taking the element over rather than copying its
+        // text and deleting it matters: a widget may keep writing to that node
+        // (the notebook puts the open file's name there), and deleting it would
+        // silently break those updates.
+        var ownTitle = own.querySelector('.bw-toolbar-title, [data-bw-title], .toolbar-title, #toolbar-title');
         if (ownTitle) {
-            var text = (ownTitle.textContent || '').trim();
-            if (text && titleEl) titleEl.textContent = text;
-            ownTitle.parentNode.removeChild(ownTitle);
+            ownTitle.classList.add('bw-topbar-title');
+            if (titleEl && titleEl.parentNode) titleEl.parentNode.removeChild(titleEl);
+            titleEl = ownTitle;
         }
 
         own.classList.add('bw-adopted-bar');
@@ -750,6 +760,7 @@
     window.BeamerWidget = {
         config:        cfg,
         serverOrigin:  serverOrigin,
+        serverUrl:     serverUrl,
         saveFile:      saveFile,
         onFlushFiles:  onFlushFiles,
         openSettings:  function () { readSchema(); if (hasSettings) openPanel(); },

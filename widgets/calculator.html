@@ -42,7 +42,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: calc(13px * var(--u));
   display: flex;
   flex-direction: column;
 }
@@ -128,7 +128,7 @@ body {
   outline: none;
   background: transparent;
   font-family: var(--font-mono);
-  font-size: 15px;
+  font-size: calc(15px * var(--u));
   color: var(--text);
   caret-color: var(--accent);
   line-height: 1.5;
@@ -144,7 +144,7 @@ body {
 
 #result {
   font-family: var(--font-mono);
-  font-size: 22px;
+  font-size: calc(22px * var(--u));
   font-weight: 500;
   letter-spacing: -0.02em;
   color: var(--text-3);
@@ -156,7 +156,7 @@ body {
   white-space: nowrap;
 }
 #result.ok  { color: var(--text-2); }
-#result.err { color: var(--red); font-size: 13px; padding-top: 4px; font-weight: 400; letter-spacing: 0; }
+#result.err { color: var(--red); font-size: calc(13px * var(--u)); padding-top: 4px; font-weight: 400; letter-spacing: 0; }
 
 /* ── Button sections ─────────────────────────────────── */
 #buttons {
@@ -171,7 +171,7 @@ body {
 #buttons::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
 
 .section-label {
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--u));
   font-weight: 500;
   color: var(--text-3);
   letter-spacing: 0.06em;
@@ -190,7 +190,7 @@ body {
 /* ── Calc button base ────────────────────────────────── */
 .cbtn {
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: calc(13px * var(--u));
   font-weight: 500;
   color: var(--text);
   background: var(--bg);
@@ -214,7 +214,7 @@ body {
 
 /* Function button — slightly muted */
 .cbtn.fn {
-  font-size: 12px;
+  font-size: calc(12px * var(--u));
   color: var(--text-2);
   background: var(--bg-subtle);
   font-family: var(--font-mono);
@@ -224,7 +224,7 @@ body {
 /* Operator buttons */
 .cbtn.op {
   color: var(--text-2);
-  font-size: 16px;
+  font-size: calc(16px * var(--u));
 }
 
 /* Primary: = */
@@ -232,7 +232,7 @@ body {
   background: var(--text);
   color: #fff;
   border-color: var(--text);
-  font-size: 18px;
+  font-size: calc(18px * var(--u));
 }
 .cbtn.primary:hover:not(:disabled) { background: #2d2d2a; border-color: #2d2d2a; }
 .cbtn.primary:active:not(:disabled) { background: #111110; }
@@ -247,7 +247,7 @@ body {
 /* Backspace */
 .cbtn.back {
   color: var(--text-2);
-  font-size: 16px;
+  font-size: calc(16px * var(--u));
 }
 
 /* ── History panel ───────────────────────────────────── */
@@ -272,7 +272,7 @@ body {
 }
 
 #history-title {
-  font-size: 12px;
+  font-size: calc(12px * var(--u));
   font-weight: 500;
   color: var(--text-2);
   flex: 1;
@@ -282,7 +282,7 @@ body {
   background: none;
   border: none;
   padding: 2px 5px;
-  font-size: 11px;
+  font-size: calc(11px * var(--u));
   color: var(--text-3);
   cursor: pointer;
   border-radius: 3px;
@@ -301,7 +301,7 @@ body {
 
 .hist-empty {
   padding: 24px 12px;
-  font-size: 12px;
+  font-size: calc(12px * var(--u));
   color: var(--text-3);
   text-align: center;
   line-height: 1.6;
@@ -318,7 +318,7 @@ body {
 
 .hist-expr {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: calc(11px * var(--u));
   color: var(--text-2);
   white-space: nowrap;
   overflow: hidden;
@@ -327,7 +327,7 @@ body {
 
 .hist-result {
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: calc(13px * var(--u));
   font-weight: 500;
   color: var(--text);
   margin-top: 2px;
@@ -342,7 +342,7 @@ body {
   bottom: 14px; right: 14px;
   background: var(--text);
   color: #fff;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--u));
   font-family: var(--font-ui);
   padding: 5px 12px;
   border-radius: 5px;

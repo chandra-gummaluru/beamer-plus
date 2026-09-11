@@ -47,7 +47,7 @@
       width: 100%; height: 100%;
       overflow: hidden;
       font-family: var(--font-sans);
-      font-size: 14px;
+      font-size: calc(14px * var(--u));
       color: var(--ink-1);
       background: var(--surface-paper);
     }
@@ -75,7 +75,7 @@
       gap: 5px;
       padding: 5px 12px;
       font-family: var(--font-sans);
-      font-size: 13px;
+      font-size: calc(13px * var(--u));
       color: var(--ink-2);
       background: var(--surface-paper);
       border: var(--line);
@@ -130,7 +130,7 @@
 
     .pane-header {
       padding: 5px 12px;
-      font-size: 11px;
+      font-size: calc(11px * var(--u));
       font-style: italic;
       color: var(--ink-4);
       background: var(--surface-cream);
@@ -143,7 +143,7 @@
     #editor {
       flex: 1;
       font-family: var(--font-mono);
-      font-size: 13px;
+      font-size: calc(13px * var(--u));
       line-height: 1.6;
       padding: 12px;
       border: none;
@@ -169,7 +169,7 @@
     #terminal {
       flex: 1;
       font-family: var(--font-mono);
-      font-size: 12.5px;
+      font-size: calc(12.5px * var(--u));
       line-height: 1.55;
       padding: 12px;
       background: var(--term-bg);

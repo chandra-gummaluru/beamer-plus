@@ -173,7 +173,7 @@ body {
   background: var(--cx-bg);
   color: var(--cx-text);
   font-family: var(--cx-ui);
-  font-size: 13px;
+  font-size: calc(13px * var(--u));
   -webkit-font-smoothing: antialiased;
 }
 
@@ -292,7 +292,7 @@ main {
 .panel-header {
   flex-shrink: 0;
   padding: 7px 12px;
-  font-size: 10px;
+  font-size: calc(10px * var(--u));
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -327,7 +327,7 @@ main {
   padding: 12px 8px 12px 0;
   text-align: right;
   font-family: var(--cx-mono);
-  font-size: 12px;
+  font-size: calc(12px * var(--u));
   line-height: 1.6;
   color: var(--cx-text-3);
   background: var(--cx-bg-subtle);
@@ -351,7 +351,7 @@ main {
   min-width: 0;
   padding: 12px 14px;
   font-family: var(--cx-mono);
-  font-size: 12px;
+  font-size: calc(12px * var(--u));
   line-height: 1.6;
   background: var(--cx-bg);
   color: var(--cx-text);
@@ -471,7 +471,7 @@ main {
 .region-header {
   flex-shrink: 0;
   padding: 6px 12px;
-  font-size: 10px;
+  font-size: calc(10px * var(--u));
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -495,7 +495,7 @@ main {
   overflow-y: auto;
   background: var(--cx-bg);
   font-family: var(--cx-mono);
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--u));
 }
 
 /* ── Pointer arrows ── */
@@ -614,12 +614,12 @@ main {
 }
 
 .mem-type {
-  font-size: 9.5px;
+  font-size: calc(9.5px * var(--u));
   color: var(--cx-text-3);
 }
 
 .mem-addr {
-  font-size: 10px;
+  font-size: calc(10px * var(--u));
   color: var(--cx-text-3);
   text-align: right;
   white-space: nowrap;
@@ -783,7 +783,7 @@ main {
   border-radius: 3px;
   background: transparent;
   color: color-mix(in srgb, var(--cx-text-3) 78%, transparent);
-  font-size: 10px;
+  font-size: calc(10px * var(--u));
   font-weight: 400;
   letter-spacing: -0.01em;
 }
@@ -809,20 +809,20 @@ main {
 }
 
 .memory-row-item-label {
-  font-size: 8.5px;
+  font-size: calc(8.5px * var(--u));
   color: var(--cx-text-3);
   white-space: nowrap;
 }
 
 .memory-row-item-value {
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--u));
   font-weight: 500;
   color: var(--cx-text);
   white-space: nowrap;
 }
 
 .memory-row-continuation {
-  font-size: 9.5px;
+  font-size: calc(9.5px * var(--u));
   font-style: italic;
   color: var(--cx-text-3);
 }
@@ -851,7 +851,7 @@ main {
 }
 
 .array-index {
-  font-size: 8.5px;
+  font-size: calc(8.5px * var(--u));
   color: var(--cx-text-3);
 }
 
@@ -861,7 +861,7 @@ main {
   border-radius: 3px;
   background: var(--cx-bg-subtle);
   color: var(--cx-text);
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--u));
   font-weight: 500;
 }
 
@@ -888,7 +888,7 @@ main {
   min-height: 0;
   padding: 8px 12px;
   font-family: var(--cx-mono);
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--u));
   line-height: 1.5;
   color: var(--cx-text-2);
   background: var(--cx-bg-output);
@@ -915,7 +915,7 @@ main {
   height: 100%;
   padding: 12px;
   font-family: var(--cx-ui);
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--u));
   font-style: italic;
   text-align: center;
   color: var(--cx-text-3);
@@ -963,7 +963,7 @@ main {
 }
 
 .crash-title {
-  font-size: 10px;
+  font-size: calc(10px * var(--u));
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -973,13 +973,13 @@ main {
 .crash-line {
   margin-left: auto;
   font-family: var(--cx-mono);
-  font-size: 10px;
+  font-size: calc(10px * var(--u));
   color: var(--cx-text-3);
 }
 
 .crash-reason {
   padding: 14px;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--u));
   line-height: 1.5;
   color: var(--cx-text);
 }
@@ -1016,7 +1016,7 @@ main {
 }
 
 .crash-hint {
-  font-size: 11px;
+  font-size: calc(11px * var(--u));
   color: var(--cx-text-3);
 }
 

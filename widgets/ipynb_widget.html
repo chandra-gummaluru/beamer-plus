@@ -6,10 +6,9 @@
   "label": "Coding Notebook",
   "category": "Computer Science",
   "fields": [
-    { "key": "notebook", "label": "Notebook file", "type": "file", "accept": ".ipynb", "folder": "notebooks",
-      "note": "uploads into the deck; a remote URL can still be typed into the config by hand" },
-    { "key": "packages", "label": "Extra packages (one per line)", "type": "textarea-lines", "rows": 4, "placeholder": "pandas\nsympy\nrequests==2.31.0", "note": "merged with any the notebook's metadata declares" },
-    { "key": "autoImport", "label": "Auto-load packages from imports", "type": "checkbox", "default": true, "note": "checks each cell's imports before running it" }
+    { "key": "notebook", "label": "Notebook file", "type": "file", "accept": ".ipynb", "folder": "notebooks" },
+    { "key": "packages", "label": "Extra packages (one per line)", "type": "textarea-lines", "rows": 4, "placeholder": "pandas\nsympy\nrequests==2.31.0" },
+    { "key": "autoImport", "label": "Auto-load packages from imports", "type": "checkbox", "default": true }
   ]
 }
 </script>
@@ -66,7 +65,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: calc(13px * var(--u));
   display: flex;
   flex-direction: column;
 }
@@ -183,8 +182,8 @@ body {
   border-radius: 50%;
   animation: spin 0.65s linear infinite;
 }
-#boot-msg   { font-size: 13px; }
-#boot-sub   { font-size: 11.5px; color: var(--text-3); }
+#boot-msg   { font-size: calc(13px * var(--u)); }
+#boot-sub   { font-size: calc(11.5px * var(--u)); color: var(--text-3); }
 
 /* ── Package warning banner ────────────────────────────────────── */
 #pkg-warning {
@@ -197,14 +196,14 @@ body {
   border-left: 3px solid var(--amber);
   background: var(--bg-subtle);
   border-radius: var(--radius);
-  font-size: 12px;
+  font-size: calc(12px * var(--u));
   line-height: 1.5;
   color: var(--text-2);
 }
 #pkg-warning strong { color: var(--amber); font-weight: 600; }
 #pkg-warning code {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: calc(11px * var(--u));
   color: var(--text);
 }
 .pkg-warn-x {
@@ -213,7 +212,7 @@ body {
   border: none;
   background: none;
   color: var(--text-3);
-  font-size: 12px;
+  font-size: calc(12px * var(--u));
   line-height: 1;
   cursor: pointer;
   padding: 2px 4px;
@@ -238,7 +237,7 @@ body {
 
 .exec-num {
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--u));
   color: var(--text-3);
   line-height: 1;
   transition: color 0.2s;
@@ -287,7 +286,7 @@ body {
   outline: none;
   resize: none;
   font-family: var(--font-mono);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--u));
   line-height: 1.7;
   padding: 9px 12px 9px 13px;
   background: transparent;
@@ -304,19 +303,19 @@ body {
 .md-view {
   padding: 10px 13px;
   line-height: 1.7;
-  font-size: 13.5px;
+  font-size: calc(13.5px * var(--u));
   cursor: text;
   background: var(--bg);
   color: var(--text);
 }
 .md-view.placeholder-md { color: var(--text-3); font-style: italic; }
-.md-view h1 { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
-.md-view h2 { font-size: 15px; font-weight: 600; margin-bottom: 5px; }
-.md-view h3 { font-size: 13.5px; font-weight: 600; margin-bottom: 4px; }
+.md-view h1 { font-size: calc(18px * var(--u)); font-weight: 600; margin-bottom: 6px; }
+.md-view h2 { font-size: calc(15px * var(--u)); font-weight: 600; margin-bottom: 5px; }
+.md-view h3 { font-size: calc(13.5px * var(--u)); font-weight: 600; margin-bottom: 4px; }
 .md-view p  { margin-bottom: 5px; }
 .md-view code {
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--u));
   background: var(--bg-subtle);
   padding: 1px 5px;
   border-radius: 3px;
@@ -330,7 +329,7 @@ body {
 .md-view .katex { font-size: 1em; }
 .md-gutter-label {
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--u));
   color: var(--text-3);
   margin-top: 9px;
 }
@@ -356,7 +355,7 @@ body {
 }
 .out-num {
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--u));
   color: var(--amber);
 }
 
@@ -367,7 +366,7 @@ body {
 
 .out-text {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: calc(12px * var(--u));
   line-height: 1.65;
   white-space: pre-wrap;
   word-break: break-word;
@@ -401,7 +400,7 @@ body {
   border-radius: 4px;
   background: var(--bg);
   color: var(--text-2);
-  font-size: 11px;
+  font-size: calc(11px * var(--u));
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   transition: all 0.1s;
@@ -426,7 +425,7 @@ body {
   background: none;
   border-radius: var(--radius);
   padding: 3px 28px;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--u));
   color: var(--text-3);
   cursor: pointer;
   font-family: var(--font-ui);

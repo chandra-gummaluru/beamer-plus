@@ -92,7 +92,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; }
 }
 #idle-screen .idle-label {
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: calc(13px * var(--u));
   color: var(--idle-label-color);
 }
 #idle-screen.hidden { display: none; }
@@ -215,7 +215,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; }
 #error-screen svg { color: var(--error-icon-color); }
 #error-msg {
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: calc(13px * var(--u));
   color: var(--error-text-color);
   max-width: 260px;
   line-height: 1.5;
@@ -226,7 +226,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; }
   border: 1px solid var(--retry-border);
   border-radius: var(--radius);
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: calc(13px * var(--u));
   color: var(--retry-text);
   cursor: pointer;
   transition: background 0.15s;

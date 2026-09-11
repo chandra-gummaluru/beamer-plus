@@ -44,7 +44,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: calc(13px * var(--u));
   display: flex;
   flex-direction: column;
 }
@@ -193,7 +193,7 @@ body {
   gap: 8px;
   background: #e8e8e6;
   color: var(--text-3);
-  font-size: 13px;
+  font-size: calc(13px * var(--u));
   z-index: 20;
   pointer-events: none;
 }
@@ -518,9 +518,14 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
 
     // Resolve PDF URL — serve relative paths through /api/zip-asset/ so Flask
     // can extract them from _temp_assets (pre-save) or the loaded ZIP (saved).
+    // That route is session-scoped (/s/<code>/api/zip-asset/...), so the base
+    // must be serverUrl, NOT socketUrl — socketUrl is the bare origin for
+    // socket.io and produces a 404 here.
     let url = cfg.pdf || '';
-    if (url && cfg.socketUrl && !/^https?:/i.test(url)) {
-      url = cfg.socketUrl.replace(/\/$/, '') + '/api/zip-asset/' + url.replace(/^\//, '');
+    if (url && !/^https?:/i.test(url)) {
+      const base = (window.BeamerWidget ? BeamerWidget.serverUrl() : '')
+                || (cfg.serverUrl || cfg.publicBaseUrl || cfg.socketUrl || '').replace(/\/$/, '');
+      if (base) url = base + '/api/zip-asset/' + url.replace(/^\//, '');
     }
 
     if (url) loadPDF(url);
