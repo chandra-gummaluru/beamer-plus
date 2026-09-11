@@ -1,16 +1,12 @@
-// Settings — theme, rebindable keyboard shortcuts, and PWA install.
-// Exposes a settings panel (built into the combined Help & Settings modal) and
-// owns the preferences persisted in localStorage.
+// Settings — theme and rebindable keyboard shortcuts. Exposes a settings panel
+// (built into the combined Help & Settings modal) and owns the preferences
+// persisted in localStorage.
+//
+// There is no "install as app" control: Beamer+ caches nothing, and a browser
+// will only offer to install a site that registers a service worker with a
+// fetch handler. The button could therefore never do anything.
 
 import { getSessionId } from './session.js';
-
-/* ─── PWA install prompt ──────────────────────────────────────── */
-let _pwaInstallPrompt = null;
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    _pwaInstallPrompt = e;
-});
-window.addEventListener('appinstalled', () => { _pwaInstallPrompt = null; });
 
 /* ─── keyboard shortcut bindings ──────────────────────────────── */
 export const DEFAULT_SHORTCUTS = {
@@ -240,40 +236,6 @@ export function buildSettingsPanel() {
     scSection.appendChild(scGrid);
 
     body.appendChild(scSection);
-
-    // ── Install App ────────────────────────────────────────────────
-    const _isStandalone = window.matchMedia('(display-mode: standalone)').matches
-        || window.navigator.standalone === true;
-    if (!_isStandalone) {
-        const installSection = document.createElement('div');
-        installSection.className = 'settings-section';
-
-        const installLabel = document.createElement('div');
-        installLabel.className = 'settings-label settings-label-center';
-        installLabel.textContent = 'Install App';
-        installSection.appendChild(installLabel);
-
-        const installBtn = document.createElement('button');
-        installBtn.className = 'btn settings-install-btn';
-
-        const _DL_ICON = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
-
-        installBtn.innerHTML = _DL_ICON;
-        installBtn.title = _pwaInstallPrompt ? 'Install as App' : 'Add to home screen from your browser menu';
-        if (_pwaInstallPrompt) {
-            installBtn.addEventListener('click', async () => {
-                _pwaInstallPrompt.prompt();
-                const { outcome } = await _pwaInstallPrompt.userChoice;
-                if (outcome === 'accepted') _pwaInstallPrompt = null;
-                window.BeamerModal?.close();
-            });
-        } else {
-            installBtn.disabled = true;
-        }
-
-        installSection.appendChild(installBtn);
-        body.appendChild(installSection);
-    }
 
     return { node: body, hasConflicts: () => _hasShortcutConflicts(sc) };
 }

@@ -51,30 +51,6 @@
     letter-spacing: 0;
 }
 
-/* PWA install button */
-#pwa-install-btn {
-    position: fixed;
-    bottom: var(--sp-5);
-    right: var(--sp-5);
-    z-index: 10000;
-    padding: 0 var(--sp-4);
-    height: var(--hit-min);
-    background: var(--accent);
-    color: var(--ink-on-accent);
-    border: none;
-    border-radius: var(--r-pill);
-    font-family: var(--font-sans);
-    font-size: var(--fs-sm);
-    font-weight: 500;
-    cursor: pointer;
-    box-shadow: var(--shadow-3);
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    transition: transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast);
-}
-#pwa-install-btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-pop); }
-
 /* ── Welcome / landing page ─────────────────────────────────── */
 body.welcome-page {
     overflow: auto;
