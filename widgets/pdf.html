@@ -228,6 +228,11 @@ body {
   <div class="sep"></div>
   <button class="tb-btn active" id="btn-fit-page">Fit Page</button>
   <button class="tb-btn"        id="btn-fit-width">Fit Width</button>
+  <div class="sep"></div>
+  <button class="tb-btn" id="btn-download" disabled title="Download this PDF">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    <span id="btn-download-label">Download</span>
+  </button>
   <span class="viewer-badge" id="viewer-badge">view only</span>
 </div>
 
@@ -268,6 +273,10 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
   let widgetId    = 'textbook';
   let socket      = null;
 
+  // The PDF this widget is showing, kept for the download button.
+  let sourceUrl   = '';
+  let sourceName  = 'document.pdf';
+
   // Pan / zoom
   let zoom = 1.0, panX = 0, panY = 0;
 
@@ -303,6 +312,7 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
   const btnNext    = document.getElementById('btn-next');
   const btnFitPage = document.getElementById('btn-fit-page');
   const btnFitWid  = document.getElementById('btn-fit-width');
+  const btnDownload = document.getElementById('btn-download');
   const badge      = document.getElementById('viewer-badge');
   const docTitle   = document.getElementById('doc-title');
 
@@ -530,7 +540,46 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
       if (base) url = base + '/api/zip-asset/' + url.replace(/^\//, '');
     }
 
+    // Keep the resolved URL and a sensible filename for the download button —
+    // the viewer is reading a real file, and being able to take it away is
+    // most of the point of putting a textbook on a slide.
+    sourceUrl  = url;
+    sourceName = String(cfg.pdf || 'document.pdf').split(/[\\/]/).pop() || 'document.pdf';
+    if (!/\.pdf$/i.test(sourceName)) sourceName += '.pdf';
+    if (btnDownload) btnDownload.disabled = !url;
+
     if (url) loadPDF(url);
+  }
+
+  // ── Download ──────────────────────────────────────────────────────────────────
+  // Fetched rather than linked: the file is served from the session's
+  // zip-asset route, and a plain <a href> to it would open the browser's PDF
+  // viewer in place of saving. Blob in hand, `download` does what it says.
+  async function downloadSource() {
+    if (!sourceUrl) return;
+    const label = document.getElementById('btn-download-label');
+    const was = label.textContent;
+    try {
+      btnDownload.disabled = true;
+      label.textContent = 'Saving…';
+      const resp = await fetch(sourceUrl);
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const blob = await resp.blob();
+      const href = URL.createObjectURL(blob);
+      const a = Object.assign(document.createElement('a'), { href, download: sourceName });
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(href), 1000);
+    } catch (e) {
+      console.warn('PDF download failed:', e);
+      label.textContent = 'Failed';
+      setTimeout(() => { label.textContent = was; }, 1600);
+      return;
+    } finally {
+      btnDownload.disabled = false;
+    }
+    label.textContent = was;
   }
 
   // ── Event handlers ────────────────────────────────────────────────────────────
@@ -553,6 +602,7 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
 
   btnFitPage.addEventListener('click', () => setFitMode('page'));
   btnFitWid.addEventListener('click',  () => setFitMode('width'));
+  btnDownload.addEventListener('click', downloadSource);
 
   // ── Wheel: pan or zoom (Ctrl/Meta + wheel) ────────────────────────────────
   canvasArea.addEventListener('wheel', e => {

@@ -6,7 +6,7 @@
   "label": "Coding Notebook",
   "category": "Computer Science",
   "fields": [
-    { "key": "notebook", "label": "Notebook file", "type": "file", "accept": ".ipynb", "folder": "notebooks" },
+    { "key": "notebook", "label": "Notebook file", "type": "file", "accept": ".ipynb", "folder": "assets" },
     { "key": "packages", "label": "Extra packages (one per line)", "type": "textarea-lines", "rows": 4, "placeholder": "pandas\nsympy\nrequests==2.31.0" },
     { "key": "autoImport", "label": "Auto-load packages from imports", "type": "checkbox", "default": true }
   ]
@@ -124,6 +124,40 @@ body {
   border-color: var(--text);
 }
 .tb-btn.primary:hover:not(:disabled) { background: #2d2d2a; border-color: #2d2d2a; }
+
+/* ── Toolbar drop-down (Download) ───────────────────────────────── */
+.tb-menu-wrap { position: relative; flex-shrink: 0; display: inline-flex; }
+
+.tb-menu {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  z-index: 50;
+  min-width: 168px;
+  padding: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border-med);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.tb-menu[hidden] { display: none; }
+
+.tb-menu-item {
+  text-align: left;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tb-menu-item:hover { background: var(--bg-subtle); }
 
 /* kernel status pill */
 .kernel-pill {
@@ -454,6 +488,55 @@ body {
 #notebook-area::-webkit-scrollbar-track { background: transparent; }
 #notebook-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
 #notebook-area::-webkit-scrollbar-thumb:hover { background: var(--border-med); }
+
+/* ── Printing (the PDF export) ──────────────────────────────────────
+   "Download → PDF" hands the notebook to the browser's own print pipeline
+   and lets it write the file, which keeps the text, the maths and the
+   figures as vectors — a rasterised screenshot of the page would not.
+   What that needs from us is a document that isn't a fixed-height
+   scrolling pane: everything unrolls, the chrome goes, and cells are asked
+   not to break across pages. */
+@media print {
+  html, body {
+    height: auto;
+    overflow: visible;
+    display: block;
+    background: #fff;
+    color: #000;
+  }
+
+  /* The widget's own bar, the one the settings kit builds around it, and
+     every per-cell control: furniture, not content. */
+  #toolbar,
+  .bw-topbar,
+  .cell-controls,
+  .add-row,
+  #viewer-toast,
+  .tb-menu { display: none !important; }
+
+  /* The kit wraps the widget's body in .bw-topbar-body, which is a flex
+     child sized to what the bar leaves — on paper it has to be the page. */
+  .bw-topbar-body,
+  #notebook-area {
+    display: block;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+    padding: 0;
+  }
+
+  #notebook { max-width: none; padding: 0; }
+
+  .cell-block { break-inside: avoid; page-break-inside: avoid; }
+  .cell-card  { border-color: #ccc; box-shadow: none; }
+
+  /* Source textareas are already grown to fit their content by autoResize(),
+     so they print whole — don't touch their height here, `auto` would
+     collapse them back to their `rows` attribute. */
+  .code-ta { overflow: visible; }
+
+  .out-image img, .md-view img { max-width: 100%; }
+}
 </style>
 </head>
 <body>
@@ -481,6 +564,22 @@ body {
   <button class="tb-btn" id="btn-clear" disabled onclick="clearAllOutputs(true)">
     Clear
   </button>
+
+  <div class="sep"></div>
+
+  <!-- Download — the notebook as a file, or the whole thing as a PDF. The
+       menu is a sibling of the button rather than a child, so its absolute
+       position is measured against the toolbar even after the settings kit
+       has moved the toolbar's contents into the shared top bar. -->
+  <div class="tb-menu-wrap">
+    <button class="tb-btn" id="btn-download" disabled onclick="toggleDownloadMenu(event)">
+      Download ▾
+    </button>
+    <div class="tb-menu" id="download-menu" hidden>
+      <button class="tb-menu-item" onclick="downloadNotebook()">Notebook (.ipynb)</button>
+      <button class="tb-menu-item" onclick="downloadPdf()">PDF…</button>
+    </div>
+  </div>
 
   <div class="kernel-pill">
     <div class="k-dot" id="k-dot"></div>
@@ -561,6 +660,15 @@ if (typeof marked !== 'undefined') {
   });
 }
 
+// A path stored in the deck (`assets/diagram.png`) → a URL this iframe can
+// actually load. Absolute URLs, data: and blob: are already fine.
+function assetUrl(p) {
+  if (!p || /^(https?:|data:|blob:|#|\/\/)/i.test(p)) return p;
+  const base = (window.BeamerWidget ? BeamerWidget.serverUrl() : '')
+            || String(CFG.serverUrl || CFG.publicBaseUrl || '').replace(/\/+$/, '');
+  return base ? base + '/api/zip-asset/' + String(p).replace(/^\/+/, '') : p;
+}
+
 function mdParse(src) {
   if (!src) return '';
 
@@ -590,6 +698,20 @@ function mdParse(src) {
     html = '<pre>' + s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</pre>';
   } else {
     html = marked.parse(s);
+  }
+
+  // ── Step 2b: point deck-relative images at the asset route ─────────────
+  // A pasted or notebook-referenced image is stored in the presentation as
+  // `assets/…`. Inside a srcdoc iframe a bare relative URL resolves against
+  // the parent page, not the deck, so every such src is rewritten to the
+  // session's zip-asset route.
+  if (html.indexOf('<img') !== -1) {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = html;
+    tpl.content.querySelectorAll('img[src]').forEach(img => {
+      img.setAttribute('src', assetUrl(img.getAttribute('src')));
+    });
+    html = tpl.innerHTML;
   }
 
   // ── Step 3: restore math as KaTeX HTML ─────────────────────────────────
@@ -818,7 +940,9 @@ async function resolveNotebook() {
 
   try {
     setBoot(`Loading ${filename}…`);
-    const resp = await fetch(NOTEBOOK_PATH);
+    // A deck-relative path (assets/lecture.ipynb) is served out of the
+    // presentation ZIP; an http(s) URL passes straight through.
+    const resp = await fetch(assetUrl(NOTEBOOK_PATH));
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     return { nb: await resp.json(), filename, error: null };
   } catch (e) {
@@ -1018,8 +1142,92 @@ function addMarkdownCell(src = '', insertAfterId = null) {
       }
     });
     ta.addEventListener('blur', () => commitMarkdown(id));
+    ta.addEventListener('paste', (e) => onMarkdownPaste(e, ta));
   }
   return id;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PASTING IMAGES INTO MARKDOWN
+//
+// A screenshot on the clipboard becomes a file in the deck and a plain
+// markdown image reference to it — not a base64 blob inlined in the cell.
+// That keeps the notebook readable, keeps the deck's images where every other
+// asset lives, and means the same file can be reused from another cell.
+//
+// Beamer+ takes the bytes through saveFile(), which stores them for the
+// presentation ZIP and records the path under the config key we give it; the
+// keys are per-image so two screenshots never overwrite each other.
+// ─────────────────────────────────────────────────────────────────────────────
+let _pastedImages = 0;
+
+function insertAtCaret(ta, text) {
+  const start = ta.selectionStart ?? ta.value.length;
+  const end   = ta.selectionEnd   ?? start;
+  ta.value = ta.value.slice(0, start) + text + ta.value.slice(end);
+  ta.selectionStart = ta.selectionEnd = start + text.length;
+  autoResize(ta);
+}
+
+function replaceInTextarea(ta, find, replaceWith) {
+  const at = ta.value.indexOf(find);
+  if (at === -1) return;
+  ta.value = ta.value.slice(0, at) + replaceWith + ta.value.slice(at + find.length);
+  ta.selectionStart = ta.selectionEnd = at + replaceWith.length;
+  autoResize(ta);
+}
+
+function onMarkdownPaste(e, ta) {
+  const items = e.clipboardData?.items;
+  if (!items) return;
+  const images = [];
+  for (const item of items) {
+    if (item.kind !== 'file' || !item.type.startsWith('image/')) continue;
+    const file = item.getAsFile();
+    if (file) images.push(file);
+  }
+  // Nothing but text on the clipboard — leave the default paste alone.
+  if (!images.length) return;
+  e.preventDefault();
+  images.reduce((chain, file) => chain.then(() => insertPastedImage(file, ta)), Promise.resolve());
+}
+
+async function insertPastedImage(file, ta) {
+  const n     = ++_pastedImages;
+  const ext   = (file.type.split('/')[1] || 'png').toLowerCase()
+                  .replace('jpeg', 'jpg').replace(/[^a-z0-9]/g, '') || 'png';
+  const stamp = new Date().toISOString().replace(/\D/g, '').slice(0, 14);
+  const name  = `pasted-${stamp}-${n}.${ext}`;
+
+  // A placeholder goes in straight away: the upload is a round trip to the
+  // server, and a cell that looks like nothing happened invites a second paste.
+  const token = `![uploading ${name}…]()`;
+  insertAtCaret(ta, token);
+
+  try {
+    const buffer = await file.arrayBuffer();
+    let path;
+    if (window.BeamerWidget?.saveFile) {
+      path = await BeamerWidget.saveFile({
+        key: `pastedImage${stamp}${n}`,
+        name,
+        folder: 'assets',
+        buffer,
+      });
+    } else {
+      // Standalone (outside Beamer+): no deck to save into, so inline it.
+      path = await new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(fr.result);
+        fr.onerror = () => reject(fr.error);
+        fr.readAsDataURL(file);
+      });
+    }
+    replaceInTextarea(ta, token, `![](${path})`);
+  } catch (err) {
+    console.warn('Image paste failed:', err);
+    replaceInTextarea(ta, token, `<!-- image paste failed: ${String(err.message || err)} -->`);
+  }
 }
 
 function enterMarkdownEdit(id) {
@@ -1329,11 +1537,143 @@ function removeBoot() {
 }
 
 function enablePresenterToolbar() {
-  ['btn-run-all', 'btn-run', 'btn-add-code', 'btn-add-md', 'btn-clear'].forEach(id => {
+  ['btn-run-all', 'btn-run', 'btn-add-code', 'btn-add-md', 'btn-clear', 'btn-download'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.disabled = false;
   });
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DOWNLOAD
+//
+// Two shapes of the same notebook. The .ipynb is rebuilt from what's on
+// screen — sources, outputs and execution counts — so it opens in Jupyter
+// with the results of the talk still in it. The PDF is the browser's own
+// print-to-file, which keeps text and maths as vectors; see the @media print
+// block for the document it prints.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function notebookFilename() {
+  const raw = (document.getElementById('notebook-title')?.textContent || 'Untitled.ipynb').trim();
+  return raw.replace(/[\\/:*?"<>|]/g, '_') || 'Untitled.ipynb';
+}
+
+// nbformat wants source as a list of lines, each keeping its newline except
+// the last — a single string is legal but reads badly in diffs and in Jupyter.
+function splitSource(src) {
+  if (!src) return [];
+  const lines = src.split('\n');
+  return lines.map((l, i) => (i === lines.length - 1 ? l : l + '\n'))
+              .filter((l, i) => !(i === lines.length - 1 && l === ''));
+}
+
+// Our internal output objects → the nbformat 4 shapes Jupyter expects.
+function toIpynbOutputs(outputs) {
+  const out = [];
+  for (const o of (outputs || [])) {
+    if (o.type === 'image') {
+      out.push({
+        output_type: 'display_data',
+        data: { 'image/png': o.data },
+        metadata: {},
+      });
+    } else if (o.type === 'result') {
+      out.push({
+        output_type: 'execute_result',
+        execution_count: o.execution_count ?? null,
+        data: { 'text/plain': splitSource(o.text || '') },
+        metadata: {},
+      });
+    } else if (o.type === 'error') {
+      // We only keep the formatted traceback, not the structured exception —
+      // which is all Jupyter renders anyway.
+      out.push({
+        output_type: 'error',
+        ename: 'Error',
+        evalue: '',
+        traceback: splitSource(o.text || ''),
+      });
+    } else {
+      out.push({
+        output_type: 'stream',
+        name: o.type === 'stderr' ? 'stderr' : 'stdout',
+        text: splitSource(o.text || ''),
+      });
+    }
+  }
+  return out;
+}
+
+function buildIpynb() {
+  const state = _nbGetState();
+  const cells = state.cells.map(c => (c.cell_type === 'markdown'
+    ? { cell_type: 'markdown', metadata: {}, source: splitSource(c.source) }
+    : {
+        cell_type: 'code',
+        metadata: {},
+        execution_count: c.execution_count ?? null,
+        source: splitSource(c.source),
+        outputs: toIpynbOutputs(c.outputs),
+      }));
+
+  const metadata = {
+    kernelspec: { name: 'python3', display_name: 'Python 3 (Pyodide)', language: 'python' },
+    language_info: { name: 'python' },
+  };
+  // Keep whatever packages this notebook was set up with, so the file brings
+  // them along when it's opened again.
+  const packages = [...EXTRA_PACKAGES];
+  if (packages.length) metadata.beamerplus = { packages };
+
+  return { cells, metadata, nbformat: 4, nbformat_minor: 5 };
+}
+
+function saveBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = Object.assign(document.createElement('a'), { href: url, download: filename });
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function downloadNotebook() {
+  closeDownloadMenu();
+  let name = notebookFilename();
+  if (!/\.ipynb$/i.test(name)) name += '.ipynb';
+  saveBlob(new Blob([JSON.stringify(buildIpynb(), null, 1)], { type: 'application/json' }), name);
+}
+
+function downloadPdf() {
+  closeDownloadMenu();
+  // Markdown left open for editing would print its textarea instead of its
+  // rendered form, so close every editor first.
+  document.querySelectorAll('.cell-block[data-cell-type="markdown"]').forEach(b => {
+    const edit = document.getElementById('md-edit-' + b.dataset.id);
+    if (edit && edit.style.display !== 'none') commitMarkdown(b.dataset.id);
+  });
+  // Let the layout settle before handing the document to the print engine.
+  setTimeout(() => { try { window.print(); } catch (e) { console.warn('print failed', e); } }, 60);
+}
+
+/* ── the little menu ── */
+
+function toggleDownloadMenu(e) {
+  e?.stopPropagation();
+  const menu = document.getElementById('download-menu');
+  if (!menu) return;
+  menu.hidden = !menu.hidden;
+}
+
+function closeDownloadMenu() {
+  const menu = document.getElementById('download-menu');
+  if (menu) menu.hidden = true;
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest?.('.tb-menu-wrap')) closeDownloadMenu();
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDownloadMenu(); });
 
 function escHtml(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -1344,7 +1684,7 @@ function escHtml(s) {
 // ─────────────────────────────────────────────────────────────────────────────
 if (IS_VIEWER) {
   document.addEventListener('DOMContentLoaded', () => {
-    ['btn-run-all', 'btn-run', 'btn-add-code', 'btn-add-md', 'btn-clear'].forEach(id => {
+    ['btn-run-all', 'btn-run', 'btn-add-code', 'btn-add-md', 'btn-clear', 'btn-download'].forEach(id => {
       document.getElementById(id)?.remove();
     });
     document.getElementById('viewer-toast').style.display = 'block';

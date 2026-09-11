@@ -140,13 +140,13 @@ const socket = io(BeamerWidget.serverOrigin());</code>
 <code class="help-code">const path = await BeamerWidget.saveFile({
   key:    'notebook',           // config key the path is written to
   name:   'demo.ipynb',
-  folder: 'notebooks',          // → notebooks/demo.ipynb inside the deck
+  folder: 'assets',             // → assets/demo.ipynb inside the deck
   buffer: await file.arrayBuffer(),
   serve:  false                 // skip the upload if you already hold the content
 });</code>
 <p class="help-p">Next time the deck is opened, ${_hic('window.WIDGET_CONFIG.notebook')} is that path — load it the way you would any configured file. If the presenter edits the file during the talk, hand back the current bytes when Beamer+ asks, just before it builds the ZIP:</p>
 <code class="help-code">BeamerWidget.onFlushFiles(() =&gt; {
-  BeamerWidget.saveFile({ key: 'notebook', name: title, folder: 'notebooks',
+  BeamerWidget.saveFile({ key: 'notebook', name: title, folder: 'assets',
                           buffer: currentBytes(), serve: false });
 });</code>
 <p class="help-p">That leaves ${_hic('widget-state')} for what is genuinely ephemeral — scroll position, which cell has focus — and keeps the deck's files openable in the tools they belong to.</p>
