@@ -6,7 +6,8 @@
   "label": "Coding Notebook",
   "category": "Computer Science",
   "fields": [
-    { "key": "notebook", "label": "Notebook file", "type": "text", "placeholder": "notebooks/demo.ipynb  or  https://…/demo.ipynb" },
+    { "key": "notebook", "label": "Notebook file", "type": "file", "accept": ".ipynb", "folder": "notebooks",
+      "note": "uploads into the deck; a remote URL can still be typed into the config by hand" },
     { "key": "packages", "label": "Extra packages (one per line)", "type": "textarea-lines", "rows": 4, "placeholder": "pandas\nsympy\nrequests==2.31.0", "note": "merged with any the notebook's metadata declares" },
     { "key": "autoImport", "label": "Auto-load packages from imports", "type": "checkbox", "default": true, "note": "checks each cell's imports before running it" }
   ]
@@ -459,15 +460,15 @@ body {
 <body>
 
 <!-- ── Toolbar ─────────────────────────────────────────────────────────── -->
-<div id="toolbar">
+<div id="toolbar" data-bw-topbar>
   <span id="notebook-title">Untitled.ipynb</span>
   <div class="sep"></div>
 
   <button class="tb-btn primary" id="btn-run-all" disabled onclick="runAll()">
-    ▶&nbsp;Run All
+    Run All
   </button>
   <button class="tb-btn" id="btn-run" disabled onclick="runSelected()">
-    ▶&nbsp;Run Cell
+    Run Cell
   </button>
 
   <div class="sep"></div>
@@ -904,9 +905,9 @@ function addCodeCell(code = '', insertAfterId = null) {
 
   const ctrlsHtml = IS_VIEWER ? '' : `
     <div class="cell-controls">
-      <button class="cc-btn"        title="Run (Shift+Enter)"  onclick="runCell('${id}')">▶</button>
-      <button class="cc-btn"        title="Move up"            onclick="moveCellUp('${id}')">↑</button>
-      <button class="cc-btn"        title="Move down"          onclick="moveCellDown('${id}')">↓</button>
+      <button class="cc-btn"        title="Run (Shift+Enter)"  onclick="runCell('${id}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button>
+      <button class="cc-btn"        title="Move up"            onclick="moveCellUp('${id}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="18 15 12 9 6 15"/></svg></button>
+      <button class="cc-btn"        title="Move down"          onclick="moveCellDown('${id}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></button>
       <button class="cc-btn danger" title="Delete cell"        onclick="deleteCell('${id}')">✕</button>
     </div>`;
 
@@ -962,8 +963,8 @@ function addMarkdownCell(src = '', insertAfterId = null) {
 
   const ctrlsHtml = IS_VIEWER ? '' : `
     <div class="cell-controls">
-      <button class="cc-btn"        title="Move up"   onclick="moveCellUp('${id}')">↑</button>
-      <button class="cc-btn"        title="Move down" onclick="moveCellDown('${id}')">↓</button>
+      <button class="cc-btn"        title="Move up"   onclick="moveCellUp('${id}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="18 15 12 9 6 15"/></svg></button>
+      <button class="cc-btn"        title="Move down" onclick="moveCellDown('${id}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></button>
       <button class="cc-btn danger" title="Delete"    onclick="deleteCell('${id}')">✕</button>
     </div>`;
 

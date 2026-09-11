@@ -107,12 +107,23 @@ export function showHelpModal({ onStartTour = null } = {}) {
 &lt;/script&gt;</code>
 <p class="help-p">Supported types: ${_hic('text')}, ${_hic('password')}, ${_hic('number')}, ${_hic('number-nullable')}, ${_hic('checkbox')}, ${_hic('select')}, ${_hic('textarea')}, ${_hic('textarea-lines')}, ${_hic('file')}, ${_hic('ai-model')}.</p>
 <p class="help-p">Field values reach you through ${_hic('window.WIDGET_CONFIG')} (below); a field the presenter leaves empty is omitted, so your own ${_hic('default')} applies.</p>
-<h4 class="help-h">2 · Read configuration</h4>
+<h4 class="help-h">2 · The top bar</h4>
+<p class="help-p">Beamer+ draws the same bar at the top of every widget — the widget's name, its own controls, then a text-size stepper and a reset button. You don't build it; whatever your widget renders is placed below it automatically.</p>
+<p class="help-p">If your widget already has a bar of its own, mark it ${_hic('data-bw-topbar')} and its contents move into the shared one, keeping every id and event handler intact:</p>
+<code class="help-code">&lt;div id="toolbar" data-bw-topbar&gt;
+  &lt;button id="run"&gt;Run&lt;/button&gt;
+&lt;/div&gt;</code>
+<p class="help-p">Or add controls from script, and say what resetting your widget means:</p>
+<code class="help-code">BeamerWidget.topbar.addButton({ label: 'Run', onClick: run });
+BeamerWidget.topbar.setTitle('lecture-3.ipynb');
+BeamerWidget.topbar.onReset(() =&gt; clearEverything());</code>
+<p class="help-p">Without an ${_hic('onReset')} handler, reset reloads your widget, which restores it to how the slide first rendered it. The stepper drives ${_hic('--u')}, the presentation scale every content-sized token in the base stylesheet is built on — size your readable text with ${_hic('var(--fs-body)')} and friends and it follows along. A widget whose content it can't reach (a remote page, a video) hides the stepper with ${_hic('"fontSize": false')} in its schema; one that wants no bar at all sets ${_hic('"topbar": false')}.</p>
+<h4 class="help-h">3 · Read configuration</h4>
 <p class="help-p">Beamer+ injects ${_hic('window.WIDGET_CONFIG')} before your widget loads. It contains the field values the presenter set, plus layout info:</p>
 <code class="help-code">const cfg = window.WIDGET_CONFIG || {};
 // cfg.title, cfg.count, cfg.autorun  ← your declared fields
 // cfg.role  →  'presenter' or 'viewer'</code>
-<h4 class="help-h">3 · Communicate with Beamer+</h4>
+<h4 class="help-h">4 · Communicate with Beamer+</h4>
 <dl class="help-kv">
   <dt>widget-expand</dt><dd>Post to <code class="help-ic">window.parent</code> to animate the widget to full-slide size.</dd>
   <dt>widget-collapse</dt><dd>Return to the original size.</dd>
@@ -121,7 +132,7 @@ export function showHelpModal({ onStartTour = null } = {}) {
   <dt>widget-cleanup</dt><dd>Received when the widget is removed. Stop timers and release resources.</dd>
   <dt>widget-settings</dt><dd>Post ${_hic('{ widgetId, patch, remove }')} to save settings into your config item, where they persist with the deck. Use this if your widget changes its own configuration at run time; the presenter's own edits come from the editor panel.</dd>
 </dl>
-<h4 class="help-h">4 · Save files with the deck</h4>
+<h4 class="help-h">5 · Save files with the deck</h4>
 <p class="help-p">If your widget opens a file — a notebook, a PDF, a dataset — save it as a <em>file</em> in the presentation rather than stuffing its contents into your state. Beamer+ writes it into the deck and hands you back the path, which it also records in your config:</p>
 <code class="help-code">const path = await BeamerWidget.saveFile({
   key:    'notebook',           // config key the path is written to

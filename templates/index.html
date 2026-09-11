@@ -146,8 +146,32 @@
 
     <script>
         if ('serviceWorker' in navigator) {
+            // Whether this page load was already being served by a worker. A
+            // first-ever registration also fires controllerchange (via the new
+            // worker's clients.claim()), and that one must NOT reload — there is
+            // nothing stale to discard, and reloading would look like a flicker
+            // on every first visit.
+            const hadController = !!navigator.serviceWorker.controller;
+
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/service-worker.js', { scope: '/' }).catch(() => {});
+                navigator.serviceWorker.register('/service-worker.js', { scope: '/', updateViaCache: 'none' })
+                    // Ask straight away rather than waiting for the browser's own
+                    // update check, so a new build is picked up on the next load.
+                    .then(reg => reg.update().catch(() => {}))
+                    .catch(() => {});
+            });
+
+            // A new worker skips waiting and claims this page as soon as it
+            // installs — but the page is already running the HTML, JS and CSS the
+            // *previous* worker served, and nothing re-reads them. Reload once so
+            // the page actually runs the version the new worker is serving;
+            // without this, a code change stays invisible until the next manual
+            // reload happens to land after the swap.
+            let reloading = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (!hadController || reloading) return;
+                reloading = true;
+                window.location.reload();
             });
         }
     </script>

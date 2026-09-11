@@ -414,3 +414,117 @@ body {
   .bw-spinner { animation-duration: 2s; }
   .bw-dot.is-busy { animation: none; }
 }
+
+/* ── Injected top bar ─────────────────────────────────────────────────────
+   Built by the settings kit inside every widget iframe (see
+   widget-settings-kit.js), so every widget carries the same bar without
+   drawing one itself — title on the left, the widget's own controls next to
+   it, shared utilities pinned right.
+
+   The kit also wraps whatever the widget rendered into .bw-topbar-body, so
+   the bar can never overlap it. Everything here is chrome: fixed size
+   whatever --u is, so raising the presentation scale grows the content and
+   leaves the furniture alone.
+   ====================================================================== */
+
+body.bw-has-topbar {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.bw-topbar {
+  flex: 0 0 auto;
+  height: var(--bar-h);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 var(--pad-x);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  font-size: var(--fs-chrome);
+  user-select: none;
+}
+
+.bw-topbar-title {
+  font-size: var(--fs-title);
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 40%;
+  flex-shrink: 0;
+}
+
+/* Where a widget's own buttons land (BeamerWidget.topbar.addButton). Takes the
+   slack so the utilities stay pinned right however many buttons there are. */
+.bw-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Shared utilities — same controls, same place, in every widget. */
+.bw-topbar-utils {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+/* The widget's own content, below the bar. */
+.bw-topbar-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Font size stepper — drives --u, which every content-sized token is built on. */
+.bw-fontsize {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.bw-fontsize .bw-btn { font-variant-numeric: tabular-nums; }
+.bw-fontsize-a-sm { font-size: 10px; font-weight: 600; }
+.bw-fontsize-a-lg { font-size: 14px; font-weight: 600; }
+
+/* ── No native control ornaments ──────────────────────────────────────────
+   Spinner arrows on number inputs and the chevron on a select are drawn by
+   the browser at its own size and colour. Next to flat chrome on a projected
+   slide they read as clutter, so they're removed everywhere rather than
+   per widget.
+   ====================================================================== */
+
+select,
+.bw-select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: none;
+}
+select::-ms-expand { display: none; }
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* The disclosure triangle on <details>, for the same reason. */
+summary { list-style: none; cursor: pointer; }
+summary::-webkit-details-marker { display: none; }
+
+/* Search inputs get a cancel "x" and decoration in WebKit. */
+input[type="search"]::-webkit-search-decoration,
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; }

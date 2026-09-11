@@ -164,7 +164,13 @@ self.addEventListener('fetch', (event) => {
   // cached copy is still written and still served when the network is gone, so
   // offline use is unaffected. Vendored libraries and media stay cache-first
   // below — they're large and only change when their path does.
-  if (url.pathname.startsWith('/static/js/') || url.pathname.startsWith('/static/css/')) {
+  //
+  // /widgets/ counts as app code too: a widget's HTML carries both its
+  // behaviour and the `widget-schema` block the editor builds its properties
+  // panel from, so a stale copy shows the presenter the wrong fields.
+  if (url.pathname.startsWith('/static/js/') ||
+      url.pathname.startsWith('/static/css/') ||
+      url.pathname.startsWith('/widgets/')) {
     event.respondWith(
       fetch(request)
         .then((response) => {

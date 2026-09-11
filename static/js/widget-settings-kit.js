@@ -88,14 +88,27 @@
     // base stylesheet uses to size everything the audience has to read.
     // Chrome stays fixed, so the furniture doesn't inflate with the content.
 
+    function fieldByKey(key) {
+        if (!readSchema()) return null;
+        for (var i = 0; i < fields.length; i++) if (fields[i].key === key) return fields[i];
+        return null;
+    }
+
+    // The presentation scale in force: what the presenter set, else the scale
+    // field's default if the widget declares one, else the base stylesheet's.
+    // Every widget has a scale now — the top bar's stepper is the control — so
+    // this no longer requires a declared field.
+    function currentScale() {
+        if (!readSchema()) return 1.4;
+        var f = fieldByKey('scale');
+        var raw = cfg().scale !== undefined ? cfg().scale : (f ? f.default : undefined);
+        var v = parseFloat(raw);
+        return (!isNaN(v) && v > 0) ? v : 1.4;
+    }
+
     function applyScale() {
         if (!readSchema()) return;
-        var f = null;
-        for (var i = 0; i < fields.length; i++) if (fields[i].key === 'scale') { f = fields[i]; break; }
-        if (!f) return;
-        var raw = cfg().scale !== undefined ? cfg().scale : f.default;
-        var v = parseFloat(raw);
-        if (!isNaN(v) && v > 0) document.documentElement.style.setProperty('--u', String(v));
+        document.documentElement.style.setProperty('--u', String(currentScale()));
     }
     function post(msg) { try { parent.postMessage(msg, '*'); } catch (e) {} }
     function announce() {
@@ -482,6 +495,235 @@
         if (!silent) post({ type: 'widget-settings-close', widgetId: cfg().id });
     }
 
+    /* ─── top bar ───────────────────────────────────────────────── */
+    // Every widget carries the same bar, built here rather than in each widget:
+    // the title, whatever controls the widget registers, and the shared
+    // utilities. The widget's own markup is moved into .bw-topbar-body beneath
+    // it, so a widget never has to leave room for the bar or know it exists.
+    //
+    // A widget opts out with "topbar": false in its schema (for one that is
+    // nothing but an embedded frame), and hides the font stepper alone with
+    // "fontSize": false (for one whose content it cannot reach — a remote page,
+    // a video, a map).
+
+    // Coarse enough that one press is visibly different from the back of a room.
+    var SCALE_STEPS = [1, 1.2, 1.4, 1.7, 2, 2.4];
+
+    var barEl = null, actionsEl = null, titleEl = null, resetHandler = null;
+
+    function barTitle() {
+        // A presenter-set title wins over the widget's generic name.
+        var c = cfg();
+        if (typeof c.title === 'string' && c.title.trim()) return c.title.trim();
+        return (schema && schema.label) || '';
+    }
+
+    function makeBtn(opts) {
+        var b = el('button', 'bw-btn' + (opts.variant ? ' bw-btn--' + opts.variant : ''));
+        b.type = 'button';
+        if (opts.title) b.title = opts.title;
+        if (opts.icon) b.innerHTML = opts.icon;
+        if (opts.label) {
+            var span = el('span');
+            span.textContent = opts.label;
+            b.appendChild(span);
+        }
+        if (opts.onClick) b.addEventListener('click', opts.onClick);
+        return b;
+    }
+
+    function setScale(next) {
+        var v = SCALE_STEPS[Math.max(0, Math.min(SCALE_STEPS.length - 1, next))];
+        cfg().scale = v;
+        applyScale();
+        // Persist through the same path the settings panel uses, so the size
+        // chosen for the room is still there next time the deck is opened.
+        post({ type: 'widget-settings', widgetId: cfg().id, patch: { scale: v }, remove: [] });
+        syncScaleButtons();
+    }
+
+    var scaleDown = null, scaleUp = null;
+
+    function syncScaleButtons() {
+        if (!scaleDown || !scaleUp) return;
+        var i = nearestStep(currentScale());
+        scaleDown.disabled = i <= 0;
+        scaleUp.disabled = i >= SCALE_STEPS.length - 1;
+    }
+
+    function nearestStep(v) {
+        var best = 0, bestD = Infinity;
+        for (var i = 0; i < SCALE_STEPS.length; i++) {
+            var d = Math.abs(SCALE_STEPS[i] - v);
+            if (d < bestD) { bestD = d; best = i; }
+        }
+        return best;
+    }
+
+    function doReset() {
+        if (typeof resetHandler === 'function') {
+            try { resetHandler(); return; }
+            catch (e) { console.warn('[widget] reset handler failed', e); }
+        }
+        // No handler: reloading the srcdoc document puts the widget back exactly
+        // as the slide first rendered it, which is what reset means anyway.
+        try { location.reload(); } catch (e) {}
+    }
+
+    var RESET_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>';
+
+    function buildBar() {
+        var bar = el('div', 'bw-topbar');
+        bar.id = 'bw-topbar';
+
+        titleEl = el('div', 'bw-topbar-title');
+        titleEl.textContent = barTitle();
+        bar.appendChild(titleEl);
+
+        actionsEl = el('div', 'bw-topbar-actions');
+        actionsEl.id = 'bw-topbar-actions';
+        bar.appendChild(actionsEl);
+
+        // The audience view gets the widget's own controls but not the
+        // presenter's furniture.
+        if (cfg().role === 'viewer') return bar;
+
+        var utils = el('div', 'bw-topbar-utils');
+
+        if (!(schema && schema.fontSize === false)) {
+            var group = el('div', 'bw-fontsize');
+            scaleDown = makeBtn({
+                variant: 'icon', title: 'Smaller text',
+                onClick: function () { setScale(nearestStep(currentScale()) - 1); },
+            });
+            scaleDown.innerHTML = '<span class="bw-fontsize-a-sm">A</span>';
+            scaleUp = makeBtn({
+                variant: 'icon', title: 'Larger text',
+                onClick: function () { setScale(nearestStep(currentScale()) + 1); },
+            });
+            scaleUp.innerHTML = '<span class="bw-fontsize-a-lg">A</span>';
+            group.appendChild(scaleDown);
+            group.appendChild(scaleUp);
+            utils.appendChild(group);
+            syncScaleButtons();
+        }
+
+        utils.appendChild(makeBtn({
+            variant: 'icon', title: 'Reset widget', icon: RESET_ICON, onClick: doReset,
+        }));
+
+        bar.appendChild(utils);
+        return bar;
+    }
+
+    function buildTopbar() {
+        if (barEl || !document.body) return;
+        if (!readSchema()) return;
+        if (schema && schema.topbar === false) return;
+
+        var body = document.body;
+
+        // Take the widget's own body layout before changing it and hand it to
+        // the wrapper: a widget that laid its children out with
+        // `body { display: flex }` keeps that layout, one level down. Height and
+        // overflow are deliberately not copied — the wrapper is a flex child and
+        // sizes itself from whatever the bar leaves.
+        var cs = window.getComputedStyle(body);
+        var wrap = el('div', 'bw-topbar-body');
+        wrap.id = 'bw-topbar-body';
+        ['display', 'flexDirection', 'flexWrap', 'gap', 'alignItems', 'justifyContent',
+         'gridTemplateColumns', 'gridTemplateRows', 'gridAutoRows', 'gridAutoColumns',
+         'padding', 'background', 'color', 'textAlign'].forEach(function (prop) {
+            try { wrap.style[prop] = cs[prop]; } catch (e) {}
+        });
+
+        while (body.firstChild) wrap.appendChild(body.firstChild);
+
+        barEl = buildBar();
+        body.appendChild(barEl);
+        body.appendChild(wrap);
+        body.classList.add('bw-has-topbar');
+
+        adoptOwnBar(wrap);
+
+        // A widget that appends to <body> after this ran would land beside the
+        // wrapper instead of inside it, and show up under the content. Move late
+        // arrivals in, so a widget written without knowing about the bar still
+        // behaves.
+        try {
+            new MutationObserver(function (records) {
+                for (var i = 0; i < records.length; i++) {
+                    var added = records[i].addedNodes;
+                    for (var j = 0; j < added.length; j++) {
+                        var n = added[j];
+                        if (n === barEl || n === wrap) continue;
+                        if (n.parentNode === body) wrap.appendChild(n);
+                    }
+                }
+            }).observe(body, { childList: true });
+        } catch (e) {}
+    }
+
+    // A widget that already draws its own bar marks it with `data-bw-topbar`
+    // (or uses .bw-toolbar) and that element is MOVED into the shared bar — the
+    // element itself, not a copy of its contents, so every id, listener and
+    // piece of widget logic pointing at it keeps working untouched.
+    //
+    // It is moved rather than emptied because a widget may fill its bar later,
+    // from script (the browser widget's toolbar is empty markup that its own
+    // code populates on load); emptying it would quietly delete controls that
+    // had not been created yet.
+    //
+    // `display: contents` then drops its box so its children become items of
+    // the shared bar's own flex row, picking up the same spacing as every other
+    // widget's controls. Set inline because the widget styles it by id, which
+    // would otherwise win.
+    function adoptOwnBar(wrap) {
+        var own = wrap.querySelector('[data-bw-topbar]') || wrap.querySelector('.bw-toolbar');
+        if (!own || !actionsEl) return;
+
+        // A title the widget already wrote becomes the bar's title rather than
+        // sitting next to the one we just put there.
+        var ownTitle = own.querySelector('.bw-toolbar-title, [data-bw-title]');
+        if (ownTitle) {
+            var text = (ownTitle.textContent || '').trim();
+            if (text && titleEl) titleEl.textContent = text;
+            ownTitle.parentNode.removeChild(ownTitle);
+        }
+
+        own.classList.add('bw-adopted-bar');
+        own.style.display = 'contents';
+        // Keep the widget's name from running straight into its first control.
+        var sep = document.createElement('div');
+        sep.className = 'bw-sep';
+        actionsEl.appendChild(sep);
+        actionsEl.appendChild(own);
+    }
+
+    // What a widget uses to put its own controls in the bar and say what
+    // resetting it means.
+    var topbarApi = {
+        get el() { return barEl; },
+        addButton: function (opts) {
+            var b = makeBtn(opts || {});
+            if (actionsEl) actionsEl.appendChild(b);
+            return b;
+        },
+        addElement: function (node) {
+            if (node && actionsEl) actionsEl.appendChild(node);
+            return node;
+        },
+        addSeparator: function () {
+            var sep = el('div', 'bw-sep');
+            if (actionsEl) actionsEl.appendChild(sep);
+            return sep;
+        },
+        setTitle: function (text) {
+            if (titleEl) titleEl.textContent = text == null ? '' : String(text);
+        },
+        onReset: function (fn) { resetHandler = typeof fn === 'function' ? fn : null; },
+    };
+
     /* ─── wiring ────────────────────────────────────────────────── */
 
     window.addEventListener('message', function (e) {
@@ -497,6 +739,8 @@
         if (d.type === 'widget-config' && d.config) {
             window.WIDGET_CONFIG = d.config;
             applyScale();
+            syncScaleButtons();
+            if (titleEl) titleEl.textContent = barTitle();
             announce();  // the id may only have arrived with this message
         }
     });
@@ -511,9 +755,10 @@
         openSettings:  function () { readSchema(); if (hasSettings) openPanel(); },
         closeSettings: function () { closePanel(); },
         hasSettings:   function () { readSchema(); return hasSettings; },
+        topbar:        topbarApi,
     };
 
-    function init() { applyScale(); announce(); }
+    function init() { applyScale(); announce(); buildTopbar(); syncScaleButtons(); }
 
     init();
     if (document.readyState === 'loading') {
