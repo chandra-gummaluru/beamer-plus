@@ -1,6 +1,16 @@
-const CACHE_NAME = 'beamer-plus-v21';
-const STATIC_CACHE_NAME = 'beamer-plus-static-v21';
-const DYNAMIC_CACHE_NAME = 'beamer-plus-dynamic-v21';
+// Cache version. The server rewrites the placeholder below with a stamp derived
+// from the modification times of everything under static/, widgets/ and
+// templates/, so ANY edit to the app changes these cache names — which makes
+// the activate handler drop the previous caches. Nobody has to remember to bump
+// a number by hand; a forgotten bump used to mean the browser quietly kept
+// serving the old build with no obvious way out.
+//
+// Served raw (not through the Flask route) this stays the literal string, which
+// is still valid — it just means the version never changes.
+const BUILD = '__BUILD__';
+const CACHE_NAME = 'beamer-plus-' + BUILD;
+const STATIC_CACHE_NAME = 'beamer-plus-static-' + BUILD;
+const DYNAMIC_CACHE_NAME = 'beamer-plus-dynamic-' + BUILD;
 
 // The app shell — just enough to boot the presenter offline. These are the real
 // Flask route / entry-point assets; everything they pull in (the ES-module tree
