@@ -125,62 +125,6 @@ body {
 }
 .tb-btn.primary:hover:not(:disabled) { background: #2d2d2a; border-color: #2d2d2a; }
 
-/* ── Toolbar drop-down (Download) ───────────────────────────────── */
-.tb-menu-wrap { position: relative; flex-shrink: 0; display: inline-flex; }
-
-.tb-menu {
-  position: absolute;
-  top: calc(100% + 5px);
-  left: 0;
-  z-index: 50;
-  min-width: 168px;
-  padding: 4px;
-  background: var(--bg);
-  border: 1px solid var(--border-med);
-  border-radius: var(--radius);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.tb-menu[hidden] { display: none; }
-
-.tb-menu-item {
-  text-align: left;
-  padding: 7px 10px;
-  border: none;
-  border-radius: 4px;
-  background: none;
-  color: var(--text);
-  font-family: var(--font-ui);
-  font-size: 12px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.tb-menu-item:hover { background: var(--bg-subtle); }
-
-/* kernel status pill */
-.kernel-pill {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--text-2);
-  flex-shrink: 0;
-}
-.k-dot {
-  width: 7px; height: 7px;
-  border-radius: 50%;
-  background: var(--amber);
-  transition: background 0.3s;
-  flex-shrink: 0;
-}
-.k-dot.ready  { background: var(--green); }
-.k-dot.busy   { background: var(--red); animation: blink 0.9s ease-in-out infinite; }
-.k-dot.viewer { background: var(--text-3); }
-
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.25} }
 @keyframes spin   { to { transform: rotate(360deg); } }
 
@@ -511,8 +455,7 @@ body {
   .bw-topbar,
   .cell-controls,
   .add-row,
-  #viewer-toast,
-  .tb-menu { display: none !important; }
+  #viewer-toast { display: none !important; }
 
   /* The kit wraps the widget's body in .bw-topbar-body, which is a flex
      child sized to what the bar leaves — on paper it has to be the page. */
@@ -543,7 +486,11 @@ body {
 
 <!-- ── Toolbar ─────────────────────────────────────────────────────────── -->
 <div id="toolbar" data-bw-topbar>
-  <span id="notebook-title">Untitled.ipynb</span>
+  <!-- data-bw-title hands this element to the shared bar as its title, so the
+       open file's name replaces the generic widget name rather than sitting
+       next to it. The kit adopts the element itself, so the updates this
+       widget writes to it still land. -->
+  <span id="notebook-title" data-bw-title>Untitled.ipynb</span>
   <div class="sep"></div>
 
   <button class="tb-btn primary" id="btn-run-all" disabled onclick="runAll()">
@@ -567,24 +514,19 @@ body {
 
   <div class="sep"></div>
 
-  <!-- Download — the notebook as a file, or the whole thing as a PDF. The
-       menu is a sibling of the button rather than a child, so its absolute
-       position is measured against the toolbar even after the settings kit
-       has moved the toolbar's contents into the shared top bar. -->
-  <div class="tb-menu-wrap">
-    <button class="tb-btn" id="btn-download" disabled onclick="toggleDownloadMenu(event)">
-      Download ▾
-    </button>
-    <div class="tb-menu" id="download-menu" hidden>
-      <button class="tb-menu-item" onclick="downloadNotebook()">Notebook (.ipynb)</button>
-      <button class="tb-menu-item" onclick="downloadPdf()">PDF…</button>
-    </div>
-  </div>
-
-  <div class="kernel-pill">
-    <div class="k-dot" id="k-dot"></div>
-    <span id="k-label">Loading…</span>
-  </div>
+  <!-- Two plain buttons rather than a Download menu: the settings kit moves
+       this toolbar into the shared top bar, whose actions strip clips
+       anything that hangs below it — a drop-down opens into nothing. -->
+  <button class="tb-btn" id="btn-download" disabled onclick="downloadNotebook()"
+          title="Download this notebook as a .ipynb file">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Notebook
+  </button>
+  <button class="tb-btn" id="btn-download-pdf" disabled onclick="downloadPdf()"
+          title="Print the notebook — choose “Save as PDF” in the dialog">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    PDF
+  </button>
 </div>
 
 <!-- ── Notebook ───────────────────────────────────────────────────────── -->
@@ -649,6 +591,10 @@ let isBusy      = false;
 let execCounter = 0;
 let selectedId  = null;
 const cellMeta  = new Map(); // id → { type: 'code'|'markdown' }
+// The open file's name. Kept apart from the title element: the shared top
+// bar adopts that element and rewrites it with the widget's own name until a
+// notebook is actually loaded, which is not what a download should be called.
+let notebookName = 'Untitled.ipynb';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MARKDOWN  —  configure marked.js for Jupyter-style rendering
@@ -965,7 +911,8 @@ function packagesFromNotebook(nb) {
 function renderNotebook(nb, filename, withOutputs = true) {
   try {
     if (filename) {
-      document.getElementById('notebook-title').textContent = filename.split('/').pop();
+      notebookName = filename.split('/').pop();
+      document.getElementById('notebook-title').textContent = notebookName;
     }
     for (const cell of nb.cells || []) {
       const src = Array.isArray(cell.source) ? cell.source.join('') : (cell.source || '');
@@ -1516,15 +1463,18 @@ function refreshAddRows() {
   });
 }
 
+// The kernel's status used to sit in a pill in the toolbar. The bar is for
+// things you act on, and the state it reported is already visible where it
+// matters — the boot overlay while Pyodide loads, [*] on a running cell — so
+// the pill is gone and what's left is the record of what the kernel has:
+// the notebook title carries it as a tooltip, out of the way until asked for.
 function setKernel(state, label) {
-  document.getElementById('k-dot').className = `k-dot ${state}`;
-  document.getElementById('k-label').textContent = label;
-  // Hovering the pill shows what's actually available in the kernel.
-  const pill = document.querySelector('.kernel-pill');
-  if (pill && loadedPackages.length) {
-    pill.title = 'Packages: ' + loadedPackages.join(', ')
-      + (failedPackages.length ? `\nFailed: ${failedPackages.join(', ')}` : '');
-  }
+  const title = document.getElementById('notebook-title');
+  if (!title) return;
+  title.title = loadedPackages.length
+    ? 'Packages: ' + loadedPackages.join(', ')
+      + (failedPackages.length ? `\nFailed: ${failedPackages.join(', ')}` : '')
+    : (label || '');
 }
 
 function setBoot(msg) {
@@ -1537,7 +1487,8 @@ function removeBoot() {
 }
 
 function enablePresenterToolbar() {
-  ['btn-run-all', 'btn-run', 'btn-add-code', 'btn-add-md', 'btn-clear', 'btn-download'].forEach(id => {
+  ['btn-run-all', 'btn-run', 'btn-add-code', 'btn-add-md', 'btn-clear',
+   'btn-download', 'btn-download-pdf'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.disabled = false;
   });
@@ -1554,7 +1505,7 @@ function enablePresenterToolbar() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function notebookFilename() {
-  const raw = (document.getElementById('notebook-title')?.textContent || 'Untitled.ipynb').trim();
+  const raw = (notebookName || 'Untitled.ipynb').trim();
   return raw.replace(/[\\/:*?"<>|]/g, '_') || 'Untitled.ipynb';
 }
 
@@ -1638,14 +1589,12 @@ function saveBlob(blob, filename) {
 }
 
 function downloadNotebook() {
-  closeDownloadMenu();
   let name = notebookFilename();
   if (!/\.ipynb$/i.test(name)) name += '.ipynb';
   saveBlob(new Blob([JSON.stringify(buildIpynb(), null, 1)], { type: 'application/json' }), name);
 }
 
 function downloadPdf() {
-  closeDownloadMenu();
   // Markdown left open for editing would print its textarea instead of its
   // rendered form, so close every editor first.
   document.querySelectorAll('.cell-block[data-cell-type="markdown"]').forEach(b => {
@@ -1656,24 +1605,6 @@ function downloadPdf() {
   setTimeout(() => { try { window.print(); } catch (e) { console.warn('print failed', e); } }, 60);
 }
 
-/* ── the little menu ── */
-
-function toggleDownloadMenu(e) {
-  e?.stopPropagation();
-  const menu = document.getElementById('download-menu');
-  if (!menu) return;
-  menu.hidden = !menu.hidden;
-}
-
-function closeDownloadMenu() {
-  const menu = document.getElementById('download-menu');
-  if (menu) menu.hidden = true;
-}
-
-document.addEventListener('click', (e) => {
-  if (!e.target.closest?.('.tb-menu-wrap')) closeDownloadMenu();
-});
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDownloadMenu(); });
 
 function escHtml(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -1684,7 +1615,8 @@ function escHtml(s) {
 // ─────────────────────────────────────────────────────────────────────────────
 if (IS_VIEWER) {
   document.addEventListener('DOMContentLoaded', () => {
-    ['btn-run-all', 'btn-run', 'btn-add-code', 'btn-add-md', 'btn-clear', 'btn-download'].forEach(id => {
+    ['btn-run-all', 'btn-run', 'btn-add-code', 'btn-add-md', 'btn-clear',
+   'btn-download', 'btn-download-pdf'].forEach(id => {
       document.getElementById(id)?.remove();
     });
     document.getElementById('viewer-toast').style.display = 'block';
@@ -1753,7 +1685,7 @@ function _nbGetState() {
       cells.push({ cell_type: 'markdown', source });
     }
   });
-  return { cells, title: document.getElementById('notebook-title')?.textContent || '' };
+  return { cells, title: notebookName };
 }
 
 function _nbSetState(s) {
@@ -1764,7 +1696,10 @@ function _nbSetState(s) {
   if (document.querySelectorAll('.cell-block').length > 0) return;
   // Fresh iframe (restoring from saved ZIP state) — rebuild from scratch.
   document.querySelectorAll('.cell-block, .add-row').forEach(el => el.remove());
-  if (s.title) document.getElementById('notebook-title').textContent = s.title;
+  if (s.title) {
+    notebookName = s.title;
+    document.getElementById('notebook-title').textContent = s.title;
+  }
   for (const cell of s.cells) {
     const src = cell.source || '';
     if (cell.cell_type === 'markdown') {
