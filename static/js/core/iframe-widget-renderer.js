@@ -185,12 +185,13 @@ export function parkWidgets(container, slideKey) {
 }
 
 /**
- * Destroy all widget iframes belonging to a specific slide.
- * Call after editor changes so a fresh render is forced on next visit.
+ * Destroy the widget iframes belonging to a specific slide, except those whose
+ * id is in `keepIds` (when given).
  */
-export function discardParkedWidgets(slideKey) {
+export function discardParkedWidgets(slideKey, keepIds = null) {
     document.querySelectorAll(_bySlideSel(slideKey)).forEach(iframe => {
         const wid = iframe.dataset.widgetId;
+        if (keepIds && keepIds.has(String(wid))) return;
         if (wid) { _widgetRegistry.delete(wid); _capturedStates.delete(String(wid)); }
         try { iframe.contentWindow?.postMessage({ type: 'widget-cleanup' }, '*'); } catch (_) {}
         iframe.remove();
@@ -277,6 +278,32 @@ const _NOT_ASSET_KEYS = new Set([
     'sessionId', 'socketUrl', 'serverUrl', 'publicBaseUrl',
 ]);
 
+// ── Config signature ───────────────────────────────────────────────────────
+// A parked iframe is reused only while its widget's settings are the ones it
+// was built with. Layout keys are left out: moving or resizing a widget is
+// applied in place, and must not reboot it (a notebook would reload its
+// kernel, a shell would lose its session).
+const _LAYOUT_KEYS = new Set(['x', 'y', 'width', 'height', 'zIndex', 'interactive']);
+
+function _configSignature(w) {
+    const out = {};
+    for (const key of Object.keys(w || {}).sort()) {
+        if (!_LAYOUT_KEYS.has(key)) out[key] = w[key];
+    }
+    try { return JSON.stringify(out); } catch (_) { return String(Math.random()); }
+}
+
+/**
+ * Record that a widget's live iframe already reflects its current config item.
+ * Called when the widget itself wrote to the item (a saved file path, a
+ * setting changed from inside the widget) — the iframe made that change, so
+ * it must not be rebuilt for it.
+ */
+export function syncWidgetSignature(widgetId, item) {
+    document.querySelectorAll(`.widget-iframe[data-widget-id="${CSS.escape(String(widgetId))}"]`)
+        .forEach(iframe => { iframe.dataset.widgetSig = _configSignature(item); });
+}
+
 function _pendingAssetUrl(path) {
     const buffer = window.beamerState?.editorNewFiles?.[path];
     if (!buffer) return null;
@@ -328,7 +355,18 @@ export function renderWidgets(slideConfig, container, zipFile, viewerMode = fals
     const promises = slideConfig.widgets.map(async (w) => {
         // dataset properties are always strings; w.id may be a number from JSON —
         // coerce to string so the Map lookup matches the string keys in existingMap.
-        const existing = existingMap.get(String(w.id));
+        let existing = existingMap.get(String(w.id));
+
+        // Settings changed since this iframe was built (edited in the editor):
+        // it has to be rebuilt to pick them up. Anything else — including a
+        // plain trip in and out of edit mode — keeps the live iframe.
+        if (existing && existing.dataset.widgetSig !== _configSignature(w)) {
+            existingMap.delete(String(w.id));
+            _capturedStates.delete(String(w.id));
+            try { existing.contentWindow?.postMessage({ type: 'widget-cleanup' }, '*'); } catch (_) {}
+            existing.remove();
+            existing = null;
+        }
 
         if (existing) {
             // ── Reveal parked iframe ───────────────────────────────────────
@@ -341,7 +379,14 @@ export function renderWidgets(slideConfig, container, zipFile, viewerMode = fals
             _widgetRegistry.set(String(w.id), { iframe: existing, container, savedStyle: null });
             _ensureExpandListener();
 
-            // Restore position / size in case the container was resized
+            // Restore position / size — the container may have been resized, or
+            // the widget moved in the editor. The dataset is what later
+            // resizes read, so it has to follow too.
+            Object.assign(existing.dataset, {
+                widgetX: w.x, widgetY: w.y, widgetWidth: w.width, widgetHeight: w.height,
+                widgetZIndex: w.zIndex || 10,
+                widgetInteractive: w.interactive !== false ? 'true' : 'false',
+            });
             const rect = container.getBoundingClientRect();
             existing.style.left          = `${w.x * rect.width}px`;
             existing.style.top           = `${w.y * rect.height}px`;
@@ -372,6 +417,7 @@ export function renderWidgets(slideConfig, container, zipFile, viewerMode = fals
         iframe.className = 'widget-iframe';
         iframe.dataset.widgetId    = w.id;
         iframe.dataset.widgetSlide = slideKey ?? '';   // which slide owns this iframe
+        iframe.dataset.widgetSig   = _configSignature(w);
 
         iframe.dataset.widgetX      = w.x;
         iframe.dataset.widgetY      = w.y;

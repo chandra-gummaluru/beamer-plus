@@ -1,11 +1,12 @@
-// "Add Widget" picker — enumerates built-in widgets from the server, groups
-// them into categories, and adds the chosen widget (or a custom uploaded
-// .html file) to the current slide.
+// "Add Widget" picker — lists every widget in the server's widgets/ folder,
+// groups them into categories, and adds the chosen widget (or a custom
+// uploaded .html file) to the current slide.
 //
-// The maps below are used ONLY by the picker to enumerate and categorise
-// available widgets. They do NOT control editable fields — each widget HTML
-// file declares its own schema via:
+// A widget's name and category come from its own schema block, read by the
+// server (/api/widgets/catalog):
 //   <script id="widget-schema" type="application/json"> … </script>
+// so a new file in widgets/ appears here with no change to this module. The
+// only thing kept here is the icon, with a generic one for anything unlisted.
 import { ctx, getOrCreateConfig, escHtml } from './context.js';
 import { renderEditOverlays, cleanupEditOverlays, selectOverlayEl } from './overlays.js';
 
@@ -14,10 +15,12 @@ const WIDGET_ICONS = {
     calculator:         `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="11" x2="16" y2="11"/><line x1="8" y1="16" x2="12" y2="16"/></svg>`,
     camera:             `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`,
     'function-plotter': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
+    'karnaugh-map':     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/><rect x="4.6" y="4.6" width="8.8" height="8.8" rx="4"/></svg>`,
     ipynb_widget:       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`,
     map:                `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
     mcq:                `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`,
-    'python-repl':      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="18" rx="2"/><polyline points="8 9 12 13 8 17"/><line x1="12" y1="17" x2="16" y2="17"/></svg>`,
+    'python-ide':       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="18" rx="2"/><line x1="2" y1="13" x2="22" y2="13"/><line x1="6" y1="7" x2="13" y2="7"/><polyline points="6 16 8 17.5 6 19"/></svg>`,
+    'python-visualizer':`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="7" height="6" rx="1"/><rect x="15" y="4" width="7" height="6" rx="1"/><rect x="15" y="14" width="7" height="6" rx="1"/><path d="M9 7h6M9 7l6 10"/></svg>`,
     'python-shell':     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="18" rx="2"/><polyline points="6 9 9 12 6 15"/><polyline points="11 9 14 12 11 15"/><line x1="16" y1="15" x2="19" y2="15"/></svg>`,
     shell:              `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="18" rx="2"/><polyline points="4 9 8 13 4 17"/><line x1="10" y1="17" x2="20" y2="17"/></svg>`,
     survey:             `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`,
@@ -29,17 +32,12 @@ const WIDGET_ICONS = {
     __custom__:         `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>`,
 };
 
-export const WIDGET_LABELS = {
-    'ipynb_widget':     'Coding Notebook',
-    'pdf':              'PDF',
-    'function-plotter': 'Function Plotter',
-    'mcq':              'Choice',
-    'word-cloud':       'Word Cloud',
-};
+// type → display name. Filled from the catalog the first time the picker
+// opens; the properties panel reads it for the widget-type badge.
+export const WIDGET_LABELS = {};
 
-// Widgets that exist on the server but should not appear in the picker UI.
-const WIDGET_HIDDEN = new Set(['python-repl']);
-
+// Preferred tab order. A category a widget declares that isn't listed here
+// still gets a tab, just before "Other".
 const WIDGET_CATEGORY_ORDER = [
     'Mathematics',
     'Computer Science',
@@ -50,23 +48,33 @@ const WIDGET_CATEGORY_ORDER = [
     'Other',
 ];
 
-const WIDGET_CATEGORIES = {
-    'calculator':       'Mathematics',
-    'function-plotter': 'Mathematics',
-    'browser':          'Tools',
-    'ipynb_widget':     'Computer Science',
-    'shell':            'Computer Science',
-    'python-shell':     'Computer Science',
-    'cortexc':          'Computer Science',
-    'mcq':              'Audience Response',
-    'survey':           'Audience Response',
-    'word-cloud':       'Audience Response',
-    'camera':           'Tools',
-    'map':              'Tools',
-    'pdf':              'Tools',
-    'timer':            'Tools',
-    'youtube':          'Tools',
-};
+function _defaultLabel(type) {
+    return type.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// Older servers only have /api/widgets (bare file names); fall back to that.
+async function _loadCatalog() {
+    try {
+        const res = await fetch('/api/widgets/catalog');
+        if (res.ok) return await res.json();
+    } catch (_) { /* fall through */ }
+    try {
+        const res = await fetch('/api/widgets');
+        if (res.ok) {
+            return (await res.json()).map(file => {
+                const type = file.replace(/\.html$/i, '');
+                return { file, type, label: _defaultLabel(type), category: 'Other' };
+            });
+        }
+    } catch (e) {
+        console.warn('Could not load widget list:', e);
+    }
+    return [];
+}
+
+// Fill the names early, so the properties badge has them before the picker
+// has ever been opened.
+_loadCatalog().then(list => { for (const w of list) WIDGET_LABELS[w.type] = w.label; });
 
 /* ─── picker modal ──────────────────────────────────────────── */
 
@@ -77,14 +85,8 @@ export async function addWidget() {
         return;
     }
 
-    let widgets = [];
-    try {
-        const res = await fetch('/api/widgets');
-        if (res.ok) widgets = await res.json();
-    } catch (e) {
-        console.warn('Could not load widget list:', e);
-    }
-
+    const widgets = await _loadCatalog();
+    for (const w of widgets) WIDGET_LABELS[w.type] = w.label;
     _showWidgetModal(widgets);
 }
 
@@ -92,12 +94,12 @@ function _showWidgetModal(widgets) {
     document.getElementById('widget-modal-overlay')?.remove();
 
     // Determine which categories actually have widgets (so we don't show empty tabs).
-    const usedCats = new Set(widgets.flatMap(f => {
-        const type = f.replace(/\.html$/i, '');
-        if (WIDGET_HIDDEN.has(type)) return [];
-        return [WIDGET_CATEGORIES[type] || 'Other'];
-    }));
-    const visibleCats = WIDGET_CATEGORY_ORDER.filter(c => usedCats.has(c));
+    const usedCats = new Set(widgets.map(w => w.category || 'Other'));
+    const extraCats = [...usedCats]
+        .filter(c => !WIDGET_CATEGORY_ORDER.includes(c))
+        .sort();
+    const order = [...WIDGET_CATEGORY_ORDER.slice(0, -1), ...extraCats, 'Other'];
+    const visibleCats = order.filter(c => usedCats.has(c));
 
     const overlay = document.createElement('div');
     overlay.id = 'widget-modal-overlay';
@@ -112,7 +114,7 @@ function _showWidgetModal(widgets) {
             </div>
             <div class="widget-modal-cats" id="widget-modal-cats">
                 <button class="widget-cat-btn is-active" data-cat="all">All</button>
-                ${visibleCats.map(c => `<button class="widget-cat-btn" data-cat="${c}">${c}</button>`).join('')}
+                ${visibleCats.map(c => `<button class="widget-cat-btn" data-cat="${escHtml(c)}">${escHtml(c)}</button>`).join('')}
             </div>
             <div class="widget-modal-search-row">
                 <input class="editor-prop-input widget-modal-search" type="search"
@@ -161,13 +163,10 @@ function _populateWidgetGrid(grid, widgets, filter, category = 'all') {
         grid.appendChild(_makeWidgetCard('__custom__', 'Custom', WIDGET_ICONS.__custom__, true));
     }
 
-    widgets.forEach(filename => {
-        const type  = filename.replace(/\.html$/i, '');
-        if (WIDGET_HIDDEN.has(type)) return;
-        const cat   = WIDGET_CATEGORIES[type] || 'Other';
+    widgets.forEach(({ type, label, category: cat = 'Other' }) => {
         if (category !== 'all' && cat !== category) return;
-        const label = WIDGET_LABELS[type] || type.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-        if (q && !label.toLowerCase().includes(q) && !type.toLowerCase().includes(q)) return;
+        const q2 = `${label} ${type} ${cat}`.toLowerCase();
+        if (q && !q2.includes(q)) return;
         grid.appendChild(_makeWidgetCard(type, label, WIDGET_ICONS[type] || WIDGET_ICONS.__default__));
     });
 }

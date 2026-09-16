@@ -13,7 +13,7 @@
 //   ← widget   widget-asset-upload    a file field picked a file
 //   → widget   widget-asset-saved     …and the path it was stored under
 import { ctx, WIDGET_RESERVED } from './context.js';
-import { postToWidget, widgetIdForWindow } from '../core/iframe-widget-renderer.js';
+import { postToWidget, widgetIdForWindow, syncWidgetSignature } from '../core/iframe-widget-renderer.js';
 import { sessionUrl } from '../app/session.js';
 
 export function initWidgetSettings() {
@@ -70,6 +70,8 @@ function mergeSettings(widgetId, msg) {
     for (const key of (Array.isArray(msg.remove) ? msg.remove : [])) {
         if (typeof key === 'string' && !WIDGET_RESERVED.has(key)) delete item[key];
     }
+    // The widget made this change itself, so its iframe is already current.
+    syncWidgetSignature(widgetId, item);
 }
 
 /* ─── saving ────────────────────────────────────────────────────── */
@@ -95,6 +97,7 @@ async function storeAsset(widgetId, msg) {
     if (!item) return;
     const path = await saveWidgetAsset(item, msg);
     if (path === null) return;
+    syncWidgetSignature(widgetId, item);   // the widget's own write — no rebuild
     postToWidget(widgetId, { type: 'widget-asset-saved', key: msg.key, path });
 }
 

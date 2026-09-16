@@ -250,6 +250,20 @@ body {
 .cell-card.focused::before { background: var(--accent); }
 .cell-card.running::before { background: var(--amber); animation: blink 0.9s ease-in-out infinite; }
 
+/* ── Monospace text: no ligatures ──────────────────────────────── */
+/* JetBrains Mono joins ">>", ">>>", "->", "!=" … into single glyphs, and it
+   re-shapes the run on every keystroke — typing ">>>" made the first ">"
+   jump and briefly vanish. Code should show the characters that are there. */
+.code-ta,
+.out-text,
+.exec-num,
+.out-num,
+.md-view code,
+.md-view pre {
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
+}
+
 /* ── Code input ────────────────────────────────────────────────── */
 .code-area {
   display: flex;
@@ -529,8 +543,7 @@ body {
   <div id="notebook">
     <div id="boot-state">
       <div class="boot-spinner"></div>
-      <span id="boot-msg">Initialising Pyodide…</span>
-      <span id="boot-sub">First load may take a few seconds</span>
+      <span id="boot-msg">Loading Python…</span>
     </div>
   </div>
 </div>
@@ -553,7 +566,7 @@ const CFG      = window.WIDGET_CONFIG || {};
 const WIDGET_ID      = CFG.id              || 'jupyter-notebook';
 const NOTEBOOK_PATH  = CFG.notebook        || _qs.get('notebook') || null;
 const NOTEBOOK_OBJ   = CFG.notebookContent || null;  // pre-loaded by renderer
-const IS_VIEWER      = !!(CFG.viewer || _qs.get('viewer') === '1');
+const IS_VIEWER      = !!(CFG.viewer || CFG.role === 'viewer' || _qs.get('viewer') === '1');
 
 // ── Package configuration ───────────────────────────────────────────────────
 // Always loaded — the widget's matplotlib capture helper depends on them.
@@ -583,6 +596,7 @@ const AUTO_IMPORT = CFG.autoImport != null
 // ─────────────────────────────────────────────────────────────────────────────
 let pyodide     = null;
 let bpRunCell   = null;   // PyProxy of _bp_run_cell (see initPyodide)
+let pythonVersion = '3';  // "3.11.3" once the kernel is up
 let isBusy      = false;
 let execCounter = 0;
 let selectedId  = null;
@@ -598,6 +612,14 @@ let originalMetadata = null;
 // the generic widget name back over it (see the widget-config handler).
 let notebookTitleSet = false;
 let originalNbformat = { major: 4, minor: 5 };
+// Cells can arrive from two places: the notebook file (after the kernel
+// boots, which takes seconds) and the host's saved state (widget-set-state,
+// usually much sooner). Whichever lands first owns the notebook; the other is
+// dropped. Without this the two were appended one after the other.
+let contentLoaded = false;
+// The empty starter cell shown when there's no notebook. It isn't content,
+// so restored state may still replace it — as long as nobody typed in it.
+let placeholderId = null;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MARKDOWN  —  configure marked.js for Jupyter-style rendering
@@ -618,6 +640,26 @@ function assetUrl(p) {
   return base ? base + '/api/zip-asset/' + String(p).replace(/^\/+/, '') : p;
 }
 
+// A line starting with ">>>" is a Python prompt (a doctest, a pasted REPL
+// session), but to markdown it's three nested blockquotes — the arrows vanish
+// and only "sq(3)" is left. Escaping the first ">" keeps the line as text.
+// Fenced blocks are skipped (marked already shows them verbatim), and so are
+// lines indented 4+ spaces: that's an indented code block, where a "\" would
+// show up literally — and 4 spaces can't open a blockquote anyway.
+function protectPythonPrompts(src) {
+  let fence = null;
+  return src.split('\n').map(line => {
+    const f = line.match(/^ {0,3}(`{3,}|~{3,})/);
+    if (f) {
+      if (!fence) fence = f[1];
+      else if (f[1][0] === fence[0] && f[1].length >= fence.length) fence = null;
+      return line;
+    }
+    if (fence) return line;
+    return line.replace(/^( {0,3})>>>/, '$1\\>>>');
+  }).join('\n');
+}
+
 function mdParse(src) {
   if (!src) return '';
 
@@ -626,7 +668,7 @@ function mdParse(src) {
   // afterwards rendered by KaTeX.  Using a private sentinel unlikely to appear
   // in real notebook content.
   const mathParts = [];
-  let s = src;
+  let s = protectPythonPrompts(src);
 
   if (typeof katex !== 'undefined') {
     // Display math  $$...$$  (multi-line OK) — process before inline
@@ -776,7 +818,6 @@ async function installExtraPackages(names) {
     const key = packageKey(name);
     if (seen.has(key)) continue;
     seen.add(key);
-    setBoot(`Installing ${name}…`);
     try {
       await installPackage(name);
       loadedPackages.push(name);
@@ -796,7 +837,7 @@ function showPackageWarning(failed) {
   div.id = 'pkg-warning';
   div.innerHTML =
     `<div><strong>Could not install:</strong> <code>${escHtml(failed.join(', '))}</code><br>` +
-    `Not in the Pyodide distribution, and no pure-Python wheel on PyPI. ` +
+    `They aren't available for Python in the browser. ` +
     `Cells importing them will fail.</div>` +
     `<button class="pkg-warn-x" title="Dismiss">✕</button>`;
   div.querySelector('.pkg-warn-x').addEventListener('click', () => div.remove());
@@ -810,13 +851,11 @@ async function initPyodide() {
   // Start the notebook fetch alongside the runtime download — the two are
   // independent, and we need the notebook's metadata before installing
   // packages so it can contribute to the list.
-  setBoot('Loading Pyodide runtime…');
   const nbPromise = resolveNotebook();
 
   pyodide = await loadPyodide();
   const { nb, filename, error: nbError } = await nbPromise;
 
-  setBoot('Loading numpy + matplotlib…');
   await pyodide.loadPackage(BASE_PACKAGES);
   loadedPackages.push(...BASE_PACKAGES);
 
@@ -872,13 +911,29 @@ async def _bp_run_cell(src):
   bpRunCell = pyodide.globals.get('_bp_run_cell');
 
   removeBoot();
-  setKernel('ready', 'Python 3 · Pyodide');
+  pythonVersion = pyodide.runPython('import sys; sys.version.split()[0]');
+  setKernel('ready', 'Python ' + pythonVersion);
   enablePresenterToolbar();
   showPackageWarning(failedPackages);
 
+  // Saved state may already have built the cells while the kernel booted.
+  if (contentLoaded) return;
   if (nb)           renderNotebook(nb, filename);
-  else if (nbError) addCodeCell('# Could not load notebook: ' + nbError);
-  else              addCodeCell('');
+  else if (nbError) addCodeCell('# Could not load notebook: ' + nbError, null, { focus: false });
+  else              addPlaceholderCell();
+}
+
+function addPlaceholderCell() {
+  if (document.querySelector('.cell-block')) return;
+  placeholderId = addCodeCell('', null, { focus: false });
+}
+
+// Once a notebook is on screen, start at its top — a load is not an edit,
+// so it has no business moving the view. 'instant' overrides the pane's
+// smooth scroll-behavior, which would otherwise animate the jump.
+function scrollNotebookToTop() {
+  const area = document.getElementById('notebook-area');
+  if (area) area.scrollTo({ top: 0, behavior: 'instant' });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -907,7 +962,6 @@ async function resolveNotebook() {
   if (!NOTEBOOK_PATH) return { nb: null, filename, error: null };
 
   try {
-    setBoot(`Loading ${filename}…`);
     // A deck-relative path (assets/lecture.ipynb) is served out of the
     // presentation ZIP; an http(s) URL passes straight through.
     const resp = await fetch(assetUrl(NOTEBOOK_PATH));
@@ -931,6 +985,8 @@ function packagesFromNotebook(nb) {
 // `withOutputs` is false in viewer mode, where outputs come from the presenter
 // over Socket.IO rather than from the file.
 function renderNotebook(nb, filename, withOutputs = true) {
+  if (contentLoaded) return;
+  contentLoaded = true;
   try {
     if (filename) {
       notebookName = filename.split('/').pop();
@@ -950,7 +1006,7 @@ function renderNotebook(nb, filename, withOutputs = true) {
       if (cell.cell_type === 'markdown') { addMarkdownCell(src); continue; }
       if (cell.cell_type !== 'code') continue;
 
-      const id = addCodeCell(src);
+      const id = addCodeCell(src, null, { focus: false });
       // Restore saved outputs from the file (don't re-execute)
       if (withOutputs && cell.outputs?.length) {
         renderOutputs(id, parseIpynbOutputs(cell.outputs), cell.execution_count);
@@ -962,8 +1018,9 @@ function renderNotebook(nb, filename, withOutputs = true) {
     }
   } catch (e) {
     console.warn('Notebook render failed:', e);
-    addCodeCell('# Could not load notebook: ' + (e.message || e));
+    addCodeCell('# Could not load notebook: ' + (e.message || e), null, { focus: false });
   }
+  scrollNotebookToTop();
 }
 
 // Convert .ipynb output objects → our internal format
@@ -995,7 +1052,9 @@ function parseIpynbOutputs(raw) {
 // ─────────────────────────────────────────────────────────────────────────────
 function uid() { return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
 
-function addCodeCell(code = '', insertAfterId = null) {
+// `focus: false` for cells built by a load: focusing a textarea scrolls it
+// into view, so focusing each cell in turn left the view at the last one.
+function addCodeCell(code = '', insertAfterId = null, { focus = true } = {}) {
   const id = uid();
 
   const block = document.createElement('div');
@@ -1048,7 +1107,7 @@ function addCodeCell(code = '', insertAfterId = null) {
   }
 
   refreshAddRows();
-  if (!IS_VIEWER) { ta.focus(); selectCell(id); }
+  if (!IS_VIEWER && focus) { ta.focus(); selectCell(id); }
   return id;
 }
 
@@ -1309,7 +1368,7 @@ async function runCell(id) {
   const en = document.getElementById(`enum-${id}`);
   if (en) { en.textContent = `[${n}]`; en.classList.add('ran'); }
   document.getElementById(`card-${id}`).classList.remove('running');
-  setKernel('ready', 'Python 3 · Pyodide');
+  setKernel('ready', 'Python ' + pythonVersion);
   isBusy = false;
 }
 
@@ -1509,16 +1568,15 @@ function refreshAddRows() {
 
 // The kernel's status used to sit in a pill in the toolbar. The bar is for
 // things you act on, and the state it reported is already visible where it
-// matters — the boot overlay while Pyodide loads, [*] on a running cell — so
+// matters — the boot overlay while Python loads, [*] on a running cell — so
 // the pill is gone and what's left is the record of what the kernel has:
 // the notebook title carries it as a tooltip, out of the way until asked for.
 function setKernel(state, label) {
   const title = document.getElementById('notebook-title');
   if (!title) return;
-  title.title = loadedPackages.length
-    ? 'Packages: ' + loadedPackages.join(', ')
-      + (failedPackages.length ? `\nFailed: ${failedPackages.join(', ')}` : '')
-    : (label || '');
+  title.title = (label || '')
+    + (loadedPackages.length ? '\nPackages: ' + loadedPackages.join(', ') : '')
+    + (failedPackages.length ? `\nFailed: ${failedPackages.join(', ')}` : '');
 }
 
 function setBoot(msg) {
@@ -1615,7 +1673,7 @@ function buildIpynb() {
   // doesn't model — kernelspec, language_info, anything the presenter's own
   // tools wrote at the top level — survive a round trip through Beamer+.
   const metadata = Object.assign({
-    kernelspec: { name: 'python3', display_name: 'Python 3 (Pyodide)', language: 'python' },
+    kernelspec: { name: 'python3', display_name: 'Python 3', language: 'python' },
     language_info: { name: 'python' },
   }, originalMetadata || {});
 
@@ -1742,15 +1800,17 @@ if (IS_VIEWER) {
   removeBoot();
   setKernel('viewer', 'View only');
   resolveNotebook().then(({ nb, filename }) => {
+    if (contentLoaded) return;
     if (nb) renderNotebook(nb, filename, false);
-    else    addCodeCell('');
+    else    addPlaceholderCell();
   });
 } else {
   // Presenter: full Pyodide kernel
   initPyodide().catch(e => {
     removeBoot();
     setKernel('busy', 'Kernel error');
-    addCodeCell('# Pyodide failed to load: ' + e.message);
+    console.warn('[notebook] load failed:', e);
+    addCodeCell('# Python failed to load. Check the network connection, then reload the slide.');
     console.error(e);
   });
 }
@@ -1798,12 +1858,22 @@ function _nbGetState() {
 
 function _nbSetState(s) {
   if (!s || !Array.isArray(s.cells)) return;
-  // If cells already exist the iframe is live (opacity-based navigation keeps
-  // iframes in the DOM).  The DOM — including cell outputs — is already intact,
-  // so skip the rebuild entirely to avoid wiping rendered results.
-  if (document.querySelectorAll('.cell-block').length > 0) return;
+  // If content is already on screen the iframe is live (opacity-based
+  // navigation keeps iframes in the DOM), or the notebook file got there
+  // first. Either way the DOM — including outputs — is intact, so skip.
+  if (contentLoaded) return;
+  // An untouched starter cell doesn't count; anything else someone typed does.
+  const blocks = document.querySelectorAll('.cell-block');
+  const onlyPlaceholder = blocks.length === 1
+    && blocks[0].dataset.id === placeholderId
+    && !document.getElementById('ta-' + placeholderId)?.value;
+  if (blocks.length && !onlyPlaceholder) return;
+  contentLoaded = true;
+  placeholderId = null;
   // Fresh iframe (restoring from saved ZIP state) — rebuild from scratch.
   document.querySelectorAll('.cell-block, .add-row').forEach(el => el.remove());
+  cellMeta.clear();
+  selectedId = null;
   if (s.title) {
     notebookName = s.title;
     document.getElementById('notebook-title').textContent = s.title;
@@ -1814,7 +1884,7 @@ function _nbSetState(s) {
     if (cell.cell_type === 'markdown') {
       addMarkdownCell(src);
     } else {
-      const id = addCodeCell(src);
+      const id = addCodeCell(src, null, { focus: false });
       if (cell.outputs?.length) {
         // cell.outputs is already in our internal format — pass directly to renderOutputs
         renderOutputs(id, cell.outputs, cell.execution_count);
@@ -1826,6 +1896,7 @@ function _nbSetState(s) {
     }
   }
   refreshAddRows?.();
+  scrollNotebookToTop();
 }
 
 window.addEventListener('message', function(e) {

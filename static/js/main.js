@@ -877,7 +877,8 @@ async function renderSplitSlides(leftIdx, rightIdx) {
     ro?.classList.remove('visible');
 }
 
-// forceRefresh=true discards any parked widgets for this slide so editor
+// forceRefresh=true is passed after editor changes: widgets that are no longer
+// on the slide are discarded; changed ones are rebuilt by renderWidgets.
 // changes (add/remove/modify widgets) take effect on re-render.
 async function renderLogicalSlide(logicalIndex, isRight = false, suppressOverlay = false, forceRefresh = false) {
     const obj = state.slideStructure[logicalIndex];
@@ -908,8 +909,15 @@ async function renderLogicalSlide(logicalIndex, isRight = false, suppressOverlay
         // Remove non-widget media from the old slide
         slideContainer.querySelectorAll('video,audio,model-viewer').forEach(el => el.remove());
     }
-    // After editor changes, kill parked widgets so fresh iframes are created
-    if (forceRefresh) discardParkedWidgets(newSlideKey);
+    // After editor changes, only widgets that were removed are discarded here
+    // (renderWidgets never runs for a slide left with none). Changed ones are
+    // rebuilt by renderWidgets itself. Discarding everything rebooted every
+    // widget on the slide each time edit mode was left — a notebook loaded twice.
+    if (forceRefresh) {
+        const cfgKey = obj.type === 'pdf' ? obj.pdfIndex : obj.blankId;
+        const keep = new Set((state.slideConfigs[cfgKey]?.widgets || []).map(w => String(w.id)));
+        discardParkedWidgets(newSlideKey, keep);
+    }
 
     const loading = suppressOverlay ? null : _slideOverlay(isRight);
     if (loading) loading.classList.add('visible');

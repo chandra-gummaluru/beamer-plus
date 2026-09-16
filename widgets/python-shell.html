@@ -64,10 +64,12 @@
 
     .body { flex: 1 1 auto; min-width: 0; }
 
-    .out  { white-space: pre-wrap; overflow-wrap: anywhere; }
+    /* Same ink as the Python IDE's shell: what Python printed or returned in
+       the text colour, errors in --err, the shell's own notes muted. */
+    .out  { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); }
     .val  { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); }
     .err  { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--err); }
-    .note { color: var(--text-3); font-style: italic; }
+    .note { white-space: pre-wrap; color: var(--text-3); font-style: italic; }
 
     /* The input is a textarea, not a contenteditable: it gets paste, IME and
        undo for free, and grows to fit a pasted block. */
@@ -90,9 +92,10 @@
 
     #inputrow[hidden] { display: none; }
 
-    /* Boot / fatal states reuse the shared loading furniture. */
-    #boot { padding: 48px 20px; }
-    #fatal { margin: 16px; }
+    /* Loading sits in the transcript, where the prompt is about to appear —
+       the same row the Python IDE's shell shows. */
+    #boot { display: flex; align-items: center; gap: 8px; color: var(--text-3); }
+    #boot .bw-spinner { width: 12px; height: 12px; }
   </style>
 </head>
 <body>
@@ -104,11 +107,7 @@
       <div class="body"><textarea id="input" rows="1" spellcheck="false" autocapitalize="off" autocorrect="off" aria-label="Python input"></textarea></div>
     </div>
 
-    <div class="bw-boot" id="boot">
-      <div class="bw-spinner"></div>
-      <div class="bw-boot-msg" id="boot-msg">Starting Python…</div>
-      <div class="bw-boot-sub" id="boot-sub">First load downloads the runtime</div>
-    </div>
+    <div id="boot"><span class="bw-spinner"></span><span>Loading Python…</span></div>
   </div>
 
 <script>
@@ -445,7 +444,10 @@
   inputEl.addEventListener('input', autoGrow);
 
   function abandonInput() {
-    if (inputEl.value.trim()) write('echo', { ps: currentPrompt(), line: inputEl.value + '  ^C' });
+    // What CPython prints: the line as it stood, then KeyboardInterrupt.
+    write('echo', { ps: currentPrompt(), line: inputEl.value + '^C' });
+    write('err', 'KeyboardInterrupt');
+    endStream();
     setInput('');
     try { if (pyconsole && clearBuffer) clearBuffer(pyconsole); } catch (e) {}
     setPrompt(PS1);
@@ -481,25 +483,17 @@
 
   /* ─── boot ────────────────────────────────────────────────────── */
 
-  function setBoot(msg, sub) {
-    var m = document.getElementById('boot-msg');
-    var s = document.getElementById('boot-sub');
-    if (m) m.textContent = msg;
-    if (s && sub !== undefined) s.textContent = sub;
-  }
-
   function removeBoot() {
     if (bootEl && bootEl.parentNode) bootEl.parentNode.removeChild(bootEl);
     bootEl = null;
   }
 
-  function fatal(message) {
+  // Said the same way as in the Python IDE. The detail goes to the console:
+  // it names the runtime, which is nothing the room needs to read.
+  function fatal(detail) {
     removeBoot();
-    var b = document.createElement('div');
-    b.className = 'bw-banner bw-banner--error';
-    b.id = 'fatal';
-    b.innerHTML = '<div><strong>Python couldn\'t start.</strong> ' + message + '</div>';
-    termEl.insertBefore(b, rowEl);
+    if (detail) console.warn('[python-shell] load failed:', detail);
+    write('err', 'Python failed to load. Check the network connection, then reload the slide.');
   }
 
   function asList(v) {
@@ -516,7 +510,6 @@
     var micropip = null;
     for (var i = 0; i < names.length; i++) {
       var name = names[i];
-      setBoot('Loading ' + name + '…');
       try {
         await pyodide.loadPackage(name);
         continue;
@@ -543,21 +536,18 @@
 
   async function boot() {
     if (typeof loadPyodide !== 'function') {
-      fatal('The Pyodide runtime could not be fetched. This widget needs an internet ' +
-            'connection the first time it runs; afterwards the browser cache serves it.');
+      fatal('runtime script not fetched');
       return;
     }
 
     try {
       pyodide = await loadPyodide({ indexURL: INDEX_URL });
     } catch (e) {
-      fatal('Loading the runtime failed: ' + (e && e.message ? e.message : String(e)));
+      fatal(e && e.message ? e.message : String(e));
       return;
     }
 
     var failed = await loadPackages(asList(CFG.packages));
-
-    setBoot('Starting the interpreter…');
 
     // One namespace holds the helpers this widget needs on the Python side;
     // the console itself gets a clean __main__-shaped dict so the presenter's
@@ -599,11 +589,10 @@
     removeBoot();
 
     if (CFG.banner !== false) {
-      write('note', 'Python ' + version + ' · Pyodide ' + (pyodide.version || '') +
-                    ' — real CPython, in this browser tab.');
+      write('note', 'Python ' + version);
     }
     if (failed.length) {
-      write('err', 'Could not install: ' + failed.join(', '));
+      write('err', 'Could not load: ' + failed.join(', '));
     }
 
     rowEl.hidden = false;
@@ -654,7 +643,7 @@
 
     bw.topbar.addButton({
       label: 'Restart',
-      title: 'Throw away every name and start a fresh interpreter',
+      title: 'Restart Python — every name is forgotten',
       onClick: restart,
     });
 
@@ -667,13 +656,12 @@
     if (!pyconsole) return;
     try { pyconsole.destroy(); } catch (e) {}
     pyconsole = makeConsole();
-    clearTranscript();
-    history = [];
-    histIdx = -1;
+    endStream();
     setPrompt(PS1);
     setInput('');
     setBusy(false);
-    write('note', 'Fresh interpreter — every name from before is gone.');
+    // IDLE's marker, and the Python IDE's: the screen stays, the names go.
+    write('note', '=== RESTART ===');
     focusInput();
   }
 
@@ -705,7 +693,7 @@
     history = Array.isArray(state.history) ? state.history.slice() : [];
     histIdx = -1;
     if (state.entries.length) {
-      write('note', '— restored from the saved deck; the interpreter itself starts empty —');
+      write('note', 'Restored from the saved deck — earlier names are not defined.');
     }
     scrollDown();
   }

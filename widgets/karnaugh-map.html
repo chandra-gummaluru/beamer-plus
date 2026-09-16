@@ -1,0 +1,1889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script id="widget-schema" type="application/json">
+{
+  "label": "Karnaugh Map",
+  "category": "Computer Science",
+  "fields": [
+    { "key": "inputMode", "label": "Input", "type": "select",
+      "options": [{ "v": "formula", "l": "Formula" }, { "v": "table", "l": "Truth table" }],
+      "default": "formula" },
+    { "key": "expression", "label": "Boolean expression", "type": "text",
+      "placeholder": "A*B + A'*C   or   (A+B)(A'+C')" },
+    { "key": "mode", "label": "Simplify to", "type": "select",
+      "options": [{ "v": "sop", "l": "Sum of products" }, { "v": "pos", "l": "Product of sums" }],
+      "default": "sop" },
+    { "key": "tableVars", "label": "Variables (truth-table input)", "type": "select",
+      "options": ["2", "3", "4"], "default": "3" },
+    { "key": "truthTable", "label": "Truth table (0 / 1 / X per row)", "type": "text", "placeholder": "00110101" },
+    { "key": "dontCares", "label": "Don't-cares (formula input)", "type": "text", "placeholder": "5, 7, 13" },
+    { "key": "vars", "label": "Variable names (blank = auto)", "type": "text", "placeholder": "A, B, C, D" },
+    { "key": "fnName", "label": "Function name", "type": "text", "default": "F" },
+    { "key": "notation", "label": "Complement shown as", "type": "select",
+      "options": [{ "v": "prime", "l": "A'" }, { "v": "bar", "l": "A with overbar" }],
+      "default": "prime" },
+    { "key": "rowOrder", "label": "Truth-table reveal order", "type": "select",
+      "options": [{ "v": "term", "l": "Term by term" }, { "v": "table", "l": "Straight down the table" }],
+      "default": "term" },
+    { "key": "scale", "label": "Text size", "type": "select", "options": ["1", "1.4", "1.8", "2.2"], "default": "1.4" }
+  ]
+}
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Karnaugh Map — Beamer+</title>
+
+<!-- Vendored by the Beamer+ server. Never load socket.io from a CDN, and never
+     call io() bare — inside the srcdoc iframe that resolves to
+     http://about/socket.io/, which an HTTPS deck blocks as mixed content. -->
+<script src="/static/vendor/socket.io.min.js"></script>
+
+<style>
+/* Tokens, reset, toolbar, buttons, inputs and banners come from the shared
+   widget base (static/css/widget-base.css). What's left here is this widget's
+   own furniture: the four quadrants, the truth table, the map grid, and the
+   group outlines drawn over it. */
+
+/* ── Group colours ────────────────────────────────────────────────────────
+   The one place in this widget where hue carries meaning: a group's outline
+   on the map and the term it produced in the bottom-right have to be
+   recognisably the same thing from the back of a room. Six is enough — a
+   4-variable map never needs more in a minimal cover — and they cycle after
+   that. Mid-saturation so they hold up against both a white and a dark deck.
+   ====================================================================== */
+#shell {
+  --kg-0: #2563eb;
+  --kg-1: #c0392b;
+  --kg-2: #15803d;
+  --kg-3: #b45309;
+  --kg-4: #7c3aed;
+  --kg-5: #0e7490;
+
+  /* ── One face for every variable ───────────────────────────────────────
+     A, B, C and D, the 0s and 1s, and the terms of the answer are the same
+     symbols wherever they appear — in the equation box, the truth table
+     header, the map's axis labels, the squares, the simplified expression —
+     so they are set in one family at one weight everywhere, and only the
+     SIZE changes between quadrants. Emphasis (this is the value we are about
+     to group; this row is revealed) is carried by ink colour alone, never by
+     a heavier weight, because a bolder cut reads as a different typeface
+     from the back of a room.
+     =================================================================== */
+  --font-var: var(--font-mono);
+  --wt-var:   500;
+
+  /* Map cell size: grows with the room, but never so far that a 4-variable
+     map stops fitting in a quarter of the slide. */
+  --km-cell: clamp(30px, calc(36px * var(--u)), 76px);
+  /* Still a slower climb than the content tokens — sixteen rows have to keep
+     fitting a quarter of the slide as the presenter raises the size — but
+     near enough the answer's size that the two read as one piece of work. */
+  --tt-fs:   clamp(11px, calc(12px * var(--u)), 26px);
+}
+
+/* ── Quadrants ────────────────────────────────────────────────────────── */
+
+#quads {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+
+.quad {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.quad:nth-child(2n)  { border-right: none; }
+.quad:nth-child(n+3) { border-bottom: none; }
+
+.quad-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px 5px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  user-select: none;
+}
+.quad-head .count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0;
+  color: var(--text-3);
+  margin-left: auto;
+}
+.quad-head.is-live { color: var(--text); }
+
+.quad-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 2px 12px 12px;
+  scrollbar-width: thin;
+}
+.quad-body::-webkit-scrollbar { width: 6px; height: 6px; }
+.quad-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.quad-body::-webkit-scrollbar-thumb:hover { background: var(--border-med); }
+.quad-body::-webkit-scrollbar-track { background: transparent; }
+
+/* Centres a quadrant's one piece of content (the map, the term list). */
+.quad-body.is-centred { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+
+/* ── Top left: the expression ─────────────────────────────────────────────
+   One box, and the one thing that has to be said back: whether it parsed.
+   Everything the expression implies — its minterms, which form it is being
+   read as — is already on show in the other three quadrants, so repeating it
+   here is noise on a slide.
+   ====================================================================== */
+
+/* Slightly above true centre, as everything centred in these widgets sits. */
+#q-expr-body { padding-bottom: 8%; }
+#expr-block, #table-block { width: 100%; }
+
+/* The "F =" belongs to the equation, not to a label beside it, so it lives
+   inside the box and the input is drawn without a frame of its own. */
+#eq-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-med);
+  border-radius: var(--radius);
+  transition: border-color var(--dur);
+}
+#eq-box:focus-within { border-color: var(--accent); }
+
+#eq-prefix {
+  flex: 0 0 auto;
+  font-family: var(--font-var);
+  font-weight: var(--wt-var);
+  font-size: calc(15px * var(--u));
+  color: var(--text-2);
+  user-select: none;
+}
+#expr-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font-family: var(--font-var);
+  font-weight: var(--wt-var);
+  font-size: calc(15px * var(--u));
+}
+#expr-input:focus { outline: none; }
+
+/* Truth-table input: the width of the table, and how to clear it. Centred,
+   because with the table itself being the input this row is all the quadrant
+   holds. */
+#vars-row { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.mini-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  white-space: nowrap;
+  margin-right: 2px;
+}
+#vars-row .bw-btn { font-family: var(--font-var); min-width: var(--ctl-h); }
+
+/* Which half of quadrant 1 is showing follows the input selector. */
+#shell.src-formula #table-block,
+#shell.src-table   #expr-block { display: none; }
+
+/* In the top bar, next to the buttons — same height, auto width. */
+#src-sel, #mode-sel {
+  flex: 0 0 auto;
+  width: auto;
+  height: var(--ctl-h);
+  padding: 0 9px;
+  font-size: var(--fs-chrome);
+  font-weight: 500;
+  background: var(--bg);
+  border-color: var(--border);
+}
+
+/* .bw-banner is display:flex, which outranks the browser's own rule for
+   [hidden] — so say it here, or an empty error bar sits there permanently. */
+#parse-error { margin-top: 12px; width: 100%; }
+#parse-error[hidden] { display: none; }
+
+.op { color: var(--text-3); padding: 0 1px; }
+
+/* Overbar complement — the textbook look, when the presenter prefers it. */
+.ovl { text-decoration: overline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+/* ── Bottom left: the truth table ─────────────────────────────────────── */
+
+#tt-wrap { display: flex; gap: 14px; align-items: flex-start; justify-content: center; }
+
+.tt {
+  border-collapse: collapse;
+  font-family: var(--font-var);
+  font-weight: var(--wt-var);
+  font-size: var(--tt-fs);
+  font-variant-numeric: tabular-nums;
+}
+.tt th, .tt td {
+  padding: 0 6px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+  line-height: 1.4;
+  font-weight: var(--wt-var);
+}
+.tt th {
+  color: var(--text-3);
+  border-bottom: 1px solid var(--border-med);
+}
+.tt .c-idx { color: var(--text-3); text-align: right; padding-right: 6px; }
+.tt .c-out { border-left: 1px solid var(--border); padding-left: 8px; }
+
+/* The row written out as the term it is. Left-aligned so the primes line up
+   down the column, and quiet until the row turns out to be one the map will
+   group. */
+.tt .c-term {
+  text-align: left;
+  padding-right: 10px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.tt th.c-term {
+  font-size: 0.78em;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.tt .c-term.is-live { color: var(--text-2); }
+/* Set by the fitter when the region is too narrow to carry the column. */
+#shell.tt-compact .tt .c-term { display: none; }
+
+/* With truth-table input, the F column is the control: click it to cycle. */
+.tt.is-editable .c-out { cursor: pointer; }
+.tt.is-editable tbody .c-out:hover { background: var(--accent-bg); }
+
+/* A row not reached yet keeps its shape but says nothing.
+   Once revealed, full ink marks the value the map is about to group — the 1s
+   of a sum of products, the 0s of a product of sums — and everything else
+   stays quiet. */
+.tt tr.row { color: var(--text-3); }
+.tt tr.row .c-out { color: var(--text-3); }
+.tt tr.row.is-on { color: var(--text); }
+.tt tr.row.is-on .c-out       { color: var(--text-3); }
+.tt tr.row.is-on .c-out.v-hot { color: var(--text); }
+.tt tr.row.is-on .c-out.vx    { color: var(--warn); }
+.tt tr.row.is-current td { background: var(--accent-bg); }
+.tt tr.row.is-source td  { background: var(--accent-bg); }
+
+/* ── Top right: the map ───────────────────────────────────────────────── */
+
+#km-wrap {
+  display: inline-grid;
+  gap: 0;
+  font-family: var(--font-var);
+  font-weight: var(--wt-var);
+}
+
+.km-corner, .km-lbl {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(12px * var(--u));
+  color: var(--text-3);
+  padding: 2px 5px;
+}
+.km-corner { font-size: calc(10px * var(--u)); gap: 2px; }
+.km-lbl.col { align-items: flex-end; padding-bottom: 4px; }
+.km-lbl.row { justify-content: flex-end; padding-right: 6px; }
+
+.km-cell {
+  position: relative;
+  width: var(--km-cell);
+  height: var(--km-cell);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(18px * var(--u));
+  font-weight: var(--wt-var);
+  color: var(--text-3);
+  background: var(--bg);
+  transition: background var(--dur), color var(--dur), border-color var(--dur);
+}
+.km-cell .v { opacity: 0; transition: opacity 0.18s; }
+.km-cell.is-on .v { opacity: 1; }
+.km-cell.is-on       { color: var(--text-3); }
+.km-cell.is-on.v-hot { color: var(--text); }
+.km-cell.is-on.vx    { color: var(--warn); }
+.km-cell.is-target  { background: var(--accent-bg); border-color: var(--border-med); }
+
+/* m-number in the corner: which truth-table row this square is. */
+.km-cell .m {
+  position: absolute;
+  top: 1px; left: 3px;
+  font-size: calc(8px * var(--u));
+  color: var(--text-3);
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+/* Manual grouping: the cells become the control. */
+#km-wrap.is-picking .km-cell { cursor: pointer; }
+#km-wrap.is-picking .km-cell:hover { background: var(--bg-subtle); }
+/* Dashed, so a square picked by hand never reads as a group that has already
+   been drawn — those outlines are solid and coloured. */
+.km-cell.is-picked {
+  background: var(--accent-bg);
+  outline: 2px dashed var(--text);
+  outline-offset: -2px;
+}
+
+/* One outline per group per cell, inset by how many groups already overlap
+   this square so two groups over the same 1 stay separately readable. Borders
+   are drawn only on the sides where the neighbouring square is NOT in the
+   group, which is what makes a group that wraps round the edge of the map
+   appear as two pieces — exactly how it is drawn by hand. */
+.grp {
+  position: absolute;
+  border: 0 solid var(--c);
+  border-top-width: 0; border-right-width: 0; border-bottom-width: 0; border-left-width: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.grp.is-shown { opacity: 1; }
+.grp.g-t { border-top-width: 2.5px; }
+.grp.g-r { border-right-width: 2.5px; }
+.grp.g-b { border-bottom-width: 2.5px; }
+.grp.g-l { border-left-width: 2.5px; }
+.grp.is-faded { opacity: 0.22; }
+
+/* ── Bottom right: the simplified expression ──────────────────────────────
+   Just the equation. Each term carries the colour of the group it came from,
+   so the link back to the map is the term itself rather than a row of
+   bookkeeping beside it.
+   ====================================================================== */
+
+#q-terms-body { padding-bottom: 6%; }
+
+#equation {
+  width: 100%;
+  font-family: var(--font-var);
+  font-weight: var(--wt-var);
+  font-size: calc(19px * var(--u));
+  line-height: 1.45;
+  text-align: center;
+  word-break: break-word;
+  hyphens: none;
+}
+#equation .lhs  { color: var(--text-2); font-weight: 400; }
+#equation .plus { color: var(--text-3); font-weight: 400; padding: 0 0.3em; }
+
+/* The one thing in this widget where hue is load-bearing: this term is that
+   ring on the map. Clicking one dims every other ring so a single group can
+   be talked about on its own. */
+#equation .gterm {
+  color: var(--c);
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 0 2px;
+  transition: background var(--dur);
+}
+#equation .gterm:hover     { background: var(--bg-subtle); }
+#equation .gterm.is-focus  { background: var(--accent-bg); }
+#shell.is-viewer #equation .gterm { cursor: default; }
+
+/* Terms the presenter built by hand, kept visibly apart from the solution. */
+#equation .mine {
+  display: block;
+  margin-top: 10px;
+  font-size: calc(14px * var(--u));
+}
+#equation .mine .tag {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+/* Manual grouping readout */
+#manual-box { width: 100%; margin-top: 10px; display: none; }
+#manual-box.is-live { display: block; }
+#manual-line {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  font-family: var(--font-var);
+  font-weight: var(--wt-var);
+  font-size: calc(11px * var(--u));
+  color: var(--text-2);
+}
+#manual-line strong { font-weight: var(--wt-var); color: var(--text); }
+#manual-line .ok  { color: var(--ok); }
+#manual-line .bad { color: var(--err); }
+#manual-line .grow { flex: 1 1 auto; }
+
+/* View-only marker, bottom right of the slide region. */
+#viewer-note {
+  position: absolute;
+  right: 10px; bottom: 8px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  background: var(--bg);
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: none;
+  pointer-events: none;
+}
+#shell.is-viewer #viewer-note { display: block; }
+#shell { position: relative; }
+
+@media (prefers-reduced-motion: reduce) {
+  .km-cell .v, .grp { transition: none; }
+}
+</style>
+</head>
+<body>
+<div id="shell" class="bw-shell">
+
+  <div id="toolbar" class="bw-toolbar" data-bw-topbar>
+    <span class="bw-toolbar-title">Karnaugh Map</span>
+    <div class="bw-sep"></div>
+    <button class="bw-btn" id="back-btn" title="Previous step">Back</button>
+    <button class="bw-btn bw-btn--primary" id="next-btn" title="Next step">Next</button>
+    <button class="bw-btn" id="restart-btn" title="Back to the start">Restart</button>
+    <div class="bw-sep"></div>
+    <select id="src-sel" class="bw-select" title="How the function is given">
+      <option value="formula">Formula</option>
+      <option value="table">Truth table</option>
+    </select>
+    <select id="mode-sel" class="bw-select" title="Which squares to group, and how the answer is written">
+      <option value="sop">SOP</option>
+      <option value="pos">POS</option>
+    </select>
+    <button class="bw-btn" id="pick-btn" title="Draw your own group on the map">Select group</button>
+    <div class="bw-spacer"></div>
+    <span id="status" class="bw-status">ready</span>
+  </div>
+
+  <div id="quads">
+
+    <!-- Top left ────────────────────────────────────────────────────── -->
+    <div class="quad">
+      <div class="quad-head" id="h-expr"><span>1 · Expression</span></div>
+      <div class="quad-body is-centred" id="q-expr-body">
+
+        <!-- Formula input: the box reads as the equation it is. -->
+        <div id="expr-block">
+          <div id="eq-box">
+            <span id="eq-prefix">F =</span>
+            <input id="expr-input" type="text" spellcheck="false"
+                   autocomplete="off" placeholder="A*B + A'*C">
+          </div>
+        </div>
+
+        <!-- Truth-table input: the table itself is the control, over in
+             quadrant 2, so all that is left here is how wide it is. -->
+        <div id="table-block">
+          <div id="vars-row">
+            <span class="mini-label">Variables</span>
+            <button class="bw-btn" data-nvars="2">2</button>
+            <button class="bw-btn" data-nvars="3">3</button>
+            <button class="bw-btn" data-nvars="4">4</button>
+            <div class="bw-sep"></div>
+            <button class="bw-btn" id="tbl-clear" title="Set every row back to 0">Clear</button>
+          </div>
+        </div>
+
+        <div id="parse-error" class="bw-banner bw-banner--error" hidden></div>
+      </div>
+    </div>
+
+    <!-- Top right ───────────────────────────────────────────────────── -->
+    <div class="quad">
+      <div class="quad-head" id="h-kmap"><span>3 · Karnaugh map</span><span class="count" id="c-kmap"></span></div>
+      <div class="quad-body is-centred" id="q-kmap-body">
+        <div id="km-wrap"></div>
+      </div>
+    </div>
+
+    <!-- Bottom left ─────────────────────────────────────────────────── -->
+    <div class="quad">
+      <div class="quad-head" id="h-table"><span>2 · Truth table</span><span class="count" id="c-table"></span></div>
+      <div class="quad-body" id="q-table-body">
+        <div id="tt-wrap"></div>
+      </div>
+    </div>
+
+    <!-- Bottom right ────────────────────────────────────────────────── -->
+    <div class="quad">
+      <div class="quad-head" id="h-terms"><span>4 · Groups → simplified</span><span class="count" id="c-terms"></span></div>
+      <div class="quad-body is-centred" id="q-terms-body">
+        <div id="equation"></div>
+        <div id="manual-box">
+          <div id="manual-line">
+            <span id="manual-msg">Click squares on the map to form a group.</span>
+            <span class="grow"></span>
+            <button class="bw-btn" id="manual-add" disabled>Add term</button>
+            <button class="bw-btn" id="manual-clear">Clear</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="viewer-note">View-only · synced with presenter</div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ══════════════════════════════════════════════════════════════════════
+     Config
+     ══════════════════════════════════════════════════════════════════════ */
+
+  const _qs   = new URLSearchParams(location.search);
+  const CFG0  = window.WIDGET_CONFIG || {};
+  let   cfg   = CFG0;
+  let   WIDGET_ID = CFG0.id || CFG0.widgetId || 'karnaugh-map';
+  let   role      = CFG0.role || 'presenter';
+  let   IS_VIEWER = role === 'viewer' || _qs.get('viewer') === '1';
+
+  /* ══════════════════════════════════════════════════════════════════════
+     DOM
+     ══════════════════════════════════════════════════════════════════════ */
+
+  const shell      = document.getElementById('shell');
+  const exprInput  = document.getElementById('expr-input');
+  const eqPrefix   = document.getElementById('eq-prefix');
+  const modeSel    = document.getElementById('mode-sel');
+  const srcSel     = document.getElementById('src-sel');
+  const clearBtn   = document.getElementById('tbl-clear');
+  const varBtns    = [...document.querySelectorAll('#vars-row [data-nvars]')];
+  const errBox     = document.getElementById('parse-error');
+  const ttWrap     = document.getElementById('tt-wrap');
+  const ttBody     = document.getElementById('q-table-body');
+  const kmWrap     = document.getElementById('km-wrap');
+  const kmBody     = document.getElementById('q-kmap-body');
+  const eqEl       = document.getElementById('equation');
+  const manualBox  = document.getElementById('manual-box');
+  const manualMsg  = document.getElementById('manual-msg');
+  const manualAdd  = document.getElementById('manual-add');
+  const manualClr  = document.getElementById('manual-clear');
+  const statusEl   = document.getElementById('status');
+  const nextBtn    = document.getElementById('next-btn');
+  const backBtn    = document.getElementById('back-btn');
+  const restartBtn = document.getElementById('restart-btn');
+  const pickBtn    = document.getElementById('pick-btn');
+  const heads = {
+    expr:  document.getElementById('h-expr'),
+    table: document.getElementById('h-table'),
+    kmap:  document.getElementById('h-kmap'),
+    terms: document.getElementById('h-terms'),
+  };
+  const counts = {
+    table: document.getElementById('c-table'),
+    kmap:  document.getElementById('c-kmap'),
+    terms: document.getElementById('c-terms'),
+  };
+
+  /* ══════════════════════════════════════════════════════════════════════
+     State — everything that has to survive a re-render or travel to a
+     viewer lives here. The DOM is a projection of it, never the source.
+     ══════════════════════════════════════════════════════════════════════ */
+
+  const S = {
+    source:   'formula',    // formula | table — how the function is given
+    expr:     "A*B*C' + A*B*C + A'*B*C + A*B'*C",
+    modeSel:  'sop',        // sop | pos — which squares to group, how to write the answer
+    dcText:   '',
+    nvars:    3,            // truth-table input: how many columns
+    table:    '',           // truth-table input: one char per row, '0' | '1' | 'x'
+    step:     0,            // 0 = nothing revealed yet
+    picking:  false,        // manual grouping mode
+    sel:      [],           // cell indices picked by hand
+    manual:   [],           // [{ cells, text }] terms the presenter built
+    focus:    -1,           // group index whose outline is emphasised
+  };
+
+  // Presentation options that come from the config panel only.
+  let OPT = { fnName: 'F', notation: 'prime', rowOrder: 'term', varsText: '' };
+
+  // The compiled model. Rebuilt from S.expr/dcText/mode — never synced,
+  // because a viewer that has the same inputs derives the same thing.
+  let M = null;
+
+  /* ══════════════════════════════════════════════════════════════════════
+     Boolean expression parser
+
+     Grammar:
+       expr   := term ('+' term)*
+       term   := factor (('*')? factor)*        — juxtaposition is AND, so AB'C works
+       factor := ('!' | '~')* atom "'"*
+       atom   := VAR | '0' | '1' | '(' expr ')'
+     ══════════════════════════════════════════════════════════════════════ */
+
+  const OR_CH  = '+|';
+  const AND_CH = '*.&·⋅';
+  const NOT_PRE = '!~¬';
+
+  function parse(srcRaw) {
+    const src = String(srcRaw || '');
+    let i = 0;
+
+    function ws() { while (i < src.length && /\s/.test(src[i])) i++; }
+    function peek() { ws(); return i < src.length ? src[i] : null; }
+
+    function parseExpr() {
+      const xs = [parseTerm()];
+      for (;;) {
+        const c = peek();
+        if (c && OR_CH.indexOf(c) >= 0) { i++; xs.push(parseTerm()); }
+        else break;
+      }
+      return xs.length === 1 ? xs[0] : { t: 'or', xs };
+    }
+
+    function parseTerm() {
+      const xs = [parseFactor()];
+      for (;;) {
+        const c = peek();
+        if (c && AND_CH.indexOf(c) >= 0) { i++; xs.push(parseFactor()); continue; }
+        // Juxtaposition: another atom starts right here, so it's an implicit AND.
+        if (c && (/[A-Za-z(01]/.test(c) || NOT_PRE.indexOf(c) >= 0)) { xs.push(parseFactor()); continue; }
+        break;
+      }
+      return xs.length === 1 ? xs[0] : { t: 'and', xs };
+    }
+
+    function parseFactor() {
+      let negs = 0;
+      for (;;) { const c = peek(); if (c && NOT_PRE.indexOf(c) >= 0) { i++; negs++; } else break; }
+      let node = parseAtom();
+      // Postfix primes bind to whatever atom just closed: A', (A+B)', A''.
+      for (;;) { const c = peek(); if (c === "'" || c === '’' || c === '`') { i++; node = { t: 'not', a: node }; } else break; }
+      while (negs--) node = { t: 'not', a: node };
+      return node;
+    }
+
+    function parseAtom() {
+      const c = peek();
+      if (c === null) throw new Error('Expression ends early — something is missing after it.');
+      if (c === '(') {
+        i++;
+        const inner = parseExpr();
+        if (peek() !== ')') throw new Error('Missing a closing bracket ")".');
+        i++;
+        return inner;
+      }
+      if (c === '0' || c === '1') { i++; return { t: 'const', v: c === '1' }; }
+      if (/[A-Za-z]/.test(c)) { i++; return { t: 'var', name: c.toUpperCase() }; }
+      if (OR_CH.indexOf(c) >= 0 || AND_CH.indexOf(c) >= 0)
+        throw new Error('Operator "' + c + '" with nothing in front of it.');
+      throw new Error('Don\'t know what to do with "' + c + '".');
+    }
+
+    const root = parseExpr();
+    ws();
+    if (i < src.length) {
+      if (src[i] === ')') throw new Error('One ")" too many.');
+      throw new Error('Unexpected "' + src[i] + '" after the expression.');
+    }
+    return root;
+  }
+
+  function collectVars(node, out) {
+    if (!node) return out;
+    if (node.t === 'var') out.add(node.name);
+    else if (node.t === 'not') collectVars(node.a, out);
+    else if (node.xs) node.xs.forEach(x => collectVars(x, out));
+    return out;
+  }
+
+  function evalNode(node, env) {
+    switch (node.t) {
+      case 'const': return node.v;
+      case 'var':   return !!env[node.name];
+      case 'not':   return !evalNode(node.a, env);
+      case 'and':   return node.xs.every(x => evalNode(x, env));
+      case 'or':    return node.xs.some(x => evalNode(x, env));
+    }
+    return false;
+  }
+
+  // Row index → { A:bool, … }, MSB is the first variable.
+  function envOf(idx, vars) {
+    const env = {};
+    for (let k = 0; k < vars.length; k++) env[vars[k]] = !!(idx & (1 << (vars.length - 1 - k)));
+    return env;
+  }
+
+  /* ── Don't-cares ─────────────────────────────────────────────────────
+     Accepted either in the field of their own or tacked onto the end of the
+     expression the way a textbook writes it: "… + d(5,7)". */
+  function stripDontCares(src) {
+    const list = [];
+    const cleaned = String(src || '').replace(
+      /(?:[+|]\s*)?\b[dD]\s*\(([^)]*)\)/g,
+      (_, inner) => { list.push(...parseIndexList(inner)); return ' '; }
+    );
+    return { expr: cleaned, dcs: list };
+  }
+
+  function parseIndexList(s) {
+    return String(s || '')
+      .split(/[^0-9]+/)
+      .filter(x => x !== '')
+      .map(Number);
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     Quine–McCluskey
+
+     n is at most 4, so nothing here needs to be clever: prime implicants by
+     repeated pairwise combining, then the smallest cover found by taking the
+     essentials and searching over what's left.
+     ══════════════════════════════════════════════════════════════════════ */
+
+  function primeImplicants(terms, n) {
+    if (!terms.length) return [];
+    const seen = new Set();
+    let cur = [];
+    terms.forEach(t => {
+      const key = t + '/0';
+      if (!seen.has(key)) { seen.add(key); cur.push({ bits: t, dash: 0 }); }
+    });
+
+    const primes = [];
+    const pSeen = new Set();
+    const addPrime = p => {
+      const key = p.bits + '/' + p.dash;
+      if (!pSeen.has(key)) { pSeen.add(key); primes.push(p); }
+    };
+
+    while (cur.length) {
+      const used = new Array(cur.length).fill(false);
+      const nextMap = new Map();
+      for (let a = 0; a < cur.length; a++) {
+        for (let b = a + 1; b < cur.length; b++) {
+          if (cur[a].dash !== cur[b].dash) continue;
+          const diff = cur[a].bits ^ cur[b].bits;
+          if (diff === 0 || (diff & (diff - 1)) !== 0) continue;   // must differ in exactly one bit
+          used[a] = used[b] = true;
+          const dash = cur[a].dash | diff;
+          const bits = cur[a].bits & ~dash;
+          nextMap.set(bits + '/' + dash, { bits, dash });
+        }
+      }
+      cur.forEach((c, k) => { if (!used[k]) addPrime(c); });
+      cur = [...nextMap.values()];
+    }
+    return primes;
+  }
+
+  function cellsOf(imp, n) {
+    const out = [];
+    for (let i = 0; i < (1 << n); i++) if ((i & ~imp.dash) === imp.bits) out.push(i);
+    return out;
+  }
+
+  function literalCount(imp, n) {
+    let c = 0;
+    for (let k = 0; k < n; k++) if (!(imp.dash & (1 << k))) c++;
+    return c;
+  }
+
+  /**
+   * Smallest set of prime implicants covering every required index.
+   * Essentials first (they are in every solution), then a breadth-first
+   * search over the rest — with n ≤ 4 the candidate set is small enough that
+   * exhaustive is both fast and exactly minimal.
+   */
+  function minimalCover(primes, required, n) {
+    if (!required.length) return [];
+    const need = new Set(required);
+    const cover = primes.map(p => cellsOf(p, n).filter(c => need.has(c)));
+
+    const chosen = [];
+    const left = new Set(need);
+
+    // Essential: some required cell only one prime implicant can reach.
+    for (const cell of need) {
+      const owners = [];
+      for (let p = 0; p < primes.length; p++) if (cover[p].indexOf(cell) >= 0) owners.push(p);
+      if (owners.length === 1 && chosen.indexOf(owners[0]) < 0) {
+        chosen.push(owners[0]);
+        cover[owners[0]].forEach(c => left.delete(c));
+      }
+    }
+
+    if (left.size) {
+      const rest = [];
+      for (let p = 0; p < primes.length; p++) {
+        if (chosen.indexOf(p) >= 0) continue;
+        if (cover[p].some(c => left.has(c))) rest.push(p);
+      }
+      const target = [...left];
+      let best = null;
+      for (let k = 1; k <= rest.length && !best; k++) {
+        const pick = [];
+        (function search(start, depth) {
+          if (best) return;
+          if (depth === k) {
+            const got = new Set();
+            pick.forEach(p => cover[p].forEach(c => got.add(c)));
+            if (target.every(c => got.has(c))) {
+              const lits = pick.reduce((a, p) => a + literalCount(primes[p], n), 0);
+              if (!best || lits < best.lits) best = { pick: pick.slice(), lits };
+            }
+            return;
+          }
+          for (let p = start; p < rest.length; p++) {
+            pick.push(rest[p]);
+            search(p + 1, depth + 1);
+            pick.pop();
+          }
+        })(0, 0);
+      }
+      if (best) best.pick.forEach(p => chosen.push(p));
+    }
+
+    // Biggest groups first: that is the order they get explained in.
+    return chosen
+      .map(p => primes[p])
+      .sort((a, b) => literalCount(a, n) - literalCount(b, n) || a.bits - b.bits);
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     Compile: expression → variables, rows, map, groups
+     ══════════════════════════════════════════════════════════════════════ */
+
+  const FALLBACK_VARS = ['A', 'B', 'C', 'D'];
+
+  // Truth-table input is stored as one character per row. Anything missing or
+  // unrecognised reads as 0, so a half-typed config can never break the map.
+  function tableChars(R) {
+    const src = String(S.table || '');
+    const out = [];
+    for (let i = 0; i < R; i++) {
+      const c = (src[i] || '0').toLowerCase();
+      out.push(c === '1' ? '1' : (c === 'x' || c === 'd' || c === '-' ? 'x' : '0'));
+    }
+    return out;
+  }
+
+  function compile() {
+    const prev = M;
+    const out = { ok: false, error: '', vars: [], n: 0, mode: 'sop' };
+
+    // The form selector says which squares get grouped and how the answer is
+    // written — it is not a claim about the shape of the input, which is why
+    // it applies just as well to a function given as a truth table.
+    const mode = S.modeSel === 'pos' ? 'pos' : 'sop';
+
+    let vars, n, R, rows, terms, root = null, dcs;
+
+    if (S.source === 'table') {
+      n    = Math.max(2, Math.min(4, S.nvars | 0 || 3));
+      vars = OPT.varsText
+        ? [...new Set(OPT.varsText.toUpperCase().split(/[^A-Z]+/).filter(Boolean))].slice(0, n)
+        : FALLBACK_VARS.slice(0, n);
+      while (vars.length < n) vars.push(FALLBACK_VARS.find(v => vars.indexOf(v) < 0));
+      R = 1 << n;
+
+      const chars = tableChars(R);
+      rows  = chars.map((c, i) => ({ i, val: c === 'x' ? 'x' : Number(c) }));
+      dcs   = new Set(rows.filter(r => r.val === 'x').map(r => r.i));
+      terms = [];                       // nothing was written, so nothing to split
+    } else {
+      const split = stripDontCares(S.expr);
+      const body  = split.expr.trim();
+
+      if (!body) { out.empty = true; M = out; return; }
+
+      try { root = parse(body); }
+      catch (e) { out.error = e.message; M = out; return; }
+
+      // Variables: the letters actually used, alphabetically, unless the
+      // presenter pinned an order in the config.
+      vars = OPT.varsText
+        ? OPT.varsText.toUpperCase().split(/[^A-Z]+/).filter(Boolean)
+        : [...collectVars(root, new Set())].sort();
+      vars = [...new Set(vars)];
+
+      if (!vars.length) { out.error = 'No variables in that expression.'; M = out; return; }
+      if (vars.length > 4) {
+        out.error = 'A Karnaugh map here goes up to 4 variables — that expression uses ' + vars.length + '.';
+        M = out; return;
+      }
+      // A one-variable map is not a map. Pad with the first unused letter so
+      // there is always something to draw.
+      while (vars.length < 2) vars.push(FALLBACK_VARS.find(v => vars.indexOf(v) < 0));
+
+      n = vars.length;
+      R = 1 << n;
+
+      dcs = new Set(split.dcs.concat(parseIndexList(S.dcText)).filter(d => d >= 0 && d < R));
+
+      rows = [];
+      for (let i = 0; i < R; i++) {
+        const v = evalNode(root, envOf(i, vars));
+        rows.push({ i, val: dcs.has(i) ? 'x' : (v ? 1 : 0) });
+      }
+
+      // How the expression as written divides up, which is what the truth
+      // table gets filled in term by term. Independent of the form selector:
+      // a product of sums is split at its ANDs however the answer is to be
+      // written, because that is how the presenter typed it.
+      const isSum = nd => nd.t === 'or' || (nd.t === 'not' && nd.a.t === 'or');
+      const shape = (root.t === 'and' && root.xs.some(isSum)) ? 'pos' : 'sop';
+      const topTerms = shape === 'sop'
+        ? (root.t === 'or'  ? root.xs : [root])
+        : (root.t === 'and' ? root.xs : [root]);
+
+      terms = topTerms.map(nd => {
+        const hits = [];
+        for (let i = 0; i < R; i++) {
+          const v = evalNode(nd, envOf(i, vars));
+          if (shape === 'sop' ? v : !v) hits.push(i);
+        }
+        return { text: renderNode(nd, shape === 'pos'), rows: new Set(hits) };
+      });
+    }
+
+    const ones   = rows.filter(r => r.val === 1).map(r => r.i);
+    const zeros  = rows.filter(r => r.val === 0).map(r => r.i);
+    const dcList = [...dcs].sort((a, b) => a - b);
+
+    // The order rows are revealed in: term by term (so each term of the
+    // expression visibly becomes rows) or straight down the table.
+    let order;
+    if (OPT.rowOrder === 'term' && terms.length) {
+      const seen = new Set();
+      order = [];
+      terms.forEach(t => [...t.rows].sort((a, b) => a - b).forEach(i => {
+        if (!seen.has(i)) { seen.add(i); order.push(i); }
+      }));
+      for (let i = 0; i < R; i++) if (!seen.has(i)) order.push(i);
+    } else {
+      order = rows.map(r => r.i);
+    }
+
+    // Groups. SOP groups the 1s; POS groups the 0s and reads each group off
+    // as a sum, which is the same minimisation run on the complement.
+    const target = (mode === 'sop') ? ones : zeros;
+    const primes = primeImplicants(target.concat(dcList), n);
+    const impls  = minimalCover(primes, target, n);
+    const groups = impls.map((imp, gi) => ({
+      imp,
+      cells: cellsOf(imp, n),
+      text:  mode === 'sop' ? implToSOP(imp, vars) : implToPOS(imp, vars),
+      gi,
+    }));
+
+    Object.assign(out, {
+      ok: true, root, vars, n, R, rows, dcs, mode, terms, order,
+      ones, zeros, dcList, groups,
+      // A function given as a truth table is already on the screen: there is
+      // no filling-in phase to walk through, so the walkthrough starts at the
+      // map instead.
+      tableSteps: S.source === 'table' ? 0 : R,
+      degenerate: target.length === 0 ? (mode === 'sop' ? '0' : '1') : null,
+    });
+    M = out;
+
+    // A different function starts the walkthrough again; a cosmetic change
+    // (notation, text size) leaves the presenter where they were. Editing one
+    // row of a truth table counts as a different function, which is why the
+    // values are part of the comparison.
+    const shapeChanged = !prev || !prev.ok ||
+      prev.vars.join('') !== out.vars.join('') ||
+      prev.rows.map(r => r.val).join('') !== out.rows.map(r => r.val).join('') ||
+      prev.mode !== out.mode ||
+      prev.tableSteps !== out.tableSteps ||
+      prev.order.join(',') !== out.order.join(',');
+    if (shapeChanged) { S.step = Math.min(S.step, 0); S.sel = []; S.manual = []; S.focus = -1; }
+  }
+
+  function totalSteps() {
+    if (!M || !M.ok) return 0;
+    return M.tableSteps + M.R + M.groups.length;
+  }
+
+  // What the current step is showing: idle → truth table → map → groups.
+  function phase() {
+    if (!M || !M.ok) return { name: 'idle' };
+    const s = S.step, R = M.R, T = M.tableSteps;
+    if (s <= 0) return { name: 'idle' };
+    if (s <= T) return { name: 'table', k: s - 1, row: M.order[s - 1] };
+    if (s <= T + R) return { name: 'kmap', k: s - T - 1, row: M.order[s - T - 1] };
+    // The last step is the last group: there is no separate "finished" state,
+    // because circling the final group IS the finished slide.
+    return { name: 'group', k: Math.min(s - T - R - 1, M.groups.length - 1) };
+  }
+
+  // With truth-table input the rows were typed, so they are all on show from
+  // the start rather than arriving a step at a time.
+  function rowsShown() {
+    if (!M || !M.ok) return 0;
+    if (!M.tableSteps) return M.R;
+    const p = phase();
+    return p.name === 'idle' ? 0 : (p.name === 'table' ? p.k + 1 : M.R);
+  }
+  function cellsShown() {
+    const p = phase();
+    if (p.name === 'idle' || p.name === 'table') return 0;
+    if (p.name === 'kmap') return p.k + 1;
+    return M.R;
+  }
+  function groupsShown() {
+    const p = phase();
+    return p.name === 'group' ? p.k + 1 : 0;
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     Rendering terms
+     ══════════════════════════════════════════════════════════════════════ */
+
+  function lit(name, negated) {
+    if (!negated) return escHtml(name);
+    return OPT.notation === 'bar'
+      ? '<span class="ovl">' + escHtml(name) + '</span>'
+      : escHtml(name) + "'";
+  }
+
+  function implToSOP(imp, vars) {
+    const n = vars.length;
+    let s = '';
+    for (let k = 0; k < n; k++) {
+      const bit = 1 << (n - 1 - k);
+      if (imp.dash & bit) continue;
+      s += lit(vars[k], !(imp.bits & bit));
+    }
+    return s || '1';
+  }
+
+  function implToPOS(imp, vars, compact) {
+    // An implicant of the ZEROS. Complementing it turns the product into the
+    // sum that keeps those squares at 0.
+    const n = vars.length;
+    const lits = [];
+    for (let k = 0; k < n; k++) {
+      const bit = 1 << (n - 1 - k);
+      if (imp.dash & bit) continue;
+      lits.push(lit(vars[k], !!(imp.bits & bit)));
+    }
+    return lits.length ? '(' + lits.join(compact ? '+' : ' + ') + ')' : '0';
+  }
+
+  // The min- or maxterm of a single row: the implicant with nothing free.
+  function rowTerm(i) {
+    const imp = { bits: i, dash: 0 };
+    return M.mode === 'sop' ? implToSOP(imp, M.vars) : implToPOS(imp, M.vars, true);
+  }
+
+  // The presenter's own expression, echoed back with the chosen notation.
+  function renderNode(nd, topIsSum, depth) {
+    depth = depth || 0;
+    switch (nd.t) {
+      case 'const': return nd.v ? '1' : '0';
+      case 'var':   return lit(nd.name, false);
+      case 'not':
+        if (nd.a.t === 'var') return lit(nd.a.name, true);
+        return '(' + renderNode(nd.a, false, depth + 1) + ')' + (OPT.notation === 'bar' ? '' : "'");
+      case 'and':   return nd.xs.map(x => renderNode(x, false, depth + 1)).map(s => s).join('');
+      case 'or': {
+        const inner = nd.xs.map(x => renderNode(x, false, depth + 1)).join(' + ');
+        return depth > 0 || topIsSum ? '(' + inner + ')' : inner;
+      }
+    }
+    return '';
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     Gray-code map layout
+     ══════════════════════════════════════════════════════════════════════ */
+
+  const GRAY = { 1: [0, 1], 2: [0, 1, 3, 2] };
+
+  function layout() {
+    const n = M.n;
+    // The shape every textbook draws: 2×2 for two variables, 2×4 for three
+    // (one variable down the side, two along the top), 4×4 for four.
+    const rowBits = n <= 3 ? 1 : 2;
+    const colBits = n - rowBits;
+    return {
+      rowBits, colBits,
+      rowVals: GRAY[rowBits],
+      colVals: GRAY[colBits],
+      rowVars: M.vars.slice(0, rowBits).join(''),
+      colVars: M.vars.slice(rowBits).join(''),
+      idx: (rv, cv) => (rv << colBits) | cv,
+      pos: (i) => ({
+        r: GRAY[rowBits].indexOf(i >> colBits),
+        c: GRAY[colBits].indexOf(i & ((1 << colBits) - 1)),
+      }),
+    };
+  }
+
+  function bitsStr(v, w) { return v.toString(2).padStart(w, '0'); }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     Fitting the two dense quadrants
+
+     The map and the truth table want to be as big as the room can read, but
+     they also have to be whole: a 4×4 map with its axis labels scrolled out
+     of sight is no longer a Karnaugh map, and a truth table missing its last
+     two rows is worse than a small one. So the presenter's text size is
+     treated as a CEILING, and each of the two is shrunk to whatever actually
+     fits the quadrant it was given.
+     ══════════════════════════════════════════════════════════════════════ */
+
+  function fitSizes() {
+    if (!M || !M.ok) return;
+    const u = parseFloat(getComputedStyle(shell).getPropertyValue('--u')) || 1.4;
+
+    // Map: the label row and column are chrome around the grid, so they come
+    // off the available space before the squares are sized.
+    const L = layout();
+    const labelFs = 12 * u;
+    const availW = kmBody.clientWidth  - 10 - labelFs * 3.4;
+    const availH = kmBody.clientHeight - 10 - labelFs * 2.0;
+    if (availW > 0 && availH > 0) {
+      const cell = Math.max(22, Math.min(
+        Math.min(36 * u, 76),
+        availW / L.colVals.length,
+        availH / L.rowVals.length));
+      shell.style.setProperty('--km-cell', cell.toFixed(1) + 'px');
+    }
+
+    // Truth table: one line per row plus the header. 1.55 is the line box
+    // (line-height 1.4) plus its rule.
+    const lines = (M.R > 8 ? Math.ceil(M.R / 2) : M.R) + 1;
+    const availT = ttBody.clientHeight - 10;
+    const availX = ttBody.clientWidth - 6;
+    if (availT <= 0 || availX <= 0) return;
+
+    const MIN_FS = 8.5;       // below this nobody at the back reads it anyway
+    const KEEP   = 11;        // ...and below this the term column is what costs it
+
+    const apply = fs => shell.style.setProperty('--tt-fs', fs.toFixed(2) + 'px');
+    // Measured rather than estimated from a character count: a maxterm is half
+    // again as wide as a minterm, and the notation setting changes it again.
+    const measure = () => {
+      const tables = ttWrap.querySelectorAll('table');
+      let w = 14 * Math.max(0, tables.length - 1);
+      tables.forEach(t => { w += t.offsetWidth; });
+      return w;
+    };
+
+    let fs = Math.max(MIN_FS, Math.min(Math.min(14 * u, 30), availT / lines / 1.55));
+    shell.classList.remove('tt-compact');
+    apply(fs);
+
+    let w = measure();
+    if (w > availX) {
+      // Squeezing everything down to fit the spelled-out term would cost more
+      // than the term is worth, so in a cramped region that column goes and
+      // the numbers stay readable.
+      if (fs * availX / w < KEEP) { shell.classList.add('tt-compact'); w = measure(); }
+      // Cell padding and rules are fixed pixels, so the width does not scale
+      // quite linearly with the font — hence a nudge under, and a couple of
+      // passes to settle.
+      for (let pass = 0; pass < 4 && w > availX && fs > MIN_FS; pass++) {
+        fs = Math.max(MIN_FS, fs * (availX / w) * 0.98);
+        apply(fs);
+        w = measure();
+      }
+    }
+  }
+
+  // Re-fit when the slide region changes shape. Setting the two custom
+  // properties resizes what is INSIDE these panes, never the panes
+  // themselves, so this cannot feed back into itself.
+  let fitObs = null;
+  try {
+    fitObs = new ResizeObserver(() => fitSizes());
+    fitObs.observe(kmBody);
+    fitObs.observe(ttBody);
+  } catch (_) { /* no ResizeObserver: the CSS clamps still apply */ }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     Render
+     ══════════════════════════════════════════════════════════════════════ */
+
+  function render() {
+    shell.classList.toggle('is-viewer', IS_VIEWER);
+    shell.classList.toggle('src-formula', S.source !== 'table');
+    shell.classList.toggle('src-table',   S.source === 'table');
+
+    exprInput.readOnly = IS_VIEWER;
+    modeSel.disabled   = IS_VIEWER;
+    srcSel.disabled    = IS_VIEWER;
+    [nextBtn, backBtn, restartBtn, pickBtn, modeSel, srcSel].forEach(b => { b.style.display = IS_VIEWER ? 'none' : ''; });
+    varBtns.concat([clearBtn]).forEach(b => { b.disabled = IS_VIEWER; });
+
+    if (document.activeElement !== exprInput) exprInput.value = S.expr;
+    modeSel.value = S.modeSel;
+    srcSel.value  = S.source;
+    eqPrefix.textContent = OPT.fnName + ' =';
+    varBtns.forEach(b => b.classList.toggle('is-active', Number(b.dataset.nvars) === S.nvars));
+
+    heads.expr.firstElementChild.textContent =
+      S.source === 'table' ? '1 · Truth table input' : '1 · Expression';
+
+    renderExpr();
+    renderTable();
+    renderMap();
+    renderOut();
+    renderStatus();
+    fitSizes();
+  }
+
+  /* ── Top left ────────────────────────────────────────────────────────── */
+
+  // The box, and nothing else — except when what was typed doesn't parse,
+  // which the presenter has to be told.
+  function renderExpr() {
+    const bad = !!(M && M.error);
+    errBox.hidden = !bad;
+    if (bad) errBox.innerHTML = '<span>' + escHtml(M.error) + '</span>';
+  }
+
+  /* ── Bottom left: truth table ───────────────────────────────────────── */
+
+  function renderTable() {
+    if (!M || !M.ok) { ttWrap.innerHTML = ''; counts.table.textContent = ''; return; }
+
+    const shown = rowsShown();
+    const revealed = new Set(M.order.slice(0, shown));
+    const p = phase();
+    const currentRow = p.name === 'table' ? p.row : -1;
+    const sourceRow  = p.name === 'kmap'  ? p.row : -1;
+    const hot = M.mode === 'sop' ? 1 : 0;   // the value this map is about to group
+
+    // Sixteen rows will not sit in a quarter of a slide, so a 4-variable
+    // table becomes two columns of eight side by side.
+    const perTable = M.R > 8 ? Math.ceil(M.R / 2) : M.R;
+    const chunks = [];
+    for (let s = 0; s < M.R; s += perTable) chunks.push(M.rows.slice(s, s + perTable));
+
+    const editable = S.source === 'table' && !IS_VIEWER;
+
+    ttWrap.innerHTML = chunks.map(chunk => {
+      const head = '<tr><th class="c-idx"></th>' +
+        '<th class="c-term">' + (M.mode === 'sop' ? 'minterm' : 'maxterm') + '</th>' +
+        M.vars.map(v => '<th>' + escHtml(v) + '</th>').join('') +
+        '<th class="c-out">' + escHtml(OPT.fnName) + '</th></tr>';
+      const body = chunk.map(r => {
+        const on  = revealed.has(r.i);
+        const cls = ['row'];
+        if (on) cls.push('is-on');
+        if (r.i === currentRow) cls.push('is-current');
+        if (r.i === sourceRow)  cls.push('is-source');
+        const bits = bitsStr(r.i, M.n).split('')
+          .map(b => '<td>' + b + '</td>').join('');
+        const vTxt = on ? (r.val === 'x' ? 'X' : r.val) : '·';
+        const vCls = 'c-out' + (on && r.val === hot ? ' v-hot' : '') + (on && r.val === 'x' ? ' vx' : '');
+        // The row's own term, full ink only where it is one the map will
+        // group — that is the set the answer gets built from.
+        const tCls = 'c-term' + (on && (r.val === hot || r.val === 'x') ? ' is-live' : '');
+        return '<tr class="' + cls.join(' ') + '" data-row="' + r.i + '">' +
+          '<td class="c-idx">' + (M.mode === 'sop' ? 'm' : 'M') + r.i + '</td>' +
+          '<td class="' + tCls + '">' + rowTerm(r.i) + '</td>' +
+          bits + '<td class="' + vCls + '">' + vTxt + '</td></tr>';
+      }).join('');
+      return '<table class="tt' + (editable ? ' is-editable' : '') + '"><thead>' +
+        head + '</thead><tbody>' + body + '</tbody></table>';
+    }).join('');
+
+    counts.table.textContent = S.source === 'table' ? String(M.R) : shown + ' / ' + M.R;
+    heads.table.classList.toggle('is-live', p.name === 'table');
+  }
+
+  /* ── Top right: the map ─────────────────────────────────────────────── */
+
+  function renderMap() {
+    if (!M || !M.ok) { kmWrap.innerHTML = ''; counts.kmap.textContent = ''; return; }
+
+    const L = layout();
+    const p = phase();
+    const hot = M.mode === 'sop' ? 1 : 0;
+    const shown = cellsShown();
+    const placed = new Set(M.order.slice(0, shown));
+    const target = p.name === 'kmap' ? p.row : -1;
+
+    const cols = L.colVals.length, rows = L.rowVals.length;
+    kmWrap.style.gridTemplateColumns = 'auto repeat(' + cols + ', var(--km-cell))';
+    kmWrap.style.gridTemplateRows    = 'auto repeat(' + rows + ', var(--km-cell))';
+    kmWrap.classList.toggle('is-picking', S.picking && !IS_VIEWER);
+
+    const parts = [];
+    parts.push('<div class="km-corner"><span>' + escHtml(L.rowVars) + '</span>\\<span>' + escHtml(L.colVars) + '</span></div>');
+    L.colVals.forEach(cv => parts.push('<div class="km-lbl col">' + bitsStr(cv, L.colBits) + '</div>'));
+
+    // Groups revealed so far, plus whatever the presenter has picked by hand.
+    const liveGroups = M.groups.slice(0, groupsShown());
+
+    L.rowVals.forEach(rv => {
+      parts.push('<div class="km-lbl row">' + bitsStr(rv, L.rowBits) + '</div>');
+      L.colVals.forEach(cv => {
+        const i   = L.idx(rv, cv);
+        const row = M.rows[i];
+        const on  = placed.has(i);
+        const cls = ['km-cell'];
+        if (on) cls.push('is-on');
+        if (on && row.val === hot) cls.push('v-hot');
+        if (on && row.val === 'x') cls.push('vx');
+        if (i === target)          cls.push('is-target');
+        if (S.sel.indexOf(i) >= 0) cls.push('is-picked');
+
+        const overlays = [];
+        let depth = 0;
+        liveGroups.forEach(g => {
+          if (g.cells.indexOf(i) < 0) return;
+          overlays.push(groupOverlay(g, i, L, depth, S.focus >= 0 && S.focus !== g.gi));
+          depth++;
+        });
+        S.manual.forEach((mt, mi) => {
+          if (mt.cells.indexOf(i) < 0) return;
+          overlays.push(groupOverlay({ cells: mt.cells, gi: M.groups.length + mi }, i, L, depth, false));
+          depth++;
+        });
+
+        parts.push(
+          '<div class="' + cls.join(' ') + '" data-cell="' + i + '">' +
+            '<span class="m">' + (M.mode === 'sop' ? 'm' : 'M') + i + '</span>' +
+            '<span class="v">' + (row.val === 'x' ? 'X' : row.val) + '</span>' +
+            overlays.join('') +
+          '</div>'
+        );
+      });
+    });
+
+    kmWrap.innerHTML = parts.join('');
+    counts.kmap.textContent = shown + ' / ' + M.R;
+    heads.kmap.classList.toggle('is-live', p.name === 'kmap');
+  }
+
+  /**
+   * One cell's slice of a group outline. A border is drawn on each side whose
+   * neighbour in the grid is not also in the group — so a group that wraps
+   * round the edge of the map shows up as two outlined pieces, which is how it
+   * is drawn by hand and how students are asked to recognise it.
+   */
+  function groupOverlay(g, i, L, depth, faded) {
+    const here = L.pos(i);
+    const inGroup = (r, c) => {
+      if (r < 0 || c < 0 || r >= L.rowVals.length || c >= L.colVals.length) return false;
+      return g.cells.indexOf(L.idx(L.rowVals[r], L.colVals[c])) >= 0;
+    };
+    const t = !inGroup(here.r - 1, here.c);
+    const b = !inGroup(here.r + 1, here.c);
+    const l = !inGroup(here.r, here.c - 1);
+    const r = !inGroup(here.r, here.c + 1);
+
+    const cls = ['grp', 'is-shown'];
+    if (t) cls.push('g-t'); if (r) cls.push('g-r'); if (b) cls.push('g-b'); if (l) cls.push('g-l');
+    if (faded) cls.push('is-faded');
+
+    const inset = 3 + depth * 4;
+    const rad = (a, c2) => (a && c2) ? '7px' : '0';
+    const style = [
+      'inset:' + inset + 'px',
+      '--c:var(--kg-' + (g.gi % 6) + ')',
+      'border-radius:' + rad(t, l) + ' ' + rad(t, r) + ' ' + rad(b, r) + ' ' + rad(b, l),
+    ].join(';');
+    return '<span class="' + cls.join(' ') + '" style="' + style + '"></span>';
+  }
+
+  /* ── Bottom right: groups and the simplified expression ─────────────── */
+
+  function renderOut() {
+    if (!M || !M.ok) {
+      eqEl.innerHTML = '';
+      manualBox.classList.remove('is-live');
+      counts.terms.textContent = '';
+      return;
+    }
+
+    const shown = groupsShown();
+    const p = phase();
+
+    {
+      const term = (text, gi, focusable) =>
+        '<span class="gterm' + (S.focus === gi ? ' is-focus' : '') + '"' +
+        (focusable ? ' data-group="' + gi + '"' : '') +
+        ' style="--c:var(--kg-' + (gi % 6) + ')">' + text + '</span>';
+
+      let rhs;
+      if (M.degenerate) {
+        rhs = M.degenerate;
+      } else {
+        const plus = M.mode === 'sop' ? '<span class="plus">+</span>' : '';
+        rhs = M.groups.slice(0, shown).map(g => term(g.text, g.gi, true)).join(plus);
+        // Nothing circled yet: the equation stands with its right-hand side
+        // still to come, rather than opening with a stray operator.
+        if (shown < M.groups.length) rhs += (shown ? plus : '') + '<span class="plus">…</span>';
+      }
+
+      let html = '<span class="lhs">' + escHtml(OPT.fnName) + ' = </span>' + rhs;
+
+      // What the presenter grouped by hand, kept on its own line so it never
+      // reads as part of the solved answer.
+      if (S.manual.length) {
+        const plus = M.mode === 'sop' ? '<span class="plus">+</span>' : '';
+        html += '<span class="mine"><span class="tag">yours</span>' +
+          S.manual.map((mt, mi) => term(mt.text, M.groups.length + mi, false)).join(plus) +
+          '</span>';
+      }
+      eqEl.innerHTML = html;
+    }
+
+    counts.terms.textContent = shown + ' / ' + M.groups.length;
+    heads.terms.classList.toggle('is-live', p.name === 'group');
+
+    renderManual();
+  }
+
+  function renderManual() {
+    manualBox.classList.toggle('is-live', S.picking && !IS_VIEWER);
+    if (!S.picking) return;
+
+    const v = validateSelection();
+    manualMsg.innerHTML = v.html;
+    manualAdd.disabled  = !v.valid;
+  }
+
+  /**
+   * Is the hand-picked set of squares a legal group? Three things have to
+   * hold: every square is a 1 (or a don't-care), the count is a power of two,
+   * and the squares are exactly one subcube — not just a set that happens to
+   * share literals.
+   */
+  function validateSelection() {
+    const sel = S.sel;
+    // Nothing picked yet is not a state worth narrating — the buttons say
+    // what this row is for.
+    if (!sel.length) return { valid: false, html: '' };
+
+    const want = M.mode === 'sop' ? 1 : 0;
+    const bad  = sel.filter(i => M.rows[i].val !== want && M.rows[i].val !== 'x');
+    if (bad.length) {
+      return { valid: false, html: '<span class="bad">A group can only cover ' +
+        (want === 1 ? '1s' : '0s') + ' and don\'t-cares.</span>' };
+    }
+    if (sel.length & (sel.length - 1)) {
+      return { valid: false, html: '<span class="bad">' + sel.length +
+        ' squares — a group has to be 1, 2, 4, 8…</span>' };
+    }
+
+    // The tightest implicant containing the selection: a variable is fixed
+    // only where every selected square agrees on it.
+    let dash = 0;
+    const first = sel[0];
+    for (let k = 0; k < M.n; k++) {
+      const bit = 1 << k;
+      if (sel.some(i => (i & bit) !== (first & bit))) dash |= bit;
+    }
+    const imp = { bits: first & ~dash, dash };
+    if (cellsOf(imp, M.n).length !== sel.length) {
+      return { valid: false, html: '<span class="bad">Those squares aren\'t adjacent as a block.</span>' };
+    }
+
+    const text = M.mode === 'sop' ? implToSOP(imp, M.vars) : implToPOS(imp, M.vars);
+    return {
+      valid: true, imp, text,
+      html: '<span class="ok">Valid group</span> · ' + plural(sel.length) + ' → <strong>' + text + '</strong>',
+    };
+  }
+
+  function renderStatus() {
+    if (!M || !M.ok) { statusEl.textContent = M && M.error ? 'check expression' : 'ready'; return; }
+    const p = phase();
+    const total = totalSteps();
+    let txt;
+    switch (p.name) {
+      case 'idle':  txt = 'ready · ' + total + ' steps'; break;
+      case 'table': txt = 'truth table ' + (p.k + 1) + '/' + M.R; break;
+      case 'kmap':  txt = 'map ' + (p.k + 1) + '/' + M.R; break;
+      default:      txt = 'group ' + (p.k + 1) + '/' + M.groups.length; break;
+    }
+    statusEl.textContent = txt + (S.picking ? ' · selecting' : '');
+    nextBtn.disabled = S.step >= total;
+    backBtn.disabled = S.step <= 0;
+    pickBtn.classList.toggle('is-active', S.picking);
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     Actions
+     ══════════════════════════════════════════════════════════════════════ */
+
+  function step(delta) {
+    if (IS_VIEWER || !M || !M.ok) return;
+    const total = totalSteps();
+    const next = Math.max(0, Math.min(total, S.step + delta));
+    if (next === S.step) return;
+    S.step = next;
+    S.focus = -1;
+    render(); emitState();
+  }
+
+  function restart() {
+    if (IS_VIEWER) return;
+    S.step = 0; S.focus = -1; S.sel = []; S.manual = [];
+    render(); emitState();
+  }
+
+  function togglePicking() {
+    if (IS_VIEWER) return;
+    S.picking = !S.picking;
+    if (!S.picking) S.sel = [];
+    render(); emitState();
+  }
+
+  function toggleCell(i) {
+    if (IS_VIEWER || !S.picking) return;
+    const k = S.sel.indexOf(i);
+    if (k >= 0) S.sel.splice(k, 1); else S.sel.push(i);
+    render(); emitState();
+  }
+
+  function addManualTerm() {
+    if (IS_VIEWER) return;
+    const v = validateSelection();
+    if (!v.valid) return;
+    S.manual.push({ cells: S.sel.slice().sort((a, b) => a - b), text: v.text });
+    S.sel = [];
+    render(); emitState();
+  }
+
+  function focusGroup(gi) {
+    if (IS_VIEWER) return;
+    S.focus = (S.focus === gi) ? -1 : gi;
+    render(); emitState();
+  }
+
+  function setExpr(value) {
+    if (IS_VIEWER) return;
+    S.expr = value;
+    compile(); render(); emitState(); pushSetting({ expression: value });
+  }
+
+  function setDontCares(value) {
+    if (IS_VIEWER) return;
+    S.dcText = value;
+    compile(); render(); emitState(); pushSetting({ dontCares: value });
+  }
+
+  /* ── Truth-table input ──────────────────────────────────────────────── */
+
+  // Switching in from a formula carries its rows across, so "show me the
+  // table, now let me change one row" is two clicks rather than retyping it.
+  function setSource(src) {
+    if (IS_VIEWER || src === S.source) return;
+    if (src === 'table' && M && M.ok) {
+      S.nvars = M.n;
+      S.table = M.rows.map(r => (r.val === 'x' ? 'x' : String(r.val))).join('');
+    }
+    S.source = src;
+    S.step = 0;
+    compile(); render(); emitState();
+    pushSetting({ inputMode: src, truthTable: S.table, tableVars: String(S.nvars) });
+  }
+
+  function setVarCount(n) {
+    if (IS_VIEWER || n === S.nvars) return;
+    const R = 1 << n;
+    S.table = tableChars(1 << S.nvars).slice(0, R).join('').padEnd(R, '0');
+    S.nvars = n;
+    S.step = 0;
+    compile(); render(); emitState();
+    pushSetting({ tableVars: String(n), truthTable: S.table });
+  }
+
+  // 0 → 1 → X → 0, so one column of clicks enters a function and its
+  // don't-cares without a second field to fill in.
+  const CYCLE = { '0': '1', '1': 'x', 'x': '0' };
+  function cycleRow(i) {
+    if (IS_VIEWER || S.source !== 'table') return;
+    const chars = tableChars(1 << S.nvars);
+    if (i < 0 || i >= chars.length) return;
+    chars[i] = CYCLE[chars[i]] || '1';
+    S.table = chars.join('');
+    compile(); render(); emitState(); pushSetting({ truthTable: S.table });
+  }
+
+  function clearTable() {
+    if (IS_VIEWER) return;
+    S.table = ''.padEnd(1 << S.nvars, '0');
+    S.step = 0;
+    compile(); render(); emitState(); pushSetting({ truthTable: S.table });
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     Socket.IO sync — presenter emits, viewers apply
+     ══════════════════════════════════════════════════════════════════════ */
+
+  let socket = null, syncTimer = null;
+
+  function initSocket(url) {
+    if (typeof io === 'undefined') { socket = { emit() {}, on() {} }; return; }
+    try {
+      const prev = socket;
+      socket = io(url || (window.BeamerWidget ? BeamerWidget.serverOrigin() : ''),
+                  { transports: ['websocket', 'polling'] });
+      if (prev && prev.disconnect) prev.disconnect();
+      socket.on('widget_state', data => {
+        if (!IS_VIEWER || data?.widgetId !== WIDGET_ID) return;
+        applyState(data.state || {});
+      });
+    } catch (_) {
+      socket = { emit() {}, on() {} };
+    }
+  }
+
+  function emitState() {
+    if (!socket || IS_VIEWER) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => {
+      socket.emit('widget_state', { widgetId: WIDGET_ID, state: getState() });
+    }, 120);
+  }
+
+  // The presenter's typed expression is part of the slide, not just this
+  // run of it — hand it back to the host so it is still there next time the
+  // deck is opened. Same message the settings panel posts.
+  let settingTimer = null, pendingPatch = null;
+  function pushSetting(patch) {
+    if (IS_VIEWER) return;
+    pendingPatch = { ...(pendingPatch || {}), ...patch };
+    clearTimeout(settingTimer);
+    settingTimer = setTimeout(() => {
+      try {
+        window.parent.postMessage(
+          { type: 'widget-settings', widgetId: WIDGET_ID, patch: pendingPatch, remove: [] }, '*');
+      } catch (_) { /* no parent to tell — standalone */ }
+      pendingPatch = null;
+    }, 600);
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     State serialisation — one shape for live sync and for saving with the
+     deck, so a restored slide looks exactly like a synced viewer.
+     ══════════════════════════════════════════════════════════════════════ */
+
+  function getState() {
+    return {
+      source: S.source, expr: S.expr, modeSel: S.modeSel, dcText: S.dcText,
+      nvars: S.nvars, table: S.table,
+      step: S.step, picking: S.picking,
+      sel: S.sel.slice(0, 16),
+      manual: S.manual.slice(0, 12),
+      focus: S.focus,
+    };
+  }
+
+  function applyState(s) {
+    if (!s) return;
+    if (s.source  != null) S.source  = s.source === 'table' ? 'table' : 'formula';
+    if (s.expr    != null) S.expr    = s.expr;
+    if (s.modeSel != null) S.modeSel = s.modeSel === 'pos' ? 'pos' : 'sop';
+    if (s.dcText  != null) S.dcText  = s.dcText;
+    if (s.nvars   != null) S.nvars   = Math.max(2, Math.min(4, s.nvars | 0));
+    if (s.table   != null) S.table   = String(s.table);
+    compile();
+    if (s.step    != null) S.step    = Math.max(0, Math.min(totalSteps(), s.step));
+    if (s.picking != null) S.picking = !!s.picking;
+    if (Array.isArray(s.sel))    S.sel    = s.sel.slice();
+    if (Array.isArray(s.manual)) S.manual = s.manual.slice();
+    if (s.focus   != null) S.focus   = s.focus;
+    render();
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     Config
+     ══════════════════════════════════════════════════════════════════════ */
+
+  let lastCfgExpr = null, lastCfgDc = null, lastCfgMode = null,
+      lastCfgSrc = null, lastCfgTable = null, lastCfgVars = null;
+
+  function applyConfig(c) {
+    if (!c) return;
+    cfg       = { ...cfg, ...c };
+    WIDGET_ID = cfg.id || cfg.widgetId || WIDGET_ID;
+    role      = cfg.role || role;
+    IS_VIEWER = role === 'viewer' || IS_VIEWER;
+
+    OPT = {
+      fnName:       (cfg.fnName || 'F').trim() || 'F',
+      notation:     cfg.notation === 'bar' ? 'bar' : 'prime',
+      rowOrder:     cfg.rowOrder === 'table' ? 'table' : 'term',
+      varsText:     (cfg.vars || '').trim(),
+    };
+
+    // Only adopt a config value when it actually changed, so re-applying the
+    // config doesn't wipe what the presenter has typed into the widget.
+    if (cfg.expression != null && cfg.expression !== lastCfgExpr) {
+      lastCfgExpr = cfg.expression;
+      if (String(cfg.expression).trim()) { S.expr = cfg.expression; S.step = 0; }
+    }
+    if (cfg.dontCares != null && cfg.dontCares !== lastCfgDc) {
+      lastCfgDc = cfg.dontCares;
+      S.dcText = cfg.dontCares;
+    }
+    if (cfg.mode != null && cfg.mode !== lastCfgMode) {
+      lastCfgMode = cfg.mode;
+      // "auto" was the old third option; decks saved with it read as SOP.
+      S.modeSel = cfg.mode === 'pos' ? 'pos' : 'sop';
+    }
+    if (cfg.inputMode != null && cfg.inputMode !== lastCfgSrc) {
+      lastCfgSrc = cfg.inputMode;
+      S.source = cfg.inputMode === 'table' ? 'table' : 'formula';
+      S.step = 0;
+    }
+    if (cfg.tableVars != null && cfg.tableVars !== lastCfgVars) {
+      lastCfgVars = cfg.tableVars;
+      S.nvars = Math.max(2, Math.min(4, parseInt(cfg.tableVars, 10) || 3));
+    }
+    if (cfg.truthTable != null && cfg.truthTable !== lastCfgTable) {
+      lastCfgTable = cfg.truthTable;
+      S.table = String(cfg.truthTable);
+    }
+
+    if (cfg.socketUrl) initSocket(cfg.socketUrl);
+
+    compile();
+    render();
+  }
+
+  function destroy() {
+    clearTimeout(syncTimer);
+    clearTimeout(settingTimer);
+    if (fitObs) { fitObs.disconnect(); fitObs = null; }
+    if (socket && socket.disconnect) socket.disconnect();
+    socket = null;
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     Beamer+ message bridge
+     ══════════════════════════════════════════════════════════════════════ */
+
+  window.addEventListener('message', e => {
+    const d = e.data || {};
+    if (d.type === 'widget-config')  applyConfig(d.config);
+    if (d.type === 'widget-cleanup') destroy();
+    if (d.type === 'widget-get-state') {
+      try {
+        window.parent.postMessage(
+          { type: 'widget-state', widgetId: WIDGET_ID, state: getState() }, '*');
+      } catch (_) { /* standalone */ }
+    }
+    if (d.type === 'widget-set-state' && d.state) applyState(d.state);
+  });
+
+  /* ══════════════════════════════════════════════════════════════════════
+     Events
+     ══════════════════════════════════════════════════════════════════════ */
+
+  nextBtn   .addEventListener('click', e => { e.stopPropagation(); step(1); });
+  backBtn   .addEventListener('click', e => { e.stopPropagation(); step(-1); });
+  restartBtn.addEventListener('click', e => { e.stopPropagation(); restart(); });
+  pickBtn   .addEventListener('click', e => { e.stopPropagation(); togglePicking(); });
+  manualAdd .addEventListener('click', e => { e.stopPropagation(); addManualTerm(); });
+  manualClr .addEventListener('click', e => { e.stopPropagation(); S.sel = []; render(); emitState(); });
+
+  let exprTimer = null;
+  exprInput.addEventListener('input', () => {
+    clearTimeout(exprTimer);
+    exprTimer = setTimeout(() => setExpr(exprInput.value), 220);
+  });
+  exprInput.addEventListener('change', () => { clearTimeout(exprTimer); setExpr(exprInput.value); });
+
+  modeSel.addEventListener('change', () => {
+    if (IS_VIEWER) return;
+    S.modeSel = modeSel.value === 'pos' ? 'pos' : 'sop';
+    compile(); render(); emitState(); pushSetting({ mode: S.modeSel });
+  });
+
+  srcSel  .addEventListener('change', () => setSource(srcSel.value));
+  clearBtn.addEventListener('click', e => { e.stopPropagation(); clearTable(); });
+  varBtns .forEach(b => b.addEventListener('click', e => {
+    e.stopPropagation(); setVarCount(Number(b.dataset.nvars));
+  }));
+
+  // Stepping is the buttons' job and nothing else's — a stray click on the
+  // slide while pointing at something must never move the walkthrough on.
+  // The only clicks the panes take are the two that are their own controls:
+  // picking squares for a group, and pulling one term out of the answer.
+  document.getElementById('quads').addEventListener('click', e => {
+    if (IS_VIEWER) return;
+
+    const cell = e.target.closest('.km-cell');
+    if (cell && S.picking) { toggleCell(Number(cell.dataset.cell)); return; }
+
+    const out = e.target.closest('.tt.is-editable tbody .c-out');
+    if (out) { cycleRow(Number(out.parentNode.dataset.row)); return; }
+
+    const gterm = e.target.closest('.gterm[data-group]');
+    if (gterm) focusGroup(Number(gterm.dataset.group));
+  });
+
+  /* ══════════════════════════════════════════════════════════════════════
+     Helpers
+     ══════════════════════════════════════════════════════════════════════ */
+
+  function plural(n) { return n + (n === 1 ? ' square' : ' squares'); }
+
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     Boot
+     ══════════════════════════════════════════════════════════════════════ */
+
+  initSocket(CFG0.socketUrl);
+  applyConfig(CFG0);
+  compile();
+  render();
+
+  // "Reset widget" in the shared bar means back to the first step, not a
+  // reload that would throw away the expression the presenter typed.
+  (function wireReset(tries) {
+    if (window.BeamerWidget && BeamerWidget.topbar) { BeamerWidget.topbar.onReset(restart); return; }
+    if (tries > 0) setTimeout(() => wireReset(tries - 1), 120);
+  })(20);
+
+  // Exposed for the harness that tests the parser and the solver.
+  window.__kmap = { parse, evalNode, envOf, primeImplicants, minimalCover, cellsOf,
+                    compile, get model() { return M; }, S, OPT };
+})();
+</script>
+</body>
+</html>

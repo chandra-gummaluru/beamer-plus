@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script id="widget-schema" type="application/json">
+{
+  "label": "Python IDE",
+  "category": "Computer Science",
+  "fields": [
+    { "key": "filename", "label": "File name", "type": "text", "placeholder": "main.py" },
+    { "key": "code", "label": "Starting code", "type": "textarea", "rows": 8,
+      "placeholder": "print('Hello, world!')" },
+    { "key": "layout", "label": "Layout", "type": "select", "default": "stacked",
+      "options": [ { "v": "stacked", "l": "Editor above shell" },
+                   { "v": "side",    "l": "Editor beside shell" } ] },
+    { "key": "scale", "label": "Text size", "type": "select", "default": "1.4",
+      "options": ["1", "1.4", "1.8", "2.2"] },
+    { "key": "clearOnRun", "label": "Clear shell before each run", "type": "checkbox", "default": false },
+    { "key": "banner", "label": "Show version banner", "type": "checkbox", "default": true },
+    { "key": "readOnly", "label": "Read-only editor", "type": "checkbox", "default": false }
+  ]
+}
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Python IDE — Beamer+</title>
+
+<!-- Vendored by the Beamer+ server. Never call io() bare — inside the srcdoc
+     iframe that resolves to http://about/socket.io/. -->
+<script src="/static/vendor/socket.io.min.js"></script>
+
+<style>
+/* Tokens, reset, toolbar, buttons, spinner and status pills come from the
+   shared widget base (static/css/widget-base.css). What's left here is the
+   IDE itself: the two panes, the splitter, the highlighted editor and the
+   shell transcript. */
+
+html, body { height: 100%; overflow: hidden; }
+
+#shell-root { --ws: 1.4; }
+#file-input { display: none; }
+
+/* ── Workspace + panes ─────────────────────────────────────── */
+#workspace {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  gap: 0;
+}
+#workspace.is-side { flex-direction: row; }
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg);
+}
+#editor-pane { flex: 0 0 60%; }
+#shell-pane  { flex: 1 1 0; }
+
+#workspace.max-editor #shell-pane,
+#workspace.max-editor #splitter,
+#workspace.max-shell  #editor-pane,
+#workspace.max-shell  #splitter { display: none; }
+#workspace.max-editor #editor-pane { flex: 1 1 0; }
+
+.pane-head {
+  flex: 0 0 auto;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 6px 0 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-subtle);
+  user-select: none;
+}
+.pane-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  font-weight: 600;
+}
+.pane-file {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-2);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 2px 4px;
+  width: 16ch;
+  transition: border-color var(--dur, 0.15s);
+}
+.pane-file:hover:not(:disabled),
+.pane-file:focus { border-color: var(--border-med); outline: none; }
+.pane-head .bw-btn--icon { width: 24px; height: 24px; padding: 0; }
+.pane-head svg { width: 13px; height: 13px; }
+
+/* ── Splitter ───────────────────────────────────────────────── */
+#splitter {
+  flex: 0 0 8px;
+  cursor: row-resize;
+  position: relative;
+  touch-action: none;
+}
+#workspace.is-side #splitter { cursor: col-resize; }
+#splitter::after {
+  content: '';
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 28px; height: 2px;
+  transform: translate(-50%, -50%);
+  border-radius: 1px;
+  background: var(--border);
+  transition: background var(--dur, 0.15s);
+}
+#workspace.is-side #splitter::after { width: 2px; height: 28px; }
+#splitter:hover::after, #splitter.is-dragging::after { background: var(--text-3); }
+
+/* ── Editor ─────────────────────────────────────────────────── */
+.code-font {
+  font-family: var(--font-mono);
+  font-size: calc(10px * var(--u, 1) * var(--ws));
+  line-height: 1.5;
+  tab-size: 4;
+}
+
+#editor-body { flex: 1; min-height: 0; display: flex; position: relative; }
+
+#gutter {
+  flex: 0 0 auto;
+  min-width: 3.2em;
+  padding: 10px 8px 40px 0;   /* extra end padding: see #code-hl */
+  text-align: right;
+  color: var(--text-3);
+  background: var(--bg-subtle);
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+  white-space: pre;
+  user-select: none;
+}
+#gutter .is-err { color: var(--err); }
+
+#code-wrap { flex: 1; min-width: 0; position: relative; }
+
+/* The textarea sits on top of the highlighted <pre> with transparent ink,
+   so both must share every metric that affects where a glyph lands. */
+/* Textareas don't inherit font from their parent, and the host base may style
+   pre/textarea differently, so every metric is pinned explicitly on both. */
+#code-hl, #code, #gutter {
+  font-family: var(--font-mono);
+  font-size: calc(10px * var(--u, 1) * var(--ws));
+  font-weight: 400;
+  font-style: normal;
+  line-height: 1.5;
+  letter-spacing: 0;
+  word-spacing: 0;
+  tab-size: 4;
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
+  font-kerning: none;
+  text-rendering: optimizeSpeed;
+  text-transform: none;
+  text-indent: 0;
+}
+#code-hl, #code {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  white-space: pre;
+  overflow: auto;
+  overflow-wrap: normal;
+  word-wrap: normal;
+  word-break: normal;
+  -webkit-appearance: none;
+  appearance: none;
+}
+/* The highlight layer has no scrollbars, so it gets extra end padding to be
+   able to scroll at least as far as the textarea when a scrollbar appears. */
+#code-hl {
+  pointer-events: none;
+  color: var(--text);
+  overflow: hidden;
+  padding-right: 40px;
+  padding-bottom: 40px;
+}
+#code {
+  resize: none;
+  outline: none;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--text);
+}
+/* The textarea sits above the highlighted text, so its selection must be
+   translucent — an opaque fill paints straight over the glyphs underneath. */
+#code::selection {
+  background: rgba(37, 99, 235, 0.25);
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  color: transparent;
+}
+
+/* Colour only — bold or italic can change glyph advance in some monospace
+   fonts and knock the highlight out of step with the caret. */
+.t-kw  { color: var(--chart-1); }
+.t-str { color: var(--chart-2); }
+.t-num { color: var(--chart-3); }
+.t-bi  { color: var(--chart-4); }
+.t-def { color: var(--accent); }
+.t-dec { color: var(--chart-5); }
+.t-com { color: var(--text-3); }
+
+/* ── Shell ──────────────────────────────────────────────────── */
+#shell-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px 12px;
+  background: var(--bg-output);
+  cursor: text;
+}
+.sh-line { white-space: pre-wrap; word-break: break-word; margin: 0; }
+.sh-in   { color: var(--text); }
+.sh-in .sh-p { color: var(--text-3); user-select: none; }
+.sh-out  { color: var(--text); }
+.sh-err  { color: var(--err); }
+.sh-sys  { color: var(--text-3); font-style: italic; }
+
+/* Same shape as the Python Shell widget: a 4ch prompt column, and a
+   textarea that grows to fit a pasted or Shift+Enter block. */
+#prompt-row { display: flex; align-items: flex-start; }
+#prompt     { flex: 0 0 4ch; width: 4ch; color: var(--text-3); white-space: pre; user-select: none; }
+#shell-input {
+  flex: 1;
+  display: block;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  padding: 0;
+  margin: 0;
+  resize: none;
+  overflow: hidden;
+  background: transparent;
+  color: var(--text);
+  caret-color: var(--text);
+  font: inherit;
+  line-height: inherit;
+  white-space: pre-wrap;
+}
+#prompt-row.is-hidden { display: none; }
+
+#shell-body::-webkit-scrollbar,
+#code::-webkit-scrollbar { width: 8px; height: 8px; }
+#shell-body::-webkit-scrollbar-thumb,
+#code::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+#shell-body::-webkit-scrollbar-thumb:hover,
+#code::-webkit-scrollbar-thumb:hover { background: var(--border-med); }
+
+#boot-row { display: flex; align-items: center; gap: 8px; color: var(--text-3); }
+#boot-row .bw-spinner { width: 12px; height: 12px; }
+
+.status-run { color: var(--ok); }
+.status-err { color: var(--err); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
+</style>
+</head>
+<body>
+<div id="shell-root" class="bw-shell">
+
+  <div id="toolbar" class="bw-toolbar" data-bw-topbar>
+    <span class="bw-toolbar-title">Python</span>
+    <div class="bw-sep"></div>
+    <button class="bw-btn" id="open-btn" title="Open a .py file">Open</button>
+    <button class="bw-btn" id="save-btn" title="Download this file">Save</button>
+    <div class="bw-spacer"></div>
+    <span id="status" class="bw-status">loading</span>
+    <button class="bw-btn" id="restart-btn" title="Stop and restart the shell (Ctrl+C in shell)">Restart</button>
+    <button class="bw-btn bw-btn--primary" id="run-btn" title="Run file (F5 / Ctrl+Enter)">
+      Run
+    </button>
+    <input type="file" id="file-input" accept=".py,.txt,text/x-python,text/plain">
+  </div>
+
+  <div id="workspace">
+    <section class="pane" id="editor-pane">
+      <div class="pane-head" id="editor-head">
+        <span class="pane-label">Editor</span>
+        <input class="pane-file" id="filename" value="main.py" spellcheck="false" aria-label="File name">
+        <div class="bw-spacer"></div>
+        <button class="bw-btn bw-btn--icon" id="editor-max" title="Expand editor"></button>
+      </div>
+      <div id="editor-body" class="code-font">
+        <div id="gutter">1</div>
+        <div id="code-wrap">
+          <pre id="code-hl" aria-hidden="true"></pre>
+          <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off"
+                    autocorrect="off" wrap="off" aria-label="Python source"></textarea>
+        </div>
+      </div>
+    </section>
+
+    <div id="splitter" role="separator" aria-label="Resize panes"></div>
+
+    <section class="pane" id="shell-pane">
+      <div class="pane-head" id="shell-head">
+        <span class="pane-label">Shell</span>
+        <div class="bw-spacer"></div>
+        <button class="bw-btn bw-btn--icon" id="clear-btn" title="Clear shell (Ctrl+L)">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 4h10M6 4V2.5h4V4M4.5 4l.7 9.5h5.6l.7-9.5"/></svg>
+        </button>
+        <button class="bw-btn bw-btn--icon" id="shell-max" title="Expand shell"></button>
+      </div>
+      <div id="shell-body" class="code-font">
+        <div id="transcript"></div>
+        <div id="boot-row"><span class="bw-spinner"></span><span id="boot-msg">Loading Python…</span></div>
+        <div id="prompt-row" class="is-hidden">
+          <span id="prompt">&gt;&gt;&gt; </span>
+          <textarea id="shell-input" rows="1" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" aria-label="Python input"></textarea>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ── Config ──────────────────────────────────────────────────────────────────
+  const _qs       = new URLSearchParams(location.search);
+  const CFG0      = window.WIDGET_CONFIG || {};
+  let   cfg       = { ...CFG0 };
+  let   WIDGET_ID = CFG0.id || CFG0.widgetId || 'python-ide';
+  let   IS_VIEWER = CFG0.role === 'viewer' || _qs.get('viewer') === '1';
+
+  const PYODIDE_URL = 'https://cdn.jsdelivr.net/pyodide/v0.25.0/full/';
+  const MAX_ENTRIES = 400;
+  const MAX_HISTORY = 500;
+  const PS1 = '>>> ';
+  const PS2 = '... ';
+
+  const DEFAULT_CODE =
+`def greet(name):
+    return f"Hello, {name}!"
+
+for who in ["world", "class"]:
+    print(greet(who))
+`;
+
+  // ── DOM ─────────────────────────────────────────────────────────────────────
+  const $ = id => document.getElementById(id);
+  const root       = $('shell-root');
+  const workspace  = $('workspace');
+  const editorPane = $('editor-pane');
+  const splitter   = $('splitter');
+  const codeEl     = $('code');
+  const hlEl       = $('code-hl');
+  const gutterEl   = $('gutter');
+  const fileEl     = $('filename');
+  const shellBody  = $('shell-body');
+  const transcript = $('transcript');
+  const promptRow  = $('prompt-row');
+  const promptEl   = $('prompt');
+  const inputEl    = $('shell-input');
+  const bootRow    = $('boot-row');
+  const bootMsg    = $('boot-msg');
+  const statusEl   = $('status');
+  const runBtn     = $('run-btn');
+  const restartBtn = $('restart-btn');
+  const openBtn    = $('open-btn');
+  const saveBtn    = $('save-btn');
+  const fileInput  = $('file-input');
+  const editorMax  = $('editor-max');
+  const shellMax   = $('shell-max');
+  const clearBtn   = $('clear-btn');
+
+  // ── State ───────────────────────────────────────────────────────────────────
+  // The code, the transcript and the layout are the shared state. The Python
+  // namespace is not — it lives in the presenter's worker and never travels.
+  const S = {
+    filename: 'main.py',
+    code:     DEFAULT_CODE,
+    entries:  [],            // { k: 'in'|'out'|'err'|'sys', s }
+    max:      null,          // null | 'editor' | 'shell'
+    split:    0.6,
+    side:     false,
+    errLine:  null,
+  };
+  let phase      = 'loading';  // loading | ready | running | error | viewer
+  let more       = false;      // shell is waiting for a continuation line
+  let history    = [];
+  let histIdx    = -1;         // -1 = editing a fresh line
+  let histDraft  = '';         // what was typed before arrowing into history
+  let pending    = [];         // lines of a pasted block still to run
+  let lastTyped  = null;       // the line just typed, for auto-indent
+  let bannerShown = false;
+  let completeSeq = 0;
+  let lastCfgCode = null;
+  let lastCfgName = null;
+
+  // ── Icons ───────────────────────────────────────────────────────────────────
+  const ICON_EXPAND   = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2.5h4v4M6.5 13.5h-4v-4M13.5 2.5 9 7M2.5 13.5 7 9"/></svg>';
+  const ICON_COLLAPSE = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 6.5h-4v-4M2.5 9.5h4v4M9.5 6.5 14 2M6.5 9.5 2 14"/></svg>';
+
+  // ── Syntax highlighting ─────────────────────────────────────────────────────
+  const KW = 'False|None|True|and|as|assert|async|await|break|class|continue|def|del|elif|else|except|finally|for|from|global|if|import|in|is|lambda|nonlocal|not|or|pass|raise|return|try|while|with|yield|match|case';
+  const BI = 'print|input|len|range|int|float|str|list|dict|set|tuple|bool|type|isinstance|enumerate|zip|map|filter|sorted|reversed|sum|min|max|abs|round|open|super|self|object|any|all|repr|chr|ord|hex|bin|iter|next|Exception|ValueError|TypeError|KeyError|IndexError';
+  // One pass, left to right, so a '#' inside a string or a keyword inside a
+  // comment is claimed by whichever token starts first.
+  const TOK = new RegExp(
+    '(#[^\\n]*)' +
+    '|([rbfuRBFU]{0,2}(?:"""[\\s\\S]*?(?:"""|(?![\\s\\S]))|\'\'\'[\\s\\S]*?(?:\'\'\'|(?![\\s\\S]))|"(?:\\\\.|[^"\\\\\\n])*"?|\'(?:\\\\.|[^\'\\\\\\n])*\'?))' +
+    '|\\b(def|class)(\\s+)([A-Za-z_]\\w*)' +
+    '|\\b(' + KW + ')\\b' +
+    '|\\b(' + BI + ')\\b' +
+    '|(@[A-Za-z_][\\w.]*)' +
+    '|\\b(0[xXoObB][\\da-fA-F_]+|\\d[\\d_]*\\.?\\d*(?:[eE][+-]?\\d+)?j?)\\b',
+    'g');
+
+  function highlight(src) {
+    let out = '', last = 0, m;
+    TOK.lastIndex = 0;
+    while ((m = TOK.exec(src))) {
+      out += escHtml(src.slice(last, m.index));
+      if      (m[1]) out += span('com', m[1]);
+      else if (m[2]) out += span('str', m[2]);
+      else if (m[3]) out += span('kw', m[3]) + m[4] + span('def', m[5]);
+      else if (m[6]) out += span('kw', m[6]);
+      else if (m[7]) out += span('bi', m[7]);
+      else if (m[8]) out += span('dec', m[8]);
+      else if (m[9]) out += span('num', m[9]);
+      last = TOK.lastIndex;
+      if (m[0] === '') TOK.lastIndex++;
+    }
+    // Trailing newline gets a spacer, otherwise the <pre> is a line shorter
+    // than the textarea and the two drift apart when scrolled to the end.
+    return out + escHtml(src.slice(last)) + '\n ';
+  }
+  const span = (c, s) => `<span class="t-${c}">${escHtml(s)}</span>`;
+
+  function renderEditor() {
+    hlEl.innerHTML = highlight(codeEl.value);
+    const n = codeEl.value.split('\n').length;
+    let g = '';
+    for (let i = 1; i <= n; i++) {
+      g += i === S.errLine ? `<span class="is-err">${i}</span>\n` : i + '\n';
+    }
+    gutterEl.innerHTML = g;
+    syncScroll();
+  }
+
+  function syncScroll() {
+    hlEl.scrollTop  = codeEl.scrollTop;
+    hlEl.scrollLeft = codeEl.scrollLeft;
+    gutterEl.scrollTop = codeEl.scrollTop;
+  }
+
+  // ── Editor editing ──────────────────────────────────────────────────────────
+  // execCommand keeps the browser's undo stack intact; setRangeText is the
+  // fallback where it's gone.
+  function insertText(text) {
+    codeEl.focus();
+    if (!document.execCommand || !document.execCommand('insertText', false, text)) {
+      codeEl.setRangeText(text, codeEl.selectionStart, codeEl.selectionEnd, 'end');
+      onCodeInput();
+    }
+  }
+
+  function lineStartOf(pos) { return codeEl.value.lastIndexOf('\n', pos - 1) + 1; }
+
+  function indentSelection(dedent) {
+    const v = codeEl.value;
+    const a = lineStartOf(codeEl.selectionStart);
+    let   b = codeEl.selectionEnd;
+    if (b > a && v[b - 1] === '\n') b--;
+    const block = v.slice(a, b);
+    const next  = block.split('\n')
+      .map(l => dedent ? l.replace(/^ {1,4}|^\t/, '') : '    ' + l)
+      .join('\n');
+    codeEl.setSelectionRange(a, b);
+    insertText(next);
+    codeEl.setSelectionRange(a, a + next.length);
+  }
+
+  function onEditorKey(e) {
+    if (IS_VIEWER || codeEl.readOnly) return;
+    const mod = e.ctrlKey || e.metaKey;
+
+    if ((mod && e.key === 'Enter') || e.key === 'F5') {
+      e.preventDefault(); runFile(); return;
+    }
+    if (mod && e.key === 's') { e.preventDefault(); saveFile(); return; }
+    if (mod && e.key === '/') { e.preventDefault(); toggleComment(); return; }
+
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const multi = codeEl.value.slice(codeEl.selectionStart, codeEl.selectionEnd).includes('\n');
+      if (e.shiftKey || multi) indentSelection(e.shiftKey);
+      else {
+        const col = codeEl.selectionStart - lineStartOf(codeEl.selectionStart);
+        insertText(' '.repeat(4 - (col % 4)));
+      }
+      return;
+    }
+
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      const pos    = codeEl.selectionStart;
+      const line   = codeEl.value.slice(lineStartOf(pos), pos);
+      let   indent = (line.match(/^[ \t]*/) || [''])[0];
+      const code   = line.replace(/#.*$/, '').trimEnd();
+      if (code.endsWith(':')) indent += '    ';
+      else if (/^\s*(return|pass|break|continue|raise)\b/.test(line)) indent = indent.slice(0, -4);
+      insertText('\n' + indent);
+      return;
+    }
+
+    // Backspace in leading whitespace removes a whole indent level.
+    if (e.key === 'Backspace' && codeEl.selectionStart === codeEl.selectionEnd) {
+      const pos    = codeEl.selectionStart;
+      const before = codeEl.value.slice(lineStartOf(pos), pos);
+      if (before.length && /^ +$/.test(before)) {
+        e.preventDefault();
+        const drop = ((before.length - 1) % 4) + 1;
+        codeEl.setSelectionRange(pos - drop, pos);
+        insertText('');
+      }
+    }
+  }
+
+  function toggleComment() {
+    const v = codeEl.value;
+    const a = lineStartOf(codeEl.selectionStart);
+    let   b = v.indexOf('\n', codeEl.selectionEnd);
+    if (b < 0) b = v.length;
+    const lines = v.slice(a, b).split('\n');
+    const allCommented = lines.every(l => !l.trim() || /^\s*#/.test(l));
+    const next = lines.map(l => {
+      if (!l.trim()) return l;
+      return allCommented ? l.replace(/^(\s*)# ?/, '$1') : l.replace(/^(\s*)/, '$1# ');
+    }).join('\n');
+    codeEl.setSelectionRange(a, b);
+    insertText(next);
+  }
+
+  function onCodeInput() {
+    S.code = codeEl.value;
+    if (S.errLine) S.errLine = null;
+    renderEditor();
+    emitState();
+  }
+
+  // ── Shell transcript ────────────────────────────────────────────────────────
+  function lineClass(k) { return 'sh-line sh-' + k; }
+
+  function makeLine(entry) {
+    const el = document.createElement('pre');
+    el.className = lineClass(entry.k);
+    if (entry.k === 'in') {
+      const p = document.createElement('span');
+      p.className = 'sh-p';
+      p.textContent = entry.p || '>>> ';
+      el.append(p, document.createTextNode(entry.s));
+    } else {
+      el.textContent = entry.s;
+    }
+    return el;
+  }
+
+  // Output arrives in fragments (print(end='') and friends), so consecutive
+  // chunks of the same kind are merged into one element.
+  function append(k, s, p) {
+    if (!s && k !== 'in') return;
+    const last = S.entries[S.entries.length - 1];
+    if (last && k !== 'in' && last.k === k) {
+      last.s += s;
+      transcript.lastChild.textContent = last.s;
+    } else {
+      const entry = p ? { k, s, p } : { k, s };
+      S.entries.push(entry);
+      transcript.appendChild(makeLine(entry));
+      if (S.entries.length > MAX_ENTRIES) {
+        S.entries.splice(0, S.entries.length - MAX_ENTRIES);
+        while (transcript.childNodes.length > MAX_ENTRIES) transcript.firstChild.remove();
+      }
+    }
+    scrollShell();
+    emitState();
+  }
+
+  function renderTranscript() {
+    transcript.textContent = '';
+    const frag = document.createDocumentFragment();
+    S.entries.forEach(e => frag.appendChild(makeLine(e)));
+    transcript.appendChild(frag);
+    scrollShell();
+  }
+
+  function scrollShell() {
+    requestAnimationFrame(() => { shellBody.scrollTop = shellBody.scrollHeight; });
+  }
+
+  function clearShell() {
+    if (IS_VIEWER) return;
+    S.entries = [];
+    renderTranscript();
+    emitState();
+  }
+
+  // ── Python worker ───────────────────────────────────────────────────────────
+  // Pyodide runs in a worker so a long loop never freezes the slide, and so
+  // Restart can simply terminate it — the only reliable way to stop runaway
+  // code without cross-origin isolation.
+  const WORKER_SRC = `
+    importScripts(${JSON.stringify(PYODIDE_URL + 'pyodide.js')});
+    let py = null;
+    const dec = { out: new TextDecoder(), err: new TextDecoder() };
+    const HELPERS = [
+      'import sys, code, traceback, builtins, linecache',
+      '_ns = {"__name__": "__main__"}',
+      '_buf = []',
+      'def _tb(skip=1):',
+      '    et, ev, tb = sys.exc_info()',
+      '    for _ in range(skip):',
+      '        if tb is not None: tb = tb.tb_next',
+      '    line = None',
+      '    t = tb',
+      '    while t is not None:',
+      '        if t.tb_frame.f_code.co_filename == _ns.get("__file__"): line = t.tb_lineno',
+      '        t = t.tb_next',
+      '    if isinstance(ev, SyntaxError) and ev.filename == _ns.get("__file__"): line = ev.lineno',
+      '    sys.stderr.write("".join(traceback.format_exception(et, ev, tb)))',
+      '    return line',
+      'import rlcompleter, re as _re',
+      'def _complete(src):',
+      '    m = _re.search(r"[A-Za-z_][\\\\w.]*$", src)',
+      '    text = m.group(0) if m else ""',
+      '    start = m.start() if m else len(src)',
+      '    if not text: return [[], start]',
+      '    c = rlcompleter.Completer(_ns)',
+      '    out, i = [], 0',
+      '    while i < 200:',
+      '        r = c.complete(text, i)',
+      '        if r is None: break',
+      '        if r not in out: out.append(r)',
+      '        i += 1',
+      '    return [out, start]',
+      'def _input(prompt=""):',
+      '    raise RuntimeError("input() is not available in this shell - set values in code instead")',
+      'builtins.input = _input',
+      'def _run_file(src, fname):',
+      '    global _ns',
+      '    _buf.clear()',
+      '    _ns = {"__name__": "__main__", "__file__": fname, "__builtins__": builtins}',
+      '    linecache.cache[fname] = (len(src), None, src.splitlines(True), fname)',
+      '    try:',
+      '        exec(compile(src, fname, "exec"), _ns)',
+      '    except SystemExit:',
+      '        pass',
+      '    except BaseException:',
+      '        return _tb()',
+      '    return None',
+      '# Tracebacks name "<console>", as in the Python Shell widget.',
+      'def _push(line):',
+      '    _buf.append(line)',
+      '    src = "\\\\n".join(_buf)',
+      '    try:',
+      '        c = code.compile_command(src, "<console>", "single")',
+      '    except (SyntaxError, OverflowError, ValueError):',
+      '        _buf.clear()',
+      '        et, ev = sys.exc_info()[:2]',
+      '        sys.stderr.write("".join(traceback.format_exception_only(et, ev)))',
+      '        return False',
+      '    if c is None:',
+      '        return True',
+      '    _buf.clear()',
+      '    try:',
+      '        exec(c, _ns)',
+      '    except SystemExit:',
+      '        pass',
+      '    except BaseException:',
+      '        _tb()',
+      '    return False',
+    ].join('\\n');
+
+    async function boot() {
+      py = await loadPyodide({ indexURL: ${JSON.stringify(PYODIDE_URL)} });
+      py.setStdout({ write: b => { postMessage({ t: 'out', s: dec.out.decode(b, { stream: true }) }); return b.length; } });
+      py.setStderr({ write: b => { postMessage({ t: 'err', s: dec.err.decode(b, { stream: true }) }); return b.length; } });
+      py.runPython(HELPERS);
+      postMessage({ t: 'ready', v: py.runPython('sys.version.split()[0]') });
+    }
+    const booted = boot().catch(e => postMessage({ t: 'fatal', s: String(e && e.message || e) }));
+
+    let chain = booted;
+    onmessage = ev => {
+      const m = ev.data;
+      chain = chain.then(async () => {
+        if (!py) return;
+        try {
+          if (m.t === 'run') {
+            try { await py.loadPackagesFromImports(m.src); } catch (_) { /* reported by the import itself */ }
+            const line = py.globals.get('_run_file')(m.src, m.name);
+            postMessage({ t: 'done', more: false, errLine: line == null ? null : line });
+          } else if (m.t === 'push') {
+            try { await py.loadPackagesFromImports(m.line); } catch (_) {}
+            const more = py.globals.get('_push')(m.line);
+            postMessage({ t: 'done', more: !!more, pasted: !!m.pasted });
+          } else if (m.t === 'complete') {
+            const res = py.globals.get('_complete')(m.src);
+            const js  = res.toJs();
+            res.destroy();
+            postMessage({ t: 'completions', id: m.id, matches: js[0], start: js[1] });
+            return;
+          } else if (m.t === 'cancel') {
+            py.runPython('_buf.clear()');
+            postMessage({ t: 'done', more: false });
+          }
+        } catch (e) {
+          postMessage({ t: 'err', s: String(e && e.message || e) + '\\n' });
+          postMessage({ t: 'done', more: false });
+        }
+      });
+    };
+  `;
+
+  let worker = null, workerUrl = null;
+
+  function startWorker() {
+    stopWorker();
+    setPhase('loading');
+    more = false;
+    try {
+      workerUrl = URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' }));
+      worker    = new Worker(workerUrl);
+    } catch (err) {
+      setPhase('error');
+      console.warn('[python-ide] worker failed:', err);
+      append('err', 'Python failed to load. Check the network connection, then press Restart.\n');
+      return;
+    }
+    worker.onmessage = onWorkerMessage;
+    worker.onerror   = ev => {
+      setPhase('error');
+      if (ev.message) console.warn('[python-ide] load failed:', ev.message);
+      append('err', 'Python failed to load. Check the network connection, then press Restart.\n');
+    };
+  }
+
+  function stopWorker() {
+    if (worker) worker.terminate();
+    if (workerUrl) URL.revokeObjectURL(workerUrl);
+    worker = null; workerUrl = null;
+  }
+
+  function onWorkerMessage(ev) {
+    const m = ev.data || {};
+    switch (m.t) {
+      case 'out':   append('out', m.s); break;
+      case 'err':   append('err', m.s); break;
+      case 'ready':
+        // Once per widget, like the Python Shell: a restart doesn't repeat it.
+        if (!bannerShown && cfg.banner !== false) append('sys', `Python ${m.v}\n`);
+        bannerShown = true;
+        setPhase('ready');
+        break;
+      case 'fatal':
+        setPhase('error');
+        console.warn('[python-ide] load failed:', m.s);
+        append('err', 'Python failed to load. Check the network connection, then press Restart.\n');
+        break;
+      case 'done':
+        more = !!m.more;
+        if ('errLine' in m) { S.errLine = m.errLine; renderEditor(); }
+        setPhase('ready');
+        if (pending.length) { pushLine(pending.shift(), false); break; }
+        // A pasted block left open is closed, as if the blank line were typed.
+        if (m.pasted && more) { pushLine('', false); break; }
+        if (more && lastTyped != null) setInput(nextIndent(lastTyped));
+        focusInput();
+        break;
+      case 'completions':
+        if (m.id === completeSeq) showCompletions(m.matches || [], m.start || 0);
+        break;
+    }
+  }
+
+  function send(msg) {
+    if (!worker || phase === 'loading' || phase === 'error') return false;
+    setPhase('running');
+    worker.postMessage(msg);
+    return true;
+  }
+
+  // ── Actions ─────────────────────────────────────────────────────────────────
+  function runFile() {
+    if (IS_VIEWER || phase !== 'ready') return;
+    if (cfg.clearOnRun) { S.entries = []; renderTranscript(); }
+    const name = S.filename || 'main.py';
+    append('sys', `=== RUN ${name} ===\n`);
+    S.errLine = null;
+    renderEditor();
+    send({ t: 'run', src: codeEl.value, name });
+    inputEl.focus({ preventScroll: true });
+  }
+
+  function restart() {
+    if (IS_VIEWER) return;
+    pending = [];
+    if (phase === 'running') append('err', 'KeyboardInterrupt\n');
+    // IDLE's marker, and the Python Shell's: the screen stays, the names go.
+    append('sys', '=== RESTART ===\n');
+    startWorker();
+  }
+
+  // ── Shell input ─────────────────────────────────────────────────────────────
+  // Keys and behaviour match the Python Shell widget: Enter runs, Shift+Enter
+  // adds a line, ↑/↓ walk history, Tab completes, Ctrl+L clears, Ctrl+C drops
+  // the line (or stops running code), and the next line is indented for you.
+  function autoGrow() {
+    inputEl.style.height = 'auto';
+    inputEl.style.height = inputEl.scrollHeight + 'px';
+  }
+
+  function setInput(v) {
+    inputEl.value = v;
+    autoGrow();
+    inputEl.selectionStart = inputEl.selectionEnd = v.length;
+  }
+
+  function focusInput() {
+    if (IS_VIEWER || phase === 'loading' || phase === 'error') return;
+    try { inputEl.focus({ preventScroll: true }); } catch (_) { inputEl.focus(); }
+  }
+
+  function nextIndent(line) {
+    let indent = (line.match(/^[ \t]*/) || [''])[0];
+    if (/:\s*(#.*)?$/.test(line)) indent += '    ';
+    return indent;
+  }
+
+  // One line to Python, echoed with the prompt it was typed at.
+  function pushLine(line, typed) {
+    append('in', line, more ? PS2 : PS1);
+    lastTyped = typed ? line : null;
+    send({ t: 'push', line, pasted: !typed });
+  }
+
+  function submitLine() {
+    if (IS_VIEWER || phase !== 'ready') return;
+    let raw = inputEl.value;
+    // A blank line ends an open block, even if it holds the auto-indent.
+    if (!raw.trim()) raw = '';
+    if (raw.trim()) {
+      history.push(raw);
+      if (history.length > MAX_HISTORY) history.shift();
+    }
+    histIdx = -1;
+    histDraft = '';
+    setInput('');
+    // A pasted block is a sequence of lines, run one at a time as if typed.
+    const lines = raw.split('\n');
+    pending = lines.slice(1);
+    pushLine(lines[0], lines.length === 1);
+  }
+
+  function recallHistory(delta) {
+    if (!history.length) return;
+    if (histIdx === -1) {
+      if (delta > 0) return;
+      histDraft = inputEl.value;
+      histIdx = history.length - 1;
+    } else {
+      histIdx += delta;
+      if (histIdx >= history.length) { histIdx = -1; setInput(histDraft); return; }
+      if (histIdx < 0) histIdx = 0;
+    }
+    setInput(history[histIdx]);
+  }
+
+  // Completion runs in the worker, which holds the namespace. Replies are
+  // matched by sequence number so a slow answer can't land on a newer line.
+  function requestCompletions() {
+    if (phase !== 'ready' || !worker) return;
+    completeSeq++;
+    worker.postMessage({ t: 'complete', id: completeSeq,
+                         src: inputEl.value.slice(0, inputEl.selectionStart) });
+  }
+
+  function showCompletions(matches, start) {
+    if (!matches.length) return;
+    const upto = inputEl.value.slice(0, inputEl.selectionStart);
+    if (matches.length === 1) {
+      const head = upto.slice(0, start) + matches[0];
+      const rest = inputEl.value.slice(inputEl.selectionStart);
+      setInput(head + rest);
+      inputEl.selectionStart = inputEl.selectionEnd = head.length;
+      return;
+    }
+    append('in', inputEl.value, more ? PS2 : PS1);
+    append('sys', matches.join('    ') + '\n');
+  }
+
+  function onShellKey(e) {
+    if (IS_VIEWER) return;
+    const mod = e.ctrlKey || e.metaKey;
+    if (e.ctrlKey && e.key.toLowerCase() === 'c' && !String(window.getSelection() || '')) {
+      e.preventDefault();
+      if (phase === 'running') { restart(); return; }
+      append('in', inputEl.value + '^C', more ? PS2 : PS1);
+      append('err', 'KeyboardInterrupt\n');
+      setInput('');
+      if (more) send({ t: 'cancel' });
+      return;
+    }
+    if (phase !== 'ready') { e.preventDefault(); return; }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitLine(); return; }
+    if (e.key === 'Enter' && e.shiftKey) {
+      e.preventDefault();
+      const v  = inputEl.value;
+      const at = inputEl.selectionStart;
+      const indent = nextIndent(v.slice(v.lastIndexOf('\n', at - 1) + 1, at));
+      inputEl.setRangeText('\n' + indent, at, inputEl.selectionEnd, 'end');
+      autoGrow();
+      return;
+    }
+    if (mod && e.key.toLowerCase() === 'l') { e.preventDefault(); clearShell(); return; }
+    if (e.key === 'Tab') { e.preventDefault(); requestCompletions(); return; }
+    const onFirst = inputEl.value.lastIndexOf('\n', Math.max(0, inputEl.selectionStart - 1)) === -1;
+    const onLast  = inputEl.value.indexOf('\n', inputEl.selectionStart) === -1;
+    if (e.key === 'ArrowUp'   && onFirst) { e.preventDefault(); recallHistory(-1); return; }
+    if (e.key === 'ArrowDown' && onLast)  { e.preventDefault(); recallHistory(+1); return; }
+  }
+
+  function saveFile() {
+    const blob = new Blob([codeEl.value], { type: 'text/x-python' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = S.filename || 'main.py';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  function openFile(file) {
+    if (!file || IS_VIEWER) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      S.filename = file.name;
+      fileEl.value = file.name;
+      codeEl.value = String(reader.result).replace(/\r\n?/g, '\n');
+      onCodeInput();
+    };
+    reader.readAsText(file);
+  }
+
+  // ── Layout: expand / split ──────────────────────────────────────────────────
+  function toggleMax(which) {
+    if (IS_VIEWER) return;
+    S.max = S.max === which ? null : which;
+    renderLayout();
+    emitState();
+    (S.max === 'shell' ? inputEl : codeEl).focus({ preventScroll: true });
+  }
+
+  function renderLayout() {
+    workspace.classList.toggle('is-side',    S.side);
+    workspace.classList.toggle('max-editor', S.max === 'editor');
+    workspace.classList.toggle('max-shell',  S.max === 'shell');
+    editorPane.style.flex = S.max === 'editor' ? '1 1 0' : `0 0 ${(S.split * 100).toFixed(2)}%`;
+    editorMax.innerHTML = S.max === 'editor' ? ICON_COLLAPSE : ICON_EXPAND;
+    shellMax.innerHTML  = S.max === 'shell'  ? ICON_COLLAPSE : ICON_EXPAND;
+    editorMax.title = S.max === 'editor' ? 'Restore split view' : 'Expand editor';
+    shellMax.title  = S.max === 'shell'  ? 'Restore split view' : 'Expand shell';
+    syncScroll();
+  }
+
+  splitter.addEventListener('pointerdown', e => {
+    if (IS_VIEWER) return;
+    e.preventDefault();
+    splitter.setPointerCapture(e.pointerId);
+    splitter.classList.add('is-dragging');
+    const rect = workspace.getBoundingClientRect();
+    const move = ev => {
+      const r = S.side
+        ? (ev.clientX - rect.left - 8) / (rect.width - 16)
+        : (ev.clientY - rect.top  - 8) / (rect.height - 16);
+      S.split = Math.min(0.88, Math.max(0.12, r));
+      renderLayout();
+      emitState();
+    };
+    const up = () => {
+      splitter.classList.remove('is-dragging');
+      splitter.removeEventListener('pointermove', move);
+      splitter.removeEventListener('pointerup', up);
+      splitter.removeEventListener('pointercancel', up);
+    };
+    splitter.addEventListener('pointermove', move);
+    splitter.addEventListener('pointerup', up);
+    splitter.addEventListener('pointercancel', up);
+  });
+
+  // ── Phase / chrome ──────────────────────────────────────────────────────────
+  function setPhase(p) {
+    phase = IS_VIEWER ? 'viewer' : p;
+    render();
+  }
+
+  function render() {
+    const labels = { loading: 'loading', ready: 'ready', running: 'running', error: 'error', viewer: 'view-only' };
+    statusEl.textContent = labels[phase];
+    statusEl.classList.toggle('status-run', phase === 'running');
+    statusEl.classList.toggle('status-err', phase === 'error');
+
+    bootRow.style.display = phase === 'loading' ? 'flex' : 'none';
+    bootMsg.textContent   = 'Starting Python…';
+    promptRow.classList.toggle('is-hidden', IS_VIEWER || phase === 'loading' || phase === 'error');
+    // While code runs the prompt row stays in place but empty, so output
+    // lands above a steady caret instead of the layout jumping.
+    promptEl.textContent = phase === 'running' ? '' : (more ? '... ' : '>>> ');
+    // Read-only rather than disabled while code runs: the input keeps focus,
+    // so Ctrl+C can still stop it.
+    inputEl.readOnly     = phase !== 'ready';
+
+    runBtn.disabled     = phase !== 'ready';
+    runBtn.textContent  = phase === 'running' ? 'Running…' : 'Run';
+    restartBtn.textContent = phase === 'running' ? 'Stop' : 'Restart';
+
+    [runBtn, restartBtn, openBtn, clearBtn].forEach(b => { b.style.display = IS_VIEWER ? 'none' : ''; });
+    [editorMax, shellMax].forEach(b => { b.disabled = IS_VIEWER; });
+    codeEl.readOnly  = IS_VIEWER || !!cfg.readOnly;
+    fileEl.disabled  = IS_VIEWER || !!cfg.readOnly;
+    openBtn.disabled = !!cfg.readOnly;
+  }
+
+  // ── Socket.IO sync ──────────────────────────────────────────────────────────
+  let socket = null, syncTimer = null;
+
+  function initSocket(url) {
+    if (typeof io === 'undefined') { socket = { emit() {}, on() {} }; return; }
+    try {
+      const prev = socket;
+      socket = io(url || (window.BeamerWidget ? BeamerWidget.serverOrigin() : ''),
+                  { transports: ['websocket', 'polling'] });
+      if (prev && prev.disconnect) prev.disconnect();
+      socket.on('widget_state', data => {
+        if (!IS_VIEWER || data?.widgetId !== WIDGET_ID) return;
+        applyState(data.state || {});
+      });
+    } catch (_) {
+      socket = { emit() {}, on() {} };
+    }
+  }
+
+  function emitState() {
+    if (!socket || IS_VIEWER) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => {
+      socket.emit('widget_state', { widgetId: WIDGET_ID, state: getState() });
+    }, 200);
+  }
+
+  // ── State serialisation ─────────────────────────────────────────────────────
+  // The transcript is saved, the namespace isn't: a restored slide shows what
+  // happened last time, and Run rebuilds the variables.
+  function getState() {
+    return {
+      filename: S.filename,
+      code:     S.code,
+      entries:  S.entries.slice(-MAX_ENTRIES),
+      max:      S.max,
+      split:    S.split,
+    };
+  }
+
+  function applyState(s) {
+    if (!s) return;
+    if (typeof s.filename === 'string') { S.filename = s.filename; fileEl.value = s.filename; }
+    if (typeof s.code === 'string' && s.code !== codeEl.value) {
+      const top = codeEl.scrollTop;
+      S.code = s.code;
+      codeEl.value = s.code;
+      codeEl.scrollTop = top;
+    }
+    if (Array.isArray(s.entries)) { S.entries = s.entries.slice(-MAX_ENTRIES); renderTranscript(); }
+    if ('max' in s) S.max = s.max === 'editor' || s.max === 'shell' ? s.max : null;
+    if (typeof s.split === 'number') S.split = s.split;
+    renderEditor();
+    renderLayout();
+  }
+
+  // ── Config ──────────────────────────────────────────────────────────────────
+  function applyConfig(c) {
+    if (!c) return;
+    const prevSocketUrl = cfg.socketUrl;
+    cfg       = { ...cfg, ...c };
+    WIDGET_ID = cfg.id || cfg.widgetId || WIDGET_ID;
+    const wasViewer = IS_VIEWER;
+    IS_VIEWER = cfg.role === 'viewer' || IS_VIEWER;
+
+    root.style.setProperty('--ws', String(parseFloat(cfg.scale) || 1.4));
+    S.side = cfg.layout === 'side';
+    splitter.setAttribute('aria-orientation', S.side ? 'vertical' : 'horizontal');
+
+    // Only replace the buffer when the configured code itself changed, so
+    // re-sent config never clobbers what the presenter has typed since.
+    if (typeof cfg.code === 'string' && cfg.code.trim() && cfg.code !== lastCfgCode) {
+      lastCfgCode = cfg.code;
+      S.code = cfg.code;
+      codeEl.value = cfg.code;
+    }
+    if (cfg.filename && cfg.filename !== lastCfgName) {
+      lastCfgName = cfg.filename;
+      S.filename = cfg.filename;
+      fileEl.value = cfg.filename;
+    }
+
+    if (cfg.socketUrl && cfg.socketUrl !== prevSocketUrl) initSocket(cfg.socketUrl);
+
+    if (IS_VIEWER && !wasViewer) { stopWorker(); }
+    if (IS_VIEWER) phase = 'viewer';
+
+    renderEditor();
+    renderLayout();
+    render();
+  }
+
+  function destroy() {
+    clearTimeout(syncTimer);
+    stopWorker();
+    if (socket && socket.disconnect) socket.disconnect();
+    socket = null;
+  }
+
+  // ── Beamer+ message bridge ──────────────────────────────────────────────────
+  window.addEventListener('message', e => {
+    const d = e.data || {};
+    if (d.type === 'widget-config')  applyConfig(d.config);
+    if (d.type === 'widget-cleanup') destroy();
+    if (d.type === 'widget-get-state') {
+      window.parent.postMessage(
+        { type: 'widget-state', widgetId: WIDGET_ID, state: getState() }, '*');
+    }
+    if (d.type === 'widget-set-state' && d.state) applyState(d.state);
+  });
+
+  // ── Event wiring ────────────────────────────────────────────────────────────
+  codeEl.addEventListener('input',   onCodeInput);
+  codeEl.addEventListener('scroll',  syncScroll);
+  codeEl.addEventListener('keydown', onEditorKey);
+  inputEl.addEventListener('keydown', onShellKey);
+  inputEl.addEventListener('input',   autoGrow);
+
+  fileEl.addEventListener('input', () => {
+    if (IS_VIEWER) return;
+    S.filename = fileEl.value.trim() || 'main.py';
+    emitState();
+  });
+
+  runBtn    .addEventListener('click', runFile);
+  restartBtn.addEventListener('click', restart);
+  clearBtn  .addEventListener('click', clearShell);
+  saveBtn   .addEventListener('click', saveFile);
+  openBtn   .addEventListener('click', () => fileInput.click());
+  fileInput .addEventListener('change', () => { openFile(fileInput.files[0]); fileInput.value = ''; });
+  editorMax .addEventListener('click', () => toggleMax('editor'));
+  shellMax  .addEventListener('click', () => toggleMax('shell'));
+
+  $('editor-head').addEventListener('dblclick', e => { if (e.target.closest('input,button')) return; toggleMax('editor'); });
+  $('shell-head') .addEventListener('dblclick', e => { if (e.target.closest('button')) return; toggleMax('shell'); });
+
+  // Clicking anywhere in the shell focuses the prompt — unless the user is
+  // selecting output to copy.
+  shellBody.addEventListener('mouseup', () => {
+    if (IS_VIEWER || String(window.getSelection())) return;
+    focusInput();
+  });
+
+  // F5 should run from anywhere in the widget, not just the editor.
+  document.addEventListener('keydown', e => {
+    if (e.key === 'F5' && e.target !== codeEl) { e.preventDefault(); runFile(); }
+  });
+
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // ── Boot ────────────────────────────────────────────────────────────────────
+  codeEl.value = S.code;
+  initSocket(CFG0.socketUrl);
+  applyConfig(CFG0);
+  if (IS_VIEWER) {
+    setPhase('viewer');
+  } else {
+    startWorker();
+  }
+})();
+</script>
+</body>
+</html>

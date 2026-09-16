@@ -124,6 +124,18 @@ def test_widget_listing_and_serving(client):
     assert client.get('/widgets/timer.html').status_code == 200
 
 
+def test_widget_catalog_lists_every_widget_with_its_schema(client):
+    import os
+    from server.paths import WIDGETS_DIR
+    catalog = client.get('/api/widgets/catalog').get_json()
+    on_disk = sorted(f for f in os.listdir(WIDGETS_DIR) if f.lower().endswith('.html'))
+    assert [w['file'] for w in catalog] == on_disk
+    by_type = {w['type']: w for w in catalog}
+    assert by_type['python-ide']['label'] == 'Python IDE'
+    assert by_type['python-ide']['category'] == 'Computer Science'
+    assert all(w['label'] and w['category'] for w in catalog)
+
+
 def test_vendored_libraries_served(client):
     for path in (
         '/static/vendor/socket.io.min.js',
