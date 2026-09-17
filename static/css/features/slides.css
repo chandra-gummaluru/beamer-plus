@@ -213,11 +213,6 @@ model-viewer { pointer-events: auto !important; }
     margin-bottom: var(--sp-4);
 }
 
-.stage-empty-frame {
-    stroke: var(--_line);
-    stroke-width: 1.8;
-}
-
 .stage-empty-squiggle {
     fill: none;
     stroke: var(--_ink-soft);

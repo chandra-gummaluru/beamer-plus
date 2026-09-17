@@ -10,7 +10,7 @@
       "options": [{ "v": "formula", "l": "Formula" }, { "v": "table", "l": "Truth table" }],
       "default": "formula" },
     { "key": "expression", "label": "Boolean expression", "type": "text",
-      "placeholder": "A*B + A'*C   or   (A+B)(A'+C')" },
+      "placeholder": "A*B + A'*C   or   y0 = a0 + a1*a2" },
     { "key": "mode", "label": "Simplify to", "type": "select",
       "options": [{ "v": "sop", "l": "Sum of products" }, { "v": "pos", "l": "Product of sums" }],
       "default": "sop" },
@@ -79,7 +79,7 @@
   /* Still a slower climb than the content tokens — sixteen rows have to keep
      fitting a quarter of the slide as the presenter raises the size — but
      near enough the answer's size that the two read as one piece of work. */
-  --tt-fs:   clamp(11px, calc(12px * var(--u)), 26px);
+  --tt-fs:   clamp(12px, calc(16px * var(--u)), 40px);
 }
 
 /* ── Quadrants ────────────────────────────────────────────────────────── */
@@ -175,6 +175,26 @@
   color: var(--text-2);
   user-select: none;
 }
+/* The function name is its own little field: it reads as plain text until
+   hovered or focused, then shows it can be edited. Width follows the text. */
+#eq-prefix { display: inline-flex; align-items: center; gap: 0.4em; }
+#fn-input {
+  width: 2ch;
+  min-width: 1ch;
+  padding: 0 2px;
+  margin: 0 -2px;
+  border: none;
+  border-bottom: 1px dashed transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  transition: border-color var(--dur);
+}
+#fn-input:hover:not([readonly]) { border-bottom-color: var(--border-med); }
+#fn-input:focus { outline: none; border-bottom-color: var(--accent); }
+.eq-sign { color: var(--text-2); }
+
 #expr-input {
   flex: 1 1 auto;
   min-width: 0;
@@ -227,6 +247,9 @@
 .op { color: var(--text-3); padding: 0 1px; }
 
 /* Overbar complement — the textbook look, when the presenter prefers it. */
+/* Variable indices (a0 → a₀). Zero line-height so a subscript never pushes
+   its row taller than its neighbours. */
+sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
 .ovl { text-decoration: overline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
 
 /* ── Bottom left: the truth table ─────────────────────────────────────── */
@@ -241,36 +264,18 @@
   font-variant-numeric: tabular-nums;
 }
 .tt th, .tt td {
-  padding: 0 6px;
+  padding: 0 0.45em;
   text-align: center;
   border-bottom: 1px solid var(--border);
-  line-height: 1.4;
+  line-height: 1.3;
   font-weight: var(--wt-var);
 }
 .tt th {
   color: var(--text-3);
   border-bottom: 1px solid var(--border-med);
 }
-.tt .c-idx { color: var(--text-3); text-align: right; padding-right: 6px; }
-.tt .c-out { border-left: 1px solid var(--border); padding-left: 8px; }
-
-/* The row written out as the term it is. Left-aligned so the primes line up
-   down the column, and quiet until the row turns out to be one the map will
-   group. */
-.tt .c-term {
-  text-align: left;
-  padding-right: 10px;
-  color: var(--text-3);
-  white-space: nowrap;
-}
-.tt th.c-term {
-  font-size: 0.78em;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-.tt .c-term.is-live { color: var(--text-2); }
-/* Set by the fitter when the region is too narrow to carry the column. */
-#shell.tt-compact .tt .c-term { display: none; }
+.tt .c-idx { color: var(--text-3); text-align: right; padding-right: 0.6em; font-size: 0.8em; }
+.tt .c-out { border-left: 1px solid var(--border); padding-left: 0.6em; }
 
 /* With truth-table input, the F column is the control: click it to cycle. */
 .tt.is-editable .c-out { cursor: pointer; }
@@ -495,7 +500,9 @@
         <!-- Formula input: the box reads as the equation it is. -->
         <div id="expr-block">
           <div id="eq-box">
-            <span id="eq-prefix">F =</span>
+            <span id="eq-prefix"><input id="fn-input" type="text" spellcheck="false"
+                   autocomplete="off" maxlength="16" value="F" aria-label="Function name"
+                   title="Function name — click to rename"><span class="eq-sign">=</span></span>
             <input id="expr-input" type="text" spellcheck="false"
                    autocomplete="off" placeholder="A*B + A'*C">
           </div>
@@ -577,6 +584,7 @@
   const shell      = document.getElementById('shell');
   const exprInput  = document.getElementById('expr-input');
   const eqPrefix   = document.getElementById('eq-prefix');
+  const fnInput    = document.getElementById('fn-input');
   const modeSel    = document.getElementById('mode-sel');
   const srcSel     = document.getElementById('src-sel');
   const clearBtn   = document.getElementById('tbl-clear');
@@ -625,6 +633,7 @@
     sel:      [],           // cell indices picked by hand
     manual:   [],           // [{ cells, text }] terms the presenter built
     focus:    -1,           // group index whose outline is emphasised
+    fnName:   'F',          // the function's name, editable in the box
   };
 
   // Presentation options that come from the config panel only.
@@ -642,11 +651,54 @@
        term   := factor (('*')? factor)*        — juxtaposition is AND, so AB'C works
        factor := ('!' | '~')* atom "'"*
        atom   := VAR | '0' | '1' | '(' expr ')'
+       VAR    := letter ('_'? digit+)?          — A, a0, x_12
+
+     A name is one letter plus an optional numeric index, never several
+     letters, so juxtaposition still reads AB as A·B and a0a1 as a0·a1.
+     Names are matched without regard to case (a0 and A0 are one variable)
+     and shown the way they were first written.
+
+     The whole line may start with a left-hand side, "y0 = …", which names
+     the function; "y0(a2, a1, a0) = …" also pins the variable order.
      ══════════════════════════════════════════════════════════════════════ */
 
   const OR_CH  = '+|';
   const AND_CH = '*.&·⋅';
   const NOT_PRE = '!~¬';
+
+  const VAR_RE = /[A-Za-z](?:_?[0-9]+)?/y;
+
+  // Display spelling for each variable key, filled in as names are read.
+  // Keys are upper-case with no underscore, so a_0, A0 and a0 are one name.
+  let DISPLAY = {};
+  function varKey(raw) { return raw.toUpperCase().replace('_', ''); }
+  function noteVar(raw) {
+    const k = varKey(raw);
+    if (!DISPLAY[k]) DISPLAY[k] = raw;
+    return k;
+  }
+
+  // Every name in a free-text list, in order: "A, B, C", "ABCD",
+  // "a2 a1 a0" and "a2,a1,a0" all work.
+  function varList(text) {
+    const out = [];
+    const re = /[A-Za-z](?:_?[0-9]+)?/g;
+    let m;
+    while ((m = re.exec(String(text || '')))) {
+      const k = noteVar(m[0]);
+      if (out.indexOf(k) < 0) out.push(k);
+    }
+    return out;
+  }
+
+  /* An optional "name =" or "name(vars) =" in front of the expression.
+     Only a plain name counts, so a stray "=" elsewhere is still an error. */
+  function splitLhs(srcRaw) {
+    const src = String(srcRaw || '');
+    const m = /^\s*([A-Za-z][A-Za-z0-9_]*)\s*(?:\(([^()]*)\))?\s*=(?!=)/.exec(src);
+    if (!m) return { name: '', order: '', body: src };
+    return { name: m[1], order: m[2] || '', body: src.slice(m[0].length) };
+  }
 
   function parse(srcRaw) {
     const src = String(srcRaw || '');
@@ -698,7 +750,13 @@
         return inner;
       }
       if (c === '0' || c === '1') { i++; return { t: 'const', v: c === '1' }; }
-      if (/[A-Za-z]/.test(c)) { i++; return { t: 'var', name: c.toUpperCase() }; }
+      if (/[A-Za-z]/.test(c)) {
+        VAR_RE.lastIndex = i;
+        const m = VAR_RE.exec(src);
+        i += m[0].length;
+        return { t: 'var', name: noteVar(m[0]) };
+      }
+      if (c === '=') throw new Error('Only one "=", at the start:  y = …');
       if (OR_CH.indexOf(c) >= 0 || AND_CH.indexOf(c) >= 0)
         throw new Error('Operator "' + c + '" with nothing in front of it.');
       throw new Error('Don\'t know what to do with "' + c + '".');
@@ -708,6 +766,7 @@
     ws();
     if (i < src.length) {
       if (src[i] === ')') throw new Error('One ")" too many.');
+      if (src[i] === '=') throw new Error('The "=" goes at the start, after the function name:  y0 = a0 + a1*a2');
       throw new Error('Unexpected "' + src[i] + '" after the expression.');
     }
     return root;
@@ -906,9 +965,8 @@
 
     if (S.source === 'table') {
       n    = Math.max(2, Math.min(4, S.nvars | 0 || 3));
-      vars = OPT.varsText
-        ? [...new Set(OPT.varsText.toUpperCase().split(/[^A-Z]+/).filter(Boolean))].slice(0, n)
-        : FALLBACK_VARS.slice(0, n);
+      DISPLAY = {};
+      vars = OPT.varsText ? varList(OPT.varsText).slice(0, n) : FALLBACK_VARS.slice(0, n);
       while (vars.length < n) vars.push(FALLBACK_VARS.find(v => vars.indexOf(v) < 0));
       R = 1 << n;
 
@@ -917,7 +975,9 @@
       dcs   = new Set(rows.filter(r => r.val === 'x').map(r => r.i));
       terms = [];                       // nothing was written, so nothing to split
     } else {
-      const split = stripDontCares(S.expr);
+      DISPLAY = {};
+      const lhs   = splitLhs(S.expr);
+      const split = stripDontCares(lhs.body);
       const body  = split.expr.trim();
 
       if (!body) { out.empty = true; M = out; return; }
@@ -925,11 +985,15 @@
       try { root = parse(body); }
       catch (e) { out.error = e.message; M = out; return; }
 
-      // Variables: the letters actually used, alphabetically, unless the
-      // presenter pinned an order in the config.
-      vars = OPT.varsText
-        ? OPT.varsText.toUpperCase().split(/[^A-Z]+/).filter(Boolean)
-        : [...collectVars(root, new Set())].sort();
+      // Variables: the names actually used, in natural order (a10 after a9),
+      // unless the expression's own "y(a, b) =" or the config pinned an
+      // order. Anything used but not listed goes on the end.
+      const used   = [...collectVars(root, new Set())];
+      const pinned = lhs.order ? varList(lhs.order) : (OPT.varsText ? varList(OPT.varsText) : []);
+      const byName = (a, b) => a.localeCompare(b, 'en', { numeric: true });
+      vars = pinned.length
+        ? pinned.concat(used.filter(v => pinned.indexOf(v) < 0).sort(byName))
+        : used.sort(byName);
       vars = [...new Set(vars)];
 
       if (!vars.length) { out.error = 'No variables in that expression.'; M = out; return; }
@@ -1018,7 +1082,7 @@
     // row of a truth table counts as a different function, which is why the
     // values are part of the comparison.
     const shapeChanged = !prev || !prev.ok ||
-      prev.vars.join('') !== out.vars.join('') ||
+      prev.vars.join(',') !== out.vars.join(',') ||
       prev.rows.map(r => r.val).join('') !== out.rows.map(r => r.val).join('') ||
       prev.mode !== out.mode ||
       prev.tableSteps !== out.tableSteps ||
@@ -1066,11 +1130,24 @@
      Rendering terms
      ══════════════════════════════════════════════════════════════════════ */
 
+  // a0 → a<sub>0</sub>: an index reads as an index, and a product of two
+  // indexed names (a0a1) stays unambiguous without a dot between them.
+  function nameHtml(name) {
+    const shown = DISPLAY[name] || name;
+    const m = /^([A-Za-z]+)_?([0-9]+)$/.exec(shown);
+    return m ? escHtml(m[1]) + '<sub>' + m[2] + '</sub>' : escHtml(shown);
+  }
+
+  // The function's name: the expression's own "y0 =" wins over the config.
+  function fnName() {
+    return (S.source !== 'table' && splitLhs(S.expr).name) || S.fnName || 'F';
+  }
+
   function lit(name, negated) {
-    if (!negated) return escHtml(name);
+    if (!negated) return nameHtml(name);
     return OPT.notation === 'bar'
-      ? '<span class="ovl">' + escHtml(name) + '</span>'
-      : escHtml(name) + "'";
+      ? '<span class="ovl">' + nameHtml(name) + '</span>'
+      : nameHtml(name) + "'";
   }
 
   function implToSOP(imp, vars) {
@@ -1095,12 +1172,6 @@
       lits.push(lit(vars[k], !!(imp.bits & bit)));
     }
     return lits.length ? '(' + lits.join(compact ? '+' : ' + ') + ')' : '0';
-  }
-
-  // The min- or maxterm of a single row: the implicant with nothing free.
-  function rowTerm(i) {
-    const imp = { bits: i, dash: 0 };
-    return M.mode === 'sop' ? implToSOP(imp, M.vars) : implToPOS(imp, M.vars, true);
   }
 
   // The presenter's own expression, echoed back with the chosen notation.
@@ -1137,8 +1208,8 @@
       rowBits, colBits,
       rowVals: GRAY[rowBits],
       colVals: GRAY[colBits],
-      rowVars: M.vars.slice(0, rowBits).join(''),
-      colVars: M.vars.slice(rowBits).join(''),
+      rowVars: M.vars.slice(0, rowBits).map(nameHtml).join(''),
+      colVars: M.vars.slice(rowBits).map(nameHtml).join(''),
       idx: (rv, cv) => (rv << colBits) | cv,
       pos: (i) => ({
         r: GRAY[rowBits].indexOf(i >> colBits),
@@ -1160,6 +1231,8 @@
      fits the quadrant it was given.
      ══════════════════════════════════════════════════════════════════════ */
 
+  let ttCols = 1;   // side-by-side truth tables, chosen by fitSizes
+
   function fitSizes() {
     if (!M || !M.ok) return;
     const u = parseFloat(getComputedStyle(shell).getPropertyValue('--u')) || 1.4;
@@ -1178,45 +1251,35 @@
       shell.style.setProperty('--km-cell', cell.toFixed(1) + 'px');
     }
 
-    // Truth table: one line per row plus the header. 1.55 is the line box
-    // (line-height 1.4) plus its rule.
-    const lines = (M.R > 8 ? Math.ceil(M.R / 2) : M.R) + 1;
+    // Truth table: one line per row plus the header, each line 1.3 of the
+    // font plus its rule. Eight rows can go down one table or across two
+    // of four, sixteen down one, across two or across four — whichever reads larger wins.
     const availT = ttBody.clientHeight - 10;
     const availX = ttBody.clientWidth - 6;
     if (availT <= 0 || availX <= 0) return;
 
-    const MIN_FS = 8.5;       // below this nobody at the back reads it anyway
-    const KEEP   = 11;        // ...and below this the term column is what costs it
+    const MIN_FS = 9;
+    const MAX_FS = Math.min(22 * u, 44);
+    const GAP    = 14;
+    const probe  = ttWrap.querySelector('table');
+    if (!probe) return;
+    // Width per pixel of font, measured once at the current size. Padding is
+    // in em, so the table's width is close enough to linear in the font.
+    const curFs = parseFloat(getComputedStyle(probe).fontSize) || 16;
+    const perFs = probe.offsetWidth / curFs;
 
-    const apply = fs => shell.style.setProperty('--tt-fs', fs.toFixed(2) + 'px');
-    // Measured rather than estimated from a character count: a maxterm is half
-    // again as wide as a minterm, and the notation setting changes it again.
-    const measure = () => {
-      const tables = ttWrap.querySelectorAll('table');
-      let w = 14 * Math.max(0, tables.length - 1);
-      tables.forEach(t => { w += t.offsetWidth; });
-      return w;
-    };
+    const options = M.R === 4 ? [1] : M.R === 8 ? [1, 2] : [1, 2, 4];
+    let best = { cols: ttCols, fs: 0 };
+    options.forEach(cols => {
+      const lines = M.R / cols + 1;
+      const byH = availT / lines / 1.36;
+      const byW = (availX - GAP * (cols - 1)) / (cols * perFs);
+      const fs  = Math.max(MIN_FS, Math.min(MAX_FS, byH, byW * 0.97));
+      if (fs > best.fs + 0.5) best = { cols, fs };
+    });
 
-    let fs = Math.max(MIN_FS, Math.min(Math.min(14 * u, 30), availT / lines / 1.55));
-    shell.classList.remove('tt-compact');
-    apply(fs);
-
-    let w = measure();
-    if (w > availX) {
-      // Squeezing everything down to fit the spelled-out term would cost more
-      // than the term is worth, so in a cramped region that column goes and
-      // the numbers stay readable.
-      if (fs * availX / w < KEEP) { shell.classList.add('tt-compact'); w = measure(); }
-      // Cell padding and rules are fixed pixels, so the width does not scale
-      // quite linearly with the font — hence a nudge under, and a couple of
-      // passes to settle.
-      for (let pass = 0; pass < 4 && w > availX && fs > MIN_FS; pass++) {
-        fs = Math.max(MIN_FS, fs * (availX / w) * 0.98);
-        apply(fs);
-        w = measure();
-      }
-    }
+    shell.style.setProperty('--tt-fs', best.fs.toFixed(2) + 'px');
+    if (best.cols !== ttCols) { ttCols = best.cols; renderTable(); }
   }
 
   // Re-fit when the slide region changes shape. Setting the two custom
@@ -1247,7 +1310,11 @@
     if (document.activeElement !== exprInput) exprInput.value = S.expr;
     modeSel.value = S.modeSel;
     srcSel.value  = S.source;
-    eqPrefix.textContent = OPT.fnName + ' =';
+    // The box already shows "y0 =" when it was typed, so don't say it twice.
+    if (document.activeElement !== fnInput) fnInput.value = S.fnName;
+    sizeFnInput();
+    fnInput.readOnly       = IS_VIEWER;
+    eqPrefix.style.display = splitLhs(S.expr).name ? 'none' : '';
     varBtns.forEach(b => b.classList.toggle('is-active', Number(b.dataset.nvars) === S.nvars));
 
     heads.expr.firstElementChild.textContent =
@@ -1285,7 +1352,9 @@
 
     // Sixteen rows will not sit in a quarter of a slide, so a 4-variable
     // table becomes two columns of eight side by side.
-    const perTable = M.R > 8 ? Math.ceil(M.R / 2) : M.R;
+    // How many side-by-side tables the fitter chose for this region.
+    const cols = Math.max(1, Math.min(M.R >= 16 ? 4 : M.R >= 8 ? 2 : 1, ttCols));
+    const perTable = Math.ceil(M.R / cols);
     const chunks = [];
     for (let s = 0; s < M.R; s += perTable) chunks.push(M.rows.slice(s, s + perTable));
 
@@ -1293,9 +1362,8 @@
 
     ttWrap.innerHTML = chunks.map(chunk => {
       const head = '<tr><th class="c-idx"></th>' +
-        '<th class="c-term">' + (M.mode === 'sop' ? 'minterm' : 'maxterm') + '</th>' +
-        M.vars.map(v => '<th>' + escHtml(v) + '</th>').join('') +
-        '<th class="c-out">' + escHtml(OPT.fnName) + '</th></tr>';
+        M.vars.map(v => '<th>' + nameHtml(v) + '</th>').join('') +
+        '<th class="c-out">' + nameHtml(fnName()) + '</th></tr>';
       const body = chunk.map(r => {
         const on  = revealed.has(r.i);
         const cls = ['row'];
@@ -1306,12 +1374,8 @@
           .map(b => '<td>' + b + '</td>').join('');
         const vTxt = on ? (r.val === 'x' ? 'X' : r.val) : '·';
         const vCls = 'c-out' + (on && r.val === hot ? ' v-hot' : '') + (on && r.val === 'x' ? ' vx' : '');
-        // The row's own term, full ink only where it is one the map will
-        // group — that is the set the answer gets built from.
-        const tCls = 'c-term' + (on && (r.val === hot || r.val === 'x') ? ' is-live' : '');
         return '<tr class="' + cls.join(' ') + '" data-row="' + r.i + '">' +
           '<td class="c-idx">' + (M.mode === 'sop' ? 'm' : 'M') + r.i + '</td>' +
-          '<td class="' + tCls + '">' + rowTerm(r.i) + '</td>' +
           bits + '<td class="' + vCls + '">' + vTxt + '</td></tr>';
       }).join('');
       return '<table class="tt' + (editable ? ' is-editable' : '') + '"><thead>' +
@@ -1340,7 +1404,7 @@
     kmWrap.classList.toggle('is-picking', S.picking && !IS_VIEWER);
 
     const parts = [];
-    parts.push('<div class="km-corner"><span>' + escHtml(L.rowVars) + '</span>\\<span>' + escHtml(L.colVars) + '</span></div>');
+    parts.push('<div class="km-corner"><span>' + L.rowVars + '</span>\\<span>' + L.colVars + '</span></div>');
     L.colVals.forEach(cv => parts.push('<div class="km-lbl col">' + bitsStr(cv, L.colBits) + '</div>'));
 
     // Groups revealed so far, plus whatever the presenter has picked by hand.
@@ -1448,7 +1512,7 @@
         if (shown < M.groups.length) rhs += (shown ? plus : '') + '<span class="plus">…</span>';
       }
 
-      let html = '<span class="lhs">' + escHtml(OPT.fnName) + ' = </span>' + rhs;
+      let html = '<span class="lhs">' + nameHtml(fnName()) + ' = </span>' + rhs;
 
       // What the presenter grouped by hand, kept on its own line so it never
       // reads as part of the solved answer.
@@ -1591,6 +1655,21 @@
     compile(); render(); emitState(); pushSetting({ expression: value });
   }
 
+  function sizeFnInput() {
+    fnInput.style.width = Math.max(1, fnInput.value.length) + 0.3 + 'ch';
+  }
+
+  // Anything goes as a name except the characters that would read as part
+  // of the expression; an emptied box falls back to F.
+  function setFnName(value, final) {
+    if (IS_VIEWER) return;
+    const clean = String(value || '').replace(/[\s=+*()'!~|&]/g, '').slice(0, 16);
+    if (!clean && !final) return;
+    S.fnName = clean || 'F';
+    if (final) fnInput.value = S.fnName;
+    render(); emitState(); pushSetting({ fnName: S.fnName });
+  }
+
   function setDontCares(value) {
     if (IS_VIEWER) return;
     S.dcText = value;
@@ -1702,6 +1781,7 @@
       sel: S.sel.slice(0, 16),
       manual: S.manual.slice(0, 12),
       focus: S.focus,
+      fnName: S.fnName,
     };
   }
 
@@ -1719,6 +1799,7 @@
     if (Array.isArray(s.sel))    S.sel    = s.sel.slice();
     if (Array.isArray(s.manual)) S.manual = s.manual.slice();
     if (s.focus   != null) S.focus   = s.focus;
+    if (s.fnName  != null) S.fnName  = String(s.fnName) || 'F';
     render();
   }
 
@@ -1726,7 +1807,7 @@
      Config
      ══════════════════════════════════════════════════════════════════════ */
 
-  let lastCfgExpr = null, lastCfgDc = null, lastCfgMode = null,
+  let lastCfgExpr = null, lastCfgDc = null, lastCfgFn = null, lastCfgMode = null,
       lastCfgSrc = null, lastCfgTable = null, lastCfgVars = null;
 
   function applyConfig(c) {
@@ -1748,6 +1829,10 @@
     if (cfg.expression != null && cfg.expression !== lastCfgExpr) {
       lastCfgExpr = cfg.expression;
       if (String(cfg.expression).trim()) { S.expr = cfg.expression; S.step = 0; }
+    }
+    if (cfg.fnName != null && cfg.fnName !== lastCfgFn) {
+      lastCfgFn = cfg.fnName;
+      S.fnName  = String(cfg.fnName).trim() || 'F';
     }
     if (cfg.dontCares != null && cfg.dontCares !== lastCfgDc) {
       lastCfgDc = cfg.dontCares;
@@ -1815,6 +1900,12 @@
   manualClr .addEventListener('click', e => { e.stopPropagation(); S.sel = []; render(); emitState(); });
 
   let exprTimer = null;
+  fnInput.addEventListener('input', () => { sizeFnInput(); setFnName(fnInput.value, false); });
+  fnInput.addEventListener('change', () => setFnName(fnInput.value, true));
+  fnInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); exprInput.focus(); }
+  });
+
   exprInput.addEventListener('input', () => {
     clearTimeout(exprTimer);
     exprTimer = setTimeout(() => setExpr(exprInput.value), 220);

@@ -134,6 +134,7 @@ let cfg = {}, socket = null, role = 'presenter';
 let widgetId = 'mcq', serverUrl = '', publicBaseUrl = '';
 let surveyId = null, pollInterval = null, pollClosed = false, revealed = false;
 let votes = {}, options = [], correctAnswer = null;
+let pollKey = null;   // question+options of the running poll, so a repeat config doesn't reopen it
 
 function setMd(el, src) {
   if (!src) { el.textContent = ''; return; }
@@ -207,8 +208,10 @@ function showQR(sid) {
   const url = `${base}/mcq/${sid}`;
   document.getElementById('join-url').textContent = url;
   const el = document.getElementById('qrcode');
-  if (!el.innerHTML)
-    new QRCode(el, { text: url, width: 180, height: 180, colorDark: '#1a1a18', colorLight: '#ffffff' });
+  if (el.dataset.url === url) return;
+  el.innerHTML = '';
+  el.dataset.url = url;
+  new QRCode(el, { text: url, width: 180, height: 180, colorDark: '#1a1a18', colorLight: '#ffffff' });
 }
 
 function copyUrl() {
@@ -233,7 +236,7 @@ function applyState(s) {
 
 function initSocket() {
   const url = cfg.socketUrl || serverUrl;
-  if (!url) return;
+  if (!url || socket || typeof io === 'undefined') return;
   socket = io(url);
   socket.on('connect', () => {
     if (role === 'presenter') socket.emit('join_presenter', { session_id: cfg.sessionId });
@@ -246,6 +249,7 @@ function initSocket() {
 
 async function startPoll() {
   if (!cfg.question || !options.length) return;
+  stopPolling();
   try {
     const res = await fetch(`${serverUrl}/api/survey/create`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -257,6 +261,7 @@ async function startPoll() {
     setRespCount(0);
     setMd(document.getElementById('question-text'), cfg.question);
     showQR(surveyId); showPhase('collect');
+    stopPolling();   // a second startPoll may have raced this one
     pollInterval = setInterval(fetchVotes, 3000);
     emitState();
   } catch (e) { console.error('startPoll:', e); }
@@ -275,8 +280,12 @@ async function fetchVotes() {
   emitState();
 }
 
-async function closePoll() {
+function stopPolling() {
   if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+}
+
+async function closePoll() {
+  stopPolling();
   await fetchVotes(); pollClosed = true;
   if (surveyId) fetch(`${serverUrl}/api/survey/${surveyId}/close`, { method: 'POST' }).catch(() => {});
   showPhase('results'); emitState();
@@ -292,13 +301,38 @@ function init(c) {
   options = cfg.options || []; correctAnswer = cfg.correctAnswer ?? null;
   if (cfg.question) setMd(document.getElementById('question-text'), cfg.question);
   initSocket();
-  if (role !== 'viewer' && cfg.question && options.length) startPoll();
+  const key = JSON.stringify([cfg.question, options]);
+  if (role !== 'viewer' && cfg.question && options.length && key !== pollKey) {
+    pollKey = key;
+    if (surveyId) restartPoll(); else startPoll();
+  }
+}
+
+// Restart: close the current poll on the server and open a fresh one with a
+// new QR code, so old responses don't carry over.
+function restartPoll() {
+  if (role === 'viewer') return;
+  stopPolling();
+  if (surveyId && !pollClosed)
+    fetch(`${serverUrl}/api/survey/${surveyId}/close`, { method: 'POST' }).catch(() => {});
+  surveyId = null; votes = {}; revealed = false; pollClosed = false;
+  setRespCount(0);
+  startPoll();
 }
 
 window.addEventListener('message', e => {
   if (e.data?.type === 'widget-config')  init(e.data.config);
-  if (e.data?.type === 'widget-cleanup') { clearInterval(pollInterval); socket?.disconnect(); }
+  if (e.data?.type === 'widget-cleanup') { stopPolling(); socket?.disconnect(); socket = null; }
 });
+
+// Without this the host's Reset reloads the iframe, and the reloaded page
+// never receives a widget-config message (the host only sends it on first
+// load) — so the poll never restarted.
+window.BeamerWidget?.topbar?.onReset(restartPoll);
+
+// Boot from the injected config as well, so a reload still comes up working.
+// init() is idempotent: a later widget-config message re-runs it safely.
+if (window.WIDGET_CONFIG) init(window.WIDGET_CONFIG);
 window.closePoll = closePoll;
 window.copyUrl   = copyUrl;
 })();

@@ -272,9 +272,6 @@ html, body { height: 100%; overflow: hidden; }
 #boot-row { display: flex; align-items: center; gap: 8px; color: var(--text-3); }
 #boot-row .bw-spinner { width: 12px; height: 12px; }
 
-.status-run { color: var(--ok); }
-.status-err { color: var(--err); }
-
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
@@ -289,7 +286,6 @@ html, body { height: 100%; overflow: hidden; }
     <button class="bw-btn" id="open-btn" title="Open a .py file">Open</button>
     <button class="bw-btn" id="save-btn" title="Download this file">Save</button>
     <div class="bw-spacer"></div>
-    <span id="status" class="bw-status">loading</span>
     <button class="bw-btn" id="restart-btn" title="Stop and restart the shell (Ctrl+C in shell)">Restart</button>
     <button class="bw-btn bw-btn--primary" id="run-btn" title="Run file (F5 / Ctrl+Enter)">
       Run
@@ -380,7 +376,6 @@ for who in ["world", "class"]:
   const inputEl    = $('shell-input');
   const bootRow    = $('boot-row');
   const bootMsg    = $('boot-msg');
-  const statusEl   = $('status');
   const runBtn     = $('run-btn');
   const restartBtn = $('restart-btn');
   const openBtn    = $('open-btn');
@@ -1024,11 +1019,6 @@ for who in ["world", "class"]:
   }
 
   function render() {
-    const labels = { loading: 'loading', ready: 'ready', running: 'running', error: 'error', viewer: 'view-only' };
-    statusEl.textContent = labels[phase];
-    statusEl.classList.toggle('status-run', phase === 'running');
-    statusEl.classList.toggle('status-err', phase === 'error');
-
     bootRow.style.display = phase === 'loading' ? 'flex' : 'none';
     bootMsg.textContent   = 'Starting Python…';
     promptRow.classList.toggle('is-hidden', IS_VIEWER || phase === 'loading' || phase === 'error');

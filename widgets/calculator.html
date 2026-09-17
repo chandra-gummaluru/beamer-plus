@@ -250,9 +250,38 @@ body {
   font-size: calc(16px * var(--u));
 }
 
+/* ── Split handle ────────────────────────────────────── */
+/* Zero-width in the layout; the hit area straddles the history border so
+   dragging doesn't shift either pane by the handle's own width. */
+.split-handle {
+  flex: 0 0 0;
+  position: relative;
+  z-index: 20;
+}
+.split-handle::before {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0;
+  left: -4px; width: 8px;
+  cursor: col-resize;
+}
+.split-handle::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0;
+  left: -1px; width: 2px;
+  background: var(--border-med);
+  opacity: 0;
+  transition: opacity 0.12s;
+  pointer-events: none;
+}
+.split-handle:hover::after,
+.split-handle.dragging::after { opacity: 1; }
+body.splitting, body.splitting * { cursor: col-resize !important; user-select: none !important; }
+
 /* ── History panel ───────────────────────────────────── */
 #history-panel {
-  width: 200px;
+  width: 300px;
   flex-shrink: 0;
   border-left: 1px solid var(--border);
   display: flex;
@@ -401,11 +430,13 @@ body {
       <div class="section-label" style="margin-top:2px">Numpad</div>
       <div class="btn-grid cols-5">
 
-        <!-- Row 1: modifiers -->
+        <!-- Row 1: modifiers. Exactly five per row — a short row shifts every
+             digit below it one cell and scrambles the keypad. -->
         <button class="cbtn fn" data-insert=")">)</button>
         <button class="cbtn fn" data-insert="^">x<sup>y</sup></button>
         <button class="cbtn fn" data-insert="π">π</button>
         <button class="cbtn fn" data-insert="e">e</button>
+        <button class="cbtn op" data-insert="%">%</button>
 
         <!-- Row 2 -->
         <button class="cbtn" data-insert="7">7</button>
@@ -425,18 +456,19 @@ body {
         <button class="cbtn" data-insert="1">1</button>
         <button class="cbtn" data-insert="2">2</button>
         <button class="cbtn" data-insert="3">3</button>
-        <button class="cbtn op" data-insert="%">%</button>
+        <button class="cbtn danger" id="btn-clear">C</button>
         <button class="cbtn back" id="btn-back">⌫</button>
 
-        <!-- Row 5 -->
-        <button class="cbtn" data-insert="0">0</button>
+        <!-- Row 5: 0 sits under 2, like a phone/calculator keypad -->
+        <button class="cbtn" data-insert="0" style="grid-column: 2">0</button>
         <button class="cbtn" data-insert=".">.</button>
-        <button class="cbtn danger" id="btn-clear">C</button>
         <button class="cbtn primary" id="btn-eq" style="grid-column: span 2">=</button>
 
       </div>
     </div>
   </div>
+
+  <div class="split-handle" id="split-handle" title="Drag to resize · double-click to reset"></div>
 
   <!-- Right: history -->
   <div id="history-panel">
@@ -445,7 +477,7 @@ body {
       <button id="history-clear">Clear</button>
     </div>
     <div id="history-list">
-      <div class="hist-empty">No calculations yet.<br>Press = to save.</div>
+      <div class="hist-empty">No calculations yet.</div>
     </div>
   </div>
 </div>
@@ -453,6 +485,44 @@ body {
 <div id="viewer-toast">View-only · synced with presenter</div>
 
 <script src="/static/vendor/socket.io.min.js"></script>
+
+<script>
+// ── Split handle — drag to resize the history panel ───────────────────────────
+(function () {
+  'use strict';
+  const handle  = document.getElementById('split-handle');
+  const panel   = document.getElementById('history-panel');
+  const main    = document.getElementById('main');
+  const DEFAULT = 300, MIN_HIST = 140, MIN_CALC = 240;
+
+  function setWidth(w) {
+    const max = Math.max(MIN_HIST, main.clientWidth - MIN_CALC);
+    panel.style.width = Math.round(Math.min(max, Math.max(MIN_HIST, w))) + 'px';
+  }
+
+  handle.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    handle.setPointerCapture(e.pointerId);
+    handle.classList.add('dragging');
+    document.body.classList.add('splitting');
+    // History sits on the right, so its width is measured from main's right edge.
+    const right = main.getBoundingClientRect().right;
+    const move  = ev => setWidth(right - ev.clientX);
+    const up    = () => {
+      handle.classList.remove('dragging');
+      document.body.classList.remove('splitting');
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', up);
+      handle.removeEventListener('pointercancel', up);
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', up);
+    handle.addEventListener('pointercancel', up);
+  });
+  handle.addEventListener('dblclick', () => setWidth(DEFAULT));
+})();
+</script>
 
 <script>
 (function () {
@@ -629,7 +699,7 @@ body {
   function renderHistory() {
     const list = document.getElementById('history-list');
     if (!history.length) {
-      list.innerHTML = '<div class="hist-empty">No calculations yet.<br>Press = to save.</div>';
+      list.innerHTML = '<div class="hist-empty">No calculations yet.</div>';
       return;
     }
     list.innerHTML = history.map(h => `

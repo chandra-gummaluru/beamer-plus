@@ -3,66 +3,500 @@
 <head>
 <script id="widget-schema" type="application/json">
 {
-  "label": "Python Memory Model",
+  "label": "Python Workspace",
   "category": "Computer Science",
   "fields": [
-    { "key": "code", "label": "Program", "type": "textarea-lines", "rows": 8, "placeholder": "a = [1, 2]\nb = a\na.append(3)" },
-    { "key": "mode", "label": "Mode", "type": "select", "options": ["trace", "draw"], "default": "trace", "note": "trace runs a program; draw hands the student a blank canvas" },
-    { "key": "editor", "label": "Show the code pane", "type": "checkbox", "default": true },
+    { "key": "layout", "label": "Layout", "type": "select", "default": "grid-left",
+      "options": [ { "v": "single",      "l": "Single pane" },
+                   { "v": "cols",        "l": "Split: side by side" },
+                   { "v": "rows",        "l": "Split: stacked" },
+                   { "v": "grid-left",   "l": "Grid: large pane on the left" },
+                   { "v": "grid-right",  "l": "Grid: large pane on the right" },
+                   { "v": "grid-top",    "l": "Grid: large pane on top" },
+                   { "v": "grid-bottom", "l": "Grid: large pane at the bottom" } ] },
+    { "key": "primary", "label": "Main pane", "type": "select", "default": "editor",
+      "options": [ { "v": "editor", "l": "Editor" }, { "v": "shell", "l": "Shell" }, { "v": "memory", "l": "Memory model" } ] },
+    { "key": "secondary", "label": "Second pane", "type": "select", "default": "memory",
+      "options": [ { "v": "editor", "l": "Editor" }, { "v": "shell", "l": "Shell" }, { "v": "memory", "l": "Memory model" } ] },
+    { "key": "filename", "label": "File name", "type": "text", "placeholder": "main.py" },
+    { "key": "code", "label": "Starting code", "type": "textarea", "rows": 8,
+      "placeholder": "a = [1, 2]\nb = a\na.append(3)\nprint(b)" },
+    { "key": "scale", "label": "Text size", "type": "select", "default": "1.4",
+      "options": ["1", "1.4", "1.8", "2.2"] },
+    { "key": "readOnly", "label": "Read-only editor", "type": "checkbox", "default": false },
+    { "key": "clearOnRun", "label": "Clear shell before each run", "type": "checkbox", "default": false },
+    { "key": "banner", "label": "Show version banner", "type": "checkbox", "default": true },
+    { "key": "startup", "label": "Shell startup lines (run at boot)", "type": "textarea-lines", "rows": 3,
+      "placeholder": "import math" },
+    { "key": "packages", "label": "Preload packages (one per line)", "type": "textarea-lines", "rows": 2,
+      "placeholder": "numpy" },
+    { "key": "autoImport", "label": "Auto-load packages from imports", "type": "checkbox", "default": true },
+    { "key": "memoryMode", "label": "Memory model starts in", "type": "select", "default": "trace",
+      "options": [ { "v": "trace", "l": "Trace (run the program)" }, { "v": "draw", "l": "Draw (blank canvas)" } ] },
     { "key": "theme", "label": "Theme", "type": "select", "options": ["light", "dark"], "default": "light" },
     { "key": "zoom", "label": "Diagram zoom", "type": "text", "placeholder": "1" }
   ]
 }
 </script>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Python Memory Model — Beamer+</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Python Workspace — Beamer+</title>
 <!--
-  ===========================================================================
-  PYTHON EXECUTION VISUALIZER  ·  a teaching widget for Beamer+
-  ===========================================================================
+  PYTHON WORKSPACE · the Python IDE, Python Shell and Python Memory Model as
+  one widget, with a layout you choose.
 
-  A single self-contained HTML file. No backend, no build step, no CDN.
+  Three panes share one program:
+    Editor   the file, highlighted, with the memory model's line markers
+    Shell    real CPython (Pyodide, in a worker): Run executes the file here,
+             and the prompt keeps its names afterwards
+    Memory   the memory model tracing that same file step by step with its own
+             purpose-built interpreter (offline), or a blank canvas to draw on
 
-  ARCHITECTURE (see also section 29 of the brief)
-
-      Python source
-            |
-            v
-      [ LAYER 1 ]  Lexer  -> Parser  -> AST
-            |
-            v
-      [ LAYER 2 ]  Interpreter (generator based)
-            |          yields once per pedagogically meaningful statement
-            v
-      [ LAYER 3 ]  Trace = an array of immutable snapshots
-            |          { frames, objects, output, line, note, loops }
-            v
-      [ LAYER 4 ]  Renderer: frames column + heap column + SVG arrows
-            |
-            v
-      [ LAYER 5 ]  Toolbar, presentation layout, window.PythonVisualizer
-
-  The interpreter is a purpose-built Python subset rather than Pyodide. That
-  keeps the file offline-capable and, more importantly, gives the visualiser
-  exact control over object identity, which is what makes aliasing and
-  mutation legible. Layer 3 is the contract: the renderer never inspects the
-  interpreter, only snapshots.
-  ===========================================================================
+  Layouts: single, two panes (side by side or stacked), or all three with one
+  pane taking a whole side. The layout, pane sizes, file, transcript, trace
+  position and drawing are the widget state, so they sync to viewers and are
+  saved with the deck.
 -->
-<style>
-/* Tokens, reset, toolbar, buttons and status pills come from the shared
-   widget base (static/css/widget-base.css). What's left here is the memory
-   model itself: the code and output panes, the diagram, and the drawing
-   canvas — laid out like the Python IDE so the two read as one family. */
 
+<!-- Vendored by the Beamer+ server. Never call io() bare — inside the srcdoc
+     iframe that resolves to http://about/socket.io/. -->
+<script src="/static/vendor/socket.io.min.js"></script>
+
+<style>
+/* Tokens, reset, toolbar, buttons, spinner and status pills come from the
+   shared widget base (static/css/widget-base.css). What's left here is the
+   workspace: the pane layout and its splitters, the layout menu, the editor,
+   the shell, and — further down — the memory model's own rules. */
+
+html, body { height: 100%; overflow: hidden; }
+body { background: var(--bg); color: var(--text); }
+
+#root { --ws: 1.4; }
+#file-input { display: none; }
+
+/* ── Workspace + panes ─────────────────────────────────────── */
+/* Panes are placed absolutely from the layout's fractions, so every layout —
+   and dragging any splitter — is one code path, and a pane leaving the
+   layout never reflows the others. */
+#workspace { flex: 1; min-height: 0; position: relative; }
+#panes     { position: absolute; inset: 8px; }
+
+.pane {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg);
+}
+.pane.is-off { display: none; }
+
+.pane-head {
+  flex: 0 0 auto;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px 0 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-subtle);
+  user-select: none;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.pane-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.pane-file {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-2);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 2px 4px;
+  width: 16ch;
+  min-width: 6ch;
+  transition: border-color var(--dur, 0.15s);
+}
+.pane-file:hover:not(:disabled),
+.pane-file:focus { border-color: var(--border-med); outline: none; }
+.pane-head .bw-btn { height: 24px; font-size: var(--fs-chrome-sm); padding: 0 8px; flex-shrink: 0; }
+.pane-head .bw-btn--icon { width: 24px; padding: 0; }
+.pane-head svg { width: 13px; height: 13px; }
+.pane-head .bw-sep { height: 14px; }
+
+/* ── Splitters ──────────────────────────────────────────────── */
+.splitter {
+  position: absolute;
+  z-index: 2;
+  touch-action: none;
+}
+.splitter.is-v { cursor: col-resize; }
+.splitter.is-h { cursor: row-resize; }
+.splitter.is-off { display: none; }
+.splitter::after {
+  content: '';
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 1px;
+  background: var(--border);
+  transition: background var(--dur, 0.15s);
+}
+.splitter.is-v::after { width: 2px; height: 28px; }
+.splitter.is-h::after { width: 28px; height: 2px; }
+.splitter:hover::after, .splitter.is-dragging::after { background: var(--text-3); }
+body.is-viewer .splitter { pointer-events: none; }
+body.is-viewer .splitter::after { display: none; }
+
+/* ── Layout menu ───────────────────────────────────────────── */
+#layout-wrap { position: relative; display: inline-flex; }
+#layout-btn svg { width: 16px; height: 12px; }
+/* Fixed, and placed from the button's position by the script, so no
+   ancestor's overflow can clip it. */
+#layout-menu {
+  position: fixed;
+  top: 48px;
+  left: 8px;
+  z-index: 50;
+  width: 264px;
+  padding: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border-med);
+  border-radius: var(--radius-lg, 10px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14);
+  display: none;
+}
+#layout-menu.is-open { display: block; }
+.lm-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+.lm-label + .lm-grid, .lm-label + .lm-slots { margin-bottom: 14px; }
+.lm-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.lm-opt {
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text-3);
+  cursor: pointer;
+  transition: border-color var(--dur), color var(--dur), background var(--dur);
+}
+.lm-opt:hover { border-color: var(--border-med); color: var(--text-2); }
+.lm-opt.is-active { border-color: var(--text); color: var(--text); background: var(--bg-subtle); }
+.lm-opt svg { width: 34px; height: 24px; }
+.lm-opt .lm-slot   { fill: none; stroke: currentColor; stroke-width: 1.3; }
+.lm-opt .lm-slot.is-main { fill: currentColor; fill-opacity: 0.16; }
+
+.lm-slots { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; }
+.lm-slots span { font-size: var(--fs-chrome-sm); color: var(--text-2); }
+.lm-slots select {
+  height: 26px;
+  font: inherit;
+  font-size: var(--fs-chrome);
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border-med);
+  border-radius: var(--radius);
+  padding: 0 6px;
+}
+.lm-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.lm-hint { font-size: var(--fs-chrome-sm); color: var(--text-3); }
+.lm-foot .bw-btn { height: 24px; font-size: var(--fs-chrome-sm); }
+
+/* ── Editor ─────────────────────────────────────────────────── */
+#editor-body { flex: 1; min-height: 0; display: flex; position: relative; }
+
+@keyframes lockflash { 0% { box-shadow: inset 0 0 0 2px var(--mutate); } 100% { box-shadow: none; } }
+#editor-body.locked-flash { animation: lockflash .5s ease-out; }
+
+#gutter {
+  flex: 0 0 auto;
+  min-width: 3.2em;
+  padding: 10px 8px 40px 0;   /* extra end padding: see #code-hl */
+  text-align: right;
+  color: var(--text-3);
+  background: var(--bg-subtle);
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+  white-space: pre;
+  user-select: none;
+}
+#gutter .is-err    { color: var(--err); }
+#gutter .is-cur    { color: var(--text); font-weight: 600; }
+#gutter .is-locked { opacity: .55; }
+
+#code-wrap { flex: 1; min-width: 0; position: relative; overflow: hidden; }
+
+/* The textarea sits on top of the highlighted <pre> with transparent ink,
+   so both must share every metric that affects where a glyph lands.
+   Textareas don't inherit font from their parent, and the host base may style
+   pre/textarea differently, so every metric is pinned explicitly on both. */
+#code-hl, #code, #gutter {
+  font-family: var(--font-mono);
+  font-size: calc(10px * var(--u, 1) * var(--ws));
+  font-weight: 400;
+  font-style: normal;
+  line-height: 1.5;
+  letter-spacing: 0;
+  word-spacing: 0;
+  tab-size: 4;
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
+  font-kerning: none;
+  text-rendering: optimizeSpeed;
+  text-transform: none;
+  text-indent: 0;
+}
+#code-hl, #code {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  white-space: pre;
+  overflow: auto;
+  overflow-wrap: normal;
+  word-wrap: normal;
+  word-break: normal;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+}
+/* The highlight layer has no scrollbars, so it gets extra end padding to be
+   able to scroll at least as far as the textarea when a scrollbar appears. */
+#code-hl {
+  pointer-events: none;
+  color: var(--text);
+  overflow: hidden;
+  padding-right: 40px;
+  padding-bottom: 40px;
+}
+#code {
+  resize: none;
+  outline: none;
+  color: transparent;
+  caret-color: var(--text);
+}
+/* The textarea sits above the highlighted text, so its selection must be
+   translucent — an opaque fill paints straight over the glyphs underneath. */
+#code::selection {
+  background: rgba(37, 99, 235, 0.25);
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  color: transparent;
+}
+
+/* The memory model's line markers: painted under the highlighted text, one
+   line tall, following the editor's scroll. */
+.line-mark {
+  position: absolute;
+  left: 0; right: 0;
+  pointer-events: none;
+  display: none;
+}
+.line-mark.is-on { display: block; }
+#mark-cur { background: var(--accent-bg); box-shadow: inset 3px 0 0 var(--text); }
+#mark-err { background: var(--err-bg);    box-shadow: inset 3px 0 0 var(--err); }
+
+/* Colour only — bold or italic can change glyph advance in some monospace
+   fonts and knock the highlight out of step with the caret. */
+.t-kw  { color: var(--chart-1); }
+.t-str { color: var(--chart-2); }
+.t-num { color: var(--chart-3); }
+.t-bi  { color: var(--chart-4); }
+.t-def { color: var(--accent); }
+.t-dec { color: var(--chart-5); }
+.t-com { color: var(--text-3); }
+
+/* ── Shell ──────────────────────────────────────────────────── */
+#shell-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px 12px;
+  background: var(--bg-output);
+  cursor: text;
+  font-family: var(--font-mono);
+  font-size: calc(10px * var(--u, 1) * var(--ws));
+  line-height: 1.5;
+  tab-size: 4;
+}
+.sh-line { white-space: pre-wrap; word-break: break-word; margin: 0; font: inherit; }
+.sh-in   { color: var(--text); }
+.sh-in .sh-p { color: var(--text-3); user-select: none; }
+.sh-out  { color: var(--text); }
+.sh-err  { color: var(--err); }
+.sh-sys  { color: var(--text-3); font-style: italic; }
+
+/* A 4ch prompt column, and a textarea that grows to fit a pasted or
+   Shift+Enter block — the same shape as the Python Shell widget. */
+#prompt-row { display: flex; align-items: flex-start; }
+#prompt     { flex: 0 0 4ch; width: 4ch; color: var(--text-3); white-space: pre; user-select: none; }
+#shell-input {
+  flex: 1;
+  display: block;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  padding: 0;
+  margin: 0;
+  resize: none;
+  overflow: hidden;
+  background: transparent;
+  color: var(--text);
+  caret-color: var(--text);
+  font: inherit;
+  line-height: inherit;
+  white-space: pre-wrap;
+}
+#prompt-row.is-hidden { display: none; }
+
+#shell-body::-webkit-scrollbar,
+#code::-webkit-scrollbar { width: 8px; height: 8px; }
+#shell-body::-webkit-scrollbar-thumb,
+#code::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+#shell-body::-webkit-scrollbar-thumb:hover,
+#code::-webkit-scrollbar-thumb:hover { background: var(--border-med); }
+
+#boot-row { display: flex; align-items: center; gap: 8px; color: var(--text-3); }
+#boot-row .bw-spinner { width: 12px; height: 12px; }
+
+/* ── Memory pane ────────────────────────────────────────────── */
+/* The memory model was drawn for its own scale; the workspace sets it here
+   from the Text size setting so the diagram grows with the code. */
+#mm-pane { --u: 1.5; }
+
+/* The memory model's step controls sit by the editor — they walk its
+   lines — and only while the memory pane is on screen. */
+#mm-tools { display: contents; }
+.pane-head #run-btn { padding: 0 12px; }
+
+/* Icons stand in for labels only when a bar runs out of room: the top bar
+   (body.tb-*) and each pane head (.pane.ph-*) fit separately. */
+.bw-btn .bi { display: none; }
+body.tb-compact #toolbar .bw-btn:has(.bi) .bl,
+body.tb-compact #layout-btn .bl,
+.pane.ph-compact .pane-head .bw-btn:has(.bi) .bl { display: none; }
+body.tb-compact #toolbar .bw-btn .bi,
+.pane.ph-compact .pane-head .bw-btn .bi { display: block; }
+body.tb-compact #toolbar .bw-btn:has(.bi),
+body.tb-compact #layout-btn { width: var(--ctl-h); padding: 0; }
+.pane.ph-compact .pane-head .bw-btn:has(.bi) { width: 24px; padding: 0; }
+
+/* Still too wide: the names go too — the panes say what each part is. */
+body.tb-tight .bw-adopted-bar .bw-toolbar-title,
+body.tb-tight #toolbar > .bw-toolbar-title,
+body.tb-tight #toolbar > .bw-toolbar-title + .bw-sep,
+body.tb-tight .bw-topbar-actions > .bw-sep:first-child,
+.pane.ph-tight .pane-head .pane-label,
+.pane.ph-tight .slotstep-label,
+.pane.ph-tight #statusChip { display: none; }
+
+/* In the pane head the controls are the head's smaller size. */
+.pane-head .modeswitch .bw-btn { height: 22px; }
+.pane-head .slotstep .bw-btn--icon { width: 22px; }
+
+/* − Slot + : one small stepper instead of two wide buttons. */
+.slotstep { align-items: center; }
+.slotstep .bw-btn--icon { width: 24px; font-size: 14px; }
+.slotstep-label {
+  padding: 0 6px;
+  font-size: var(--fs-chrome);
+  font-weight: 500;
+  color: var(--text-2);
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+}
+.modeswitch .slotstep-label + .bw-btn { border-left: 0; }
+
+/* The Add menu: a plain list under its button. */
+.pop-menu {
+  position: fixed;
+  z-index: 50;
+  min-width: 150px;
+  padding: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border-med);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14);
+  display: none;
+}
+.pop-menu.is-open { display: block; }
+.pop-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-chrome);
+  cursor: pointer;
+}
+.pop-item:hover, .pop-item:focus-visible { background: var(--bg-subtle); outline: none; }
+#mm-tools[hidden] { display: none; }
+#pdf-wrap { display: contents; }
+#pdf-wrap[hidden] { display: none; }
+
+/* The tool groups are transparent to the flex row they sit in; `hidden`
+   has to beat `display: contents`, hence the second rule. */
+#traceTools, #drawTools { display: contents; }
+#traceTools[hidden], #drawTools[hidden] { display: none; }
+
+/* The trace's printed output sits under the diagram, and only when there
+   is some — the shell is where output lives in this widget. */
+#mm-pane .console { flex: 0 1 auto; border-top: 1px solid var(--border); }
+#mm-pane.empty-output .console { display: none; }
+
+
+/* ── Viewer badge ───────────────────────────────────────────── */
+#view-badge { display: none; }
+body.is-viewer #view-badge { display: inline-flex; }
+body.is-viewer .presenter-only { display: none !important; }
+body.is-viewer #mm-head .modeswitch,
+body.is-viewer #drawTools,
+body.is-viewer #btnPdf { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MEMORY MODEL — carried over from the Python Memory Model widget
+   ══════════════════════════════════════════════════════════════ */
 /* ── Local aliases ──────────────────────────────────────────────────────────
    The interpreter and renderer were written against these names. In light
    mode they point at the host tokens, so the widget follows the deck; the
    `theme` setting's dark palette below still stands on its own because the
    base has no dark tokens to borrow. */
 :root{
-  --u: 1.5;          /* presentation scale: this build has no small mode */
   /* The diagram is drawn in a handwriting face when one is available, so it
      reads like the board work it is imitating. */
   --hand: 'Patrick Hand', 'Bradley Hand', 'Segoe Print', 'Comic Sans MS', cursive;
@@ -125,17 +559,6 @@ html[data-theme="dark"]{
   --t-function:#EDF1EE; --t-range:#A9CF6B;
 }
 
-html, body{ height:100%; overflow:hidden; }
-body{ background: var(--bg); color: var(--text); }
-
-button{ font: inherit; color: inherit; }
-:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
-
-/* ── Toolbar ───────────────────────────────────────────────────────────────
-   The two tool groups are transparent to the flex layout, but `hidden` has
-   to beat `display:contents`, hence the second rule. */
-#traceTools, #drawTools{ display:contents; }
-#traceTools[hidden], #drawTools[hidden]{ display:none; }
 
 /* Toggle state is carried by aria-pressed, so it borrows .is-active's look. */
 .bw-btn[aria-pressed="true"]{ background: var(--text); border-color: var(--text); color: var(--bg); }
@@ -146,132 +569,10 @@ button{ font: inherit; color: inherit; }
 .modeswitch .bw-btn{ border:0; border-radius:0; height: calc(var(--ctl-h) - 2px); }
 .modeswitch .bw-btn + .bw-btn{ border-left:1px solid var(--border); }
 
-/* ── Workspace + panes ─────────────────────────────────────────────────── */
-/* Grid columns rather than a splitter: the diagram always wants the lion's
-   share, and hiding a pane must not shift the layout. */
-.workspace{
-  flex:1 1 auto;
-  min-height:0;
-  display:grid;
-  grid-template-columns: minmax(260px, 0.85fr) minmax(340px, 1.3fr);
-  gap: 8px;
-  padding: 8px;
-}
-/* The output pane is sized by what it holds, so an empty or one-line console
-   is a thin strip and the editor keeps the rest. */
-.col-left{ display:grid; grid-template-rows: minmax(0,1fr) auto; gap: 8px; min-height:0; }
-
-.pane{
-  display:flex; flex-direction:column;
-  min-width:0; min-height:0;
-  border:1px solid var(--border);
-  border-radius: var(--radius);
-  overflow:hidden;
-  background: var(--bg);
-}
-.pane-head{
-  flex:0 0 auto;
-  height:30px;
-  display:flex; align-items:center; gap:8px;
-  padding:0 8px 0 10px;
-  border-bottom:1px solid var(--border);
-  background: var(--bg-subtle);
-  user-select:none;
-}
-.pane-label{
-  font-size:10px;
-  letter-spacing:0.08em;
-  text-transform:uppercase;
-  color: var(--text-3);
-  font-weight:600;
-}
-
-/* ── Editor ────────────────────────────────────────────────────────────── */
-.editor{
-  position:relative;
-  flex:1; min-height:0;
-  display:grid; grid-template-columns:auto 1fr;
-  font-family: var(--font-mono);
-  font-size: calc(13.5px * var(--u));
-  line-height: calc(22px * var(--u));
-  overflow:hidden;
-}
-.gutter{
-  min-width:3.2em;
-  padding: 10px 8px 10px 0;
-  text-align:right;
-  color: var(--text-3);
-  background: var(--bg-subtle);
-  border-right:1px solid var(--border);
-  overflow:hidden;
-  user-select:none;
-  white-space:pre;
-}
-.gutter .g{ position:relative; padding-right:4px; }
-.gutter .g.current{ color: var(--text); font-weight:600; }
-/* Lines the program has already reached: history, and read-only while it runs */
-.gutter .g.locked{ opacity:.55; }
-@keyframes lockflash{ 0%{ box-shadow: inset 0 0 0 2px var(--mutate); } 100%{ box-shadow:none; } }
-.editor.locked-flash{ animation: lockflash .5s ease-out; }
-.gutter .g.current::after{
-  content:"";
-  position:absolute; right:-9px; top: calc(50% - 5px);
-  width:0; height:0;
-  border-left:6px solid var(--text);
-  border-top:5px solid transparent;
-  border-bottom:5px solid transparent;
-}
-.gutter .g.skipped{ opacity:.4; }
-
-.code-area{ position:relative; min-width:0; overflow:hidden; }
-.code-layer{
-  position:absolute; inset:0;
-  margin:0;
-  padding: 10px 12px;
-  font: inherit;
-  white-space:pre;
-  overflow:auto;
-  tab-size:4;
-}
-#highlight{ z-index:0; color: var(--text); pointer-events:none; }
-#code{
-  z-index:1;
-  background:transparent;
-  color:transparent;
-  caret-color: var(--text);
-  border:0; resize:none;
-  outline:none;
-  width:100%; height:100%;
-  display:block;
-}
-/* Translucent, because the textarea sits above the highlighted glyphs. */
-#code::selection{
-  background: rgba(37, 99, 235, 0.25);
-  background: color-mix(in srgb, var(--accent) 28%, transparent);
-  color: transparent;
-}
-#highlight .ln{ display:block; min-height: calc(22px * var(--u)); position:relative; }
-#highlight .ln.current{
-  background: var(--accent-bg);
-  box-shadow: inset 3px 0 0 var(--text);
-}
-#highlight .ln.skipped{ opacity:.38; }
-#highlight .ln.errline{
-  background: var(--err-bg);
-  box-shadow: inset 3px 0 0 var(--err);
-}
-
-/* Same syntax palette as the Python IDE. Colour only — bold or italic can
-   change glyph advance and knock the highlight out of step with the caret. */
-.t-kw { color: var(--chart-1); }
-.t-str{ color: var(--chart-2); }
-.t-num{ color: var(--chart-3); }
-.t-bi { color: var(--chart-4); }
-.t-com{ color: var(--text-3); }
 
 /* ── Output + errors ───────────────────────────────────────────────────── */
 .console{
-  flex:1 1 auto; min-height:0; max-height: 26vh; overflow:auto;
+  flex:1 1 auto; min-height:0; max-height: 30%; overflow:auto;
   margin:0;
   padding: 10px 12px;
   background: var(--bg-output);
@@ -314,9 +615,10 @@ button{ font: inherit; color: inherit; }
   white-space:pre-wrap; margin:6px 0 0; color: var(--text-2);
 }
 
-.console::-webkit-scrollbar, #code::-webkit-scrollbar{ width:8px; height:8px; }
-.console::-webkit-scrollbar-thumb, #code::-webkit-scrollbar-thumb{ background: var(--border); border-radius:4px; }
-.console::-webkit-scrollbar-thumb:hover, #code::-webkit-scrollbar-thumb:hover{ background: var(--border-med); }
+.console::-webkit-scrollbar{ width:8px; height:8px; }
+.console::-webkit-scrollbar-thumb{ background: var(--border); border-radius:4px; }
+.console::-webkit-scrollbar-thumb:hover{ background: var(--border-med); }
+
 
 /* ── Memory diagram — the centrepiece ──────────────────────────────────── */
 /* The step status lives in the pane head, where the IDE keeps its controls. */
@@ -368,10 +670,9 @@ button{ font: inherit; color: inherit; }
   padding:2px 4px; outline:none; resize:none; overflow:hidden;
   background: var(--bg); color: var(--text);
 }
-/* Drawing is a full-width activity: the code pane has nothing to say here. */
-body.draw .col-left{ display:none; }
-body.draw .workspace{ grid-template-columns: 1fr; }
-body.draw .linecaption, body.draw #statusChip{ display:none; }
+/* Drawing has no program: no caption, no status, no output. */
+#mm-pane.draw .linecaption, #mm-pane.draw #statusChip,
+#mm-pane.draw .console, #mm-pane.draw #errorSlot{ display:none; }
 .hd-sel{ stroke: var(--mutate); fill:none; stroke-linecap:round; stroke-linejoin:round; }
 .hd-pending{ fill: var(--mutate-soft); stroke:none; }
 .diagram{ display:block; overflow:visible; }
@@ -394,12 +695,7 @@ body.draw .linecaption, body.draw #statusChip{ display:none; }
 @keyframes hd-in{ from{ opacity:0 } to{ opacity:1 } }
 .hd-new{ animation: hd-in .22s ease-out; }
 
-/* ── Presentation layout ───────────────────────────────────────────────────
-   `E` drops the editor: the diagram takes the whole pane and grows again,
-   and the current line is echoed above it. */
-body.hide-editor{ --u: 1.75; }
-body.hide-editor .workspace{ grid-template-columns: 1fr; }
-body.hide-editor .col-left{ display:none; }
+
 .linecaption{
   display:none;
   flex:0 0 auto;
@@ -411,115 +707,169 @@ body.hide-editor .col-left{ display:none; }
   white-space:pre;
   overflow:auto;
 }
-body.hide-editor .linecaption{ display:block; }
+#mm-pane.hide-editor .linecaption{ display:block; }
 .linecaption .no{ color: var(--text-3); margin-right: 14px; font-size: calc(12px * var(--u)); }
 
-@media (max-width: 860px){
-  .workspace{ grid-template-columns: 1fr; grid-template-rows: minmax(160px,0.8fr) minmax(0,1.2fr); }
-  .col-left{ grid-template-rows: minmax(0,1fr) minmax(60px,auto); }
-}
 
 @media (prefers-reduced-motion: reduce){
-  *{ transition:none !important; }
   .hd-new{ animation:none; }
+  #editor-body.locked-flash{ animation:none; }
 }
 </style>
 </head>
 <body>
-
-<div id="app" class="bw-shell">
+<div id="root" class="bw-shell">
 
   <div id="toolbar" class="bw-toolbar" data-bw-topbar>
-    <span class="bw-toolbar-title">Memory Model</span>
+    <span class="bw-toolbar-title">Python</span>
     <div class="bw-sep"></div>
-
-    <span id="traceTools">
-      <button class="bw-btn bw-btn--icon" id="btnBack" type="button" title="Step back (left arrow)" aria-label="Step back">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
-             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5 L7 12 L15 19"/></svg>
+    <button class="bw-btn" id="open-btn" title="Open a .py file" aria-label="Open"><svg class="bi" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M1.8 3.5h4l1.4 1.6h7v8H1.8z"/></svg><span class="bl">Open</span></button>
+    <button class="bw-btn" id="save-btn" title="Download this file (Ctrl+S)" aria-label="Save"><svg class="bi" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8M4.8 7 8 10.2 11.2 7M2.5 13.5h11"/></svg><span class="bl">Save</span></button>
+    <div class="bw-sep presenter-only"></div>
+    <div id="layout-wrap" class="presenter-only">
+      <button class="bw-btn" id="layout-btn" title="Choose a layout" aria-haspopup="true" aria-expanded="false">
+        <svg viewBox="0 0 16 12" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="0.7" y="0.7" width="14.6" height="10.6" rx="1.5"/><path d="M8 0.7v10.6M8 6h7.3"/></svg>
+        <span class="bl">Layout</span>
       </button>
-      <button class="bw-btn bw-btn--icon bw-btn--primary" id="btnStep" type="button" title="Step forward (right arrow)" aria-label="Step forward">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
-             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5 L17 12 L9 19"/></svg>
-      </button>
-      <button class="bw-btn bw-btn--icon" id="btnRun" type="button" title="Run to the end" aria-label="Run to the end">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
-             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 5 L13 12 L6 19"/><path d="M14 5 L21 12 L14 19"/></svg>
-      </button>
-      <button class="bw-btn bw-btn--icon" id="btnReset" type="button" title="Reset (R)" aria-label="Reset">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
-             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
-      </button>
-    </span>
-
-    <span id="drawTools" hidden>
-      <button class="bw-btn" id="dFrame" type="button" title="Add a frame">+ Frame</button>
-      <button class="bw-btn" id="dObject" type="button" title="Add a value object">+ Object</button>
-      <button class="bw-btn" id="dList" type="button" title="Add a list or tuple">+ List</button>
-      <button class="bw-btn" id="dDict" type="button" title="Add a dictionary">+ Dict</button>
-      <div class="bw-sep"></div>
-      <button class="bw-btn" id="dAddRow" type="button" title="Add a slot to the selected shape">+ Slot</button>
-      <button class="bw-btn" id="dDelRow" type="button" title="Remove a slot from the selected shape">&minus; Slot</button>
-      <div class="bw-sep"></div>
-      <button class="bw-btn" id="dArrow" type="button" aria-pressed="false" title="Draw an arrow: click a slot, then the object it points at">Arrow</button>
-      <button class="bw-btn" id="dDelete" type="button" title="Delete what is selected (Delete)">Delete</button>
-      <button class="bw-btn" id="dClear" type="button" title="Clear the whole drawing">Clear</button>
-    </span>
-
-    <div class="bw-spacer"></div>
-
-    <button class="bw-btn" id="btnPdf" type="button"
-            title="Download this page as a PDF (P)" aria-label="Download as PDF">
-      <span id="btnPdfLabel">PDF</span>
-    </button>
-
-    <div class="modeswitch" role="group" aria-label="Mode">
-      <button class="bw-btn" id="mTrace" type="button" aria-pressed="true">Trace</button>
-      <button class="bw-btn" id="mDraw" type="button" aria-pressed="false">Draw</button>
     </div>
+    <span id="pdf-wrap" hidden>
+      <div class="bw-sep"></div>
+      <button class="bw-btn" id="btnPdf" type="button" title="Download the program and diagram as a PDF (P)" aria-label="Download as PDF">
+        <svg class="bi" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M3.5 1.8h6l3 3v9.4h-9z"/><path d="M9.5 1.8v3h3M6 10.5h4"/></svg><span class="bl" id="btnPdfLabel">PDF</span>
+      </button>
+    </span>
+    <div class="bw-spacer"></div>
+    <span class="bw-status" id="view-badge">View-only · synced with presenter</span>
+    <input type="file" id="file-input" accept=".py,.txt,text/x-python,text/plain">
   </div>
 
-  <main class="workspace">
+  <div id="workspace">
+    <div id="panes">
 
-    <div class="col-left">
-      <section class="pane">
-        <div class="pane-head"><span class="pane-label">Code</span></div>
-        <div class="editor" id="editor">
-          <div class="gutter" id="gutter" aria-hidden="true"></div>
-          <div class="code-area">
-            <pre class="code-layer" id="highlight" aria-hidden="true"></pre>
-            <textarea class="code-layer" id="code" spellcheck="false" autocapitalize="off"
-                      autocomplete="off" wrap="off" aria-label="Python code"></textarea>
+      <section class="pane" id="editor-pane" data-pane="editor">
+        <div class="pane-head" id="editor-head">
+          <span class="pane-label">Editor</span>
+          <input class="pane-file" id="filename" value="main.py" spellcheck="false" aria-label="File name">
+          <div class="bw-spacer"></div>
+          <span id="mm-tools" class="presenter-only" hidden>
+            <span id="traceTools">
+              <button class="bw-btn bw-btn--icon" id="btnReset" type="button" title="Back to the start of the trace (R)" aria-label="Back to the start of the trace">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5v14"/><path d="M19 5 L11 12 L19 19"/></svg>
+              </button>
+              <button class="bw-btn bw-btn--icon" id="btnBack" type="button" title="Step back (←)" aria-label="Step back">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5 L7 12 L15 19"/></svg>
+              </button>
+              <button class="bw-btn bw-btn--icon" id="btnStep" type="button" title="Step forward (→)" aria-label="Step forward">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5 L17 12 L9 19"/></svg>
+              </button>
+              <button class="bw-btn bw-btn--icon" id="btnRun" type="button" title="Trace to the end (End)" aria-label="Trace to the end">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 5 L13 12 L6 19"/><path d="M14 5 L21 12 L14 19"/></svg>
+              </button>
+              <div class="bw-sep"></div>
+            </span>
+          </span>
+          <button class="bw-btn bw-btn--primary" id="run-btn" title="Run file in the shell (F5 / Ctrl+Enter)">Run</button>
+          <button class="bw-btn bw-btn--icon pane-max" data-pane="editor"></button>
+        </div>
+        <div id="editor-body">
+          <div id="gutter">1</div>
+          <div id="code-wrap">
+            <div class="line-mark" id="mark-cur"></div>
+            <div class="line-mark" id="mark-err"></div>
+            <pre id="code-hl" aria-hidden="true"></pre>
+            <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off"
+                      autocorrect="off" wrap="off" aria-label="Python source"></textarea>
           </div>
         </div>
       </section>
 
-      <section class="pane">
-        <div class="pane-head"><span class="pane-label">Output</span></div>
+      <section class="pane" id="shell-pane" data-pane="shell">
+        <div class="pane-head" id="shell-head">
+          <span class="pane-label">Shell</span>
+          <div class="bw-spacer"></div>
+          <button class="bw-btn" id="restart-btn" title="Stop and restart the shell (Ctrl+C in shell)" aria-label="Restart">
+            <svg class="bi" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 1.8v5.4"/><path d="M4.6 3.8a5.2 5.2 0 1 0 6.8 0"/></svg><span class="bl" id="restart-label">Restart</span></button>
+          <button class="bw-btn bw-btn--icon" id="clear-btn" title="Clear shell (Ctrl+L)">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 4h10M6 4V2.5h4V4M4.5 4l.7 9.5h5.6l.7-9.5"/></svg>
+          </button>
+          <button class="bw-btn bw-btn--icon pane-max" data-pane="shell"></button>
+        </div>
+        <div id="shell-body">
+          <div id="transcript"></div>
+          <div id="boot-row"><span class="bw-spinner"></span><span id="boot-msg">Loading Python…</span></div>
+          <div id="prompt-row" class="is-hidden">
+            <span id="prompt">&gt;&gt;&gt; </span>
+            <textarea id="shell-input" rows="1" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" aria-label="Python input"></textarea>
+          </div>
+        </div>
+      </section>
+
+      <section class="pane state-pane" id="mm-pane" data-pane="memory">
+        <div class="pane-head" id="mm-head">
+          <span class="pane-label">Memory</span>
+          <div class="modeswitch" role="group" aria-label="Memory model mode">
+            <button class="bw-btn" id="mTrace" type="button" aria-pressed="true" title="Trace the editor's program (M)">Trace</button>
+            <button class="bw-btn" id="mDraw" type="button" aria-pressed="false" title="Draw a memory model by hand (M)">Draw</button>
+          </div>
+          <span id="drawTools" hidden>
+            <button class="bw-btn" id="dAddBtn" type="button" title="Add a frame, object, list or dictionary" aria-haspopup="true" aria-expanded="false">+ Add
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:10px;height:10px"><path d="M4 6l4 4 4-4"/></svg>
+            </button>
+            <div class="modeswitch slotstep" role="group" aria-label="Slots on the selected shape">
+              <button class="bw-btn bw-btn--icon" id="dDelRow" type="button" title="Remove a slot from the selected shape" aria-label="Remove a slot">&minus;</button>
+              <span class="slotstep-label">Slot</span>
+              <button class="bw-btn bw-btn--icon" id="dAddRow" type="button" title="Add a slot to the selected shape" aria-label="Add a slot">+</button>
+            </div>
+            <button class="bw-btn" id="dArrow" type="button" aria-pressed="false" title="Draw an arrow: click a slot, then the object it points at" aria-label="Arrow"><svg class="bi" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 13.5 13 3M7.5 3H13v5.5"/></svg><span class="bl">Arrow</span></button>
+            <button class="bw-btn" id="dDelete" type="button" title="Delete what is selected (Delete)" aria-label="Delete"><svg class="bi" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 4h10M6 4V2.5h4V4M4.5 4l.7 9.5h5.6l.7-9.5"/></svg><span class="bl">Delete</span></button>
+            <button class="bw-btn" id="dClear" type="button" title="Clear the whole drawing" aria-label="Clear"><svg class="bi" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="2" width="12" height="12" rx="1.5"/><path d="M5.5 5.5l5 5M10.5 5.5l-5 5"/></svg><span class="bl">Clear</span></button>
+          </span>
+          <div class="bw-spacer"></div>
+          <span class="chip" id="statusChip" hidden></span>
+          <button class="bw-btn bw-btn--icon pane-max" data-pane="memory"></button>
+        </div>
+        <div class="linecaption" id="lineCaption"></div>
+        <div class="memory-wrap" id="memoryWrap">
+          <svg class="diagram" id="diagram" xmlns="http://www.w3.org/2000/svg"></svg>
+        </div>
+        <div class="memory-wrap draw-wrap" id="drawWrap" hidden>
+          <svg id="canvas" width="2400" height="1600" xmlns="http://www.w3.org/2000/svg"></svg>
+          <textarea id="cellEditor" spellcheck="false" autocomplete="off"></textarea>
+        </div>
         <pre class="console" id="output"></pre>
         <div id="errorSlot"></div>
       </section>
+
+      <div class="splitter" id="split-a" role="separator" aria-label="Resize panes"></div>
+      <div class="splitter" id="split-b" role="separator" aria-label="Resize panes"></div>
     </div>
+  </div>
 
-    <section class="pane state-pane">
-      <div class="pane-head">
-        <span class="pane-label">Memory</span>
-        <div class="bw-spacer"></div>
-        <span class="chip" id="statusChip" hidden></span>
-      </div>
-      <div class="linecaption" id="lineCaption"></div>
-      <div class="memory-wrap" id="memoryWrap">
-        <svg class="diagram" id="diagram" xmlns="http://www.w3.org/2000/svg"></svg>
-      </div>
-      <div class="memory-wrap draw-wrap" id="drawWrap" hidden>
-        <svg id="canvas" width="2400" height="1600" xmlns="http://www.w3.org/2000/svg"></svg>
-        <textarea id="cellEditor" spellcheck="false" autocomplete="off"></textarea>
-      </div>
-    </section>
-
-  </main>
-
+  <!-- Outside the toolbar on purpose: Beamer+ moves the toolbar into its shared
+       top bar, which clips anything hanging below it. -->
+  <div id="add-menu" class="pop-menu" role="menu" aria-label="Add a shape">
+    <button class="pop-item" id="dFrame"  type="button" role="menuitem">Frame</button>
+    <button class="pop-item" id="dObject" type="button" role="menuitem">Object</button>
+    <button class="pop-item" id="dList"   type="button" role="menuitem">List or tuple</button>
+    <button class="pop-item" id="dDict"   type="button" role="menuitem">Dictionary</button>
+  </div>
+  <div id="layout-menu" role="dialog" aria-label="Layout">
+    <div class="lm-label">Layout</div>
+    <div class="lm-grid" id="lm-grid"></div>
+    <div class="lm-label">Panes</div>
+    <div class="lm-slots" id="lm-slots"></div>
+    <div class="lm-foot">
+      <span class="lm-hint">Drag the gaps to resize</span>
+      <button class="bw-btn" id="lm-even" type="button">Even sizes</button>
+    </div>
+  </div>
 </div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     MEMORY MODEL ENGINE — the Python Memory Model widget's interpreter,
+     trace, renderer, draw mode and PDF export. It exposes
+     window.PythonVisualizer; the workspace script below drives it.
+     ═══════════════════════════════════════════════════════════════════════ -->
 <script>
 "use strict";
 
@@ -2249,6 +2599,14 @@ var EXAMPLES = [
 
 var $ = function(id){ return document.getElementById(id); };
 
+/* The seam to the workspace around it. `visible` is whether the memory pane is
+   in the current layout; `readOnly` is the viewer role; `onChange` is told
+   whenever something worth syncing or saving has changed. */
+var MM = { visible: true, readOnly: false, onChange: null };
+function mmPane(){ return $('mm-pane'); }
+function mmScale(){ return parseFloat(getComputedStyle(mmPane()).getPropertyValue('--u')) || 1; }
+function mmChanged(){ if (MM.onChange) try { MM.onChange(); } catch (err){} }
+
 var app = {
   mode: 'trace',
   layout: {},       /* object id -> where it was drawn last, so boxes hold still */
@@ -2307,61 +2665,19 @@ function highlightLine(line){
   }).join('');
 }
 
-function paintEditor(){
-  var lines = app.code.split('\n');
-  var hl = '', gut = '';
-  for (var i = 0; i < lines.length; i++){
-    hl  += '<div class="ln" data-line="' + (i+1) + '">' + highlightLine(lines[i]) + '</div>';
-    gut += '<div class="g" data-line="' + (i+1) + '">' + (i+1) + '</div>';
-  }
-  $('highlight').innerHTML = hl;
-  $('gutter').innerHTML = gut;
-}
+/* The workspace owns the editor; the memory model only says which lines to
+   mark: the one about to run, the one that failed, and how far is history. */
+function paintEditor(){}
 
-/* Highlight the line about to run, dim lines the program never reached. */
 function markLines(state){
-  /* Before the first step nothing has run, so nothing is the current line.
-     The highlight appears when the viewer asks for it. */
   var current = app.idx === 0 ? null : (state && state.line);
-  var reached = {}, i;
-  if (app.trace){
-    for (i = 0; i <= app.idx && i < app.trace.states.length; i++){
-      var L = app.trace.states[i].line;
-      if (L) reached[L] = true;
-    }
-  }
   var errLine = (app.revealErrors && state && state.error) ? state.error.line : null;
-
-  var locked = lockedThrough();
-  var lns = $('highlight').children, gs = $('gutter').children;
-  for (i = 0; i < lns.length; i++){
-    var n = i + 1;
-    var isExec = app.trace ? app.trace.execLines.has(n) : false;
-    var skipped = isExec && !reached[n] && current !== null && current !== undefined && n < current;
-    lns[i].className = 'ln'
-      + (n === current ? ' current' : '')
-      + (n === errLine ? ' errline' : '')
-      + (skipped ? ' skipped' : '');
-    if (gs[i]) gs[i].className = 'g' + (n === current ? ' current' : '')
-      + (skipped ? ' skipped' : '') + (n <= locked ? ' locked' : '');
-  }
-  if (current) scrollLineIntoView(current);
+  if (window.PWEditor) PWEditor.mark({
+    current: MM.visible && app.mode === 'trace' ? (current || null) : null,
+    err:     MM.visible && app.mode === 'trace' ? errLine : null,
+    locked:  MM.visible ? lockedThrough() : 0
+  });
   paintCaption(state);
-}
-
-function scrollLineIntoView(line){
-  var el = $('highlight').children[line - 1];
-  if (!el) return;
-  var area = $('highlight');
-  var top = el.offsetTop, h = el.offsetHeight;
-  if (top < area.scrollTop) syncScroll(top - h);
-  else if (top + h > area.scrollTop + area.clientHeight) syncScroll(top + h - area.clientHeight + h);
-}
-function syncScroll(top){
-  var ta = $('code');
-  ta.scrollTop = Math.max(0, top);
-  $('highlight').scrollTop = ta.scrollTop;
-  $('gutter').scrollTop = ta.scrollTop;
 }
 
 /* The oversized single line shown when the editor is hidden in a lecture. */
@@ -2600,7 +2916,7 @@ function renderMemory(state, prev){
   var keepL = wrap ? wrap.scrollLeft : 0, keepT = wrap ? wrap.scrollTop : 0;
   while (svg.firstChild) svg.removeChild(svg.firstChild);
 
-  var u = parseFloat(getComputedStyle(document.body).getPropertyValue('--u')) || 1;
+  var u = mmScale();
   var frames = state.frames.map(measureFrame);
   var depth = heapDepths(state);
   var shown = state.order.filter(function(id){ return depth[id] !== undefined; });
@@ -2931,7 +3247,7 @@ function fitToPane(){
   var vb = (svg.getAttribute('viewBox') || '').split(' ');
   var W = parseFloat(vb[2]), H = parseFloat(vb[3]);
   if (!W || !H) return app.zoom;
-  var u = parseFloat(getComputedStyle(document.body).getPropertyValue('--u')) || 1;
+  var u = mmScale();
   var base = u * DIAGRAM_BASE;
   var fit = Math.min((wrap.clientWidth - 32 * u) / (W * base),
                      (wrap.clientHeight - 32 * u) / (H * base));
@@ -2988,7 +3304,7 @@ function clipToRect(r, tx, ty){
 function renderOutput(state, prev){
   var out = $('output');
   var text = state.output || '';
-  document.body.classList.toggle('empty-output', !text);
+  mmPane().classList.toggle('empty-output', !text);
   if (!text){
     out.innerHTML = '<span class="empty">Anything the program prints appears here.</span>';
     return;
@@ -3056,6 +3372,11 @@ function renderError(state){
 ------------------------------------------------------------------------- */
 function render(){
   ensureTrace();
+  if (!MM.visible){
+    if (window.PWEditor) PWEditor.mark(null);
+    emit();
+    return;
+  }
   var states = app.trace.states;
   if (app.idx >= states.length) app.idx = states.length - 1;
   if (app.idx < 0) app.idx = 0;
@@ -3174,110 +3495,61 @@ function goTo(i){
   app.idx = Math.max(0, Math.min(i, app.trace.states.length - 1));
   render();
 }
-function stepForward(){ app.revealErrors = true; refreshIfStale(); goTo(app.idx + 1); }
-function stepBackward(){ refreshIfStale(); goTo(app.idx - 1); }
+function stepForward(){ if (MM.readOnly) return; app.revealErrors = true; refreshIfStale(); goTo(app.idx + 1); }
+function stepBackward(){ if (MM.readOnly) return; refreshIfStale(); goTo(app.idx - 1); }
 function runAll(){
+  if (MM.readOnly) return;
   app.revealErrors = true;
   ensureTrace();
   refreshIfStale();
   goTo(app.trace.states.length - 1);
 }
 function resetAll(){
+  if (MM.readOnly) return;
   invalidate();
   render();
 }
 
 function setCode(code){
-  app.code = String(code).replace(/\r\n?/g, '\n');
-  $('code').value = app.code;
-  paintEditor();
+  code = String(code).replace(/\r\n?/g, '\n');
+  if (window.PWEditor){ PWEditor.setCode(code); return; }
+  app.code = code;
   invalidate();
   render();
+}
+
+/* The shared editor changed. Same rules as the old built-in editor: an edit
+   below the executed lines keeps the diagram where it is. */
+function codeEdited(code){
+  if (code === app.code) return;
+  var before = app.code;
+  app.code = code;
+  codeChanged(before);
+}
+
+/* A viewer or a restored deck: adopt the code without the keep-your-place
+   logic, because a step index is about to be applied on top. */
+function syncCode(code){
+  if (typeof code !== 'string' || code === app.code) return;
+  app.code = code;
+  invalidate();
+}
+
+/* While a program is being traced, the lines it has already run are read
+   only — the diagram is a picture of them. Returns true when an edit over
+   [start, end) must be refused, and gives the quiet nudge. */
+function editBlocked(start, end, inputType){
+  if (!MM.visible || app.mode !== 'trace' || !isLive()) return false;
+  var lockEnd = offsetOfLineEnd(lockedThrough());
+  if (lockEnd <= 0) return false;
+  if (start === end && /^delete/.test(inputType || '') && /Backward/.test(inputType || '')) start--;
+  if (start < lockEnd){ flashLock(); return true; }
+  return false;
 }
 
 /* -------------------------------------------------------------------------
    WIRING
 ------------------------------------------------------------------------- */
-function setupEditor(){
-  var ta = $('code');
-
-  ta.addEventListener('input', function(){
-    var before = app.code;
-    app.code = ta.value;
-    paintEditor();
-    codeChanged(before);
-  });
-
-  /* While a program is running, the lines it has already reached are read
-     only. You can keep writing underneath them, but you cannot rewrite
-     history out from under the diagram. */
-  ta.addEventListener('beforeinput', function(e){
-    if (!isLive()) return;
-    var lockEnd = offsetOfLineEnd(lockedThrough());
-    if (lockEnd <= 0) return;
-    var start = ta.selectionStart, end = ta.selectionEnd;
-    /* a backspace at the boundary would eat the last locked character */
-    if (start === end && /^delete/.test(e.inputType) && /Backward/.test(e.inputType)) start--;
-    if (start < lockEnd){
-      e.preventDefault();
-      flashLock();
-    }
-  });
-
-  /* Typing keys are handled above; these two rewrite the value themselves, so
-     they need the same guard. */
-  var blocked = function(){
-    if (!isLive()) return false;
-    var lockEnd = offsetOfLineEnd(lockedThrough());
-    if (ta.selectionStart < lockEnd){ flashLock(); return true; }
-    return false;
-  };
-
-  ta.addEventListener('scroll', function(){
-    $('highlight').scrollTop = ta.scrollTop;
-    $('highlight').scrollLeft = ta.scrollLeft;
-    $('gutter').scrollTop = ta.scrollTop;
-  });
-
-  ta.addEventListener('keydown', function(e){
-    var start = ta.selectionStart, end = ta.selectionEnd, v = ta.value;
-
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)){ e.preventDefault(); runAll(); return; }
-    if ((e.metaKey || e.ctrlKey) && (e.key === 'ArrowRight' || e.key === 'ArrowDown')){ e.preventDefault(); stepForward(); return; }
-    if ((e.metaKey || e.ctrlKey) && (e.key === 'ArrowLeft' || e.key === 'ArrowUp')){ e.preventDefault(); stepBackward(); return; }
-
-    if (e.key === 'Tab'){
-      e.preventDefault();
-      if (blocked()) return;
-      if (e.shiftKey){
-        var ls = v.lastIndexOf('\n', start - 1) + 1;
-        if (v.slice(ls, ls + 4) === '    '){
-          ta.value = v.slice(0, ls) + v.slice(ls + 4);
-          ta.selectionStart = ta.selectionEnd = Math.max(ls, start - 4);
-        }
-      } else {
-        ta.value = v.slice(0, start) + '    ' + v.slice(end);
-        ta.selectionStart = ta.selectionEnd = start + 4;
-      }
-      ta.dispatchEvent(new Event('input'));
-      return;
-    }
-
-    if (e.key === 'Enter'){
-      e.preventDefault();
-      if (blocked()) return;
-      var lineStart = v.lastIndexOf('\n', start - 1) + 1;
-      var lineText = v.slice(lineStart, start);
-      var indent = (/^[ \t]*/.exec(lineText)[0]) || '';
-      if (/:\s*$/.test(lineText)) indent += '    ';
-      ta.value = v.slice(0, start) + '\n' + indent + v.slice(end);
-      ta.selectionStart = ta.selectionEnd = start + 1 + indent.length;
-      ta.dispatchEvent(new Event('input'));
-      return;
-    }
-  });
-}
-
 function setupControls(){
   $('btnStep').addEventListener('click', stepForward);
   $('btnBack').addEventListener('click', stepBackward);
@@ -3305,7 +3577,7 @@ function setTheme(name){
 
 function setEditorVisible(visible){
   app.hideEditor = !visible;
-  document.body.classList.toggle('hide-editor', app.hideEditor);
+  mmPane().classList.toggle('hide-editor', app.hideEditor);
   /* The pane just changed size and the diagram is drawn to fit it, so it has
      to be measured again once the new layout has settled. */
   requestAnimationFrame(render);
@@ -3314,6 +3586,8 @@ function setEditorVisible(visible){
 
 function setupKeys(){
   document.addEventListener('keydown', function(e){
+    if (!MM.visible || MM.readOnly) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
     var typing = document.activeElement === $('code') || document.activeElement === $('cellEditor');
     if (typing) return;
     if (app.mode === 'draw' && /^(ArrowRight|ArrowLeft| |PageUp|PageDown|Home|End)$/.test(e.key)) return;
@@ -3327,14 +3601,13 @@ function setupKeys(){
       case 'Home': e.preventDefault(); goTo(0); break;
       case 'End': e.preventDefault(); runAll(); break;
       case 'r': case 'R': resetAll(); break;
-      case 'e': case 'E': setEditorVisible(app.hideEditor); break;
       case 'd': case 'D': setTheme(); break;
       case '+': case '=': e.preventDefault(); setZoom(app.zoom * 1.2); break;
       case '-': case '_': e.preventDefault(); setZoom(app.zoom / 1.2); break;
       case '0': e.preventDefault(); setZoom(1); break;
       case 'f': case 'F': fitToPane(); break;
       case 'p': case 'P': e.preventDefault(); downloadPdf(); break;
-      case 'm': case 'M': setMode(app.mode === 'draw' ? 'trace' : 'draw'); break;
+      case 'm': case 'M': if (MM.readOnly) break; setMode(app.mode === 'draw' ? 'trace' : 'draw'); break;
       case 'Delete': case 'Backspace':
         if (app.mode === 'draw'){ e.preventDefault(); deleteSelected(); }
         break;
@@ -3841,6 +4114,7 @@ function downloadPdf(){
    deck can drive the widget from its own navigation keys.
 ------------------------------------------------------------------------- */
 function emit(){
+  mmChanged();
   var s = getState();
   app.listeners.forEach(function(fn){ try { fn(s); } catch (err){} });
   if (window.parent && window.parent !== window){
@@ -3879,6 +4153,19 @@ window.PythonVisualizer = {
   setEditorVisible: setEditorVisible,
   setTheme: setTheme,
   setMode: setMode,
+  codeEdited: codeEdited,
+  syncCode: syncCode,
+  editBlocked: editBlocked,
+  setVisible: function(v){
+    v = !!v;
+    if (v === MM.visible) return;
+    MM.visible = v;
+    if (v){ requestAnimationFrame(function(){ app.mode === 'draw' ? renderDraw() : render(); }); }
+    else render();
+  },
+  setReadOnly: function(v){ MM.readOnly = !!v; mmPane().classList.toggle('is-viewer', MM.readOnly); },
+  onChange: function(fn){ MM.onChange = fn; },
+  render: function(){ if (app.mode === 'draw') renderDraw(); else render(); },
   getMode: function(){ return app.mode; },
   getWidgetState: function(){ return getWidgetState(); },
   setWidgetState: function(st){ return setWidgetState(st); },
@@ -3908,7 +4195,7 @@ window.addEventListener('message', function(e){
 
 /* A quiet nudge when an edit is refused, rather than a silent no-op. */
 function flashLock(){
-  var ed = $('editor');
+  var ed = $('editor-body');
   ed.classList.remove('locked-flash');
   void ed.offsetWidth;
   ed.classList.add('locked-flash');
@@ -4117,6 +4404,7 @@ function clearDrawing(){
 
 /* --- rendering ----------------------------------------------------------- */
 function renderDraw(){
+  mmChanged();
   var svg = $('canvas');
   while (svg.firstChild) svg.removeChild(svg.firstChild);
 
@@ -4282,6 +4570,8 @@ function setupDraw(){
     var arrowId = t.getAttribute && t.getAttribute('data-arrow');
     var shapeId = t.getAttribute && t.getAttribute('data-shape');
     var cellId = t.getAttribute && t.getAttribute('data-cell');
+    /* A viewer can pan the drawing, never change it. */
+    if (MM.readOnly){ arrowId = shapeId = cellId = null; }
 
     if (arrowId){
       draw.selArrow = arrowId; draw.sel = null; renderDraw(); return;
@@ -4384,14 +4674,15 @@ function setupDraw(){
     renderDraw();
   });
 
-  $('mTrace').addEventListener('click', function(){ setMode('trace'); });
-  $('mDraw').addEventListener('click', function(){ setMode('draw'); });
+  $('mTrace').addEventListener('click', function(){ if (!MM.readOnly) setMode('trace'); });
+  $('mDraw').addEventListener('click', function(){ if (!MM.readOnly) setMode('draw'); });
 }
 
 function setMode(mode){
   app.mode = mode === 'draw' ? 'draw' : 'trace';
   var drawing = app.mode === 'draw';
-  document.body.classList.toggle('draw', drawing);
+  mmPane().classList.toggle('draw', drawing);
+  if (drawing && window.PWEditor) PWEditor.mark(null);
   $('traceTools').hidden = drawing;
   $('drawTools').hidden = !drawing;
   $('memoryWrap').hidden = drawing;
@@ -4431,8 +4722,6 @@ function fitDrawing(){
    settings. It is plain JSON, so it survives a round trip through the deck
    file untouched.
 =========================================================================== */
-var WIDGET_ID = (window.WIDGET_CONFIG && window.WIDGET_CONFIG.id) || 'python-visualizer';
-
 function getWidgetState(){
   return {
     v: 1,
@@ -4440,7 +4729,6 @@ function getWidgetState(){
     step: app.idx,
     mode: app.mode,
     zoom: app.zoom,
-    editor: !app.hideEditor,
     theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light',
     revealErrors: !!app.revealErrors,
     drawing: {
@@ -4466,7 +4754,7 @@ function setWidgetState(st){
   if (!st || typeof st !== 'object') return false;
 
   if (st.theme) setTheme(st.theme);
-  if (typeof st.code === 'string') setCode(st.code);
+  if (typeof st.code === 'string') syncCode(st.code);
 
   if (st.drawing && Array.isArray(st.drawing.shapes)){
     draw.shapes = st.drawing.shapes.map(function(o){
@@ -4485,9 +4773,6 @@ function setWidgetState(st){
     draw.sel = null; draw.selArrow = null; draw.pending = null;
   }
 
-  if (st.editor === false) setEditorVisible(false);
-  else if (st.editor === true) setEditorVisible(true);
-
   app.revealErrors = !!st.revealErrors;
   if (typeof st.step === 'number'){ ensureTrace(); goTo(st.step); }
   if (typeof st.zoom === 'number' && st.zoom > 0) app.zoom = st.zoom;
@@ -4497,64 +4782,1370 @@ function setWidgetState(st){
   return true;
 }
 
-window.addEventListener('message', function(e){
-  var d = e.data;
-  if (!d) return;
-  if (d.type === 'widget-get-state'){
-    try {
-      window.parent.postMessage(
-        { type: 'widget-state', widgetId: WIDGET_ID, state: getWidgetState() }, '*');
-    } catch (err){}
-  } else if (d.type === 'widget-set-state' && d.state != null){
-    setWidgetState(d.state);
-  }
-});
-
 /* -------------------------------------------------------------------------
    BOOT
    Deliberately the last thing in the bundle: it wires up modules defined
    further down the file, so it must not run until they have initialised.
 ------------------------------------------------------------------------- */
 (function init(){
-  setupEditor();
   setupControls();
   setupKeys();
   setupViewport();
   setupDraw();
 
-  /* With no chrome to click, a slide configures the widget through its src:
-     python-visualizer.html?example=3&theme=dark&editor=0&zoom=1.2          */
   var q = new URLSearchParams(location.search);
-  /* Beamer+ injects its own configuration; the URL is the standalone fallback. */
   var CFG = window.WIDGET_CONFIG || {};
   var cfgGet = function(k){
     var v = CFG[k];
     if (v === undefined || v === null) return q.get(k);
-    /* "textarea-lines" fields arrive as an array of lines. */
     return Array.isArray(v) ? v.join('\n') : String(v);
   };
 
   if (cfgGet('theme') === 'dark') setTheme('dark');
+  var z = parseFloat(cfgGet('zoom'));
+  if (z > 0) app.zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
+  if (cfgGet('memoryMode') === 'draw') setMode('draw');
+})();
 
-  var code = cfgGet('code');
-  var ex = cfgGet('example');
-  if (code !== null){
-    setCode(code);
-  } else if (ex !== null && /^\d+$/.test(ex)){
-    setCode((EXAMPLES[+ex] || EXAMPLES[0]).code);
-  } else if (ex !== null){
-    var byName = EXAMPLES.filter(function(e){ return e.name === ex; })[0];
-    setCode((byName || EXAMPLES[0]).code);
-  } else {
-    setCode(EXAMPLES[0].code);
+</script>
+
+<script>
+(function () {
+  'use strict';
+
+  const PV = window.PythonVisualizer;
+
+  // ── Config ──────────────────────────────────────────────────────────────────
+  const _qs       = new URLSearchParams(location.search);
+  const CFG0      = window.WIDGET_CONFIG || {};
+  let   cfg       = { ...CFG0 };
+  let   WIDGET_ID = CFG0.id || CFG0.widgetId || 'python-workspace';
+  let   IS_VIEWER = CFG0.role === 'viewer' || _qs.get('viewer') === '1';
+
+  const PYODIDE_URL = 'https://cdn.jsdelivr.net/pyodide/v0.25.0/full/';
+  const MAX_ENTRIES = 400;
+  const MAX_HISTORY = 500;
+  const PS1 = '>>> ';
+  const PS2 = '... ';
+
+  const DEFAULT_CODE =
+`def add_item(items, item):
+    items.append(item)
+
+shopping = ["milk"]
+also = shopping
+add_item(also, "eggs")
+print(shopping)
+`;
+
+  // ── Layouts ─────────────────────────────────────────────────────────────────
+  const PANES   = ['editor', 'shell', 'memory'];
+  const NAMES   = { editor: 'Editor', shell: 'Shell', memory: 'Memory model' };
+  const LAYOUTS = ['single', 'cols', 'rows', 'grid-left', 'grid-right', 'grid-top', 'grid-bottom'];
+  const TITLES  = {
+    'single':      'Single pane',
+    'cols':        'Split side by side',
+    'rows':        'Split stacked',
+    'grid-left':   'Three panes, large on the left',
+    'grid-right':  'Three panes, large on the right',
+    'grid-top':    'Three panes, large on top',
+    'grid-bottom': 'Three panes, large at the bottom',
+  };
+  const slotCount = kind => kind === 'single' ? 1 : (kind === 'cols' || kind === 'rows') ? 2 : 3;
+  const GAP = 8;
+  const clampFrac = v => Math.min(0.88, Math.max(0.12, v));
+
+  // ── DOM ─────────────────────────────────────────────────────────────────────
+  const $ = id => document.getElementById(id);
+  const root       = $('root');
+  const panesEl    = $('panes');
+  const codeEl     = $('code');
+  const hlEl       = $('code-hl');
+  const gutterEl   = $('gutter');
+  const fileEl     = $('filename');
+  const shellBody  = $('shell-body');
+  const transcript = $('transcript');
+  const promptRow  = $('prompt-row');
+  const promptEl   = $('prompt');
+  const inputEl    = $('shell-input');
+  const bootRow    = $('boot-row');
+  const bootMsg    = $('boot-msg');
+  const runBtn     = $('run-btn');
+  const restartBtn = $('restart-btn');
+  const openBtn    = $('open-btn');
+  const saveBtn    = $('save-btn');
+  const fileInput  = $('file-input');
+  const clearBtn   = $('clear-btn');
+  const layoutBtn  = $('layout-btn');
+  const layoutMenu = $('layout-menu');
+  const lmGrid     = $('lm-grid');
+  const lmSlots    = $('lm-slots');
+  const splitA     = $('split-a');
+  const splitB     = $('split-b');
+  const markCur    = $('mark-cur');
+  const markErr    = $('mark-err');
+  const mmPaneEl   = $('mm-pane');
+  const mmTools    = $('mm-tools');
+  const paneEls    = { editor: $('editor-pane'), shell: $('shell-pane'), memory: mmPaneEl };
+  const maxBtns    = [...document.querySelectorAll('.pane-max')];
+
+  // ── State ───────────────────────────────────────────────────────────────────
+  // The code, the transcript and the layout are the shared state. The Python
+  // namespace is not — it lives in the presenter's worker and never travels.
+  const S = {
+    filename: 'main.py',
+    code:     DEFAULT_CODE,
+    entries:  [],            // { k: 'in'|'out'|'err'|'sys', s }
+    errLine:  null,
+    // kind: one of LAYOUTS. slots: all three panes, in slot order — a layout
+    // shows the first slotCount(kind). a: the main split's share for slot 0
+    // (the big pane). b: the split inside the remaining side.
+    layout:   { kind: 'grid-left', slots: ['editor', 'memory', 'shell'], a: 0.5, b: 0.55 },
+    max:      null,          // a pane shown alone for now, without losing the layout
+  };
+  let phase       = 'loading';  // loading | ready | running | error | viewer
+  let more        = false;      // shell is waiting for a continuation line
+  let history     = [];
+  let histIdx     = -1;         // -1 = editing a fresh line
+  let histDraft   = '';         // what was typed before arrowing into history
+  let pending     = [];         // lines of a pasted block still to run
+  let lastTyped   = null;       // the line just typed, for auto-indent
+  let bannerShown = false;
+  let completeSeq = 0;
+  let bootStartup = null;       // startup lines waiting on a package load
+  let lastCfg     = {};         // config values already applied, by key
+  let marks       = null;       // { current, err, locked } from the memory model
+  let applying    = false;      // restoring state: don't echo it back out
+
+  // ── Icons ───────────────────────────────────────────────────────────────────
+  const ICON_EXPAND   = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2.5h4v4M6.5 13.5h-4v-4M13.5 2.5 9 7M2.5 13.5 7 9"/></svg>';
+  const ICON_COLLAPSE = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 6.5h-4v-4M2.5 9.5h4v4M9.5 6.5 14 2M6.5 9.5 2 14"/></svg>';
+
+  // ── Syntax highlighting ─────────────────────────────────────────────────────
+  const KW = 'False|None|True|and|as|assert|async|await|break|class|continue|def|del|elif|else|except|finally|for|from|global|if|import|in|is|lambda|nonlocal|not|or|pass|raise|return|try|while|with|yield|match|case';
+  const BI = 'print|input|len|range|int|float|str|list|dict|set|tuple|bool|type|isinstance|enumerate|zip|map|filter|sorted|reversed|sum|min|max|abs|round|open|super|self|object|any|all|repr|chr|ord|hex|bin|iter|next|Exception|ValueError|TypeError|KeyError|IndexError';
+  // One pass, left to right, so a '#' inside a string or a keyword inside a
+  // comment is claimed by whichever token starts first.
+  const TOK = new RegExp(
+    '(#[^\\n]*)' +
+    '|([rbfuRBFU]{0,2}(?:"""[\\s\\S]*?(?:"""|(?![\\s\\S]))|\'\'\'[\\s\\S]*?(?:\'\'\'|(?![\\s\\S]))|"(?:\\\\.|[^"\\\\\\n])*"?|\'(?:\\\\.|[^\'\\\\\\n])*\'?))' +
+    '|\\b(def|class)(\\s+)([A-Za-z_]\\w*)' +
+    '|\\b(' + KW + ')\\b' +
+    '|\\b(' + BI + ')\\b' +
+    '|(@[A-Za-z_][\\w.]*)' +
+    '|\\b(0[xXoObB][\\da-fA-F_]+|\\d[\\d_]*\\.?\\d*(?:[eE][+-]?\\d+)?j?)\\b',
+    'g');
+
+  function highlight(src) {
+    let out = '', last = 0, m;
+    TOK.lastIndex = 0;
+    while ((m = TOK.exec(src))) {
+      out += escHtml(src.slice(last, m.index));
+      if      (m[1]) out += span('com', m[1]);
+      else if (m[2]) out += span('str', m[2]);
+      else if (m[3]) out += span('kw', m[3]) + m[4] + span('def', m[5]);
+      else if (m[6]) out += span('kw', m[6]);
+      else if (m[7]) out += span('bi', m[7]);
+      else if (m[8]) out += span('dec', m[8]);
+      else if (m[9]) out += span('num', m[9]);
+      last = TOK.lastIndex;
+      if (m[0] === '') TOK.lastIndex++;
+    }
+    // Trailing newline gets a spacer, otherwise the <pre> is a line shorter
+    // than the textarea and the two drift apart when scrolled to the end.
+    return out + escHtml(src.slice(last)) + '\n ';
+  }
+  const span = (c, s) => `<span class="t-${c}">${escHtml(s)}</span>`;
+
+  function renderEditor() {
+    hlEl.innerHTML = highlight(codeEl.value);
+    renderGutter();
+    syncScroll();
   }
 
-  var z = parseFloat(cfgGet('zoom'));
-  if (z > 0) setZoom(z);
-  var ed = cfgGet('editor');
-  if (ed === '0' || ed === 'false') setEditorVisible(false);
-  if (cfgGet('mode') === 'draw') setMode('draw');
-  if (cfgGet('step') === 'end') runAll();
+  function renderGutter() {
+    const n      = codeEl.value.split('\n').length;
+    const cur    = marks?.current;
+    const locked = marks?.locked || 0;
+    let g = '';
+    for (let i = 1; i <= n; i++) {
+      const cls = (i === S.errLine || i === marks?.err ? ' is-err' : '')
+                + (i === cur ? ' is-cur' : '')
+                + (i <= locked ? ' is-locked' : '');
+      g += cls ? `<span class="${cls.trim()}">${i}</span>\n` : i + '\n';
+    }
+    gutterEl.innerHTML = g;
+  }
+
+  function syncScroll() {
+    hlEl.scrollTop  = codeEl.scrollTop;
+    hlEl.scrollLeft = codeEl.scrollLeft;
+    gutterEl.scrollTop = codeEl.scrollTop;
+    placeMarks();
+  }
+
+  // ── Memory-model line markers ───────────────────────────────────────────────
+  // Measured from the textarea itself, so they stay on the line at any text
+  // size and any scroll position.
+  function lineMetrics() {
+    const cs = getComputedStyle(codeEl);
+    return { lh: parseFloat(cs.lineHeight) || 20, top: parseFloat(cs.paddingTop) || 0 };
+  }
+
+  function placeMark(el, line, m) {
+    el.classList.toggle('is-on', !!line);
+    if (!line) return;
+    el.style.top    = (m.top + (line - 1) * m.lh - codeEl.scrollTop) + 'px';
+    el.style.height = m.lh + 'px';
+  }
+
+  function placeMarks() {
+    const m = lineMetrics();
+    placeMark(markCur, marks?.current, m);
+    placeMark(markErr, marks?.err, m);
+  }
+
+  function scrollToLine(line) {
+    if (!line) return;
+    const m   = lineMetrics();
+    const top = m.top + (line - 1) * m.lh;
+    const view = codeEl.clientHeight;
+    if (top < codeEl.scrollTop + m.lh) codeEl.scrollTop = Math.max(0, top - m.lh);
+    else if (top + 2 * m.lh > codeEl.scrollTop + view) codeEl.scrollTop = top + 2 * m.lh - view;
+  }
+
+  // What the memory model calls to reach the editor it no longer owns.
+  window.PWEditor = {
+    mark(next) {
+      const prevCur = marks?.current;
+      marks = next || null;
+      renderGutter();
+      if (marks?.current && marks.current !== prevCur) scrollToLine(marks.current);
+      syncScroll();
+    },
+    setCode(code) {
+      if (IS_VIEWER) return;
+      codeEl.value = code;
+      onCodeInput();
+    },
+  };
+
+  // ── Editor editing ──────────────────────────────────────────────────────────
+  // execCommand keeps the browser's undo stack intact; setRangeText is the
+  // fallback where it's gone.
+  function insertText(text) {
+    codeEl.focus();
+    if (PV.editBlocked(codeEl.selectionStart, codeEl.selectionEnd, 'insertText')) return;
+    if (!document.execCommand || !document.execCommand('insertText', false, text)) {
+      codeEl.setRangeText(text, codeEl.selectionStart, codeEl.selectionEnd, 'end');
+      onCodeInput();
+    }
+  }
+
+  function lineStartOf(pos) { return codeEl.value.lastIndexOf('\n', pos - 1) + 1; }
+
+  function indentSelection(dedent) {
+    const v = codeEl.value;
+    const a = lineStartOf(codeEl.selectionStart);
+    let   b = codeEl.selectionEnd;
+    if (b > a && v[b - 1] === '\n') b--;
+    const block = v.slice(a, b);
+    const next  = block.split('\n')
+      .map(l => dedent ? l.replace(/^ {1,4}|^\t/, '') : '    ' + l)
+      .join('\n');
+    codeEl.setSelectionRange(a, b);
+    insertText(next);
+    codeEl.setSelectionRange(a, a + next.length);
+  }
+
+  function onEditorKey(e) {
+    if (IS_VIEWER) return;
+    const mod = e.ctrlKey || e.metaKey;
+
+    if ((mod && e.key === 'Enter') || e.key === 'F5') {
+      e.preventDefault(); runFile(); return;
+    }
+    if (mod && e.key === 's') { e.preventDefault(); saveFile(); return; }
+
+    // The memory model's stepping keys, kept from its own editor — only while
+    // it is on screen, so Ctrl+arrows still move by word otherwise.
+    if (mod && isShown('memory')) {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); PV.stepForward();  return; }
+      if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   { e.preventDefault(); PV.stepBackward(); return; }
+    }
+
+    if (codeEl.readOnly) return;
+    if (mod && e.key === '/') { e.preventDefault(); toggleComment(); return; }
+
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const multi = codeEl.value.slice(codeEl.selectionStart, codeEl.selectionEnd).includes('\n');
+      if (e.shiftKey || multi) indentSelection(e.shiftKey);
+      else {
+        const col = codeEl.selectionStart - lineStartOf(codeEl.selectionStart);
+        insertText(' '.repeat(4 - (col % 4)));
+      }
+      return;
+    }
+
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      const pos    = codeEl.selectionStart;
+      const line   = codeEl.value.slice(lineStartOf(pos), pos);
+      let   indent = (line.match(/^[ \t]*/) || [''])[0];
+      const code   = line.replace(/#.*$/, '').trimEnd();
+      if (code.endsWith(':')) indent += '    ';
+      else if (/^\s*(return|pass|break|continue|raise)\b/.test(line)) indent = indent.slice(0, -4);
+      insertText('\n' + indent);
+      return;
+    }
+
+    // Backspace in leading whitespace removes a whole indent level.
+    if (e.key === 'Backspace' && codeEl.selectionStart === codeEl.selectionEnd) {
+      const pos    = codeEl.selectionStart;
+      const before = codeEl.value.slice(lineStartOf(pos), pos);
+      if (before.length && /^ +$/.test(before)) {
+        e.preventDefault();
+        const drop = ((before.length - 1) % 4) + 1;
+        codeEl.setSelectionRange(pos - drop, pos);
+        insertText('');
+      }
+    }
+  }
+
+  function toggleComment() {
+    const v = codeEl.value;
+    const a = lineStartOf(codeEl.selectionStart);
+    let   b = v.indexOf('\n', codeEl.selectionEnd);
+    if (b < 0) b = v.length;
+    const lines = v.slice(a, b).split('\n');
+    const allCommented = lines.every(l => !l.trim() || /^\s*#/.test(l));
+    const next = lines.map(l => {
+      if (!l.trim()) return l;
+      return allCommented ? l.replace(/^(\s*)# ?/, '$1') : l.replace(/^(\s*)/, '$1# ');
+    }).join('\n');
+    codeEl.setSelectionRange(a, b);
+    insertText(next);
+  }
+
+  function onCodeInput() {
+    S.code = codeEl.value;
+    if (S.errLine) S.errLine = null;
+    renderEditor();
+    PV.codeEdited(S.code);
+    emitState();
+  }
+
+  // ── Shell transcript ────────────────────────────────────────────────────────
+  function makeLine(entry) {
+    const el = document.createElement('pre');
+    el.className = 'sh-line sh-' + entry.k;
+    if (entry.k === 'in') {
+      const p = document.createElement('span');
+      p.className = 'sh-p';
+      p.textContent = entry.p || PS1;
+      el.append(p, document.createTextNode(entry.s));
+    } else {
+      el.textContent = entry.s;
+    }
+    return el;
+  }
+
+  // Output arrives in fragments (print(end='') and friends), so consecutive
+  // chunks of the same kind are merged into one element.
+  function append(k, s, p) {
+    if (!s && k !== 'in') return;
+    const last = S.entries[S.entries.length - 1];
+    if (last && k !== 'in' && last.k === k && transcript.lastChild) {
+      last.s += s;
+      transcript.lastChild.textContent = last.s;
+    } else {
+      const entry = p ? { k, s, p } : { k, s };
+      S.entries.push(entry);
+      transcript.appendChild(makeLine(entry));
+      if (S.entries.length > MAX_ENTRIES) {
+        S.entries.splice(0, S.entries.length - MAX_ENTRIES);
+        while (transcript.childNodes.length > MAX_ENTRIES) transcript.firstChild.remove();
+      }
+    }
+    scrollShell();
+    emitState();
+  }
+
+  function renderTranscript() {
+    transcript.textContent = '';
+    const frag = document.createDocumentFragment();
+    S.entries.forEach(e => frag.appendChild(makeLine(e)));
+    transcript.appendChild(frag);
+    scrollShell();
+  }
+
+  function scrollShell() {
+    requestAnimationFrame(() => { shellBody.scrollTop = shellBody.scrollHeight; });
+  }
+
+  function clearShell() {
+    if (IS_VIEWER) return;
+    S.entries = [];
+    renderTranscript();
+    emitState();
+  }
+
+  // ── Python worker ───────────────────────────────────────────────────────────
+  // Pyodide runs in a worker so a long loop never freezes the slide, and so
+  // Restart can simply terminate it — the only reliable way to stop runaway
+  // code without cross-origin isolation.
+  const WORKER_SRC = `
+    importScripts(${JSON.stringify(PYODIDE_URL + 'pyodide.js')});
+    let py = null;
+    const dec = { out: new TextDecoder(), err: new TextDecoder() };
+    const HELPERS = [
+      'import sys, code, traceback, builtins, linecache',
+      '_ns = {"__name__": "__main__"}',
+      '_buf = []',
+      'def _tb(skip=1):',
+      '    et, ev, tb = sys.exc_info()',
+      '    for _ in range(skip):',
+      '        if tb is not None: tb = tb.tb_next',
+      '    line = None',
+      '    t = tb',
+      '    while t is not None:',
+      '        if t.tb_frame.f_code.co_filename == _ns.get("__file__"): line = t.tb_lineno',
+      '        t = t.tb_next',
+      '    if isinstance(ev, SyntaxError) and ev.filename == _ns.get("__file__"): line = ev.lineno',
+      '    sys.stderr.write("".join(traceback.format_exception(et, ev, tb)))',
+      '    return line',
+      'import rlcompleter, re as _re',
+      'def _complete(src):',
+      '    m = _re.search(r"[A-Za-z_][\\\\w.]*$", src)',
+      '    text = m.group(0) if m else ""',
+      '    start = m.start() if m else len(src)',
+      '    if not text: return [[], start]',
+      '    c = rlcompleter.Completer(_ns)',
+      '    out, i = [], 0',
+      '    while i < 200:',
+      '        r = c.complete(text, i)',
+      '        if r is None: break',
+      '        if r not in out: out.append(r)',
+      '        i += 1',
+      '    return [out, start]',
+      'def _input(prompt=""):',
+      '    raise RuntimeError("input() is not available in this shell - set values in code instead")',
+      'builtins.input = _input',
+      'def _run_file(src, fname):',
+      '    global _ns',
+      '    _buf.clear()',
+      '    _ns = {"__name__": "__main__", "__file__": fname, "__builtins__": builtins}',
+      '    linecache.cache[fname] = (len(src), None, src.splitlines(True), fname)',
+      '    try:',
+      '        exec(compile(src, fname, "exec"), _ns)',
+      '    except SystemExit:',
+      '        pass',
+      '    except BaseException:',
+      '        return _tb()',
+      '    return None',
+      '# Tracebacks name "<console>", as in the Python Shell widget.',
+      'def _push(line):',
+      '    _buf.append(line)',
+      '    src = "\\\\n".join(_buf)',
+      '    try:',
+      '        c = code.compile_command(src, "<console>", "single")',
+      '    except (SyntaxError, OverflowError, ValueError):',
+      '        _buf.clear()',
+      '        et, ev = sys.exc_info()[:2]',
+      '        sys.stderr.write("".join(traceback.format_exception_only(et, ev)))',
+      '        return False',
+      '    if c is None:',
+      '        return True',
+      '    _buf.clear()',
+      '    try:',
+      '        exec(c, _ns)',
+      '    except SystemExit:',
+      '        pass',
+      '    except BaseException:',
+      '        _tb()',
+      '    return False',
+    ].join('\\n');
+
+    async function boot() {
+      py = await loadPyodide({ indexURL: ${JSON.stringify(PYODIDE_URL)} });
+      py.setStdout({ write: b => { postMessage({ t: 'out', s: dec.out.decode(b, { stream: true }) }); return b.length; } });
+      py.setStderr({ write: b => { postMessage({ t: 'err', s: dec.err.decode(b, { stream: true }) }); return b.length; } });
+      py.runPython(HELPERS);
+      postMessage({ t: 'ready', v: py.runPython('sys.version.split()[0]') });
+    }
+    const booted = boot().catch(e => postMessage({ t: 'fatal', s: String(e && e.message || e) }));
+
+    // Packages ship inside the Pyodide distribution or as wheels on PyPI; try
+    // the local one first and fall back to micropip, as the Python Shell does.
+    async function loadPackages(names) {
+      let mp = null;
+      for (const name of names) {
+        try { await py.loadPackage(name); continue; } catch (_) {}
+        try {
+          if (!mp) { await py.loadPackage('micropip'); mp = py.pyimport('micropip'); }
+          await mp.install(name);
+        } catch (_) {
+          postMessage({ t: 'err', s: 'Could not load package: ' + name + '\\n' });
+        }
+      }
+    }
+
+    let chain = booted;
+    onmessage = ev => {
+      const m = ev.data;
+      chain = chain.then(async () => {
+        if (!py) return;
+        try {
+          if (m.t === 'run') {
+            if (m.auto) { try { await py.loadPackagesFromImports(m.src); } catch (_) { /* reported by the import itself */ } }
+            const line = py.globals.get('_run_file')(m.src, m.name);
+            postMessage({ t: 'done', more: false, errLine: line == null ? null : line });
+          } else if (m.t === 'push') {
+            if (m.auto) { try { await py.loadPackagesFromImports(m.line); } catch (_) {} }
+            const more = py.globals.get('_push')(m.line);
+            postMessage({ t: 'done', more: !!more, pasted: !!m.pasted });
+          } else if (m.t === 'packages') {
+            await loadPackages(m.names);
+            postMessage({ t: 'done', more: false, packages: true });
+          } else if (m.t === 'complete') {
+            const res = py.globals.get('_complete')(m.src);
+            const js  = res.toJs();
+            res.destroy();
+            postMessage({ t: 'completions', id: m.id, matches: js[0], start: js[1] });
+            return;
+          } else if (m.t === 'cancel') {
+            py.runPython('_buf.clear()');
+            postMessage({ t: 'done', more: false });
+          }
+        } catch (e) {
+          postMessage({ t: 'err', s: String(e && e.message || e) + '\\n' });
+          postMessage({ t: 'done', more: false });
+        }
+      });
+    };
+  `;
+
+  let worker = null, workerUrl = null;
+
+  function startWorker() {
+    stopWorker();
+    setPhase('loading');
+    more = false;
+    try {
+      workerUrl = URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' }));
+      worker    = new Worker(workerUrl);
+    } catch (err) {
+      setPhase('error');
+      console.warn('[python-workspace] worker failed:', err);
+      append('err', 'Python failed to load. Check the network connection, then press Restart.\n');
+      return;
+    }
+    worker.onmessage = onWorkerMessage;
+    worker.onerror   = ev => {
+      setPhase('error');
+      if (ev.message) console.warn('[python-workspace] load failed:', ev.message);
+      append('err', 'Python failed to load. Check the network connection, then press Restart.\n');
+    };
+  }
+
+  function stopWorker() {
+    if (worker) worker.terminate();
+    if (workerUrl) URL.revokeObjectURL(workerUrl);
+    worker = null; workerUrl = null;
+  }
+
+  function asList(v) {
+    if (Array.isArray(v)) return v.map(s => String(s).trim()).filter(Boolean);
+    if (typeof v === 'string') return v.split('\n').map(s => s.trim()).filter(Boolean);
+    return [];
+  }
+
+  // After boot: preload packages, then the startup lines, echoed as if typed.
+  function afterBoot() {
+    const pkgs    = asList(cfg.packages);
+    const startup = Array.isArray(cfg.startup) ? cfg.startup.map(String)
+                  : typeof cfg.startup === 'string' ? cfg.startup.split('\n') : [];
+    while (startup.length && !startup[startup.length - 1].trim()) startup.pop();
+    if (pkgs.length) {
+      bootStartup = startup;
+      append('sys', `Loading ${pkgs.join(', ')}…\n`);
+      send({ t: 'packages', names: pkgs });
+      return;
+    }
+    runStartup(startup);
+  }
+
+  function runStartup(lines) {
+    if (!lines || !lines.length) { focusInput(); return; }
+    pending = lines.slice(1);
+    pushLine(lines[0], false);
+  }
+
+  function onWorkerMessage(ev) {
+    const m = ev.data || {};
+    switch (m.t) {
+      case 'out':   append('out', m.s); break;
+      case 'err':   append('err', m.s); break;
+      case 'ready':
+        // Once per widget: a restart doesn't repeat it.
+        if (!bannerShown && cfg.banner !== false) append('sys', `Python ${m.v}\n`);
+        bannerShown = true;
+        setPhase('ready');
+        afterBoot();
+        break;
+      case 'fatal':
+        setPhase('error');
+        console.warn('[python-workspace] load failed:', m.s);
+        append('err', 'Python failed to load. Check the network connection, then press Restart.\n');
+        break;
+      case 'done':
+        more = !!m.more;
+        if ('errLine' in m) { S.errLine = m.errLine; renderEditor(); }
+        setPhase('ready');
+        if (m.packages) { const st = bootStartup; bootStartup = null; runStartup(st); break; }
+        if (pending.length) { pushLine(pending.shift(), false); break; }
+        // A pasted block left open is closed, as if the blank line were typed.
+        if (m.pasted && more) { pushLine('', false); break; }
+        if (more && lastTyped != null) setInput(nextIndent(lastTyped));
+        focusInput();
+        break;
+      case 'completions':
+        if (m.id === completeSeq) showCompletions(m.matches || [], m.start || 0);
+        break;
+    }
+  }
+
+  function send(msg) {
+    if (!worker || phase === 'loading' || phase === 'error') return false;
+    setPhase('running');
+    worker.postMessage({ ...msg, auto: cfg.autoImport !== false });
+    return true;
+  }
+
+  // ── Actions ─────────────────────────────────────────────────────────────────
+  function runFile() {
+    if (IS_VIEWER || phase !== 'ready') return;
+    if (cfg.clearOnRun) { S.entries = []; renderTranscript(); }
+    const name = S.filename || 'main.py';
+    append('sys', `=== RUN ${name} ===\n`);
+    S.errLine = null;
+    renderEditor();
+    send({ t: 'run', src: codeEl.value, name });
+    if (isShown('shell')) inputEl.focus({ preventScroll: true });
+  }
+
+  function restart() {
+    if (IS_VIEWER) return;
+    pending = [];
+    if (phase === 'running') append('err', 'KeyboardInterrupt\n');
+    // IDLE's marker: the screen stays, the names go.
+    append('sys', '=== RESTART ===\n');
+    startWorker();
+  }
+
+  // ── Shell input ─────────────────────────────────────────────────────────────
+  // Enter runs, Shift+Enter adds a line, ↑/↓ walk history, Tab completes,
+  // Ctrl+L clears, Ctrl+C drops the line (or stops running code), and the next
+  // line is indented for you.
+  function autoGrow() {
+    inputEl.style.height = 'auto';
+    inputEl.style.height = inputEl.scrollHeight + 'px';
+  }
+
+  function setInput(v) {
+    inputEl.value = v;
+    autoGrow();
+    inputEl.selectionStart = inputEl.selectionEnd = v.length;
+  }
+
+  function focusInput() {
+    if (IS_VIEWER || phase === 'loading' || phase === 'error' || !isShown('shell')) return;
+    // Never pull focus out of the editor or a drawing the presenter is using.
+    const a = document.activeElement;
+    if (a && a !== document.body && a !== inputEl && /^(TEXTAREA|INPUT|SELECT)$/.test(a.tagName)) return;
+    try { inputEl.focus({ preventScroll: true }); } catch (_) { inputEl.focus(); }
+  }
+
+  function nextIndent(line) {
+    let indent = (line.match(/^[ \t]*/) || [''])[0];
+    if (/:\s*(#.*)?$/.test(line)) indent += '    ';
+    return indent;
+  }
+
+  // One line to Python, echoed with the prompt it was typed at.
+  function pushLine(line, typed) {
+    append('in', line, more ? PS2 : PS1);
+    lastTyped = typed ? line : null;
+    send({ t: 'push', line, pasted: !typed });
+  }
+
+  function submitLine() {
+    if (IS_VIEWER || phase !== 'ready') return;
+    let raw = inputEl.value;
+    // A blank line ends an open block, even if it holds the auto-indent.
+    if (!raw.trim()) raw = '';
+    if (raw.trim()) {
+      history.push(raw);
+      if (history.length > MAX_HISTORY) history.shift();
+    }
+    histIdx = -1;
+    histDraft = '';
+    setInput('');
+    // A pasted block is a sequence of lines, run one at a time as if typed.
+    const lines = raw.split('\n');
+    pending = lines.slice(1);
+    pushLine(lines[0], lines.length === 1);
+  }
+
+  function recallHistory(delta) {
+    if (!history.length) return;
+    if (histIdx === -1) {
+      if (delta > 0) return;
+      histDraft = inputEl.value;
+      histIdx = history.length - 1;
+    } else {
+      histIdx += delta;
+      if (histIdx >= history.length) { histIdx = -1; setInput(histDraft); return; }
+      if (histIdx < 0) histIdx = 0;
+    }
+    setInput(history[histIdx]);
+  }
+
+  // Completion runs in the worker, which holds the namespace. Replies are
+  // matched by sequence number so a slow answer can't land on a newer line.
+  function requestCompletions() {
+    if (phase !== 'ready' || !worker) return;
+    completeSeq++;
+    worker.postMessage({ t: 'complete', id: completeSeq,
+                         src: inputEl.value.slice(0, inputEl.selectionStart) });
+  }
+
+  function showCompletions(matches, start) {
+    if (!matches.length) return;
+    const upto = inputEl.value.slice(0, inputEl.selectionStart);
+    if (matches.length === 1) {
+      const head = upto.slice(0, start) + matches[0];
+      const rest = inputEl.value.slice(inputEl.selectionStart);
+      setInput(head + rest);
+      inputEl.selectionStart = inputEl.selectionEnd = head.length;
+      return;
+    }
+    append('in', inputEl.value, more ? PS2 : PS1);
+    append('sys', matches.join('    ') + '\n');
+  }
+
+  function onShellKey(e) {
+    if (IS_VIEWER) return;
+    const mod = e.ctrlKey || e.metaKey;
+    if (e.ctrlKey && e.key.toLowerCase() === 'c' && !String(window.getSelection() || '')) {
+      e.preventDefault();
+      if (phase === 'running') { restart(); return; }
+      append('in', inputEl.value + '^C', more ? PS2 : PS1);
+      append('err', 'KeyboardInterrupt\n');
+      setInput('');
+      if (more) send({ t: 'cancel' });
+      return;
+    }
+    if (phase !== 'ready') { e.preventDefault(); return; }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitLine(); return; }
+    if (e.key === 'Enter' && e.shiftKey) {
+      e.preventDefault();
+      const v  = inputEl.value;
+      const at = inputEl.selectionStart;
+      const indent = nextIndent(v.slice(v.lastIndexOf('\n', at - 1) + 1, at));
+      inputEl.setRangeText('\n' + indent, at, inputEl.selectionEnd, 'end');
+      autoGrow();
+      return;
+    }
+    if (mod && e.key.toLowerCase() === 'l') { e.preventDefault(); clearShell(); return; }
+    if (e.key === 'Tab') { e.preventDefault(); requestCompletions(); return; }
+    const onFirst = inputEl.value.lastIndexOf('\n', Math.max(0, inputEl.selectionStart - 1)) === -1;
+    const onLast  = inputEl.value.indexOf('\n', inputEl.selectionStart) === -1;
+    if (e.key === 'ArrowUp'   && onFirst) { e.preventDefault(); recallHistory(-1); return; }
+    if (e.key === 'ArrowDown' && onLast)  { e.preventDefault(); recallHistory(+1); return; }
+  }
+
+  function saveFile() {
+    const blob = new Blob([codeEl.value], { type: 'text/x-python' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = S.filename || 'main.py';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  function openFile(file) {
+    if (!file || IS_VIEWER) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      S.filename = file.name;
+      fileEl.value = file.name;
+      codeEl.value = String(reader.result).replace(/\r\n?/g, '\n');
+      onCodeInput();
+    };
+    reader.readAsText(file);
+  }
+
+  // ── Layout ──────────────────────────────────────────────────────────────────
+  // Every rectangle is (100% − gap) × fraction + k × gap on each axis, so a
+  // layout is just a table of fractions and the browser does the arithmetic
+  // at any size — no resize handling needed.
+  const px  = (f, k) => `calc((100% - ${GAP}px) * ${+f.toFixed(4)} + ${k * GAP}px)`;
+  const box = (l, t, w, h) => ({ l, t, w, h });
+  const FULL = [1, 1], ZERO = [0, 0], BAR = [0, 1];
+
+  // The rectangles for a layout: slot boxes, then the two splitters (or null).
+  function geometry(kind, a, b) {
+    const A = a, B = b;
+    switch (kind) {
+      case 'single':
+        return { slots: [box(ZERO, ZERO, FULL, FULL)], split: [null, null] };
+      case 'cols':
+        return { slots: [box(ZERO, ZERO, [A, 0], FULL), box([A, 1], ZERO, [1 - A, 0], FULL)],
+                 split: [{ r: box([A, 0], ZERO, BAR, FULL), axis: 'x', key: 'a' }, null] };
+      case 'rows':
+        return { slots: [box(ZERO, ZERO, FULL, [A, 0]), box(ZERO, [A, 1], FULL, [1 - A, 0])],
+                 split: [{ r: box(ZERO, [A, 0], FULL, BAR), axis: 'y', key: 'a' }, null] };
+      case 'grid-left':
+        return { slots: [box(ZERO, ZERO, [A, 0], FULL),
+                         box([A, 1], ZERO, [1 - A, 0], [B, 0]),
+                         box([A, 1], [B, 1], [1 - A, 0], [1 - B, 0])],
+                 split: [{ r: box([A, 0], ZERO, BAR, FULL), axis: 'x', key: 'a' },
+                         { r: box([A, 1], [B, 0], [1 - A, 0], BAR), axis: 'y', key: 'b' }] };
+      case 'grid-right':
+        return { slots: [box([1 - A, 1], ZERO, [A, 0], FULL),
+                         box(ZERO, ZERO, [1 - A, 0], [B, 0]),
+                         box(ZERO, [B, 1], [1 - A, 0], [1 - B, 0])],
+                 split: [{ r: box([1 - A, 0], ZERO, BAR, FULL), axis: 'x', key: 'a', flip: true },
+                         { r: box(ZERO, [B, 0], [1 - A, 0], BAR), axis: 'y', key: 'b' }] };
+      case 'grid-top':
+        return { slots: [box(ZERO, ZERO, FULL, [A, 0]),
+                         box(ZERO, [A, 1], [B, 0], [1 - A, 0]),
+                         box([B, 1], [A, 1], [1 - B, 0], [1 - A, 0])],
+                 split: [{ r: box(ZERO, [A, 0], FULL, BAR), axis: 'y', key: 'a' },
+                         { r: box([B, 0], [A, 1], BAR, [1 - A, 0]), axis: 'x', key: 'b' }] };
+      case 'grid-bottom':
+        return { slots: [box(ZERO, [1 - A, 1], FULL, [A, 0]),
+                         box(ZERO, ZERO, [B, 0], [1 - A, 0]),
+                         box([B, 1], ZERO, [1 - B, 0], [1 - A, 0])],
+                 split: [{ r: box(ZERO, [1 - A, 0], FULL, BAR), axis: 'y', key: 'a', flip: true },
+                         { r: box([B, 0], ZERO, BAR, [1 - A, 0]), axis: 'x', key: 'b' }] };
+    }
+    return geometry('grid-left', a, b);
+  }
+
+  function place(el, r) {
+    el.style.left   = px(...r.l);
+    el.style.top    = px(...r.t);
+    el.style.width  = px(...r.w);
+    el.style.height = px(...r.h);
+  }
+
+  // The panes on screen right now, in slot order.
+  function visiblePanes() {
+    if (S.max) return [S.max];
+    return S.layout.slots.slice(0, slotCount(S.layout.kind));
+  }
+  function isShown(name) { return visiblePanes().includes(name); }
+
+  let splitDefs = [null, null];
+
+  function renderLayout() {
+    const L    = S.layout;
+    const kind = S.max ? 'single' : L.kind;
+    const g    = geometry(kind, L.a, L.b);
+    const shown = visiblePanes();
+
+    PANES.forEach(name => {
+      const i  = shown.indexOf(name);
+      const el = paneEls[name];
+      el.classList.toggle('is-off', i < 0);
+      if (i >= 0) place(el, g.slots[i]);
+    });
+
+    splitDefs = g.split;
+    [splitA, splitB].forEach((el, i) => {
+      const d = g.split[i];
+      el.classList.toggle('is-off', !d);
+      if (!d) return;
+      place(el, d.r);
+      el.classList.toggle('is-v', d.axis === 'x');
+      el.classList.toggle('is-h', d.axis === 'y');
+      el.setAttribute('aria-orientation', d.axis === 'x' ? 'vertical' : 'horizontal');
+    });
+
+    maxBtns.forEach(b => {
+      const on = S.max === b.dataset.pane;
+      b.innerHTML = on ? ICON_COLLAPSE : ICON_EXPAND;
+      b.title     = on ? 'Back to the layout' : 'Show this pane alone';
+      // A pane alone in a single layout has nothing to expand into.
+      b.style.display = (!S.max && kind === 'single') || IS_VIEWER ? 'none' : '';
+    });
+
+    // The memory model's controls follow its pane into and out of view.
+    mmTools.hidden = IS_VIEWER || !shown.includes('memory');
+    $('pdf-wrap').hidden = IS_VIEWER || !shown.includes('memory');
+    fitToolbar();
+    PV.setVisible(shown.includes('memory'));
+    syncScroll();
+    renderLayoutMenu();
+  }
+
+  function setLayout(patch, opts = {}) {
+    if (IS_VIEWER) return;
+    const L = { ...S.layout, ...patch };
+    if (!LAYOUTS.includes(L.kind)) L.kind = 'grid-left';
+    S.layout = L;
+    if (!opts.keepMax) S.max = null;
+    renderLayout();
+    emitState();
+  }
+
+  // Putting a pane into a slot swaps it with whatever held that pane before,
+  // so the three slots always hold each pane exactly once.
+  function assignSlot(i, name) {
+    const slots = S.layout.slots.slice();
+    const j = slots.indexOf(name);
+    if (j < 0 || j === i) return;
+    [slots[i], slots[j]] = [slots[j], slots[i]];
+    setLayout({ slots });
+  }
+
+  function toggleMax(name) {
+    if (IS_VIEWER) return;
+    S.max = S.max === name ? null : name;
+    renderLayout();
+    emitState();
+    if (S.max === 'shell') focusInput();
+    else if (S.max === 'editor') codeEl.focus({ preventScroll: true });
+  }
+
+  // Splitters: the pointer's position becomes the fraction directly.
+  function startSplit(which, e) {
+    if (IS_VIEWER) return;
+    const d = splitDefs[which];
+    if (!d) return;
+    e.preventDefault();
+    const el = which ? splitB : splitA;
+    el.setPointerCapture(e.pointerId);
+    el.classList.add('is-dragging');
+    const rect = panesEl.getBoundingClientRect();
+    const move = ev => {
+      // Both splits span the full pane area along their own axis, so one
+      // formula serves them; only the big pane's split on the right or bottom
+      // counts from the far edge.
+      const size = (d.axis === 'x' ? rect.width : rect.height) - GAP;
+      const pos  = (d.axis === 'x' ? ev.clientX - rect.left : ev.clientY - rect.top) - GAP / 2;
+      let   f    = pos / size;
+      if (d.flip) f = 1 - f;
+      S.layout[d.key] = clampFrac(f);
+      renderLayout();
+      emitState();
+    };
+    const up = () => {
+      el.classList.remove('is-dragging');
+      el.removeEventListener('pointermove', move);
+      el.removeEventListener('pointerup', up);
+      el.removeEventListener('pointercancel', up);
+      PV.render();
+    };
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+  }
+
+  // ── Layout menu ─────────────────────────────────────────────────────────────
+  function thumb(kind) {
+    const g = geometry(kind, 0.5, 0.5);
+    // Evaluate the same fractions on a 34×24 box with a 2px gap.
+    const W = 34, H = 24, G = 2.4, P = 1;
+    const ev = ([f, k], total) => (total - G) * f + k * G;
+    return `<svg viewBox="0 0 ${W + 2 * P} ${H + 2 * P}">` + g.slots.map((r, i) =>
+      `<rect class="lm-slot${i === 0 && g.slots.length > 1 ? ' is-main' : ''}" rx="1.5"
+         x="${P + ev(r.l, W)}" y="${P + ev(r.t, H)}"
+         width="${Math.max(1, ev(r.w, W))}" height="${Math.max(1, ev(r.h, H))}"/>`).join('') + '</svg>';
+  }
+
+  function buildLayoutMenu() {
+    lmGrid.innerHTML = LAYOUTS.map(k =>
+      `<button class="lm-opt" type="button" data-kind="${k}" title="${escHtml(TITLES[k])}" aria-label="${escHtml(TITLES[k])}">${thumb(k)}</button>`
+    ).join('');
+    lmGrid.addEventListener('click', e => {
+      const b = e.target.closest('.lm-opt');
+      if (b) setLayout({ kind: b.dataset.kind });
+    });
+    lmSlots.addEventListener('change', e => {
+      const sel = e.target.closest('select');
+      if (sel) assignSlot(+sel.dataset.slot, sel.value);
+    });
+  }
+
+  function slotName(kind, i) {
+    if (kind === 'single') return 'Pane';
+    if (kind === 'cols') return ['Left', 'Right'][i];
+    if (kind === 'rows') return ['Top', 'Bottom'][i];
+    const big = { 'grid-left': 'Left', 'grid-right': 'Right', 'grid-top': 'Top', 'grid-bottom': 'Bottom' }[kind];
+    const rest = kind === 'grid-left' || kind === 'grid-right' ? ['Top', 'Bottom'] : ['Left', 'Right'];
+    return i === 0 ? `${big} (large)` : rest[i - 1];
+  }
+
+  function renderLayoutMenu() {
+    const L = S.layout;
+    lmGrid.querySelectorAll('.lm-opt').forEach(b =>
+      b.classList.toggle('is-active', b.dataset.kind === L.kind));
+    const n = slotCount(L.kind);
+    let html = '';
+    for (let i = 0; i < n; i++) {
+      html += `<span>${escHtml(slotName(L.kind, i))}</span><select data-slot="${i}" aria-label="${escHtml(slotName(L.kind, i))} pane">` +
+        PANES.map(p => `<option value="${p}"${L.slots[i] === p ? ' selected' : ''}>${NAMES[p]}</option>`).join('') +
+        '</select>';
+    }
+    // Rebuild only when it changed, so an open <select> isn't yanked away.
+    if (lmSlots.dataset.sig !== html) { lmSlots.innerHTML = html; lmSlots.dataset.sig = html; }
+    $('lm-even').disabled = L.kind === 'single';
+  }
+
+  // Hung from its button, kept inside the frame on a narrow slide.
+  function openMenu(open) { hangMenu(layoutMenu, layoutBtn, open); }
+
+  // ── Popup menus + a toolbar that fits ───────────────────────────────────────
+  // Beamer+ puts this toolbar inside its own bar, which clips what doesn't
+  // fit. When the controls overflow (draw tools on a narrow slide), the
+  // buttons that have an icon drop their label.
+  const addBtn  = $('dAddBtn');
+  const addMenu = $('add-menu');
+
+  function barBox() {
+    return document.querySelector('.bw-topbar-actions') || $('toolbar');
+  }
+
+  // Drop labels, then names, until the row fits.
+  function fitRow(box, holder, compact, tight) {
+    const cls  = holder.classList;
+    const over = () => box.scrollWidth > box.clientWidth + 1;
+    cls.remove(compact, tight);
+    if (!box.clientWidth) return;       // not on screen
+    if (over()) cls.add(compact);
+    if (over()) cls.add(tight);
+  }
+
+  let fitting = false;
+  function fitToolbar() {
+    if (fitting) return;
+    fitting = true;
+    fitRow(barBox(), document.body, 'tb-compact', 'tb-tight');
+    PANES.forEach(n => fitRow(paneEls[n].querySelector('.pane-head'), paneEls[n], 'ph-compact', 'ph-tight'));
+    fitting = false;
+  }
+
+  function hangMenu(menu, btn, open) {
+    if (open) {
+      const r = btn.getBoundingClientRect();
+      menu.classList.add('is-open');
+      const w = menu.offsetWidth;
+      menu.style.top  = (r.bottom + 6) + 'px';
+      menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
+    } else {
+      menu.classList.remove('is-open');
+    }
+    btn.setAttribute('aria-expanded', String(open));
+    btn.classList.toggle('is-active', open);
+  }
+
+  function openAddMenu(open) { hangMenu(addMenu, addBtn, open); }
+
+  // ── Phase / chrome ──────────────────────────────────────────────────────────
+  function setPhase(p) {
+    phase = IS_VIEWER ? 'viewer' : p;
+    render();
+  }
+
+  function render() {
+    document.body.classList.toggle('is-viewer', IS_VIEWER);
+    bootRow.style.display = phase === 'loading' ? 'flex' : 'none';
+    bootMsg.textContent   = 'Starting Python…';
+    promptRow.classList.toggle('is-hidden', IS_VIEWER || phase === 'loading' || phase === 'error');
+    // While code runs the prompt row stays in place but empty, so output
+    // lands above a steady caret instead of the layout jumping.
+    promptEl.textContent = phase === 'running' ? '' : (more ? PS2 : PS1);
+    // Read-only rather than disabled while code runs: the input keeps focus,
+    // so Ctrl+C can still stop it.
+    inputEl.readOnly = phase !== 'ready';
+
+    runBtn.disabled        = phase !== 'ready';
+    runBtn.textContent     = phase === 'running' ? 'Running…' : 'Run';
+    $('restart-label').textContent = phase === 'running' ? 'Stop' : 'Restart';
+
+    [runBtn, restartBtn, openBtn, clearBtn, layoutBtn].forEach(b => { b.style.display = IS_VIEWER ? 'none' : ''; });
+    codeEl.readOnly  = IS_VIEWER || !!cfg.readOnly;
+    fileEl.disabled  = IS_VIEWER || !!cfg.readOnly;
+    openBtn.disabled = !!cfg.readOnly;
+    PV.setReadOnly(IS_VIEWER);
+  }
+
+  // ── Socket.IO sync ──────────────────────────────────────────────────────────
+  let socket = null, syncTimer = null;
+
+  function initSocket(url) {
+    if (typeof io === 'undefined') { socket = { emit() {}, on() {} }; return; }
+    try {
+      const prev = socket;
+      socket = io(url || (window.BeamerWidget ? BeamerWidget.serverOrigin() : ''),
+                  { transports: ['websocket', 'polling'] });
+      if (prev && prev.disconnect) prev.disconnect();
+      socket.on('widget_state', data => {
+        if (!IS_VIEWER || data?.widgetId !== WIDGET_ID) return;
+        applyState(data.state || {});
+      });
+    } catch (_) {
+      socket = { emit() {}, on() {} };
+    }
+  }
+
+  function emitState() {
+    if (!socket || IS_VIEWER || applying) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => {
+      socket.emit('widget_state', { widgetId: WIDGET_ID, state: getState() });
+    }, 200);
+  }
+
+  // ── State serialisation ─────────────────────────────────────────────────────
+  // The transcript is saved, the namespace isn't: a restored slide shows what
+  // happened last time, and Run rebuilds the variables. The memory model keeps
+  // its own block (step, mode, drawing, zoom, theme); its copy of the code is
+  // dropped because the file above is the same program.
+  function getState() {
+    let mm = null;
+    try { mm = PV.getWidgetState(); delete mm.code; } catch (_) { /* engine not ready */ }
+    return {
+      v:        2,
+      filename: S.filename,
+      code:     S.code,
+      entries:  S.entries.slice(-MAX_ENTRIES),
+      layout:   { ...S.layout, slots: S.layout.slots.slice() },
+      max:      S.max,
+      mm,
+    };
+  }
+
+  function cleanLayout(l) {
+    const out = { ...S.layout };
+    if (!l || typeof l !== 'object') return out;
+    if (LAYOUTS.includes(l.kind)) out.kind = l.kind;
+    if (Array.isArray(l.slots) && l.slots.length === 3 && PANES.every(p => l.slots.includes(p))) {
+      out.slots = l.slots.slice();
+    }
+    if (typeof l.a === 'number') out.a = clampFrac(l.a);
+    if (typeof l.b === 'number') out.b = clampFrac(l.b);
+    return out;
+  }
+
+  function applyState(s) {
+    if (!s) return;
+    applying = true;
+    try {
+      if (typeof s.filename === 'string') { S.filename = s.filename; fileEl.value = s.filename; }
+      if (typeof s.code === 'string' && s.code !== codeEl.value) {
+        const top = codeEl.scrollTop;
+        S.code = s.code;
+        codeEl.value = s.code;
+        codeEl.scrollTop = top;
+      }
+      if (typeof s.code === 'string') PV.syncCode(s.code);
+      if (Array.isArray(s.entries)) { S.entries = s.entries.slice(-MAX_ENTRIES); renderTranscript(); }
+      if (s.layout) S.layout = cleanLayout(s.layout);
+      // States saved by the Python IDE used `max: 'editor' | 'shell'` too.
+      if ('max' in s) S.max = PANES.includes(s.max) ? s.max : null;
+      renderEditor();
+      renderLayout();
+      if (s.mm && typeof s.mm === 'object') PV.setWidgetState({ ...s.mm, code: S.code });
+    } finally {
+      applying = false;
+    }
+  }
+
+  // ── Config ──────────────────────────────────────────────────────────────────
+  // A config value is applied only when it differs from the last one applied,
+  // so the host re-sending config never undoes what the presenter has done
+  // since — a layout they dragged, code they typed.
+  function changed(key) {
+    const v = JSON.stringify(cfg[key] ?? null);
+    if (lastCfg[key] === v) return false;
+    lastCfg[key] = v;
+    return cfg[key] != null && cfg[key] !== '';
+  }
+
+  function applyConfig(c) {
+    if (!c) return;
+    const prevSocketUrl = cfg.socketUrl;
+    cfg       = { ...cfg, ...c };
+    WIDGET_ID = cfg.id || cfg.widgetId || WIDGET_ID;
+    const wasViewer = IS_VIEWER;
+    IS_VIEWER = cfg.role === 'viewer' || IS_VIEWER;
+
+    const ws = parseFloat(cfg.scale) || 1.4;
+    root.style.setProperty('--ws', String(ws));
+    // The diagram was tuned at 1.5 for the default text size; keep that ratio.
+    mmPaneEl.style.setProperty('--u', String(+(1.5 * ws / 1.4).toFixed(3)));
+
+    const code = Array.isArray(cfg.code) ? cfg.code.join('\n') : cfg.code;
+    if (changed('code') && typeof code === 'string' && code.trim()) {
+      S.code = code.replace(/\r\n?/g, '\n');
+      codeEl.value = S.code;
+      PV.syncCode(S.code);
+    }
+    if (changed('filename')) {
+      S.filename = String(cfg.filename);
+      fileEl.value = S.filename;
+    }
+
+    const lk = changed('layout'), pk = changed('primary'), sk = changed('secondary');
+    if (lk || pk || sk) {
+      const L = { ...S.layout };
+      if (LAYOUTS.includes(cfg.layout)) L.kind = cfg.layout;
+      const first  = PANES.includes(cfg.primary) ? cfg.primary : L.slots[0];
+      let   second = PANES.includes(cfg.secondary) ? cfg.secondary : L.slots[1];
+      if (second === first) second = PANES.find(p => p !== first);
+      L.slots = [first, second, PANES.find(p => p !== first && p !== second)];
+      S.layout = L;
+      S.max = null;
+    }
+
+    if (changed('theme')) PV.setTheme(cfg.theme === 'dark' ? 'dark' : 'light');
+    if (changed('memoryMode')) PV.setMode(cfg.memoryMode === 'draw' ? 'draw' : 'trace');
+    if (changed('zoom')) { const z = parseFloat(cfg.zoom); if (z > 0) PV.setZoom(z); }
+
+    if (cfg.socketUrl && cfg.socketUrl !== prevSocketUrl) initSocket(cfg.socketUrl);
+
+    if (IS_VIEWER && !wasViewer) stopWorker();
+    if (IS_VIEWER) phase = 'viewer';
+
+    renderEditor();
+    renderLayout();
+    render();
+    PV.render();
+  }
+
+  function destroy() {
+    clearTimeout(syncTimer);
+    stopWorker();
+    if (socket && socket.disconnect) socket.disconnect();
+    socket = null;
+  }
+
+  // ── Beamer+ message bridge ──────────────────────────────────────────────────
+  window.addEventListener('message', e => {
+    const d = e.data || {};
+    if (d.type === 'widget-config')  applyConfig(d.config);
+    if (d.type === 'widget-cleanup') destroy();
+    if (d.type === 'widget-get-state') {
+      window.parent.postMessage(
+        { type: 'widget-state', widgetId: WIDGET_ID, state: getState() }, '*');
+    }
+    if (d.type === 'widget-set-state' && d.state) applyState(d.state);
+  });
+
+  // ── Event wiring ────────────────────────────────────────────────────────────
+  codeEl.addEventListener('input',   onCodeInput);
+  codeEl.addEventListener('scroll',  syncScroll);
+  codeEl.addEventListener('keydown', onEditorKey);
+  // Typing, pasting and dropping all arrive here; refuse edits to lines the
+  // memory model has already run.
+  codeEl.addEventListener('beforeinput', e => {
+    if (PV.editBlocked(codeEl.selectionStart, codeEl.selectionEnd, e.inputType)) e.preventDefault();
+  });
+  inputEl.addEventListener('keydown', onShellKey);
+  inputEl.addEventListener('input',   autoGrow);
+
+  fileEl.addEventListener('input', () => {
+    if (IS_VIEWER) return;
+    S.filename = fileEl.value.trim() || 'main.py';
+    emitState();
+  });
+
+  runBtn    .addEventListener('click', runFile);
+  restartBtn.addEventListener('click', restart);
+  clearBtn  .addEventListener('click', clearShell);
+  saveBtn   .addEventListener('click', saveFile);
+  openBtn   .addEventListener('click', () => fileInput.click());
+  fileInput .addEventListener('change', () => { openFile(fileInput.files[0]); fileInput.value = ''; });
+
+  maxBtns.forEach(b => b.addEventListener('click', () => toggleMax(b.dataset.pane)));
+  PANES.forEach(name => {
+    paneEls[name].querySelector('.pane-head').addEventListener('dblclick', e => {
+      if (e.target.closest('input,button,select')) return;
+      toggleMax(name);
+    });
+  });
+
+  splitA.addEventListener('pointerdown', e => startSplit(0, e));
+  splitB.addEventListener('pointerdown', e => startSplit(1, e));
+  // Double-clicking a gap evens that split out.
+  splitA.addEventListener('dblclick', () => setLayout({ a: 0.5 }, { keepMax: true }));
+  splitB.addEventListener('dblclick', () => setLayout({ b: 0.5 }, { keepMax: true }));
+
+  layoutBtn.addEventListener('click', e => { e.stopPropagation(); openMenu(!layoutMenu.classList.contains('is-open')); });
+  layoutMenu.addEventListener('click', e => e.stopPropagation());
+  window.addEventListener('resize', () => { openMenu(false); openAddMenu(false); fitToolbar(); });
+  addBtn.addEventListener('click', e => { e.stopPropagation(); openAddMenu(!addMenu.classList.contains('is-open')); });
+  // The memory model's own listeners add the shape; this just closes the menu.
+  addMenu.addEventListener('click', e => { if (e.target.closest('.pop-item')) openAddMenu(false); });
+  // Switching Trace/Draw (by button, key, config or restore) changes how
+  // much the bar holds.
+  try {
+    new MutationObserver(() => fitToolbar())
+      .observe($('drawTools'), { attributes: true, attributeFilter: ['hidden'] });
+  } catch (_) { /* no observer: the resize path still refits */ }
+  document.addEventListener('pointerdown', e => {
+    if (!e.target.closest('#layout-wrap, #layout-menu')) openMenu(false);
+    if (!e.target.closest('#dAddBtn, #add-menu')) openAddMenu(false);
+  });
+  $('lm-even').addEventListener('click', () => setLayout({ a: 0.5, b: 0.5 }));
+
+  // Clicking anywhere in the shell focuses the prompt — unless the user is
+  // selecting output to copy.
+  shellBody.addEventListener('mouseup', () => {
+    if (IS_VIEWER || String(window.getSelection())) return;
+    try { inputEl.focus({ preventScroll: true }); } catch (_) { inputEl.focus(); }
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && layoutMenu.classList.contains('is-open')) { openMenu(false); layoutBtn.focus(); return; }
+    if (e.key === 'Escape' && addMenu.classList.contains('is-open')) { openAddMenu(false); addBtn.focus(); return; }
+    // F5 should run from anywhere in the widget, not just the editor.
+    if (e.key === 'F5' && e.target !== codeEl) { e.preventDefault(); runFile(); }
+  });
+
+  // Anything the memory model does (a step, a mode switch, a drawing) is
+  // state worth syncing and saving.
+  PV.onChange(emitState);
+
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // ── Boot ────────────────────────────────────────────────────────────────────
+  codeEl.value = S.code;
+  PV.syncCode(S.code);
+  buildLayoutMenu();
+  initSocket(CFG0.socketUrl);
+  applyConfig(CFG0);
+  if (IS_VIEWER) {
+    setPhase('viewer');
+  } else {
+    startWorker();
+  }
+  requestAnimationFrame(fitToolbar);
+  if (document.fonts?.ready) document.fonts.ready.then(fitToolbar);
 })();
 
 </script>
