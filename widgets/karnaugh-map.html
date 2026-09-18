@@ -6,9 +6,10 @@
   "label": "Karnaugh Map",
   "category": "Computer Science",
   "fields": [
-    { "key": "inputMode", "label": "Input", "type": "select",
-      "options": [{ "v": "formula", "l": "Formula" }, { "v": "table", "l": "Truth table" }],
-      "default": "formula" },
+    { "key": "inputMode", "label": "Start with", "type": "select",
+      "options": [{ "v": "choose", "l": "The choice: formula or truth table" },
+                  { "v": "formula", "l": "Formula" }, { "v": "table", "l": "Truth table" }],
+      "default": "choose" },
     { "key": "expression", "label": "Boolean expression", "type": "text",
       "placeholder": "A*B + A'*C   or   y0 = a0 + a1*a2" },
     { "key": "mode", "label": "Simplify to", "type": "select",
@@ -16,6 +17,7 @@
       "default": "sop" },
     { "key": "tableVars", "label": "Variables (truth-table input)", "type": "select",
       "options": ["2", "3", "4"], "default": "3" },
+    { "key": "tableNames", "label": "Input names (truth-table input)", "type": "text", "placeholder": "A, B, C" },
     { "key": "truthTable", "label": "Truth table (0 / 1 / X per row)", "type": "text", "placeholder": "00110101" },
     { "key": "dontCares", "label": "Don't-cares (formula input)", "type": "text", "placeholder": "5, 7, 13" },
     { "key": "vars", "label": "Variable names (blank = auto)", "type": "text", "placeholder": "A, B, C, D" },
@@ -23,12 +25,35 @@
     { "key": "notation", "label": "Complement shown as", "type": "select",
       "options": [{ "v": "prime", "l": "A'" }, { "v": "bar", "l": "A with overbar" }],
       "default": "prime" },
+    { "key": "minterms", "label": "Show minterm numbers", "type": "checkbox", "default": false },
+    { "key": "speed", "label": "Animation speed", "type": "select",
+      "options": [{ "v": "slow", "l": "Slow" }, { "v": "normal", "l": "Normal" }, { "v": "fast", "l": "Fast" }],
+      "default": "normal" },
     { "key": "rowOrder", "label": "Truth-table reveal order", "type": "select",
-      "options": [{ "v": "term", "l": "Term by term" }, { "v": "table", "l": "Straight down the table" }],
-      "default": "term" },
+      "options": [{ "v": "table", "l": "Straight down the table" }, { "v": "term", "l": "Term by term" }],
+      "default": "table" },
     { "key": "scale", "label": "Text size", "type": "select", "options": ["1", "1.4", "1.8", "2.2"], "default": "1.4" }
   ]
 }
+</script>
+<!-- Standalone fallback. Inside Beamer+ the host injects the shared widget
+     base (tokens, fonts, toolbar, buttons) ahead of everything else. Opened
+     directly (a file in Edge, a plain web server) nothing does, so load the
+     same stylesheet from the repo, relative to this file, at the same point in
+     the cascade. Beamer+ is unaffected: its link is already present. -->
+<script id="bw-standalone">
+(function () {
+  if (document.querySelector('link[href*="widget-base.css"]')) return;
+  var head = document.head || document.getElementsByTagName('head')[0];
+  [['preconnect', 'https://fonts.googleapis.com'],
+   ['stylesheet', 'https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@400;500;600&display=swap'],
+   ['stylesheet', '../static/css/widget-base.css']].forEach(function (l) {
+    var el = document.createElement('link');
+    el.rel = l[0]; el.href = l[1];
+    head.appendChild(el);
+  });
+  document.documentElement.setAttribute('data-bw-standalone', '');
+})();
 </script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -42,8 +67,8 @@
 <style>
 /* Tokens, reset, toolbar, buttons, inputs and banners come from the shared
    widget base (static/css/widget-base.css). What's left here is this widget's
-   own furniture: the four quadrants, the truth table, the map grid, and the
-   group outlines drawn over it. */
+   own furniture: the step-by-step stage, the truth table, the map grid, and
+   the group outlines drawn over it. */
 
 /* ── Group colours ────────────────────────────────────────────────────────
    The one place in this widget where hue carries meaning: a group's outline
@@ -82,34 +107,93 @@
   --tt-fs:   clamp(12px, calc(16px * var(--u)), 40px);
 }
 
-/* ── Quadrants ────────────────────────────────────────────────────────── */
+/* ── The stage ────────────────────────────────────────────────────────────
+   One screen at a time, in the order the method is taught: say what the
+   function is, watch the truth table fill in, watch the map fill in, then
+   circle the groups. Each screen is a grid of the panels it needs; the
+   panels themselves never move between screens, they are only shown or
+   hidden, so every renderer below still has one element to draw into.
+   ====================================================================== */
 
-#quads {
+#stage-view {
   flex: 1 1 auto;
   min-height: 0;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
-}
-
-.quad {
   display: flex;
   flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  border-right: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  position: relative;
 }
-.quad:nth-child(2n)  { border-right: none; }
-.quad:nth-child(n+3) { border-bottom: none; }
 
-.quad-head {
+/* Where you are, and how far there is to go — sized to be read from the
+   back of the room, like the content it introduces. */
+#stepper {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
+  justify-content: center;
+  gap: calc(8px * var(--u));
+  padding: calc(14px * var(--u)) 16px calc(6px * var(--u));
+  user-select: none;
+}
+#shell[data-stage="start"] #stepper { visibility: hidden; }
+.st-item {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(8px * var(--u));
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-3);
+  font: inherit;
+  font-size: calc(12px * var(--u));
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: default;
+  transition: color var(--dur);
+}
+.st-item .st-n {
+  width: calc(22px * var(--u));
+  height: calc(22px * var(--u));
+  flex: 0 0 auto;
+  border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: calc(10.5px * var(--u));
+  font-weight: 600;
+  border: 1.5px solid var(--border-med);
+  background: var(--bg);
+  color: var(--text-3);
+  transition: background var(--dur), color var(--dur), border-color var(--dur);
+}
+.st-item .st-n svg { width: 62%; height: 62%; }
+.st-item.is-done { color: var(--text-2); cursor: pointer; }
+.st-item.is-done .st-n { background: var(--text-2); border-color: var(--text-2); color: var(--bg); }
+.st-item.is-done:hover { color: var(--text); }
+.st-item.is-current { color: var(--text); font-weight: 600; }
+.st-item.is-current .st-n { background: var(--text); border-color: var(--text); color: var(--bg); }
+.st-line { width: calc(36px * var(--u)); height: 1.5px; background: var(--border-med); flex: 0 0 auto; }
+.st-line.is-done { background: var(--text-2); }
+#shell.is-viewer .st-item { cursor: default; }
+
+#stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  gap: 14px 22px;
+  padding: 8px 22px 18px;
+}
+.panel {
+  display: none;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+/* Panel labels and counters are for building the slide, not for the room:
+   the step bar already says what each screen is. */
+.panel-head {
+  flex: 0 0 auto;
+  display: none;
+  align-items: center;
   gap: 8px;
-  padding: 7px 12px 5px;
+  padding: 2px 2px 6px;
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -117,40 +201,142 @@
   color: var(--text-3);
   user-select: none;
 }
-.quad-head .count {
+.panel-head .count {
   font-family: var(--font-mono);
-  font-size: 10px;
   letter-spacing: 0;
-  color: var(--text-3);
   margin-left: auto;
 }
-.quad-head.is-live { color: var(--text); }
-
-.quad-body {
+.panel-body {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  padding: 2px 12px 12px;
   scrollbar-width: thin;
 }
-.quad-body::-webkit-scrollbar { width: 6px; height: 6px; }
-.quad-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-.quad-body::-webkit-scrollbar-thumb:hover { background: var(--border-med); }
-.quad-body::-webkit-scrollbar-track { background: transparent; }
+.panel-body::-webkit-scrollbar { width: 6px; height: 6px; }
+.panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.panel-body.is-centred { display: flex; flex-direction: column; align-items: center; justify-content: center; }
 
-/* Centres a quadrant's one piece of content (the map, the term list). */
-.quad-body.is-centred { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+/* Screen by screen: which panels, and where. */
+#shell[data-stage="start"] #stage { grid-template-areas: "start"; grid-template-rows: 1fr; }
+#shell[data-stage="start"] #p-start { display: flex; }
 
-/* ── Top left: the expression ─────────────────────────────────────────────
+#shell[data-stage="input"].src-formula #stage { grid-template-areas: "input"; grid-template-rows: 1fr; }
+#shell[data-stage="input"].src-table   #stage { grid-template-areas: "input" "table"; grid-template-rows: auto 1fr; }
+#shell[data-stage="input"] #p-input { display: flex; }
+#shell[data-stage="input"].src-table #p-table { display: flex; }
+
+#shell[data-stage="table"] #stage { grid-template-areas: "echo" "table"; grid-template-rows: auto 1fr; }
+#shell[data-stage="table"] #p-echo,
+#shell[data-stage="table"] #p-table { display: flex; }
+
+#shell[data-stage="kmap"] #stage { grid-template-areas: "table map"; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.25fr); }
+#shell[data-stage="kmap"] #p-table,
+#shell[data-stage="kmap"] #p-map { display: flex; }
+
+#shell[data-stage="groups"] #stage { grid-template-areas: "map" "answer"; grid-template-rows: 1fr auto; }
+#shell[data-stage="groups"] #p-map,
+#shell[data-stage="groups"] #p-answer { display: flex; }
+
+#p-start  { grid-area: start; }
+#p-input  { grid-area: input; }
+#p-echo   { grid-area: echo; }
+#p-table  { grid-area: table; }
+#p-map    { grid-area: map; }
+#p-answer { grid-area: answer; }
+
+/* Each new screen eases in rather than snapping. */
+@keyframes panel-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+#stage.is-entering .panel { animation: panel-in 0.38s cubic-bezier(.2,.7,.2,1) both; }
+#stage.is-entering .panel:nth-of-type(2) { animation-delay: 0.06s; }
+#stage.is-entering .panel:nth-of-type(3) { animation-delay: 0.12s; }
+#stage.is-entering .panel:nth-of-type(4) { animation-delay: 0.18s; }
+
+/* ── Start: two ways in ─────────────────────────────────────────────── */
+#p-start { align-items: center; justify-content: center; padding-bottom: 6%; }
+.start-cards {
+  display: flex;
+  gap: calc(16px * var(--u));
+  flex-wrap: wrap;
+  justify-content: center;
+}
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(22px) scale(0.96); }
+  to   { opacity: 1; transform: none; }
+}
+.start-card {
+  width: calc(190px * var(--u));
+  max-width: 44vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: calc(20px * var(--u)) calc(16px * var(--u)) calc(18px * var(--u));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 10px);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  animation: card-in 0.5s cubic-bezier(.2,.8,.2,1) backwards;
+  animation-delay: calc(0.12s + var(--i) * 0.09s);
+  transition: border-color 0.12s ease;
+}
+/* The card stays put under the pointer; only its edge darkens. */
+.start-card:hover { border-color: var(--text); }
+.start-card:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.start-card svg {
+  width: calc(64px * var(--u));
+  height: calc(64px * var(--u));
+  margin-bottom: 6px;
+}
+.sc-title { font-size: calc(12.5px * var(--u)); font-weight: 600; }
+
+/* The icons hold still: the card itself answers the hover. */
+.ic-ink   { stroke: var(--text); }
+.ic-soft  { fill: var(--bg-subtle); stroke: var(--border-med); }
+.ic-caret { stroke: var(--text); }
+.ic-hot   { fill: var(--text); opacity: 0.85; }
+.ic-dot   { fill: var(--text-3); }
+.ic-dot.on { fill: var(--bg); }
+
+/* ── Input ──────────────────────────────────────────────────────────── */
+#p-input .panel-body { padding-bottom: 4%; }
+#shell.src-table #p-input .panel-body { padding-bottom: 0; flex-direction: row; gap: 14px; }
+/* The table below already carries the heading. */
+#shell.src-table #p-input .panel-head { display: none; }
+#expr-block { width: min(100%, 760px); }
+#shell.src-formula #table-block,
+#shell.src-table   #expr-block { display: none; }
+
+
+/* ── The formula, echoed while its rows are found ───────────────────── */
+#echo {
+  width: 100%;
+  text-align: center;
+  font-family: var(--font-var);
+  font-weight: var(--wt-var);
+  font-size: calc(17px * var(--u));
+  line-height: 1.5;
+}
+#echo .lhs  { color: var(--text-2); }
+#echo .plus { color: var(--text-3); padding: 0 0.25em; }
+#echo .eterm {
+  color: var(--text-3);
+  padding: 1px 4px;
+  border-radius: 4px;
+  transition: color 0.2s, background 0.2s;
+}
+#echo .eterm.is-done    { color: var(--text); }
+#echo .eterm.is-current { color: var(--text); background: var(--accent-bg); box-shadow: inset 0 -2px 0 var(--text); }
+
+/* ── The formula box ──────────────────────────────────────────────────────
    One box, and the one thing that has to be said back: whether it parsed.
-   Everything the expression implies — its minterms, which form it is being
-   read as — is already on show in the other three quadrants, so repeating it
-   here is noise on a slide.
    ====================================================================== */
 
-/* Slightly above true centre, as everything centred in these widgets sits. */
-#q-expr-body { padding-bottom: 8%; }
-#expr-block, #table-block { width: 100%; }
+#table-block { width: 100%; }
 
 /* The "F =" belongs to the equation, not to a label beside it, so it lives
    inside the box and the input is drawn without a frame of its own. */
@@ -159,7 +345,7 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 10px 12px;
+  padding: calc(10px * var(--u)) calc(14px * var(--u));
   background: var(--bg-subtle);
   border: 1px solid var(--border-med);
   border-radius: var(--radius);
@@ -167,33 +353,6 @@
 }
 #eq-box:focus-within { border-color: var(--accent); }
 
-#eq-prefix {
-  flex: 0 0 auto;
-  font-family: var(--font-var);
-  font-weight: var(--wt-var);
-  font-size: calc(15px * var(--u));
-  color: var(--text-2);
-  user-select: none;
-}
-/* The function name is its own little field: it reads as plain text until
-   hovered or focused, then shows it can be edited. Width follows the text. */
-#eq-prefix { display: inline-flex; align-items: center; gap: 0.4em; }
-#fn-input {
-  width: 2ch;
-  min-width: 1ch;
-  padding: 0 2px;
-  margin: 0 -2px;
-  border: none;
-  border-bottom: 1px dashed transparent;
-  border-radius: 0;
-  background: none;
-  color: var(--text);
-  font: inherit;
-  transition: border-color var(--dur);
-}
-#fn-input:hover:not([readonly]) { border-bottom-color: var(--border-med); }
-#fn-input:focus { outline: none; border-bottom-color: var(--accent); }
-.eq-sign { color: var(--text-2); }
 
 #expr-input {
   flex: 1 1 auto;
@@ -204,13 +363,14 @@
   color: var(--text);
   font-family: var(--font-var);
   font-weight: var(--wt-var);
-  font-size: calc(15px * var(--u));
+  font-size: calc(21px * var(--u));
 }
+/* Only a hint of what to type: it must never read as a formula already there. */
+#expr-input::placeholder { color: var(--text-3); opacity: 0.55; }
 #expr-input:focus { outline: none; }
 
-/* Truth-table input: the width of the table, and how to clear it. Centred,
-   because with the table itself being the input this row is all the quadrant
-   holds. */
+/* Truth-table input: the width of the table, and how to clear it. The table
+   itself, just below, is the rest of the control. */
 #vars-row { display: flex; align-items: center; justify-content: center; gap: 6px; }
 .mini-label {
   font-size: 10px;
@@ -223,21 +383,47 @@
 }
 #vars-row .bw-btn { font-family: var(--font-var); min-width: var(--ctl-h); }
 
-/* Which half of quadrant 1 is showing follows the input selector. */
-#shell.src-formula #table-block,
-#shell.src-table   #expr-block { display: none; }
-
-/* In the top bar, next to the buttons — same height, auto width. */
-#src-sel, #mode-sel {
+/* SOP / POS: a two-position switch whose dark thumb slides to the form in
+   use. */
+.mode-switch {
+  position: relative;
   flex: 0 0 auto;
-  width: auto;
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
   height: var(--ctl-h);
-  padding: 0 9px;
-  font-size: var(--fs-chrome);
-  font-weight: 500;
-  background: var(--bg);
-  border-color: var(--border);
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--ctl-h) / 2);
+  background: var(--bg-subtle);
+  font: inherit;
+  cursor: pointer;
 }
+.mode-switch:disabled { cursor: default; }
+.ms-opt {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  padding: 0 8px;
+  font-size: var(--fs-chrome);
+  font-weight: 600;
+  color: var(--text-3);
+  transition: color 0.2s ease;
+}
+.ms-thumb {
+  position: absolute;
+  top: 2px; bottom: 2px; left: 2px;
+  width: calc(50% - 2px);
+  border-radius: calc(var(--ctl-h) / 2 - 2px);
+  background: var(--text);
+  transition: transform 0.22s cubic-bezier(.3,.7,.3,1);
+}
+.mode-switch[aria-checked="true"] .ms-thumb { transform: translateX(100%); }
+.mode-switch[aria-checked="false"] .ms-opt:first-of-type,
+.mode-switch[aria-checked="true"]  .ms-opt:last-of-type { color: var(--bg); }
+@media (prefers-reduced-motion: reduce) { .ms-thumb, .ms-opt { transition: none; } }
 
 /* .bw-banner is display:flex, which outranks the browser's own rule for
    [hidden] — so say it here, or an empty error bar sits there permanently. */
@@ -252,9 +438,12 @@
 sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
 .ovl { text-decoration: overline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
 
-/* ── Bottom left: the truth table ─────────────────────────────────────── */
+/* ── The truth table ──────────────────────────────────────────────────── */
 
-#tt-wrap { display: flex; gap: 14px; align-items: flex-start; justify-content: center; }
+#q-table-body { display: flex; flex-direction: column; }
+/* Auto margins centre the table like the map beside it, and still let it
+   scroll from the top when it's taller than the panel. */
+#tt-wrap { display: flex; gap: 14px; align-items: flex-start; justify-content: center; margin: auto 0; }
 
 .tt {
   border-collapse: collapse;
@@ -277,6 +466,22 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
 .tt .c-idx { color: var(--text-3); text-align: right; padding-right: 0.6em; font-size: 0.8em; }
 .tt .c-out { border-left: 1px solid var(--border); padding-left: 0.6em; }
 
+/* Column names are typed over in place while the table is being entered. */
+.tt.is-editable th.th-name {
+  cursor: text;
+  min-width: 1.1em;
+  border-radius: 4px 4px 0 0;
+  color: var(--text-2);
+  transition: background var(--dur);
+}
+.tt.is-editable th.th-name:hover { background: var(--bg-subtle); }
+.tt.is-editable th.th-name:focus {
+  outline: none;
+  color: var(--text);
+  background: var(--accent-bg);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
 /* With truth-table input, the F column is the control: click it to cycle. */
 .tt.is-editable .c-out { cursor: pointer; }
 .tt.is-editable tbody .c-out:hover { background: var(--accent-bg); }
@@ -291,10 +496,13 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
 .tt tr.row.is-on .c-out       { color: var(--text-3); }
 .tt tr.row.is-on .c-out.v-hot { color: var(--text); }
 .tt tr.row.is-on .c-out.vx    { color: var(--warn); }
+.tt td { transition: background 0.2s, color 0.2s; }
 .tt tr.row.is-current td { background: var(--accent-bg); }
+@keyframes val-in { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: none; } }
+.tt tr.row.is-current .c-out { animation: val-in 0.28s cubic-bezier(.2,.9,.3,1.3); }
 .tt tr.row.is-source td  { background: var(--accent-bg); }
 
-/* ── Top right: the map ───────────────────────────────────────────────── */
+/* ── The map ──────────────────────────────────────────────────────────── */
 
 #km-wrap {
   display: inline-grid;
@@ -335,8 +543,15 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
 .km-cell.is-on.v-hot { color: var(--text); }
 .km-cell.is-on.vx    { color: var(--warn); }
 .km-cell.is-target  { background: var(--accent-bg); border-color: var(--border-med); }
+@keyframes cell-in { from { transform: scale(0.3); opacity: 0; } to { transform: none; opacity: 1; } }
+.km-cell.is-target .v { animation: cell-in 0.32s cubic-bezier(.2,.9,.3,1.35); }
+@keyframes ring-in { from { opacity: 0; transform: scale(1.12); } to { opacity: 1; transform: none; } }
+.grp.is-new { animation: ring-in 0.4s cubic-bezier(.2,.8,.2,1); }
 
 /* m-number in the corner: which truth-table row this square is. */
+#shell:not(.show-m) .km-cell .m,
+#shell:not(.show-m) .tt .c-idx { display: none; }
+#status { display: none; }
 .km-cell .m {
   position: absolute;
   top: 1px; left: 3px;
@@ -377,19 +592,19 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
 .grp.g-l { border-left-width: 2.5px; }
 .grp.is-faded { opacity: 0.22; }
 
-/* ── Bottom right: the simplified expression ──────────────────────────────
+/* ── The simplified expression ────────────────────────────────────────────
    Just the equation. Each term carries the colour of the group it came from,
    so the link back to the map is the term itself rather than a row of
    bookkeeping beside it.
    ====================================================================== */
 
-#q-terms-body { padding-bottom: 6%; }
+#q-terms-body { padding: 6px 0 4px; }
 
 #equation {
   width: 100%;
   font-family: var(--font-var);
   font-weight: var(--wt-var);
-  font-size: calc(19px * var(--u));
+  font-size: calc(22px * var(--u));
   line-height: 1.45;
   text-align: center;
   word-break: break-word;
@@ -401,6 +616,8 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
 /* The one thing in this widget where hue is load-bearing: this term is that
    ring on the map. Clicking one dims every other ring so a single group can
    be talked about on its own. */
+@keyframes term-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+#equation .gterm.is-new { display: inline-block; animation: term-in 0.35s ease both; }
 #equation .gterm {
   color: var(--c);
   cursor: pointer;
@@ -444,122 +661,136 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
 #manual-line .bad { color: var(--err); }
 #manual-line .grow { flex: 1 1 auto; }
 
-/* View-only marker, bottom right of the slide region. */
-#viewer-note {
-  position: absolute;
-  right: 10px; bottom: 8px;
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-3);
-  background: var(--bg);
-  padding: 2px 6px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  display: none;
-  pointer-events: none;
-}
-#shell.is-viewer #viewer-note { display: block; }
 #shell { position: relative; }
 
 @media (prefers-reduced-motion: reduce) {
   .km-cell .v, .grp { transition: none; }
+  #stage.is-entering .panel, .start-card,
+  .km-cell.is-target .v, .grp.is-new, .tt tr.row.is-current .c-out,
+  #equation .gterm.is-new { animation: none; }
 }
 </style>
 </head>
 <body>
-<div id="shell" class="bw-shell">
+<div id="shell" class="bw-shell" data-stage="start">
 
   <div id="toolbar" class="bw-toolbar" data-bw-topbar>
     <span class="bw-toolbar-title">Karnaugh Map</span>
     <div class="bw-sep"></div>
-    <button class="bw-btn" id="back-btn" title="Previous step">Back</button>
-    <button class="bw-btn bw-btn--primary" id="next-btn" title="Next step">Next</button>
-    <button class="bw-btn" id="restart-btn" title="Back to the start">Restart</button>
-    <div class="bw-sep"></div>
-    <select id="src-sel" class="bw-select" title="How the function is given">
-      <option value="formula">Formula</option>
-      <option value="table">Truth table</option>
-    </select>
-    <select id="mode-sel" class="bw-select" title="Which squares to group, and how the answer is written">
-      <option value="sop">SOP</option>
-      <option value="pos">POS</option>
-    </select>
+    <button class="bw-btn" id="back-btn" title="Previous screen">Back</button>
+    <button class="bw-btn bw-btn--primary" id="next-btn" title="Next">Next</button>
+    <button class="bw-btn" id="step-btn" title="Show the next row, square or group">Step</button>
+    <button class="bw-btn bw-btn--icon" id="replay-btn" title="Back to the beginning">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.8 8a5.2 5.2 0 1 0 1.7-3.9"/><path d="M2.6 2.2v3h3"/></svg>
+    </button>
+    <div class="bw-sep" id="mode-sep"></div>
+    <button class="mode-switch" id="mode-sel" role="switch" aria-checked="false"
+            title="Sum of products or product of sums">
+      <span class="ms-thumb"></span>
+      <span class="ms-opt">SOP</span><span class="ms-opt">POS</span>
+    </button>
     <button class="bw-btn" id="pick-btn" title="Draw your own group on the map">Select group</button>
     <div class="bw-spacer"></div>
     <span id="status" class="bw-status">ready</span>
   </div>
 
-  <div id="quads">
+  <div id="stage-view">
+    <div id="stepper" aria-label="Steps"></div>
 
-    <!-- Top left ────────────────────────────────────────────────────── -->
-    <div class="quad">
-      <div class="quad-head" id="h-expr"><span>1 · Expression</span></div>
-      <div class="quad-body is-centred" id="q-expr-body">
+    <div id="stage">
 
-        <!-- Formula input: the box reads as the equation it is. -->
-        <div id="expr-block">
-          <div id="eq-box">
-            <span id="eq-prefix"><input id="fn-input" type="text" spellcheck="false"
-                   autocomplete="off" maxlength="16" value="F" aria-label="Function name"
-                   title="Function name — click to rename"><span class="eq-sign">=</span></span>
-            <input id="expr-input" type="text" spellcheck="false"
-                   autocomplete="off" placeholder="A*B + A'*C">
+      <!-- Start: two ways in -->
+      <section class="panel" id="p-start">
+        <div class="start-cards">
+          <button class="start-card" data-src="formula" style="--i:0">
+            <svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
+              <rect class="ic-soft" x="4" y="14" width="56" height="36" rx="7" stroke-width="1.5"/>
+              <text x="12" y="37.5" font-family="JetBrains Mono, ui-monospace, monospace" font-size="12" font-weight="500" fill="currentColor">F=AB'</text>
+              <line class="ic-caret" x1="53" y1="25" x2="53" y2="40" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+            <span class="sc-title">Formula</span>
+          </button>
+          <button class="start-card" data-src="table" style="--i:1">
+            <svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
+              <rect class="ic-soft" x="8" y="6" width="48" height="52" rx="6" stroke-width="1.5"/>
+              <rect class="ic-hot" x="41" y="7" width="14" height="50"/>
+              <line class="ic-ink" x1="8" y1="17" x2="56" y2="17" stroke-width="1.3"/>
+              <line class="ic-ink" x1="41" y1="6" x2="41" y2="58" stroke-width="1.3"/>
+              <g stroke="var(--border-med)" stroke-width="1"><line x1="8" y1="27.5" x2="56" y2="27.5"/><line x1="8" y1="37.5" x2="56" y2="37.5"/><line x1="8" y1="47.5" x2="56" y2="47.5"/></g>
+              <g class="ic-dot"><circle cx="17" cy="22.3" r="2"/><circle cx="29" cy="22.3" r="2"/><circle cx="17" cy="32.5" r="2"/><circle cx="29" cy="42.5" r="2"/><circle cx="17" cy="52.5" r="2"/><circle cx="29" cy="52.5" r="2"/></g>
+              <g><circle class="ic-dot on" cx="48" cy="32.5" r="2.4"/><circle class="ic-dot on" cx="48" cy="52.5" r="2.4"/></g>
+            </svg>
+            <span class="sc-title">Truth table</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Input -->
+      <section class="panel" id="p-input">
+        <div class="panel-head" id="h-expr"><span>Formula</span></div>
+        <div class="panel-body is-centred">
+          <div id="expr-block">
+            <div id="eq-box">
+              <input id="expr-input" type="text" spellcheck="false"
+                     autocomplete="off" placeholder="F = A B + A' C">
+            </div>
+            <div id="parse-error" class="bw-banner bw-banner--error" hidden></div>
+          </div>
+
+          <div id="table-block">
+            <div id="vars-row">
+              <button class="bw-btn" data-nvars="2">2</button>
+              <button class="bw-btn" data-nvars="3">3</button>
+              <button class="bw-btn" data-nvars="4">4</button>
+              <div class="bw-sep"></div>
+              <button class="bw-btn" id="tbl-clear" title="Set every row back to 0">Clear</button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- The formula, while its rows are found -->
+      <section class="panel" id="p-echo">
+        <div class="panel-body is-centred"><div id="echo"></div></div>
+      </section>
+
+      <!-- Truth table -->
+      <section class="panel" id="p-table">
+        <div class="panel-head" id="h-table"><span>Truth table</span><span class="count" id="c-table"></span></div>
+        <div class="panel-body" id="q-table-body">
+          <div id="tt-wrap"></div>
+        </div>
+      </section>
+
+      <!-- Karnaugh map -->
+      <section class="panel" id="p-map">
+        <div class="panel-head" id="h-kmap"><span>Karnaugh map</span><span class="count" id="c-kmap"></span></div>
+        <div class="panel-body is-centred" id="q-kmap-body">
+          <div id="km-wrap"></div>
+        </div>
+      </section>
+
+      <!-- Simplified -->
+      <section class="panel" id="p-answer">
+        <div class="panel-head" id="h-terms"><span>Simplified</span><span class="count" id="c-terms"></span></div>
+        <div class="panel-body is-centred" id="q-terms-body">
+          <div id="equation"></div>
+          <div id="manual-box">
+            <div id="manual-line">
+              <span id="manual-msg">Click squares on the map to form a group.</span>
+              <span class="grow"></span>
+              <button class="bw-btn" id="manual-add" disabled>Add term</button>
+              <button class="bw-btn" id="manual-clear">Clear</button>
+            </div>
           </div>
         </div>
+      </section>
 
-        <!-- Truth-table input: the table itself is the control, over in
-             quadrant 2, so all that is left here is how wide it is. -->
-        <div id="table-block">
-          <div id="vars-row">
-            <span class="mini-label">Variables</span>
-            <button class="bw-btn" data-nvars="2">2</button>
-            <button class="bw-btn" data-nvars="3">3</button>
-            <button class="bw-btn" data-nvars="4">4</button>
-            <div class="bw-sep"></div>
-            <button class="bw-btn" id="tbl-clear" title="Set every row back to 0">Clear</button>
-          </div>
-        </div>
-
-        <div id="parse-error" class="bw-banner bw-banner--error" hidden></div>
-      </div>
     </div>
-
-    <!-- Top right ───────────────────────────────────────────────────── -->
-    <div class="quad">
-      <div class="quad-head" id="h-kmap"><span>3 · Karnaugh map</span><span class="count" id="c-kmap"></span></div>
-      <div class="quad-body is-centred" id="q-kmap-body">
-        <div id="km-wrap"></div>
-      </div>
-    </div>
-
-    <!-- Bottom left ─────────────────────────────────────────────────── -->
-    <div class="quad">
-      <div class="quad-head" id="h-table"><span>2 · Truth table</span><span class="count" id="c-table"></span></div>
-      <div class="quad-body" id="q-table-body">
-        <div id="tt-wrap"></div>
-      </div>
-    </div>
-
-    <!-- Bottom right ────────────────────────────────────────────────── -->
-    <div class="quad">
-      <div class="quad-head" id="h-terms"><span>4 · Groups → simplified</span><span class="count" id="c-terms"></span></div>
-      <div class="quad-body is-centred" id="q-terms-body">
-        <div id="equation"></div>
-        <div id="manual-box">
-          <div id="manual-line">
-            <span id="manual-msg">Click squares on the map to form a group.</span>
-            <span class="grow"></span>
-            <button class="bw-btn" id="manual-add" disabled>Add term</button>
-            <button class="bw-btn" id="manual-clear">Clear</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
   </div>
 
-  <div id="viewer-note">View-only · synced with presenter</div>
+  
 </div>
 
 <script>
@@ -583,10 +814,7 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
 
   const shell      = document.getElementById('shell');
   const exprInput  = document.getElementById('expr-input');
-  const eqPrefix   = document.getElementById('eq-prefix');
-  const fnInput    = document.getElementById('fn-input');
   const modeSel    = document.getElementById('mode-sel');
-  const srcSel     = document.getElementById('src-sel');
   const clearBtn   = document.getElementById('tbl-clear');
   const varBtns    = [...document.querySelectorAll('#vars-row [data-nvars]')];
   const errBox     = document.getElementById('parse-error');
@@ -602,8 +830,12 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
   const statusEl   = document.getElementById('status');
   const nextBtn    = document.getElementById('next-btn');
   const backBtn    = document.getElementById('back-btn');
-  const restartBtn = document.getElementById('restart-btn');
   const pickBtn    = document.getElementById('pick-btn');
+  const stepBtn    = document.getElementById('step-btn');
+  const replayBtn  = document.getElementById('replay-btn');
+  const stageEl    = document.getElementById('stage');
+  const stepperEl  = document.getElementById('stepper');
+  const echoEl     = document.getElementById('echo');
   const heads = {
     expr:  document.getElementById('h-expr'),
     table: document.getElementById('h-table'),
@@ -622,13 +854,15 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
      ══════════════════════════════════════════════════════════════════════ */
 
   const S = {
+    stage:    'start',      // start | input | table | kmap | groups — the screen on show
     source:   'formula',    // formula | table — how the function is given
-    expr:     "A*B*C' + A*B*C + A'*B*C + A*B'*C",
+    expr:     '',           // nothing until the presenter types it
     modeSel:  'sop',        // sop | pos — which squares to group, how to write the answer
     dcText:   '',
     nvars:    3,            // truth-table input: how many columns
     table:    '',           // truth-table input: one char per row, '0' | '1' | 'x'
-    step:     0,            // 0 = nothing revealed yet
+    tnames:   '',           // truth-table input: the presenter's own input names
+    step:     0,            // how far the walkthrough has got, across all screens
     picking:  false,        // manual grouping mode
     sel:      [],           // cell indices picked by hand
     manual:   [],           // [{ cells, text }] terms the presenter built
@@ -637,7 +871,7 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
   };
 
   // Presentation options that come from the config panel only.
-  let OPT = { fnName: 'F', notation: 'prime', rowOrder: 'term', varsText: '' };
+  let OPT = { fnName: 'F', notation: 'prime', rowOrder: 'table', varsText: '', speed: 'normal', startMode: 'choose' };
 
   // The compiled model. Rebuilt from S.expr/dcText/mode — never synced,
   // because a viewer that has the same inputs derives the same thing.
@@ -961,13 +1195,18 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
     // it applies just as well to a function given as a truth table.
     const mode = S.modeSel === 'pos' ? 'pos' : 'sop';
 
-    let vars, n, R, rows, terms, root = null, dcs;
+    let vars, n, R, rows, terms, root = null, dcs, termShape = 'sop';
 
     if (S.source === 'table') {
       n    = Math.max(2, Math.min(4, S.nvars | 0 || 3));
       DISPLAY = {};
-      vars = OPT.varsText ? varList(OPT.varsText).slice(0, n) : FALLBACK_VARS.slice(0, n);
-      while (vars.length < n) vars.push(FALLBACK_VARS.find(v => vars.indexOf(v) < 0));
+      const typed = varList(S.tnames || '');
+      const base  = typed.length ? typed
+                  : (OPT.varsText ? varList(OPT.varsText) : FALLBACK_VARS);
+      vars = base.slice(0, n);
+      while (vars.length < n) {
+        vars.push(FALLBACK_VARS.find(v => vars.indexOf(v) < 0) || ('V' + (vars.length + 1)));
+      }
       R = 1 << n;
 
       const chars = tableChars(R);
@@ -1026,6 +1265,7 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
         ? (root.t === 'or'  ? root.xs : [root])
         : (root.t === 'and' ? root.xs : [root]);
 
+      termShape = shape;
       terms = topTerms.map(nd => {
         const hits = [];
         for (let i = 0; i < R; i++) {
@@ -1053,6 +1293,10 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
     } else {
       order = rows.map(r => r.i);
     }
+    // Which term of the formula first produced each row, for the echo that
+    // highlights the term being worked on.
+    const rowTerm = {};
+    terms.forEach((t, ti) => t.rows.forEach(i => { if (!(i in rowTerm)) rowTerm[i] = ti; }));
 
     // Groups. SOP groups the 1s; POS groups the 0s and reads each group off
     // as a sum, which is the same minimisation run on the complement.
@@ -1067,7 +1311,7 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
     }));
 
     Object.assign(out, {
-      ok: true, root, vars, n, R, rows, dcs, mode, terms, order,
+      ok: true, root, vars, n, R, rows, dcs, mode, terms, order, termShape, rowTerm,
       ones, zeros, dcList, groups,
       // A function given as a truth table is already on the screen: there is
       // no filling-in phase to walk through, so the walkthrough starts at the
@@ -1087,7 +1331,12 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
       prev.mode !== out.mode ||
       prev.tableSteps !== out.tableSteps ||
       prev.order.join(',') !== out.order.join(',');
-    if (shapeChanged) { S.step = Math.min(S.step, 0); S.sel = []; S.manual = []; S.focus = -1; }
+    if (shapeChanged) {
+      S.sel = []; S.manual = []; S.focus = -1;
+      // A screen that is already showing a finished picture shows the new
+      // one finished too, rather than jumping back to a half-drawn state.
+      S.step = isAnimated(S.stage) ? stageRange(S.stage)[1] : 0;
+    }
   }
 
   function totalSteps() {
@@ -1095,16 +1344,51 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
     return M.tableSteps + M.R + M.groups.length;
   }
 
-  // What the current step is showing: idle → truth table → map → groups.
+  /* ══════════════════════════════════════════════════════════════════════
+     Screens
+
+     start  → the two ways in
+     input  → the formula box, or the truth table to click through
+     table  → the rows filling in from the formula      (formula only)
+     kmap   → the squares filling in from the rows
+     groups → the groups circled, and the answer
+
+     S.step still counts every row, square and group across the whole walk;
+     each animated screen owns one stretch of it.
+     ══════════════════════════════════════════════════════════════════════ */
+
+  function stages() {
+    return S.source === 'table'
+      ? ['start', 'input', 'kmap', 'groups']
+      : ['start', 'input', 'table', 'kmap', 'groups'];
+  }
+  const STAGE_NAME = { input: 'Input', table: 'Truth Table', kmap: 'Karnaugh Map', groups: 'Simplify' };
+
+  function isAnimated(st) { return st === 'table' || st === 'kmap' || st === 'groups'; }
+
+  function stageRange(st) {
+    if (!M || !M.ok) return [0, 0];
+    const T = M.tableSteps, R = M.R, G = M.groups.length;
+    if (st === 'table')  return [0, T];
+    if (st === 'kmap')   return [T, T + R];
+    if (st === 'groups') return [T + R, T + R + G];
+    return [0, 0];
+  }
+
+  // What the current screen and step are showing.
   function phase() {
     if (!M || !M.ok) return { name: 'idle' };
     const s = S.step, R = M.R, T = M.tableSteps;
-    if (s <= 0) return { name: 'idle' };
-    if (s <= T) return { name: 'table', k: s - 1, row: M.order[s - 1] };
-    if (s <= T + R) return { name: 'kmap', k: s - T - 1, row: M.order[s - T - 1] };
-    // The last step is the last group: there is no separate "finished" state,
-    // because circling the final group IS the finished slide.
-    return { name: 'group', k: Math.min(s - T - R - 1, M.groups.length - 1) };
+    switch (S.stage) {
+      case 'table':
+        return s <= 0 ? { name: 'table', k: -1, row: -1 } : { name: 'table', k: s - 1, row: M.order[s - 1] };
+      case 'kmap':
+        // The map is filled straight down the truth table, row 0 first.
+        return { name: 'kmap', k: s - T - 1, row: s > T ? s - T - 1 : -1 };
+      case 'groups':
+        return { name: 'group', k: s - T - R - 1 };
+    }
+    return { name: 'idle' };
   }
 
   // With truth-table input the rows were typed, so they are all on show from
@@ -1112,18 +1396,16 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
   function rowsShown() {
     if (!M || !M.ok) return 0;
     if (!M.tableSteps) return M.R;
-    const p = phase();
-    return p.name === 'idle' ? 0 : (p.name === 'table' ? p.k + 1 : M.R);
+    if (S.stage === 'table') return Math.max(0, S.step);
+    return (S.stage === 'kmap' || S.stage === 'groups') ? M.R : 0;
   }
   function cellsShown() {
-    const p = phase();
-    if (p.name === 'idle' || p.name === 'table') return 0;
-    if (p.name === 'kmap') return p.k + 1;
-    return M.R;
+    if (S.stage === 'kmap')   return Math.max(0, phase().k + 1);
+    if (S.stage === 'groups') return M.R;
+    return 0;
   }
   function groupsShown() {
-    const p = phase();
-    return p.name === 'group' ? p.k + 1 : 0;
+    return S.stage === 'groups' ? Math.max(0, phase().k + 1) : 0;
   }
 
   /* ══════════════════════════════════════════════════════════════════════
@@ -1245,7 +1527,9 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
     const availH = kmBody.clientHeight - 10 - labelFs * 2.0;
     if (availW > 0 && availH > 0) {
       const cell = Math.max(22, Math.min(
-        Math.min(36 * u, 76),
+        // Each screen gives the map most of the slide, so it can grow well
+        // past what a quarter of it used to allow.
+        Math.min(60 * u, 110),
         availW / L.colVals.length,
         availH / L.rowVals.length));
       shell.style.setProperty('--km-cell', cell.toFixed(1) + 'px');
@@ -1268,7 +1552,9 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
     const curFs = parseFloat(getComputedStyle(probe).fontSize) || 16;
     const perFs = probe.offsetWidth / curFs;
 
-    const options = M.R === 4 ? [1] : M.R === 8 ? [1, 2] : [1, 2, 4];
+    // Always one table, top to bottom, however many rows: splitting it
+    // breaks the 0000 → 1111 order the room reads down.
+    const options = [1];
     let best = { cols: ttCols, fs: 0 };
     options.forEach(cols => {
       const lines = M.R / cols + 1;
@@ -1300,27 +1586,32 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
     shell.classList.toggle('is-viewer', IS_VIEWER);
     shell.classList.toggle('src-formula', S.source !== 'table');
     shell.classList.toggle('src-table',   S.source === 'table');
+    shell.dataset.stage = S.stage;
+    shell.classList.toggle('show-m', !!OPT.minterms);
 
     exprInput.readOnly = IS_VIEWER;
     modeSel.disabled   = IS_VIEWER;
-    srcSel.disabled    = IS_VIEWER;
-    [nextBtn, backBtn, restartBtn, pickBtn, modeSel, srcSel].forEach(b => { b.style.display = IS_VIEWER ? 'none' : ''; });
+    const animated = isAnimated(S.stage);
+    const show = (el, on) => { el.style.display = (on && !IS_VIEWER) ? '' : 'none'; };
+    show(nextBtn, S.stage !== 'start');
+    show(backBtn, S.stage !== 'start');
+    show(stepBtn, animated);
+    show(replayBtn, S.stage !== 'start');
+    show(modeSel, S.stage !== 'start');
+    show(document.getElementById('mode-sep'), S.stage !== 'start');
+    show(pickBtn, S.stage === 'groups');
     varBtns.concat([clearBtn]).forEach(b => { b.disabled = IS_VIEWER; });
 
     if (document.activeElement !== exprInput) exprInput.value = S.expr;
-    modeSel.value = S.modeSel;
-    srcSel.value  = S.source;
+    modeSel.setAttribute('aria-checked', String(S.modeSel === 'pos'));
     // The box already shows "y0 =" when it was typed, so don't say it twice.
-    if (document.activeElement !== fnInput) fnInput.value = S.fnName;
-    sizeFnInput();
-    fnInput.readOnly       = IS_VIEWER;
-    eqPrefix.style.display = splitLhs(S.expr).name ? 'none' : '';
     varBtns.forEach(b => b.classList.toggle('is-active', Number(b.dataset.nvars) === S.nvars));
 
-    heads.expr.firstElementChild.textContent =
-      S.source === 'table' ? '1 · Truth table input' : '1 · Expression';
+    heads.expr.firstElementChild.textContent = S.source === 'table' ? 'Truth table' : 'Formula';
 
+    renderStepper();
     renderExpr();
+    renderEcho();
     renderTable();
     renderMap();
     renderOut();
@@ -1328,7 +1619,39 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
     fitSizes();
   }
 
-  /* ── Top left ────────────────────────────────────────────────────────── */
+  /* ── Stepper ─────────────────────────────────────────────────────────── */
+
+  const TICK = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 6.3l2.2 2.2 4.8-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  function renderStepper() {
+    const list = stages().slice(1);
+    const at = list.indexOf(S.stage);
+    stepperEl.innerHTML = list.map((st, i) => {
+      const cls = i < at ? 'is-done' : i === at ? 'is-current' : '';
+      return (i ? '<span class="st-line' + (i <= at ? ' is-done' : '') + '"></span>' : '') +
+        '<button class="st-item ' + cls + '" data-stage="' + st + '"' + (i < at ? '' : ' tabindex="-1"') + '>' +
+        '<span class="st-n">' + (i < at ? TICK : (i + 1)) + '</span>' + STAGE_NAME[st] + '</button>';
+    }).join('');
+  }
+
+  /* ── The formula, echoed with the term being worked on ─────────────── */
+
+  function renderEcho() {
+    if (S.stage !== 'table' || !M || !M.ok || !M.terms.length) { echoEl.innerHTML = ''; return; }
+    const p = phase();
+    const shownRows = new Set(M.order.slice(0, rowsShown()));
+    const cur = p.row >= 0 && (p.row in M.rowTerm) ? M.rowTerm[p.row] : -1;
+    const sep = M.termShape === 'sop' ? '<span class="plus">+</span>' : '';
+    echoEl.innerHTML = '<span class="lhs">' + nameHtml(fnName()) + ' = </span>' +
+      M.terms.map((t, ti) => {
+        const done = [...t.rows].every(i => shownRows.has(i));
+        const cls = 'eterm' + (ti === cur ? ' is-current' : done ? ' is-done' : '');
+        return '<span class="' + cls + '">' + t.text + '</span>';
+      }).join(sep);
+  }
+
+  /* ── The formula box ─────────────────────────────────────────────────── */
+
 
   // The box, and nothing else — except when what was typed doesn't parse,
   // which the presenter has to be told.
@@ -1338,7 +1661,7 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
     if (bad) errBox.innerHTML = '<span>' + escHtml(M.error) + '</span>';
   }
 
-  /* ── Bottom left: truth table ───────────────────────────────────────── */
+  /* ── Truth table ─────────────────────────────────────────────────────── */
 
   function renderTable() {
     if (!M || !M.ok) { ttWrap.innerHTML = ''; counts.table.textContent = ''; return; }
@@ -1358,12 +1681,18 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
     const chunks = [];
     for (let s = 0; s < M.R; s += perTable) chunks.push(M.rows.slice(s, s + perTable));
 
-    const editable = S.source === 'table' && !IS_VIEWER;
+    const editable = S.source === 'table' && S.stage === 'input' && !IS_VIEWER;
 
     ttWrap.innerHTML = chunks.map(chunk => {
+      // On the input screen the column names are the presenter's to set:
+      // click a heading and type over it.
+      const nameCell = (txt, key, cls) => editable
+        ? '<th class="' + cls + ' th-name" contenteditable="plaintext-only" spellcheck="false"'
+          + ' data-vi="' + key + '" title="Click to rename">' + escHtml(txt) + '</th>'
+        : '<th class="' + cls + '">' + nameHtml(txt) + '</th>';
       const head = '<tr><th class="c-idx"></th>' +
-        M.vars.map(v => '<th>' + nameHtml(v) + '</th>').join('') +
-        '<th class="c-out">' + nameHtml(fnName()) + '</th></tr>';
+        M.vars.map((v, i) => nameCell(DISPLAY[v] || v, String(i), '')).join('') +
+        nameCell(fnName(), 'f', 'c-out') + '</tr>';
       const body = chunk.map(r => {
         const on  = revealed.has(r.i);
         const cls = ['row'];
@@ -1382,11 +1711,11 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
         head + '</thead><tbody>' + body + '</tbody></table>';
     }).join('');
 
-    counts.table.textContent = S.source === 'table' ? String(M.R) : shown + ' / ' + M.R;
+    counts.table.textContent = (S.source === 'table' || S.stage !== 'table') ? M.R + ' rows' : shown + ' / ' + M.R;
     heads.table.classList.toggle('is-live', p.name === 'table');
   }
 
-  /* ── Top right: the map ─────────────────────────────────────────────── */
+  /* ── Map ─────────────────────────────────────────────────────────────── */
 
   function renderMap() {
     if (!M || !M.ok) { kmWrap.innerHTML = ''; counts.kmap.textContent = ''; return; }
@@ -1395,7 +1724,7 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
     const p = phase();
     const hot = M.mode === 'sop' ? 1 : 0;
     const shown = cellsShown();
-    const placed = new Set(M.order.slice(0, shown));
+    const placed = new Set(M.rows.slice(0, shown).map(r => r.i));
     const target = p.name === 'kmap' ? p.row : -1;
 
     const cols = L.colVals.length, rows = L.rowVals.length;
@@ -1408,7 +1737,9 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
     L.colVals.forEach(cv => parts.push('<div class="km-lbl col">' + bitsStr(cv, L.colBits) + '</div>'));
 
     // Groups revealed so far, plus whatever the presenter has picked by hand.
-    const liveGroups = M.groups.slice(0, groupsShown());
+    const gShown = groupsShown();
+    const liveGroups = M.groups.slice(0, gShown);
+    const newGi = gShown > lastGroupsDrawn ? gShown - 1 : -1;
 
     L.rowVals.forEach(rv => {
       parts.push('<div class="km-lbl row">' + bitsStr(rv, L.rowBits) + '</div>');
@@ -1427,7 +1758,7 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
         let depth = 0;
         liveGroups.forEach(g => {
           if (g.cells.indexOf(i) < 0) return;
-          overlays.push(groupOverlay(g, i, L, depth, S.focus >= 0 && S.focus !== g.gi));
+          overlays.push(groupOverlay(g, i, L, depth, S.focus >= 0 && S.focus !== g.gi, g.gi === newGi));
           depth++;
         });
         S.manual.forEach((mt, mi) => {
@@ -1447,7 +1778,8 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
     });
 
     kmWrap.innerHTML = parts.join('');
-    counts.kmap.textContent = shown + ' / ' + M.R;
+    lastGroupsDrawn = gShown;
+    counts.kmap.textContent = S.stage === 'kmap' ? shown + ' / ' + M.R : '';
     heads.kmap.classList.toggle('is-live', p.name === 'kmap');
   }
 
@@ -1457,7 +1789,9 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
    * round the edge of the map shows up as two outlined pieces, which is how it
    * is drawn by hand and how students are asked to recognise it.
    */
-  function groupOverlay(g, i, L, depth, faded) {
+  let lastGroupsDrawn = 0, lastTermsDrawn = 0;
+
+  function groupOverlay(g, i, L, depth, faded, isNew) {
     const here = L.pos(i);
     const inGroup = (r, c) => {
       if (r < 0 || c < 0 || r >= L.rowVals.length || c >= L.colVals.length) return false;
@@ -1471,6 +1805,7 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
     const cls = ['grp', 'is-shown'];
     if (t) cls.push('g-t'); if (r) cls.push('g-r'); if (b) cls.push('g-b'); if (l) cls.push('g-l');
     if (faded) cls.push('is-faded');
+    if (isNew) cls.push('is-new');
 
     const inset = 3 + depth * 4;
     const rad = (a, c2) => (a && c2) ? '7px' : '0';
@@ -1482,7 +1817,7 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
     return '<span class="' + cls.join(' ') + '" style="' + style + '"></span>';
   }
 
-  /* ── Bottom right: groups and the simplified expression ─────────────── */
+  /* ── Groups and the simplified expression ────────────────────────────── */
 
   function renderOut() {
     if (!M || !M.ok) {
@@ -1496,8 +1831,10 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
     const p = phase();
 
     {
+      const newTerm = shown > lastTermsDrawn ? shown - 1 : -1;
+      lastTermsDrawn = shown;
       const term = (text, gi, focusable) =>
-        '<span class="gterm' + (S.focus === gi ? ' is-focus' : '') + '"' +
+        '<span class="gterm' + (S.focus === gi ? ' is-focus' : '') + (gi === newTerm ? ' is-new' : '') + '"' +
         (focusable ? ' data-group="' + gi + '"' : '') +
         ' style="--c:var(--kg-' + (gi % 6) + ')">' + text + '</span>';
 
@@ -1584,19 +1921,31 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
   }
 
   function renderStatus() {
-    if (!M || !M.ok) { statusEl.textContent = M && M.error ? 'check expression' : 'ready'; return; }
     const p = phase();
-    const total = totalSteps();
-    let txt;
-    switch (p.name) {
-      case 'idle':  txt = 'ready · ' + total + ' steps'; break;
-      case 'table': txt = 'truth table ' + (p.k + 1) + '/' + M.R; break;
-      case 'kmap':  txt = 'map ' + (p.k + 1) + '/' + M.R; break;
-      default:      txt = 'group ' + (p.k + 1) + '/' + M.groups.length; break;
-    }
+    let txt = '';
+    if (M && M.error) txt = 'check the formula';
+    else if (S.stage === 'start') txt = 'choose an input';
+    else if (S.stage === 'input') txt = S.source === 'table' ? 'click F to set each row' : 'type a formula';
+    else if (p.name === 'table')  txt = 'row ' + Math.max(0, p.k + 1) + ' / ' + M.R;
+    else if (p.name === 'kmap')   txt = 'square ' + Math.max(0, p.k + 1) + ' / ' + M.R;
+    else if (p.name === 'group')  txt = M.groups.length
+      ? 'group ' + Math.max(0, p.k + 1) + ' / ' + M.groups.length : 'no groups needed';
     statusEl.textContent = txt + (S.picking ? ' · selecting' : '');
-    nextBtn.disabled = S.step >= total;
-    backBtn.disabled = S.step <= 0;
+
+    const list = stages();
+    const last = S.stage === list[list.length - 1];
+    const end = stageRange(S.stage)[1];
+    const running = isAnimated(S.stage) && S.step < end;
+    const playing = !!playTimer;
+    nextBtn.disabled = S.stage === 'start' ||
+      (S.stage === 'input' && !(M && M.ok)) ||
+      (last && !running);
+    nextBtn.textContent = running ? (playing ? 'Skip' : 'Play') : 'Next';
+    nextBtn.title = running
+      ? (playing ? 'Show the rest of this screen now' : 'Start this screen')
+      : 'Next screen';
+    backBtn.disabled = S.stage === 'start';
+    stepBtn.disabled = !running;
     pickBtn.classList.toggle('is-active', S.picking);
   }
 
@@ -1604,20 +1953,121 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
      Actions
      ══════════════════════════════════════════════════════════════════════ */
 
-  function step(delta) {
-    if (IS_VIEWER || !M || !M.ok) return;
-    const total = totalSteps();
-    const next = Math.max(0, Math.min(total, S.step + delta));
-    if (next === S.step) return;
-    S.step = next;
+  const SPEEDS = {
+    slow:   { table: 800, kmap: 750, groups: 1500, lead: 600 },
+    normal: { table: 430, kmap: 420, groups: 1000, lead: 450 },
+    fast:   { table: 200, kmap: 200, groups: 550,  lead: 250 },
+  };
+  let playTimer = null;
+
+  function stopPlay() {
+    clearTimeout(playTimer);
+    playTimer = null;
+  }
+
+  // Walk the current screen forward on its own, one row, square or group at
+  // a time, and stop at the end of it: moving on is always the presenter's
+  // call.
+  function play(lead) {
+    stopPlay();
+    if (IS_VIEWER || !isAnimated(S.stage)) return;
+    const end = stageRange(S.stage)[1];
+    if (S.step >= end) { renderStatus(); return; }
+    const sp = SPEEDS[OPT.speed] || SPEEDS.normal;
+    const tickOnce = () => {
+      S.step = Math.min(end, S.step + 1);
+      S.focus = -1;
+      playTimer = S.step < end ? setTimeout(tickOnce, sp[S.stage]) : null;
+      render(); emitState();
+    };
+    playTimer = setTimeout(tickOnce, lead ? sp.lead : sp[S.stage]);
+    renderStatus();
+  }
+
+  function enterAnimation() {
+    stageEl.classList.remove('is-entering');
+    void stageEl.offsetWidth;
+    stageEl.classList.add('is-entering');
+    clearTimeout(enterAnimation.t);
+    enterAnimation.t = setTimeout(() => stageEl.classList.remove('is-entering'), 700);
+  }
+
+  // Forward: the screen starts empty and waits — the next click on Next is
+  // what sets it going. Backward: it comes back as it was left, finished,
+  // with nothing to sit through again.
+  function goStage(st) {
+    if (st !== 'start' && st !== 'input' && !(M && M.ok)) return;
+    const list = stages();
+    if (list.indexOf(st) < 0) return;
+    const forward = list.indexOf(st) > list.indexOf(S.stage);
+    stopPlay();
+    S.stage = st;
+    S.picking = false; S.sel = []; S.focus = -1;
+    lastGroupsDrawn = 0; lastTermsDrawn = 0;
+    if (isAnimated(st)) {
+      const r = stageRange(st);
+      S.step = forward ? r[0] : r[1];
+    } else {
+      S.step = 0;
+    }
+    enterAnimation();
+    render(); emitState();
+  }
+
+  // Next, on an animated screen: start it (or carry on after a pause), then
+  // skip to the end if it is still playing, then move to the next screen.
+  function next() {
+    if (IS_VIEWER) return;
+    const list = stages();
+    if (S.stage === 'start') return;
+    if (S.stage === 'input') { if (M && M.ok) goStage(list[list.indexOf('input') + 1]); return; }
+    const end = stageRange(S.stage)[1];
+    if (S.step < end) {
+      if (!playTimer) { play(false); return; }
+      stopPlay();
+      S.step = end;
+      S.focus = -1;
+      render(); emitState();
+      return;
+    }
+    const i = list.indexOf(S.stage);
+    if (i < list.length - 1) goStage(list[i + 1]);
+  }
+
+  function back() {
+    if (IS_VIEWER) return;
+    const list = stages();
+    const i = list.indexOf(S.stage);
+    if (i > 0) goStage(list[i - 1]);
+  }
+
+  // One row, square or group, and stop.
+  function stepOnce() {
+    if (IS_VIEWER || !isAnimated(S.stage)) return;
+    const end = stageRange(S.stage)[1];
+    stopPlay();
+    if (S.step < end) S.step += 1;
     S.focus = -1;
     render(); emitState();
   }
 
+
+  // Back to the beginning: the choice, or the input the deck named.
   function restart() {
     if (IS_VIEWER) return;
-    S.step = 0; S.focus = -1; S.sel = []; S.manual = [];
-    render(); emitState();
+    stopPlay();
+    S.manual = [];
+    const first = OPT.startMode === 'choose' ? 'start' : 'input';
+    S.stage = 'groups';   // so the move reads as going back
+    if (stages().indexOf('groups') < 0) S.stage = first;
+    goStage(first);
+  }
+
+  function chooseSource(src) {
+    if (IS_VIEWER) return;
+    if (src !== S.source) setSource(src);
+    goStage('input');
+    if (src === 'formula') setTimeout(() => { try { exprInput.focus(); } catch (_) {} }, 60);
   }
 
   function togglePicking() {
@@ -1655,20 +2105,6 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
     compile(); render(); emitState(); pushSetting({ expression: value });
   }
 
-  function sizeFnInput() {
-    fnInput.style.width = Math.max(1, fnInput.value.length) + 0.3 + 'ch';
-  }
-
-  // Anything goes as a name except the characters that would read as part
-  // of the expression; an emptied box falls back to F.
-  function setFnName(value, final) {
-    if (IS_VIEWER) return;
-    const clean = String(value || '').replace(/[\s=+*()'!~|&]/g, '').slice(0, 16);
-    if (!clean && !final) return;
-    S.fnName = clean || 'F';
-    if (final) fnInput.value = S.fnName;
-    render(); emitState(); pushSetting({ fnName: S.fnName });
-  }
 
   function setDontCares(value) {
     if (IS_VIEWER) return;
@@ -1713,6 +2149,54 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
     S.table = chars.join('');
     compile(); render(); emitState(); pushSetting({ truthTable: S.table });
   }
+
+  // Renaming a column. A name has to be a name — a letter then letters,
+  // digits or an underscore — and no two columns may share one, so a rejected
+  // edit simply snaps back to what was there.
+  const NAME_RE = /^[A-Za-z][A-Za-z0-9_]*$/;
+
+  function commitName(cell) {
+    if (IS_VIEWER || !M || !M.ok) return;
+    const raw = (cell.textContent || '').replace(/\s+/g, '').slice(0, 6);
+    const key = cell.dataset.vi;
+
+    // Nothing to redraw when the edit changes nothing: put the heading back
+    // as it was, so a click straight onto the next heading still lands.
+    const keep = txt => { if (cell.textContent !== txt) cell.textContent = txt; };
+
+    if (key === 'f') {
+      if (!NAME_RE.test(raw) || raw === fnName()) { keep(fnName()); return; }
+      S.fnName = raw;
+      pushSetting({ fnName: raw });
+    } else {
+      const names = M.vars.map(v => DISPLAY[v] || v);
+      const i = Number(key);
+      const clash = names.some((nm, j) => j !== i && varKey(nm) === varKey(raw));
+      if (!NAME_RE.test(raw) || clash || names[i] === raw) { keep(names[i]); return; }
+      names[i] = raw;
+      S.tnames = names.join(' ');
+      pushSetting({ tableNames: S.tnames });
+    }
+    compile(); render(); emitState();
+  }
+
+  ttWrap.addEventListener('focusout', e => {
+    const cell = e.target.closest && e.target.closest('.th-name');
+    if (cell) commitName(cell);
+  });
+
+  ttWrap.addEventListener('keydown', e => {
+    const cell = e.target.closest && e.target.closest('.th-name');
+    if (!cell) return;
+    e.stopPropagation();              // the stage keys are not for typing into
+    if (e.key === 'Enter')  { e.preventDefault(); cell.blur(); }
+    if (e.key === 'Escape') { e.preventDefault(); render(); }
+  });
+
+  // A click on a heading is a click into the text, nothing more.
+  ttWrap.addEventListener('click', e => {
+    if (e.target.closest && e.target.closest('.th-name')) e.stopPropagation();
+  });
 
   function clearTable() {
     if (IS_VIEWER) return;
@@ -1775,8 +2259,9 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
 
   function getState() {
     return {
+      stage: S.stage,
       source: S.source, expr: S.expr, modeSel: S.modeSel, dcText: S.dcText,
-      nvars: S.nvars, table: S.table,
+      nvars: S.nvars, table: S.table, tnames: S.tnames,
       step: S.step, picking: S.picking,
       sel: S.sel.slice(0, 16),
       manual: S.manual.slice(0, 12),
@@ -1793,8 +2278,18 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
     if (s.dcText  != null) S.dcText  = s.dcText;
     if (s.nvars   != null) S.nvars   = Math.max(2, Math.min(4, s.nvars | 0));
     if (s.table   != null) S.table   = String(s.table);
+    if (s.tnames  != null) S.tnames  = String(s.tnames);
     compile();
     if (s.step    != null) S.step    = Math.max(0, Math.min(totalSteps(), s.step));
+    if (['start', 'input', 'table', 'kmap', 'groups'].indexOf(s.stage) >= 0) {
+      if (s.stage !== S.stage) { enterAnimation(); lastGroupsDrawn = 0; lastTermsDrawn = 0; }
+      S.stage = s.stage;
+    } else if (s.step != null) {
+      // Saved before the widget had screens: work out which one the step was on.
+      const T = M && M.ok ? M.tableSteps : 0, R = M && M.ok ? M.R : 0;
+      S.stage = S.step <= 0 ? 'input' : S.step <= T ? 'table' : S.step <= T + R ? 'kmap' : 'groups';
+    }
+    if (stages().indexOf(S.stage) < 0) S.stage = 'input';
     if (s.picking != null) S.picking = !!s.picking;
     if (Array.isArray(s.sel))    S.sel    = s.sel.slice();
     if (Array.isArray(s.manual)) S.manual = s.manual.slice();
@@ -1808,7 +2303,7 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
      ══════════════════════════════════════════════════════════════════════ */
 
   let lastCfgExpr = null, lastCfgDc = null, lastCfgFn = null, lastCfgMode = null,
-      lastCfgSrc = null, lastCfgTable = null, lastCfgVars = null;
+      lastCfgSrc = null, lastCfgTable = null, lastCfgVars = null, lastCfgNames = null;
 
   function applyConfig(c) {
     if (!c) return;
@@ -1820,8 +2315,11 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
     OPT = {
       fnName:       (cfg.fnName || 'F').trim() || 'F',
       notation:     cfg.notation === 'bar' ? 'bar' : 'prime',
-      rowOrder:     cfg.rowOrder === 'table' ? 'table' : 'term',
+      rowOrder:     cfg.rowOrder === 'term' ? 'term' : 'table',
       varsText:     (cfg.vars || '').trim(),
+      minterms:     cfg.minterms === true || cfg.minterms === 'true',
+      speed:        ['slow', 'fast'].indexOf(cfg.speed) >= 0 ? cfg.speed : 'normal',
+      startMode:    (cfg.inputMode === 'formula' || cfg.inputMode === 'table') ? 'direct' : 'choose',
     };
 
     // Only adopt a config value when it actually changed, so re-applying the
@@ -1845,12 +2343,23 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
     }
     if (cfg.inputMode != null && cfg.inputMode !== lastCfgSrc) {
       lastCfgSrc = cfg.inputMode;
-      S.source = cfg.inputMode === 'table' ? 'table' : 'formula';
+      // A deck that names its input opens straight on it; otherwise the
+      // presenter is offered the choice.
+      if (cfg.inputMode === 'formula' || cfg.inputMode === 'table') {
+        S.source = cfg.inputMode;
+        S.stage = 'input';
+      } else {
+        S.stage = 'start';
+      }
       S.step = 0;
     }
     if (cfg.tableVars != null && cfg.tableVars !== lastCfgVars) {
       lastCfgVars = cfg.tableVars;
       S.nvars = Math.max(2, Math.min(4, parseInt(cfg.tableVars, 10) || 3));
+    }
+    if (cfg.tableNames != null && cfg.tableNames !== lastCfgNames) {
+      lastCfgNames = cfg.tableNames;
+      S.tnames = String(cfg.tableNames);
     }
     if (cfg.truthTable != null && cfg.truthTable !== lastCfgTable) {
       lastCfgTable = cfg.truthTable;
@@ -1864,6 +2373,7 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
   }
 
   function destroy() {
+    stopPlay();
     clearTimeout(syncTimer);
     clearTimeout(settingTimer);
     if (fitObs) { fitObs.disconnect(); fitObs = null; }
@@ -1892,33 +2402,45 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
      Events
      ══════════════════════════════════════════════════════════════════════ */
 
-  nextBtn   .addEventListener('click', e => { e.stopPropagation(); step(1); });
-  backBtn   .addEventListener('click', e => { e.stopPropagation(); step(-1); });
-  restartBtn.addEventListener('click', e => { e.stopPropagation(); restart(); });
+  nextBtn   .addEventListener('click', e => { e.stopPropagation(); next(); });
+  backBtn   .addEventListener('click', e => { e.stopPropagation(); back(); });
+  stepBtn   .addEventListener('click', e => { e.stopPropagation(); stepOnce(); });
+  replayBtn .addEventListener('click', e => { e.stopPropagation(); restart(); });
   pickBtn   .addEventListener('click', e => { e.stopPropagation(); togglePicking(); });
   manualAdd .addEventListener('click', e => { e.stopPropagation(); addManualTerm(); });
   manualClr .addEventListener('click', e => { e.stopPropagation(); S.sel = []; render(); emitState(); });
 
   let exprTimer = null;
-  fnInput.addEventListener('input', () => { sizeFnInput(); setFnName(fnInput.value, false); });
-  fnInput.addEventListener('change', () => setFnName(fnInput.value, true));
-  fnInput.addEventListener('keydown', e => {
-    if (e.key === 'Enter') { e.preventDefault(); exprInput.focus(); }
-  });
 
   exprInput.addEventListener('input', () => {
     clearTimeout(exprTimer);
     exprTimer = setTimeout(() => setExpr(exprInput.value), 220);
   });
   exprInput.addEventListener('change', () => { clearTimeout(exprTimer); setExpr(exprInput.value); });
+  exprInput.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    clearTimeout(exprTimer);
+    setExpr(exprInput.value);
+    next();
+  });
 
-  modeSel.addEventListener('change', () => {
+  document.querySelectorAll('.start-card').forEach(c =>
+    c.addEventListener('click', e => { e.stopPropagation(); chooseSource(c.dataset.src); }));
+
+
+  stepperEl.addEventListener('click', e => {
+    const it = e.target.closest('.st-item.is-done');
+    if (it && !IS_VIEWER) goStage(it.dataset.stage);
+  });
+
+  modeSel.addEventListener('click', e => {
+    e.stopPropagation();
     if (IS_VIEWER) return;
-    S.modeSel = modeSel.value === 'pos' ? 'pos' : 'sop';
+    S.modeSel = S.modeSel === 'pos' ? 'sop' : 'pos';
     compile(); render(); emitState(); pushSetting({ mode: S.modeSel });
   });
 
-  srcSel  .addEventListener('change', () => setSource(srcSel.value));
   clearBtn.addEventListener('click', e => { e.stopPropagation(); clearTable(); });
   varBtns .forEach(b => b.addEventListener('click', e => {
     e.stopPropagation(); setVarCount(Number(b.dataset.nvars));
@@ -1926,9 +2448,10 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
 
   // Stepping is the buttons' job and nothing else's — a stray click on the
   // slide while pointing at something must never move the walkthrough on.
-  // The only clicks the panes take are the two that are their own controls:
-  // picking squares for a group, and pulling one term out of the answer.
-  document.getElementById('quads').addEventListener('click', e => {
+  // The only clicks the panels take are their own controls: a truth-table
+  // row's output, picking squares for a group, and pulling one term out of
+  // the answer.
+  stageEl.addEventListener('click', e => {
     if (IS_VIEWER) return;
 
     const cell = e.target.closest('.km-cell');
@@ -1964,7 +2487,7 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
   compile();
   render();
 
-  // "Reset widget" in the shared bar means back to the first step, not a
+  // "Reset widget" in the shared bar means back to the first screen, not a
   // reload that would throw away the expression the presenter typed.
   (function wireReset(tries) {
     if (window.BeamerWidget && BeamerWidget.topbar) { BeamerWidget.topbar.onReset(restart); return; }
@@ -1973,7 +2496,8 @@ sub { font-size: 0.68em; line-height: 0; vertical-align: -0.28em; }
 
   // Exposed for the harness that tests the parser and the solver.
   window.__kmap = { parse, evalNode, envOf, primeImplicants, minimalCover, cellsOf,
-                    compile, get model() { return M; }, S, OPT };
+                    compile, goStage, next, back, get model() { return M; }, S,
+                    get OPT() { return OPT; } };
 })();
 </script>
 </body>

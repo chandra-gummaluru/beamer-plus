@@ -8,118 +8,64 @@
   "fields": []
 }
 </script>
+<!-- Standalone fallback. Inside Beamer+ the host injects the shared widget
+     base (tokens, fonts, toolbar, buttons) ahead of everything else. Opened
+     directly (a file in Edge, a plain web server) nothing does, so load the
+     same stylesheet from the repo, relative to this file, at the same point in
+     the cascade. Beamer+ is unaffected: its link is already present. -->
+<script id="bw-standalone">
+(function () {
+  if (document.querySelector('link[href*="widget-base.css"]')) return;
+  var head = document.head || document.getElementsByTagName('head')[0];
+  [['preconnect', 'https://fonts.googleapis.com'],
+   ['stylesheet', 'https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@400;500;600&display=swap'],
+   ['stylesheet', '../static/css/widget-base.css']].forEach(function (l) {
+    var el = document.createElement('link');
+    el.rel = l[0]; el.href = l[1];
+    head.appendChild(el);
+  });
+  document.documentElement.setAttribute('data-bw-standalone', '');
+})();
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Calculator — Beamer+</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@400;500;600&display=swap');
+/* Tokens, reset, toolbar and buttons come from the shared widget base
+   (static/css/widget-base.css). What's left here is the calculator: a display
+   sized to be read from the back of the room, a keypad that fills whatever
+   the slide gives it, and the running history beside it. */
 
-/* ── Tokens ──────────────────────────────────────────── */
-:root {
-  --bg:           #ffffff;
-  --bg-subtle:    #f9f9f8;
-  --bg-output:    #fafaf9;
-  --border:       #e9e9e6;
-  --border-med:   #d4d4cf;
-  --text:         #1a1a18;
-  --text-2:       #6b6b65;
-  --text-3:       #aeaea5;
-  --accent:       #52524e;
-  --accent-bg:    #f0f0ee;
-  --green:        #15803d;
-  --amber:        #b45309;
-  --red:          #dc2626;
-  --red-bg:       #fef2f2;
-  --radius:       6px;
-  --font-mono:    'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
-  --font-ui:      'DM Sans', system-ui, sans-serif;
-}
-
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-ui);
-  font-size: calc(13px * var(--u));
-  display: flex;
-  flex-direction: column;
-}
-
-/* ── Toolbar ─────────────────────────────────────────── */
-#toolbar {
-  flex-shrink: 0;
-  height: 42px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg);
-  display: flex;
-  align-items: center;
-  padding: 0 14px;
-  gap: 5px;
-}
-
-.toolbar-title {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text);
-}
-
-.sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; flex-shrink: 0; }
-
-.tb-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 28px;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-ui);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.1s, border-color 0.1s;
-}
-.tb-btn:hover:not(:disabled) { background: var(--bg-subtle); border-color: var(--border-med); }
-.tb-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-
-.viewer-badge {
-  margin-left: auto;
-  font-size: 11px;
-  color: var(--text-3);
-  font-family: var(--font-mono);
-  display: none;
-}
-
-/* ── Main layout ─────────────────────────────────────── */
 #main {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   overflow: hidden;
 }
 
-/* ── Calculator panel ────────────────────────────────── */
+/* ── The calculator ──────────────────────────────────── */
 #calc-panel {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  padding: 12px;
   gap: 10px;
+  padding: 12px 14px 14px;
   overflow: hidden;
-  min-width: 0;
+  container-type: size;
 }
 
 /* ── Display ─────────────────────────────────────────── */
+/* The expression on top, its value underneath in the largest type the
+   region allows: on a slide the answer is the thing being looked at. */
 #display {
-  flex-shrink: 0;
+  flex: 0 0 auto;
   background: var(--bg-output);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 10px 13px 11px;
+  padding: min(3.2cqh, 14px) 16px min(3.6cqh, 15px);
 }
 
 #expr-input {
@@ -128,136 +74,146 @@ body {
   outline: none;
   background: transparent;
   font-family: var(--font-mono);
-  font-size: calc(15px * var(--u));
+  font-size: clamp(15px, min(4.4cqw, 9cqh), 42px);
+  line-height: 1.35;
   color: var(--text);
   caret-color: var(--accent);
-  line-height: 1.5;
 }
-#expr-input::placeholder { color: var(--text-3); }
+#expr-input::placeholder { color: var(--text-3); opacity: 0.6; }
 #expr-input:read-only { cursor: default; }
 
-#display-sep {
-  height: 1px;
-  background: var(--border);
-  margin: 8px 0 7px;
-}
+#display-sep { height: 1px; background: var(--border); margin: min(1.4cqh, 8px) 0; }
 
 #result {
   font-family: var(--font-mono);
-  font-size: calc(22px * var(--u));
+  font-size: clamp(22px, min(8cqw, 15cqh), 92px);
   font-weight: 500;
   letter-spacing: -0.02em;
+  line-height: 1.1;
   color: var(--text-3);
-  min-height: 28px;
-  line-height: 1.2;
-  transition: color 0.12s;
+  min-height: 1.1em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition: color 0.12s;
 }
-#result.ok  { color: var(--text-2); }
-#result.err { color: var(--red); font-size: calc(13px * var(--u)); padding-top: 4px; font-weight: 400; letter-spacing: 0; }
+#result.ok  { color: var(--text); }
+#result.err {
+  color: var(--err);
+  font-size: clamp(13px, min(3.4cqw, 6cqh), 28px);
+  font-weight: 400;
+  letter-spacing: 0;
+}
 
-/* ── Button sections ─────────────────────────────────── */
+/* ── Keypad ──────────────────────────────────────────── */
+/* Six rows that share the leftover height, so the keys are as big as the
+   slide allows and never need scrolling. */
 #buttons {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-#buttons::-webkit-scrollbar { width: 4px; }
-#buttons::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
-
-.section-label {
-  font-size: calc(10.5px * var(--u));
-  font-weight: 500;
-  color: var(--text-3);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 0 1px;
-  user-select: none;
-}
-
-.btn-grid {
+  flex: 1 1 auto;
+  min-height: 0;
   display: grid;
-  gap: 5px;
+  grid-template-columns: repeat(5, 1fr);
+  grid-auto-rows: 1fr;
+  gap: min(1.2cqh, 7px) 7px;
 }
-.btn-grid.cols-5 { grid-template-columns: repeat(5, 1fr); }
-.btn-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
 
-/* ── Calc button base ────────────────────────────────── */
 .cbtn {
   font-family: var(--font-ui);
-  font-size: calc(13px * var(--u));
+  font-size: clamp(12px, min(2.6cqw, 4.6cqh), 30px);
   font-weight: 500;
   color: var(--text);
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  min-height: 0;
   padding: 0;
-  height: 40px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.08s, border-color 0.08s, color 0.08s;
   white-space: nowrap;
-  overflow: hidden;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
+  transition: background 0.08s, border-color 0.08s, color 0.08s;
 }
 .cbtn:hover:not(:disabled)  { background: var(--bg-subtle); border-color: var(--border-med); }
 .cbtn:active:not(:disabled) { background: var(--accent-bg); border-color: var(--border-med); }
 .cbtn:disabled { opacity: 0.4; cursor: default; }
 
-/* Function button — slightly muted */
+/* Functions read as the quieter half of the keypad. */
 .cbtn.fn {
-  font-size: calc(12px * var(--u));
+  font-family: var(--font-mono);
+  font-size: clamp(11px, min(2.2cqw, 3.9cqh), 24px);
   color: var(--text-2);
   background: var(--bg-subtle);
-  font-family: var(--font-mono);
 }
-.cbtn.fn:hover:not(:disabled) { background: #f0f0ee; }
-
-/* Operator buttons */
-.cbtn.op {
-  color: var(--text-2);
-  font-size: calc(16px * var(--u));
-}
-
-/* Primary: = */
+.cbtn.op   { color: var(--text-2); }
+.cbtn.back { color: var(--text-2); }
 .cbtn.primary {
   background: var(--text);
-  color: #fff;
   border-color: var(--text);
-  font-size: calc(18px * var(--u));
+  color: var(--bg);
 }
-.cbtn.primary:hover:not(:disabled) { background: #2d2d2a; border-color: #2d2d2a; }
-.cbtn.primary:active:not(:disabled) { background: #111110; }
+.cbtn.primary:hover:not(:disabled) { background: var(--text-2); border-color: var(--text-2); }
+.cbtn.danger { color: var(--err); }
+.cbtn.danger:hover:not(:disabled) { background: var(--err-bg); border-color: var(--err); }
+.cbtn sup { font-size: 0.66em; }
 
-/* Clear */
-.cbtn.danger {
-  color: var(--red);
+/* ── History ─────────────────────────────────────────── */
+/* No header of its own: the top bar clears it, and each line says what it
+   is. Hidden entirely when the presenter doesn't want it on the slide. */
+#history-panel {
+  width: 300px;
+  flex: 0 0 auto;
+  min-width: 0;
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: var(--bg);
+  container-type: inline-size;
 }
-.cbtn.danger:hover:not(:disabled) { background: var(--red-bg); border-color: #fca5a5; }
+body.no-history #history-panel,
+body.no-history .split-handle { display: none; }
 
-/* Backspace */
-.cbtn.back {
-  color: var(--text-2);
-  font-size: calc(16px * var(--u));
+#history-list { flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; }
+#history-list::-webkit-scrollbar { width: 5px; }
+#history-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+
+.hist-empty { display: none; }
+
+.hist-item {
+  padding: min(2.6cqw, 12px) 14px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.hist-item:hover { background: var(--bg-subtle); }
+#shell.is-viewer .hist-item { cursor: default; }
+
+.hist-expr {
+  font-family: var(--font-mono);
+  font-size: clamp(11px, 4.4cqw, 22px);
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hist-result {
+  font-family: var(--font-mono);
+  font-size: clamp(13px, 6cqw, 30px);
+  font-weight: 500;
+  color: var(--text);
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ── Split handle ────────────────────────────────────── */
 /* Zero-width in the layout; the hit area straddles the history border so
    dragging doesn't shift either pane by the handle's own width. */
-.split-handle {
-  flex: 0 0 0;
-  position: relative;
-  z-index: 20;
-}
+.split-handle { flex: 0 0 0; position: relative; z-index: 20; }
 .split-handle::before {
   content: '';
   position: absolute;
@@ -279,140 +235,38 @@ body {
 .split-handle.dragging::after { opacity: 1; }
 body.splitting, body.splitting * { cursor: col-resize !important; user-select: none !important; }
 
-/* ── History panel ───────────────────────────────────── */
-#history-panel {
-  width: 300px;
-  flex-shrink: 0;
-  border-left: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--bg);
-}
+/* The audience sees the numbers, not a notice about them. */
+#viewer-toast, #viewer-badge { display: none !important; }
 
-#history-header {
-  flex-shrink: 0;
-  height: 38px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  padding: 0 12px;
-  gap: 6px;
-}
-
-#history-title {
-  font-size: calc(12px * var(--u));
-  font-weight: 500;
-  color: var(--text-2);
-  flex: 1;
-}
-
-#history-clear {
-  background: none;
-  border: none;
-  padding: 2px 5px;
-  font-size: calc(11px * var(--u));
-  color: var(--text-3);
-  cursor: pointer;
-  border-radius: 3px;
-  font-family: var(--font-ui);
-  transition: color 0.1s, background 0.1s;
-}
-#history-clear:hover { color: var(--red); background: var(--red-bg); }
-
-#history-list {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-#history-list::-webkit-scrollbar { width: 4px; }
-#history-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
-
-.hist-empty {
-  padding: 24px 12px;
-  font-size: calc(12px * var(--u));
-  color: var(--text-3);
-  text-align: center;
-  line-height: 1.6;
-}
-
-.hist-item {
-  padding: 9px 12px;
-  border-bottom: 1px solid var(--border);
-  cursor: pointer;
-  transition: background 0.1s;
-}
-.hist-item:hover { background: var(--bg-subtle); }
-.hist-item:last-child { border-bottom: none; }
-
-.hist-expr {
-  font-family: var(--font-mono);
-  font-size: calc(11px * var(--u));
-  color: var(--text-2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.hist-result {
-  font-family: var(--font-mono);
-  font-size: calc(13px * var(--u));
-  font-weight: 500;
-  color: var(--text);
-  margin-top: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* ── Viewer toast ────────────────────────────────────── */
-#viewer-toast {
-  position: fixed;
-  bottom: 14px; right: 14px;
-  background: var(--text);
-  color: #fff;
-  font-size: calc(11.5px * var(--u));
-  font-family: var(--font-ui);
-  padding: 5px 12px;
-  border-radius: 5px;
-  opacity: 0.8;
-  pointer-events: none;
-  display: none;
-  z-index: 100;
-}
+/* A narrow slide region keeps the keypad and drops the rest. */
+@media (max-width: 620px) { #history-panel, .split-handle { display: none; } }
+@media (max-width: 460px) { .bw-toolbar-title, .bw-toolbar-title + .bw-sep { display: none !important; } }
 </style>
 </head>
 <body>
+<div id="shell" class="bw-shell">
 
-<!-- ── Toolbar ──────────────────────────────────────── -->
-<div id="toolbar" data-bw-topbar>
-  <span class="toolbar-title">Calculator</span>
-  <div class="sep"></div>
-  <button class="tb-btn" id="btn-clear-hist">Clear History</button>
-  <span class="viewer-badge" id="viewer-badge">view only</span>
-</div>
+  <div id="toolbar" class="bw-toolbar" data-bw-topbar>
+    <span class="bw-toolbar-title">Calculator</span>
+    <div class="bw-sep"></div>
+    <button class="bw-btn" id="btn-history" aria-pressed="true" title="Show or hide the history">History</button>
+    <button class="bw-btn" id="btn-clear-hist" title="Empty the history">Clear history</button>
+    <div class="bw-spacer"></div>
+    <span class="bw-status" id="viewer-badge">view only</span>
+  </div>
 
-<!-- ── Main ─────────────────────────────────────────── -->
-<div id="main">
+  <div id="main">
 
-  <!-- Left: calculator -->
-  <div id="calc-panel">
+    <div id="calc-panel">
+      <div id="display">
+        <input id="expr-input" type="text" spellcheck="false"
+               autocomplete="off" autocorrect="off" placeholder="Type or tap an expression" />
+        <div id="display-sep"></div>
+        <div id="result"></div>
+      </div>
 
-    <!-- Display -->
-    <div id="display">
-      <input id="expr-input" type="text" spellcheck="false"
-             autocomplete="off" autocorrect="off"
-             placeholder="Enter expression…" />
-      <div id="display-sep"></div>
-      <div id="result"></div>
-    </div>
-
-    <!-- Buttons -->
-    <div id="buttons">
-
-      <!-- Functions section -->
-      <div class="section-label">Functions</div>
-      <div class="btn-grid cols-5">
+      <div id="buttons">
+        <!-- Functions -->
         <button class="cbtn fn" data-insert="sin(">sin</button>
         <button class="cbtn fn" data-insert="cos(">cos</button>
         <button class="cbtn fn" data-insert="tan(">tan</button>
@@ -424,65 +278,50 @@ body.splitting, body.splitting * { cursor: col-resize !important; user-select: n
         <button class="cbtn fn" id="btn-ans">ans</button>
         <button class="cbtn fn" id="btn-frac">a/b</button>
         <button class="cbtn fn" data-insert="(">( )</button>
-      </div>
 
-      <!-- Numpad + operators -->
-      <div class="section-label" style="margin-top:2px">Numpad</div>
-      <div class="btn-grid cols-5">
-
-        <!-- Row 1: modifiers. Exactly five per row — a short row shifts every
-             digit below it one cell and scrambles the keypad. -->
+        <!-- Exactly five per row — a short row shifts every digit below it
+             one cell and scrambles the keypad. -->
         <button class="cbtn fn" data-insert=")">)</button>
         <button class="cbtn fn" data-insert="^">x<sup>y</sup></button>
         <button class="cbtn fn" data-insert="π">π</button>
         <button class="cbtn fn" data-insert="e">e</button>
         <button class="cbtn op" data-insert="%">%</button>
 
-        <!-- Row 2 -->
         <button class="cbtn" data-insert="7">7</button>
         <button class="cbtn" data-insert="8">8</button>
         <button class="cbtn" data-insert="9">9</button>
         <button class="cbtn op" data-insert="×">×</button>
         <button class="cbtn op" data-insert="÷">÷</button>
 
-        <!-- Row 3 -->
         <button class="cbtn" data-insert="4">4</button>
         <button class="cbtn" data-insert="5">5</button>
         <button class="cbtn" data-insert="6">6</button>
         <button class="cbtn op" data-insert="+">+</button>
         <button class="cbtn op" data-insert="−">−</button>
 
-        <!-- Row 4 -->
         <button class="cbtn" data-insert="1">1</button>
         <button class="cbtn" data-insert="2">2</button>
         <button class="cbtn" data-insert="3">3</button>
         <button class="cbtn danger" id="btn-clear">C</button>
         <button class="cbtn back" id="btn-back">⌫</button>
 
-        <!-- Row 5: 0 sits under 2, like a phone/calculator keypad -->
+        <!-- 0 sits under 2, like any keypad -->
         <button class="cbtn" data-insert="0" style="grid-column: 2">0</button>
         <button class="cbtn" data-insert=".">.</button>
         <button class="cbtn primary" id="btn-eq" style="grid-column: span 2">=</button>
-
       </div>
     </div>
-  </div>
 
-  <div class="split-handle" id="split-handle" title="Drag to resize · double-click to reset"></div>
+    <div class="split-handle" id="split-handle" title="Drag to resize · double-click to reset"></div>
 
-  <!-- Right: history -->
-  <div id="history-panel">
-    <div id="history-header">
-      <span id="history-title">History</span>
-      <button id="history-clear">Clear</button>
-    </div>
-    <div id="history-list">
-      <div class="hist-empty">No calculations yet.</div>
+    <div id="history-panel">
+      <div id="history-list"><div class="hist-empty"></div></div>
+      <button id="history-clear" hidden></button>
     </div>
   </div>
+
+  <div id="viewer-toast" hidden></div>
 </div>
-
-<div id="viewer-toast">View-only · synced with presenter</div>
 
 <script src="/static/vendor/socket.io.min.js"></script>
 
@@ -589,33 +428,41 @@ body.splitting, body.splitting * { cursor: col-resize !important; user-select: n
   }
 
   // ── Evaluation ──────────────────────────────────────────────────────────────
+  // One pass over the names, not a chain of replacements: replacing "ln("
+  // with "Math.log(" and then "log(" with "Math.log10(" turned ln(e) into
+  // "Math.Math.log10(...)", which read back as an invalid expression.
+  const FN = {
+    sin: 'Math.sin', cos: 'Math.cos', tan: 'Math.tan',
+    asin: 'Math.asin', acos: 'Math.acos', atan: 'Math.atan',
+    ln: 'Math.log', log: 'Math.log10', exp: 'Math.exp',
+    sqrt: 'Math.sqrt', pi: 'Math.PI', e: 'Math.E',
+  };
+  const FN_RE = /\b(asin|acos|atan|sin|cos|tan|ln|log|exp|sqrt|pi|e)\b/g;
+
   function sanitize(raw) {
     return raw
-      .replace(/×/g,       '*')
-      .replace(/÷/g,       '/')
-      .replace(/−/g,       '-')
-      .replace(/\bsin\(/g,  'Math.sin(')
-      .replace(/\bcos\(/g,  'Math.cos(')
-      .replace(/\btan\(/g,  'Math.tan(')
-      .replace(/\basin\(/g, 'Math.asin(')
-      .replace(/\bacos\(/g, 'Math.acos(')
-      .replace(/\batan\(/g, 'Math.atan(')
-      .replace(/\bln\(/g,   'Math.log(')
-      .replace(/\blog\(/g,  'Math.log10(')
-      .replace(/\bexp\(/g,  'Math.exp(')
-      .replace(/√\(/g,      'Math.sqrt(')
-      .replace(/\bπ\b/g,    'Math.PI')
-      .replace(/\be\b/g,    'Math.E')
-      .replace(/\^/g,       '**')
-      .replace(/%/g,        '/100');
+      .replace(/×/g, '*')
+      .replace(/÷/g, '/')
+      .replace(/−/g, '-')
+      // √ and π aren't word characters, so they become names first and go
+      // through the same single pass as the rest.
+      .replace(/√/g, 'sqrt')
+      .replace(/π/g, 'pi')
+      .replace(FN_RE, m => FN[m])
+      .replace(/\^/g, '**')
+      .replace(/%/g, '/100');
   }
+
 
   function evaluate(raw) {
     if (!raw.trim()) return { value: '', ok: true };
     try {
       const san = sanitize(raw);
       // Only allow safe math characters after sanitization
-      const safe = san.replace(/Math\.[a-z0-9]+/g, '').replace(/[\d\s\+\-\*\/\.\(\)\*\*]/g, '');
+      // Case matters here: Math.PI and Math.E are the two capitalised names
+      // the sanitiser produces, and a lower-case-only pattern left them in
+      // place — which read as "invalid expression" for anything using π or e.
+      const safe = san.replace(/Math\.[A-Za-z0-9]+/g, '').replace(/[\d\s\+\-\*\/\.\(\)\*\*]/g, '');
       if (safe.length) return { value: 'invalid expression', ok: false };
       // eslint-disable-next-line no-new-func
       const val = Function('"use strict"; return (' + san + ')')();
@@ -749,6 +596,16 @@ body.splitting, body.splitting * { cursor: col-resize !important; user-select: n
     onInput();
   });
   document.getElementById('btn-clear-hist').addEventListener('click', clearHistory);
+
+  // History on the slide or not: some lectures want the running record, some
+  // want the keypad as wide as the region allows.
+  const histBtn = document.getElementById('btn-history');
+  histBtn.addEventListener('click', () => {
+    const off = document.body.classList.toggle('no-history');
+    histBtn.setAttribute('aria-pressed', String(!off));
+    histBtn.classList.toggle('is-active', !off);
+  });
+  histBtn.classList.add('is-active');
   document.getElementById('history-clear').addEventListener('click', clearHistory);
 
   exprEl.addEventListener('input', onInput);
@@ -759,10 +616,12 @@ body.splitting, body.splitting * { cursor: col-resize !important; user-select: n
 
   // ── Viewer mode ───────────────────────────────────────────────────────────────
   function setViewerMode() {
+    document.getElementById('shell').classList.add('is-viewer');
     exprEl.readOnly = true;
     document.getElementById('viewer-badge').style.display = 'block';
     document.getElementById('viewer-toast').style.display = 'block';
     document.getElementById('btn-clear-hist').style.display = 'none';
+    document.getElementById('btn-history').style.display = 'none';
     document.querySelectorAll('.cbtn').forEach(b => b.disabled = true);
   }
 

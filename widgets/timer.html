@@ -12,433 +12,526 @@
   ]
 }
 </script>
+<!-- Standalone fallback. Inside Beamer+ the host injects the shared widget
+     base (tokens, fonts, toolbar, buttons) ahead of everything else. Opened
+     directly (a file in Edge, a plain web server) nothing does, so load the
+     same stylesheet from the repo, relative to this file, at the same point in
+     the cascade. Beamer+ is unaffected: its link is already present. -->
+<script id="bw-standalone">
+(function () {
+  if (document.querySelector('link[href*="widget-base.css"]')) return;
+  var head = document.head || document.getElementsByTagName('head')[0];
+  [['preconnect', 'https://fonts.googleapis.com'],
+   ['stylesheet', 'https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@400;500;600&display=swap'],
+   ['stylesheet', '../static/css/widget-base.css']].forEach(function (l) {
+    var el = document.createElement('link');
+    el.rel = l[0]; el.href = l[1];
+    head.appendChild(el);
+  });
+  document.documentElement.setAttribute('data-bw-standalone', '');
+})();
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timer — Beamer+</title>
+
+<!-- Vendored by the Beamer+ server. Never call io() bare. -->
+<script src="/static/vendor/socket.io.min.js"></script>
+
 <style>
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@400;500;600&display=swap');
+/* Tokens, reset, toolbar and buttons come from the shared widget base
+   (static/css/widget-base.css). What's left here is the clock: digits as
+   large as the region allows, a hairline of progress under a countdown, and
+   the few states the room needs to notice. */
 
-:root {
-  --bg:         #ffffff;
-  --bg-subtle:  #f9f9f8;
-  --border:     #e9e9e6;
-  --border-med: #d4d4cf;
-  --text:       #1a1a18;
-  --text-2:     #6b6b65;
-  --text-3:     #aeaea5;
-  --accent:     #52524e;
-  --accent-bg:  #f0f0ee;
-  --red:        #dc2626;
-  --red-bg:     #fef2f2;
-  --radius:     6px;
-  --font-mono:  'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
-  --font-ui:    'DM Sans', system-ui, sans-serif;
-}
-
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-ui);
-  font-size: calc(13px * var(--u));
-  display: flex;
-  flex-direction: column;
-  transition: background 0.2s;
+/* ── Toolbar ────────────────────────────────────────────── */
+/* Stopwatch / Countdown as one segmented control. */
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; flex: 0 0 auto; }
+.seg .bw-btn { border: 0; border-radius: 0; height: calc(var(--ctl-h) - 2px); }
+.seg .bw-btn + .bw-btn { border-left: 1px solid var(--border); }
+.presets { display: contents; }
+.presets[hidden] { display: none; }
+.presets .bw-btn { font-family: var(--font-mono); padding: 0 9px; }
+#btn-start { min-width: 64px; }
+
+/* A small slide region keeps the controls that matter. */
+#btn-start { min-width: 78px; justify-content: center; }
+#btn-reset { min-width: 62px; justify-content: center; }
+
+@media (max-width: 600px) { .presets { display: none !important; } }
+@media (max-width: 460px) {
+  .bw-toolbar-title, .bw-toolbar-title + .bw-sep { display: none !important; }
+  .seg .bw-btn { padding: 0 8px; }
+  /* The shared bar's own reset button does the same job. */
+  #btn-reset { display: none !important; }
 }
-body.flash { background: var(--red-bg); }
 
-/* ── Toolbar ─────────────────────────────────────────── */
-#toolbar {
-  flex-shrink: 0;
-  height: 42px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg);
-  display: flex;
-  align-items: center;
-  padding: 0 14px;
-  gap: 5px;
-}
-
-.toolbar-title { font-size: 13px; font-weight: 500; flex-shrink: 0; }
-.sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; flex-shrink: 0; }
-.spacer { flex: 1; }
-
-/* Mode toggle buttons */
-.tb-btn {
-  display: inline-flex; align-items: center; gap: 4px;
-  height: 28px; padding: 0 10px;
-  border: 1px solid var(--border); border-radius: var(--radius);
-  background: var(--bg); color: var(--text);
-  font-family: var(--font-ui); font-size: 12px; font-weight: 500;
-  cursor: pointer; white-space: nowrap; flex-shrink: 0;
-  transition: background 0.1s, border-color 0.1s;
-}
-.tb-btn:hover:not(:disabled) { background: var(--bg-subtle); border-color: var(--border-med); }
-.tb-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-.tb-btn.active { background: var(--accent-bg); color: var(--accent); border-color: #c8c8c4; }
-
-/* Action buttons — right side of toolbar */
-#btn-reset {
-  height: 28px; padding: 0 10px;
-  border: 1px solid var(--border); border-radius: var(--radius);
-  background: var(--bg); color: var(--text-2);
-  font-family: var(--font-ui); font-size: 12px; font-weight: 500;
-  cursor: pointer; white-space: nowrap; flex-shrink: 0;
-  transition: background 0.1s, border-color 0.1s, color 0.1s;
-}
-#btn-reset:hover:not(:disabled) { background: var(--bg-subtle); border-color: var(--border-med); color: var(--text); }
-#btn-reset:disabled { opacity: 0.35; cursor: not-allowed; }
-
-#btn-start-pause {
-  height: 28px; padding: 0 14px;
-  border: 1px solid var(--text); border-radius: var(--radius);
-  background: var(--text); color: #fff;
-  font-family: var(--font-ui); font-size: 12px; font-weight: 500;
-  cursor: pointer; white-space: nowrap; flex-shrink: 0;
-  transition: background 0.1s;
-}
-#btn-start-pause:hover:not(:disabled) { background: #2d2d2a; }
-#btn-start-pause:disabled { opacity: 0.35; cursor: not-allowed; }
-
-/* ── Main area ───────────────────────────────────────── */
+/* ── The clock ──────────────────────────────────────────── */
 #app {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 24px 16px 10%;   /* bias slightly above true centre */
+  padding: 4% 6% 8%;          /* bias slightly above true centre */
+  container-type: size;
   overflow: hidden;
-  gap: 20px;
 }
 
-/* ── Time display ────────────────────────────────────── */
-#time-display {
-  font-family: var(--font-mono);
-  font-size: clamp(2.8rem, 10vw, 5.5rem);
-  font-weight: 400;
-  letter-spacing: -0.01em;
-  color: var(--text);
+#clock {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  /* The UI face with fixed-width figures: plain, open zeros that read from
+     the back of the room, and digits that don't shuffle as they change. */
+  font-family: var(--font-ui);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: -0.03em;
   line-height: 1;
-  text-align: center;
-  transition: color 0.2s;
+  color: var(--text);
+  white-space: nowrap;
   user-select: none;
+  /* As big as the region allows, by width or by height, whichever runs out. */
+  font-size: min(22cqw, 62cqh);
+  transition: color 0.3s, font-size 0.18s ease;
 }
-#time-display.expired { color: var(--red); }
+#clock.is-long  { font-size: min(15.5cqw, 58cqh); }   /* h:mm:ss */
 
-/* ── Duration stepper ────────────────────────────────── */
-#duration-controls {
-  display: none;
-  align-items: center;
-  gap: 6px;
+/* Reserved boxes: the fields never resize as their digits change, so the
+   clock is dead still through a whole countdown. */
+#clock .unit, #clock .colon, #clock .tenth {
+  display: inline-block;
+  text-align: center;
+  flex: 0 0 auto;
 }
-#duration-controls.visible { display: flex; }
+#clock .unit  { width: 2ch; }
+#clock .unit[data-u="h"] { width: 1ch; }   /* capped at 6 hours: one digit */
+#clock .unit.wide { width: 3ch; }
+#clock .colon { width: 0.62ch; color: var(--text-3); }
+#clock .tenth { width: 1.3ch; font-size: 0.42em; color: var(--text-3); margin-left: 0.04em; }
+#clock.is-idle { color: var(--text-2); }
 
-.dur-btn {
-  display: inline-flex; align-items: center; justify-content: center;
-  height: 28px; padding: 0 10px;
-  border: 1px solid var(--border); border-radius: var(--radius);
-  background: var(--bg); color: var(--text-2);
-  font-family: var(--font-mono); font-size: calc(11px * var(--u));
-  cursor: pointer; white-space: nowrap;
-  transition: background 0.1s, border-color 0.1s;
+/* Countdown digits can be set in place before starting: scroll, arrow keys,
+   or type. They look like digits until pointed at. */
+.unit { border-radius: 0.06em; outline: none; transition: background 0.15s; }
+#clock.is-editable .unit { cursor: ns-resize; }
+#clock.is-editable .unit:hover { background: var(--bg-subtle); }
+#clock.is-editable .unit:focus { background: var(--accent-bg); box-shadow: inset 0 -0.04em 0 var(--text); }
+
+/* The last stretch of a countdown, and the end of it. */
+#clock.is-warn    { color: var(--warn); }
+#clock.is-expired { color: var(--err); }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+#clock.is-expired.is-pulsing { animation: pulse 0.9s ease-in-out 4; }
+
+/* Progress: one hairline under the digits, emptying as time runs out. */
+#bar {
+  width: min(70cqw, 900px);
+  height: max(3px, 0.8cqh);
+  margin-top: 4cqh;
+  border-radius: 99px;
+  background: var(--border);
+  overflow: hidden;
+  opacity: 1;
+  transition: opacity 0.3s;
 }
-.dur-btn:hover:not(:disabled) { background: var(--bg-subtle); border-color: var(--border-med); }
-.dur-btn:active:not(:disabled) { background: var(--accent-bg); }
-.dur-btn:disabled { opacity: 0.4; cursor: default; }
-
-#duration-display {
-  font-family: var(--font-mono); font-size: calc(12px * var(--u)); color: var(--text-2);
-  min-width: 52px; text-align: center;
-  padding: 4px 10px;
-  border: 1px solid var(--border); border-radius: var(--radius);
-  background: var(--bg-subtle);
-  cursor: default; user-select: none;
+#bar[hidden] { display: block; opacity: 0; }
+#bar-fill {
+  height: 100%;
+  width: 100%;
+  border-radius: inherit;
+  background: var(--text);
+  transform-origin: left center;
+  transition: background 0.3s;
 }
+#clock.is-warn ~ #bar #bar-fill    { background: var(--warn); }
+#clock.is-expired ~ #bar #bar-fill { background: var(--err); }
 
-/* Hidden compat shims */
-#controls { display: none; }
-#mode-label { display: none; }
-#shell { display: contents; }
+@media (prefers-reduced-motion: reduce) {
+  #clock.is-expired.is-pulsing { animation: none; }
+}
 </style>
 </head>
 <body>
+<div id="shell" class="bw-shell">
 
-<div id="toolbar" data-bw-topbar>
-  <span class="toolbar-title">Timer</span>
-  <div class="sep"></div>
-  <button class="tb-btn active" id="tb-stopwatch">Stopwatch</button>
-  <button class="tb-btn"        id="tb-countdown">Countdown</button>
-  <div class="spacer"></div>
-  <button id="btn-reset">Reset</button>
-  <button id="btn-start-pause">Start</button>
-</div>
-
-<div id="app">
-  <div id="time-display">00:00.0</div>
-
-  <div id="duration-controls">
-    <button class="dur-btn" id="btn-minus-1m">−1m</button>
-    <button class="dur-btn" id="btn-minus-10s">−10s</button>
-    <div id="duration-display">5:00</div>
-    <button class="dur-btn" id="btn-plus-10s">+10s</button>
-    <button class="dur-btn" id="btn-plus-1m">+1m</button>
+  <div id="toolbar" class="bw-toolbar" data-bw-topbar>
+    <span class="bw-toolbar-title">Timer</span>
+    <div class="bw-sep"></div>
+    <div class="seg" id="mode-seg">
+      <button class="bw-btn" id="tb-countdown">Countdown</button>
+      <button class="bw-btn" id="tb-stopwatch">Stopwatch</button>
+    </div>
+    <span class="presets" id="presets">
+      <div class="bw-sep"></div>
+      <button class="bw-btn" data-min="1">1m</button>
+      <button class="bw-btn" data-min="2">2m</button>
+      <button class="bw-btn" data-min="5">5m</button>
+      <button class="bw-btn" data-min="10">10m</button>
+    </span>
+    <div class="bw-spacer"></div>
+    <button class="bw-btn" id="btn-reset" title="Reset (R)">Reset</button>
+    <button class="bw-btn bw-btn--primary" id="btn-start" title="Start / pause (Space)">Start</button>
   </div>
 
-  <!-- Kept for JS compat -->
-  <div id="controls">
-    <button id="btn-start-pause-compat">Start</button>
-    <button id="btn-reset-compat">Reset</button>
+  <div id="app">
+    <div id="clock" aria-live="off"></div>
+    <div id="bar" hidden><div id="bar-fill"></div></div>
   </div>
-</div>
 
-<script src="/static/vendor/socket.io.min.js"></script>
+</div>
 <script>
 (function () {
   'use strict';
 
-  const state = {
-    mode:     'stopwatch',
+  // ── Config ──────────────────────────────────────────────────────────────────
+  const _qs   = new URLSearchParams(location.search);
+  const CFG0  = window.WIDGET_CONFIG || {};
+  let   cfg   = { ...CFG0 };
+  let   WIDGET_ID = CFG0.id || CFG0.widgetId || 'timer';
+  let   IS_VIEWER = CFG0.role === 'viewer' || _qs.get('viewer') === '1';
+
+  const MAX_MS = 6 * 3600000;
+  const MIN_MS = 5000;
+
+  // ── DOM ─────────────────────────────────────────────────────────────────────
+  const $ = id => document.getElementById(id);
+  const clock     = $('clock');
+  const bar       = $('bar');
+  const barFill   = $('bar-fill');
+  const btnStart  = $('btn-start');
+  const btnReset  = $('btn-reset');
+  const tbCount   = $('tb-countdown');
+  const tbWatch   = $('tb-stopwatch');
+  const presets   = $('presets');
+  const modeSeg   = $('mode-seg');
+
+  // ── State ───────────────────────────────────────────────────────────────────
+  const S = {
+    mode:     'countdown',   // countdown | stopwatch
     running:  false,
-    elapsed:  0,
-    duration: 300000,
+    elapsed:  0,             // ms
+    duration: 300000,        // ms, countdown only
     expired:  false,
   };
+  let rafId = null, lastTick = 0;
 
-  let rafId      = null;
-  let lastTick   = null;
-  let socket     = null;
-  let isViewer   = false;
-  let widgetId   = 'timer-default';
-  let syncTimer  = null;
-  let flashTimer = null;
+  // ── Formatting ──────────────────────────────────────────────────────────────
+  const pad = n => String(n).padStart(2, '0');
 
-  const timeEl      = document.getElementById('time-display');
-  const durControls = document.getElementById('duration-controls');
-  const durDisplay  = document.getElementById('duration-display');
-  const btnSP       = document.getElementById('btn-start-pause');
-  const btnReset    = document.getElementById('btn-reset');
-  const tbStopwatch = document.getElementById('tb-stopwatch');
-  const tbCountdown = document.getElementById('tb-countdown');
-
-  // ── Format helpers ────────────────────────────────────────────────────────────
-  function fmtStopwatch(ms) {
-    const m  = Math.floor(ms / 60000);
-    const s  = Math.floor((ms % 60000) / 1000);
-    const t  = Math.floor((ms % 1000) / 100);
-    return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${t}`;
-  }
-
-  function fmtCountdown(ms) {
-    const rem = Math.max(0, ms);
-    const h   = Math.floor(rem / 3600000);
-    const m   = Math.floor((rem % 3600000) / 60000);
-    const s   = Math.floor((rem % 60000) / 1000);
-    if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-    return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-  }
-
-  function fmtDuration(ms) {
-    const h = Math.floor(ms / 3600000);
-    const m = Math.floor((ms % 3600000) / 60000);
-    const s = Math.floor((ms % 60000) / 1000);
-    if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-    if (s > 0) return `${m}:${String(s).padStart(2,'0')}`;
-    return `${m}:00`;
-  }
-
-  // ── Render ────────────────────────────────────────────────────────────────────
-  function render() {
-    if (state.mode === 'stopwatch') {
-      timeEl.textContent = fmtStopwatch(state.elapsed);
-      timeEl.classList.remove('expired');
-    } else {
-      const remaining = state.duration - state.elapsed;
-      timeEl.textContent = fmtCountdown(remaining);
-      timeEl.classList.toggle('expired', state.expired);
+  // A countdown shows whole seconds rounded up, so it reads 5:00 when it
+  // starts and 0:00 only when it has actually finished.
+  function parts() {
+    if (S.mode === 'countdown') {
+      const rem = Math.max(0, S.duration - S.elapsed);
+      const t = Math.ceil(rem / 1000);
+      return { h: Math.floor(t / 3600), m: Math.floor(t / 60) % 60, s: t % 60, tenth: null, rem };
     }
-
-    tbStopwatch.classList.toggle('active', state.mode === 'stopwatch');
-    tbCountdown.classList.toggle('active', state.mode === 'countdown');
-
-    btnSP.textContent = state.running ? 'Pause' : 'Start';
-
-    const showStepper = state.mode === 'countdown' && !state.running && !state.expired;
-    durControls.classList.toggle('visible', showStepper);
-    if (showStepper) durDisplay.textContent = fmtDuration(state.duration);
-
-    const canControl = !isViewer;
-    btnSP.disabled    = !canControl;
-    btnReset.disabled = !canControl;
-    tbStopwatch.disabled = !canControl;
-    tbCountdown.disabled = !canControl;
-    document.querySelectorAll('.dur-btn').forEach(b => { b.disabled = !canControl; });
+    const t = Math.floor(S.elapsed / 1000);
+    return { h: Math.floor(t / 3600), m: Math.floor(t / 60) % 60, s: t % 60,
+             tenth: Math.floor(S.elapsed / 100) % 10, rem: 0 };
   }
 
-  // ── Timer control ─────────────────────────────────────────────────────────────
+  const isIdle = () => !S.running && S.elapsed === 0 && !S.expired;
+  const editable = () => !IS_VIEWER && S.mode === 'countdown' && isIdle();
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+  // The digits are rebuilt only when their shape changes, so a unit being
+  // edited keeps its focus while its value updates.
+  let shapeKey = '';
+  function renderClock() {
+    const p = parts();
+    const long = S.mode === 'countdown' && S.duration >= 3600000;
+    const bigMin = !long && (p.m + p.h * 60) >= 100;
+    const key = [S.mode, long, bigMin, editable()].join('|');
+    if (key !== shapeKey) {
+      shapeKey = key;
+      const unit = (u) => `<span class="unit${u === 'm' && bigMin ? ' wide' : ''}" data-u="${u}"`
+        + `${editable() ? ' tabindex="0"' : ''}></span>`;
+      const colon = '<span class="colon">:</span>';
+      clock.innerHTML = (long ? unit('h') + colon : '') + unit('m') + colon + unit('s') +
+        (S.mode === 'stopwatch' ? '<span class="tenth"></span>' : '');
+      clock.classList.toggle('is-long', long);
+      clock.classList.toggle('is-editable', editable());
+    }
+    const set = (u, v) => { const el = clock.querySelector(`[data-u="${u}"]`); if (el && el.textContent !== v) el.textContent = v; };
+    set('h', String(p.h));
+    set('m', long ? pad(p.m) : pad(p.m + p.h * 60));
+    set('s', pad(p.s));
+    const tenth = clock.querySelector('.tenth');
+    if (tenth) tenth.textContent = '.' + p.tenth;
+
+    const warnAt = Math.max(10000, S.duration * 0.1);
+    clock.classList.toggle('is-warn', S.mode === 'countdown' && !S.expired && !isIdle() && p.rem <= warnAt);
+    clock.classList.toggle('is-expired', S.expired);
+
+    bar.hidden = S.mode !== 'countdown';
+    barFill.style.transform = `scaleX(${S.mode === 'countdown' ? (p.rem / S.duration).toFixed(4) : 1})`;
+  }
+
+  function render() {
+    renderClock();
+    tbCount.classList.toggle('is-active', S.mode === 'countdown');
+    tbWatch.classList.toggle('is-active', S.mode === 'stopwatch');
+    presets.hidden = !(S.mode === 'countdown' && isIdle());
+    btnStart.textContent = S.running ? 'Pause' : (S.elapsed > 0 && !S.expired ? 'Resume' : 'Start');
+    btnStart.disabled = S.expired;
+    btnReset.disabled = isIdle();
+    // The audience sees the clock and nothing else.
+    [modeSeg, presets, btnStart, btnReset].forEach(el => { el.style.display = IS_VIEWER ? 'none' : ''; });
+    presets.querySelectorAll('[data-min]').forEach(b =>
+      b.classList.toggle('is-active', S.duration === Number(b.dataset.min) * 60000));
+  }
+
+  // ── Running ─────────────────────────────────────────────────────────────────
   function tick(now) {
-    if (!state.running) return;
-    const delta = now - lastTick;
+    if (!S.running) return;
+    S.elapsed += now - lastTick;
     lastTick = now;
-    state.elapsed += delta;
-    if (state.mode === 'countdown' && state.elapsed >= state.duration) {
-      state.elapsed = state.duration;
-      stopTimer();
-      state.expired = true;
-      doFlash(); render(); emitState();
+    if (S.mode === 'countdown' && S.elapsed >= S.duration) {
+      S.elapsed = S.duration;
+      stop();
+      expire();
+      render(); emitState(true);
       return;
     }
-    render();
+    renderClock();
     rafId = requestAnimationFrame(tick);
   }
 
-  function startTimer() {
-    if (state.running || state.expired) return;
-    state.running = true;
+  function run() {
     lastTick = performance.now();
+    cancelAnimationFrame(rafId);
     rafId = requestAnimationFrame(tick);
-    startSyncInterval();
+  }
+
+  function stop() {
+    S.running = false;
+    cancelAnimationFrame(rafId);
+    rafId = null;
+  }
+
+  function expire() {
+    S.expired = true;
+    clock.classList.remove('is-pulsing');
+    void clock.offsetWidth;
+    clock.classList.add('is-pulsing');
+  }
+
+  function start() {
+    if (IS_VIEWER || S.running || S.expired) return;
+    if (document.activeElement && document.activeElement.classList.contains('unit')) document.activeElement.blur();
+    S.running = true;
+    run();
+    render(); emitState(true);
+  }
+
+  function pause() {
+    if (IS_VIEWER || !S.running) return;
+    stop();
+    render(); emitState(true);
+  }
+
+  function reset() {
+    if (IS_VIEWER) return;
+    stop();
+    S.elapsed = 0;
+    S.expired = false;
+    clock.classList.remove('is-pulsing');
+    render(); emitState(true);
+  }
+
+  function setMode(m) {
+    if (IS_VIEWER || S.mode === m) return;
+    S.mode = m;
+    reset();
+  }
+
+  function setDuration(ms) {
+    if (IS_VIEWER || !isIdle()) return;
+    S.duration = Math.max(MIN_MS, Math.min(MAX_MS, Math.round(ms / 1000) * 1000));
     render(); emitState();
   }
 
-  function stopTimer() {
-    state.running = false;
-    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
-    stopSyncInterval();
+  // ── Setting the countdown in place ──────────────────────────────────────────
+  const UNIT_MS = { h: 3600000, m: 60000, s: 1000 };
+  function nudge(u, dir, big) {
+    setDuration(S.duration + dir * UNIT_MS[u] * (big ? 10 : 1));
   }
 
-  function pauseTimer() {
-    if (!state.running) return;
-    stopTimer(); render(); emitState();
+  // Typing into a unit: the last two digits typed are its value.
+  let typed = { u: null, buf: '' };
+  function typeDigit(u, d) {
+    if (typed.u !== u) typed = { u, buf: '' };
+    typed.buf = (typed.buf + d).slice(-2);
+    const v = Number(typed.buf);
+    const t = Math.ceil(S.duration / 1000);
+    let h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, s = t % 60;
+    const long = clock.classList.contains('is-long');
+    if (u === 'h') h = Math.min(6, v);
+    if (u === 'm') { if (long) m = Math.min(59, v); else { h = 0; m = Math.min(99, v); } }
+    if (u === 's') s = Math.min(59, v);
+    setDuration((h * 3600 + m * 60 + s) * 1000);
   }
 
-  function resetTimer() {
-    stopTimer();
-    state.elapsed = 0; state.expired = false;
-    document.body.classList.remove('flash');
-    if (flashTimer) { clearTimeout(flashTimer); flashTimer = null; }
-    render(); emitState();
-  }
+  clock.addEventListener('wheel', e => {
+    const unit = e.target.closest('.unit');
+    if (!unit || !editable()) return;
+    e.preventDefault();
+    nudge(unit.dataset.u, e.deltaY < 0 ? 1 : -1, e.shiftKey);
+  }, { passive: false });
 
-  function doFlash() {
-    let count = 0;
-    function step() {
-      if (count >= 6) { document.body.classList.remove('flash'); return; }
-      document.body.classList.toggle('flash');
-      count++;
-      flashTimer = setTimeout(step, 350);
+  clock.addEventListener('keydown', e => {
+    const unit = e.target.closest('.unit');
+    if (!unit || !editable()) return;
+    const u = unit.dataset.u;
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      nudge(u, e.key === 'ArrowUp' ? 1 : -1, e.shiftKey);
+    } else if (/^[0-9]$/.test(e.key)) {
+      e.preventDefault();
+      typeDigit(u, e.key);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      start();
+    } else if (e.key === 'Tab' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      typed = { u: null, buf: '' };
+      if (e.key !== 'Tab') {
+        e.preventDefault();
+        const units = [...clock.querySelectorAll('.unit')];
+        const i = units.indexOf(unit) + (e.key === 'ArrowRight' ? 1 : -1);
+        if (units[i]) units[i].focus();
+      }
     }
-    step();
-  }
+  });
+  clock.addEventListener('focusout', () => { typed = { u: null, buf: '' }; });
 
-  // ── Event listeners ───────────────────────────────────────────────────────────
-  tbStopwatch.addEventListener('click', () => {
-    if (isViewer || state.mode === 'stopwatch') return;
-    state.mode = 'stopwatch'; resetTimer();
-  });
-  tbCountdown.addEventListener('click', () => {
-    if (isViewer || state.mode === 'countdown') return;
-    state.mode = 'countdown'; resetTimer();
-  });
-
-  btnSP.addEventListener('click', () => {
-    if (isViewer) return;
-    state.running ? pauseTimer() : startTimer();
-  });
-  btnReset.addEventListener('click', () => { if (!isViewer) resetTimer(); });
-
-  document.getElementById('btn-plus-1m').addEventListener('click', () => {
-    if (isViewer || state.running) return;
-    state.duration = Math.min(state.duration + 60000, 6 * 3600000); render();
-  });
-  document.getElementById('btn-minus-1m').addEventListener('click', () => {
-    if (isViewer || state.running) return;
-    state.duration = Math.max(state.duration - 60000, 10000); render();
-  });
-  document.getElementById('btn-plus-10s').addEventListener('click', () => {
-    if (isViewer || state.running) return;
-    state.duration = Math.min(state.duration + 10000, 6 * 3600000); render();
-  });
-  document.getElementById('btn-minus-10s').addEventListener('click', () => {
-    if (isViewer || state.running) return;
-    state.duration = Math.max(state.duration - 10000, 10000); render();
+  // ── Events ──────────────────────────────────────────────────────────────────
+  btnStart.addEventListener('click', () => (S.running ? pause() : start()));
+  btnReset.addEventListener('click', reset);
+  tbCount .addEventListener('click', () => setMode('countdown'));
+  tbWatch .addEventListener('click', () => setMode('stopwatch'));
+  presets .addEventListener('click', e => {
+    const b = e.target.closest('[data-min]');
+    if (b) setDuration(Number(b.dataset.min) * 60000);
   });
 
-  // ── Sync ──────────────────────────────────────────────────────────────────────
-  function emitState() {
-    if (socket && !isViewer) {
-      socket.emit('widget_state', { widgetId,
-        state: { mode: state.mode, running: state.running, elapsed: state.elapsed, duration: state.duration } });
+  // Space starts and pauses, R resets — from anywhere in the widget except a
+  // unit being typed into.
+  document.addEventListener('keydown', e => {
+    if (IS_VIEWER || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.target.closest && e.target.closest('.unit, input, textarea, select')) return;
+    if (e.key === ' ') { e.preventDefault(); S.running ? pause() : start(); }
+    else if (e.key === 'r' || e.key === 'R') reset();
+  });
+
+  // ── Sync ────────────────────────────────────────────────────────────────────
+  // Presenter emits, viewers apply. While running, a heartbeat each second
+  // keeps a viewer that joined late (or drifted) on the presenter's time.
+  let socket = null, syncTimer = null, beat = null;
+
+  function initSocket(url) {
+    if (typeof io === 'undefined') { socket = { emit() {}, on() {} }; return; }
+    try {
+      const prev = socket;
+      socket = io(url || (window.BeamerWidget ? BeamerWidget.serverOrigin() : ''),
+                  { transports: ['websocket', 'polling'] });
+      if (prev && prev.disconnect) prev.disconnect();
+      socket.on('widget_state', data => {
+        if (!IS_VIEWER || data?.widgetId !== WIDGET_ID) return;
+        applyState(data.state || {}, true);
+      });
+    } catch (_) {
+      socket = { emit() {}, on() {} };
     }
   }
 
-  function startSyncInterval() { if (!syncTimer) syncTimer = setInterval(emitState, 1000); }
-  function stopSyncInterval()  { if (syncTimer) { clearInterval(syncTimer); syncTimer = null; } }
+  function getState() {
+    return { mode: S.mode, running: S.running, elapsed: Math.round(S.elapsed),
+             duration: S.duration, expired: S.expired };
+  }
 
-  function applyRemoteState(data) {
-    if (!isViewer) return;
-    const wasRunning = state.running;
-    const wasExpired = state.expired;
-    state.mode = data.mode || 'stopwatch';
-    state.duration = data.duration || 300000;
-    state.elapsed  = data.elapsed  || 0;
-    state.expired  = false;
-    if (data.running && !wasRunning) {
-      stopTimer(); state.running = true;
-      lastTick = performance.now();
-      rafId = requestAnimationFrame(tick);
-    } else if (!data.running && wasRunning) {
-      stopTimer();
-    }
-    if (state.mode === 'countdown' && state.elapsed >= state.duration) {
-      state.expired = true;
-      if (!wasExpired) doFlash();
-    }
+  function emitState(now) {
+    if (!socket || IS_VIEWER) return;
+    clearTimeout(syncTimer);
+    const send = () => socket.emit('widget_state', { widgetId: WIDGET_ID, state: getState() });
+    if (now) send(); else syncTimer = setTimeout(send, 150);
+    clearInterval(beat);
+    beat = S.running ? setInterval(send, 1000) : null;
+  }
+
+  function applyState(s, live) {
+    if (!s) return;
+    const wasExpired = S.expired;
+    if (s.mode === 'countdown' || s.mode === 'stopwatch') S.mode = s.mode;
+    if (typeof s.duration === 'number' && s.duration > 0) S.duration = s.duration;
+    if (typeof s.elapsed === 'number') S.elapsed = s.elapsed;
+    S.expired = !!s.expired || (S.mode === 'countdown' && S.elapsed >= S.duration && S.elapsed > 0);
+    // A restored deck always comes back paused; a live viewer follows along.
+    const shouldRun = live && !!s.running && !S.expired;
+    if (shouldRun && !S.running) { S.running = true; run(); }
+    else if (!shouldRun && S.running) stop();
+    if (S.expired && !wasExpired && live) expire();
     render();
   }
 
-  function connectSocket(url) {
-    if (socket) { socket.disconnect(); socket = null; }
-    socket = io(url, { transports: ['websocket', 'polling'] });
-    socket.on('widget_state', data => {
-      if (!isViewer || data?.widgetId !== widgetId) return;
-      applyRemoteState(data?.state || {});
-    });
+  // ── Config ──────────────────────────────────────────────────────────────────
+  let lastMode = null, lastDur = null;
+  function applyConfig(c) {
+    if (!c) return;
+    const prevUrl = cfg.socketUrl;
+    cfg = { ...cfg, ...c };
+    WIDGET_ID = cfg.id || cfg.widgetId || WIDGET_ID;
+    IS_VIEWER = cfg.role === 'viewer' || IS_VIEWER;
+    // Only a changed setting is adopted, so re-sent config never interrupts
+    // a running clock.
+    if ((cfg.mode === 'countdown' || cfg.mode === 'stopwatch') && cfg.mode !== lastMode) {
+      lastMode = cfg.mode;
+      if (!S.running) { S.mode = cfg.mode; S.elapsed = 0; S.expired = false; }
+    }
+    const d = Number(cfg.duration);
+    if (d > 0 && d !== lastDur) {
+      lastDur = d;
+      if (isIdle()) S.duration = Math.max(MIN_MS, Math.min(MAX_MS, d * 1000));
+    }
+    if (cfg.socketUrl && cfg.socketUrl !== prevUrl) initSocket(cfg.socketUrl);
+    render();
   }
 
-  // ── Config ────────────────────────────────────────────────────────────────────
-  function updateConfig(cfg) {
-    cfg = cfg || {};
-    widgetId = cfg.id || cfg.widgetId || widgetId;
-    isViewer = cfg.role === 'viewer';
-    if (cfg.mode === 'countdown' || cfg.mode === 'stopwatch') state.mode = cfg.mode;
-    if (typeof cfg.duration === 'number' && cfg.duration > 0) state.duration = cfg.duration * 1000;
-    resetTimer();
-    if (cfg.autoStart && !isViewer) startTimer();
-    if (cfg.socketUrl) connectSocket(cfg.socketUrl);
+  function destroy() {
+    stop();
+    clearTimeout(syncTimer);
+    clearInterval(beat);
+    if (socket && socket.disconnect) socket.disconnect();
+    socket = null;
   }
 
   window.addEventListener('message', e => {
-    if (e.data?.type === 'widget-config')  updateConfig(e.data.config);
-    if (e.data?.type === 'widget-cleanup') { stopTimer(); socket?.disconnect(); if (flashTimer) clearTimeout(flashTimer); }
-    // Beamer+ state persistence protocol
-    if (e.data?.type === 'widget-get-state') {
-      window.parent.postMessage({ type: 'widget-state', widgetId,
-        state: { mode: state.mode, running: state.running, elapsed: state.elapsed, duration: state.duration } }, '*');
+    const d = e.data || {};
+    if (d.type === 'widget-config')  applyConfig(d.config);
+    if (d.type === 'widget-cleanup') destroy();
+    if (d.type === 'widget-get-state') {
+      window.parent.postMessage({ type: 'widget-state', widgetId: WIDGET_ID, state: getState() }, '*');
     }
-    if (e.data?.type === 'widget-set-state' && e.data.state) {
-      const s = e.data.state;
-      state.mode     = s.mode     ?? state.mode;
-      state.elapsed  = s.elapsed  ?? state.elapsed;
-      state.duration = s.duration ?? state.duration;
-      state.running  = false; // always start paused after restore
-      render();
-    }
+    if (d.type === 'widget-set-state' && d.state) applyState(d.state, false);
   });
 
+  // ── Boot ────────────────────────────────────────────────────────────────────
+  initSocket(CFG0.socketUrl);
+  applyConfig(CFG0);
   render();
+  if (CFG0.autoStart && !IS_VIEWER) start();
+
+  // The shared bar's reset means reset the clock, not reload the widget.
+  (function wireReset(tries) {
+    if (window.BeamerWidget && BeamerWidget.topbar) { BeamerWidget.topbar.onReset(reset); return; }
+    if (tries > 0) setTimeout(() => wireReset(tries - 1), 120);
+  })(20);
 })();
 </script>
 </body>

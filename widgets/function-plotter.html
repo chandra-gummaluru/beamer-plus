@@ -5,8 +5,32 @@
 {
   "label": "Function Plotter",
   "category": "Mathematics",
-  "fields": []
+  "fields": [
+    { "key": "mode", "label": "Open in", "type": "select",
+      "options": [{ "v": "2d", "l": "2D — curves y = f(x)" },
+                  { "v": "3d", "l": "3D — surfaces z = f(x, y)" }],
+      "default": "2d" }
+  ]
 }
+</script>
+<!-- Standalone fallback. Inside Beamer+ the host injects the shared widget
+     base (tokens, fonts, toolbar, buttons) ahead of everything else. Opened
+     directly (a file in Edge, a plain web server) nothing does, so load the
+     same stylesheet from the repo, relative to this file, at the same point in
+     the cascade. Beamer+ is unaffected: its link is already present. -->
+<script id="bw-standalone">
+(function () {
+  if (document.querySelector('link[href*="widget-base.css"]')) return;
+  var head = document.head || document.getElementsByTagName('head')[0];
+  [['preconnect', 'https://fonts.googleapis.com'],
+   ['stylesheet', 'https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@400;500;600&display=swap'],
+   ['stylesheet', '../static/css/widget-base.css']].forEach(function (l) {
+    var el = document.createElement('link');
+    el.rel = l[0]; el.href = l[1];
+    head.appendChild(el);
+  });
+  document.documentElement.setAttribute('data-bw-standalone', '');
+})();
 </script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,93 +41,40 @@
 <style>
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@400;500;600&display=swap');
 
-/* ── Design tokens ───────────────────────────────────────── */
+/* The shared Beamer+ base (injected ahead of this file) owns the tokens, the
+   top bar, the buttons and the text scale. What is left here is the plotter:
+   the expression list, the canvas and its overlays. These two names are the
+   ones this widget used before the base existed. */
 :root {
-  --bg:           #ffffff;
-  --bg-subtle:    #f9f9f8;
-  --bg-output:    #fafaf9;
-  --border:       #e9e9e6;
-  --border-med:   #d4d4cf;
-  --text:         #1a1a18;
-  --text-2:       #6b6b65;
-  --text-3:       #aeaea5;
-  --accent:       #52524e;
-  --accent-bg:    #f0f0ee;
-  --green:        #15803d;
-  --amber:        #b45309;
-  --red:          #dc2626;
-  --red-bg:       #fef2f2;
-  --radius:       6px;
-  --font-mono:    'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
-  --font-ui:      'DM Sans', system-ui, sans-serif;
+  --red:    var(--err);
+  --red-bg: var(--err-bg);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; overflow: hidden; }
+body { display: flex; flex-direction: column; }
 
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-ui);
-  font-size: calc(13px * var(--u));
-  display: flex;
-  flex-direction: column;
+#shell { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+
+/* ── Top bar ─────────────────────────────────────────────── */
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; flex: 0 0 auto; }
+.seg .bw-btn { border: 0; border-radius: 0; height: calc(var(--ctl-h) - 2px); min-width: 34px; justify-content: center; }
+.seg .bw-btn + .bw-btn { border-left: 1px solid var(--border); }
+
+/* A narrow slide keeps what it can. */
+@media (max-width: 720px) { #btn-labels { display: none !important; } }
+@media (max-width: 560px) {
+  .bw-toolbar-title, .bw-toolbar-title + .bw-sep { display: none !important; }
+  #btn-grid { display: none !important; }
 }
-
-/* ── Toolbar ─────────────────────────────────────────────── */
-#toolbar {
-  flex-shrink: 0;
-  height: 42px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg);
-  display: flex;
-  align-items: center;
-  padding: 0 14px;
-  gap: 5px;
-  z-index: 10;
-}
-
-.toolbar-title {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text);
-  flex-shrink: 0;
-}
-
-.sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; flex-shrink: 0; }
-
-.tb-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 28px;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-ui);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.1s, border-color 0.1s;
-  flex-shrink: 0;
-}
-.tb-btn:hover:not(:disabled) { background: var(--bg-subtle); border-color: var(--border-med); }
-.tb-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-.tb-btn.active { background: var(--accent-bg); color: var(--accent); border-color: #c8c8c4; }
 
 /* ── Main layout ─────────────────────────────────────────── */
-#main {
-  flex: 1;
-  display: flex;
-  overflow: hidden;
-}
+#main { flex: 1; display: flex; overflow: hidden; }
 
 /* ── Expression panel ────────────────────────────────────── */
 #expr-panel {
-  width: 264px;
+  width: 340px;
+  max-width: 45%;      /* on a small slide the graph still gets the room */
   flex-shrink: 0;
   border-right: 1px solid var(--border);
   display: flex;
@@ -112,11 +83,7 @@ body {
   background: var(--bg);
 }
 
-#expr-list {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
+#expr-list { flex: 1; overflow-y: auto; overflow-x: hidden; }
 #expr-list::-webkit-scrollbar { width: 4px; }
 #expr-list::-webkit-scrollbar-track { background: transparent; }
 #expr-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
@@ -125,30 +92,71 @@ body {
 /* Expression row */
 .expr-row {
   border-bottom: 1px solid var(--border);
-  padding: 9px 10px;
+  padding: calc(7px * var(--u)) calc(7px * var(--u));
   position: relative;
-  transition: background 0.1s;
+  transition: background var(--dur);
 }
 .expr-row:hover { background: var(--bg-subtle); }
 .expr-row.has-error { background: var(--red-bg); }
 
-.expr-main {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 24px;
-}
+.expr-main { display: flex; align-items: center; gap: calc(6px * var(--u)); min-height: calc(18px * var(--u)); }
 
-/* Color swatch */
+/* Colour swatch */
 .color-swatch {
-  width: 14px; height: 14px;
+  width: calc(11px * var(--u)); height: calc(11px * var(--u));
   border-radius: 50%;
   flex-shrink: 0;
   cursor: pointer;
   border: 1.5px solid rgba(0,0,0,0.1);
   transition: transform 0.12s;
 }
-.color-swatch:hover { transform: scale(1.25); }
+.color-swatch:hover { transform: scale(1.2); }
+
+/* Colour picker: the palette, plus the system picker for anything else.
+   Fixed, so the expression list's scrolling can't clip it. */
+#color-pop {
+  position: fixed;
+  z-index: 60;
+  display: none;
+  padding: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border-med);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+}
+#color-pop.open { display: block; }
+.cp-grid { display: grid; grid-template-columns: repeat(4, 22px); gap: 6px; }
+.cp-chip {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(0,0,0,0.12);
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+.cp-chip:hover { transform: scale(1.12); }
+.cp-chip.on { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--text); }
+.cp-custom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: var(--fs-chrome-sm);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.cp-custom input[type="color"] {
+  width: 22px; height: 22px;
+  padding: 0;
+  border: 1.5px solid rgba(0,0,0,0.12);
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+.cp-custom input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+.cp-custom input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 50%; }
 
 /* Expression input */
 .expr-input {
@@ -163,29 +171,25 @@ body {
   min-width: 0;
   line-height: 1.5;
 }
-.expr-input::placeholder { color: var(--text-3); font-style: italic; }
+.expr-input::placeholder { color: var(--text-3); }
 .expr-input:disabled { opacity: 0.5; cursor: default; }
 .expr-input.hidden-expr { opacity: 0.4; }
 
 /* Row action buttons */
-.expr-actions {
-  display: none;
-  gap: 2px;
-  flex-shrink: 0;
-}
+.expr-actions { display: none; gap: 2px; flex-shrink: 0; }
 .expr-row:hover .expr-actions,
 .expr-row:focus-within .expr-actions { display: flex; }
 
 .expr-btn {
-  width: 20px; height: 20px;
+  width: calc(15px * var(--u)); height: calc(15px * var(--u));
   border: none;
   background: none;
   color: var(--text-3);
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   border-radius: 3px;
-  font-size: calc(12px * var(--u));
-  transition: color 0.1s, background 0.1s;
+  font-size: calc(11px * var(--u));
+  transition: color var(--dur), background var(--dur);
   padding: 0;
   flex-shrink: 0;
   line-height: 1;
@@ -198,22 +202,15 @@ body {
   font-size: calc(10.5px * var(--u));
   color: var(--red);
   margin-top: 3px;
-  padding-left: 21px;
+  padding-left: calc(17px * var(--u));
   font-family: var(--font-mono);
   line-height: 1.4;
 }
+.expr-error:empty { display: none; }
 
 /* ── Slider ──────────────────────────────────────────────── */
-.slider-wrap {
-  margin-top: 7px;
-  padding-left: 21px;
-}
-
-.slider-track-row {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
+.slider-wrap { margin-top: calc(5px * var(--u)); padding-left: calc(17px * var(--u)); }
+.slider-track-row { display: flex; align-items: center; gap: calc(6px * var(--u)); }
 
 .slider-range {
   flex: 1;
@@ -226,37 +223,30 @@ body {
 }
 .slider-range::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 13px; height: 13px;
+  width: calc(10px * var(--u)); height: calc(10px * var(--u));
   border-radius: 50%;
   background: var(--text);
-  border: 2px solid white;
+  border: 2px solid var(--bg);
   box-shadow: 0 0 0 1.5px var(--border-med);
   cursor: pointer;
   transition: transform 0.1s, box-shadow 0.1s;
 }
-.slider-range::-webkit-slider-thumb:hover {
-  transform: scale(1.2);
-  box-shadow: 0 0 0 2px var(--border-med);
-}
+.slider-range::-webkit-slider-thumb:hover { transform: scale(1.15); box-shadow: 0 0 0 2px var(--border-med); }
 .slider-range:disabled { opacity: 0.5; cursor: default; }
 
 .slider-val {
   font-family: var(--font-mono);
   font-size: calc(11px * var(--u));
   color: var(--text-2);
-  min-width: 38px;
+  min-width: calc(30px * var(--u));
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
-.slider-bounds-row {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: 4px;
-}
+.slider-bounds-row { display: flex; align-items: center; gap: 5px; margin-top: 4px; }
 .slider-bound-lbl { font-size: calc(10.5px * var(--u)); color: var(--text-3); }
 .slider-bound-inp {
-  width: 44px;
+  width: calc(34px * var(--u));
   border: 1px solid var(--border);
   border-radius: 3px;
   padding: 2px 5px;
@@ -271,41 +261,29 @@ body {
 .slider-bound-inp:disabled { opacity: 0.5; }
 
 /* ── Add expression row ──────────────────────────────────── */
-#add-expr-row {
-  padding: 8px 10px;
-  border-top: 1px solid var(--border);
-  flex-shrink: 0;
-}
+#add-expr-row { padding: calc(6px * var(--u)) calc(7px * var(--u)); border-top: 1px solid var(--border); flex-shrink: 0; }
 .add-expr-btn {
   width: 100%;
   border: 1px dashed var(--border);
   background: none;
   border-radius: var(--radius);
-  padding: 6px 0;
-  font-size: calc(12px * var(--u));
+  padding: calc(5px * var(--u)) 0;
+  font-size: calc(11.5px * var(--u));
   color: var(--text-3);
   cursor: pointer;
   font-family: var(--font-ui);
-  transition: all 0.1s;
+  transition: border-color var(--dur), color var(--dur), background var(--dur);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 5px;
 }
-.add-expr-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: var(--accent-bg);
-}
+.add-expr-btn:hover { border-color: var(--accent); color: var(--text); background: var(--accent-bg); }
 
 /* ── Split handle ──────────────────────────────────────── */
 /* Zero-width in the layout; the hit area straddles the panel border so
    dragging doesn't shift either pane by the handle's own width. */
-.split-handle {
-  flex: 0 0 0;
-  position: relative;
-  z-index: 20;
-}
+.split-handle { flex: 0 0 0; position: relative; z-index: 20; }
 .split-handle::before {
   content: '';
   position: absolute;
@@ -336,12 +314,11 @@ body.splitting, body.splitting * { cursor: col-resize !important; user-select: n
   background: var(--bg);
 }
 
-#plot-canvas {
-  display: block;
-  cursor: crosshair;
-}
+#plot-canvas { display: block; cursor: crosshair; }
 #plot-canvas.dragging { cursor: grabbing; }
 #plot-canvas.viewer   { cursor: default; }
+body.mode-3d #plot-canvas { cursor: grab; }
+body.mode-3d #plot-canvas.dragging { cursor: grabbing; }
 
 /* Coordinates & trace labels */
 #coord-display {
@@ -349,14 +326,15 @@ body.splitting, body.splitting * { cursor: col-resize !important; user-select: n
   bottom: 10px;
   left: 10px;
   font-family: var(--font-mono);
-  font-size: calc(11.5px * var(--u));
+  font-size: calc(11px * var(--u));
   color: var(--text-3);
   pointer-events: none;
-  background: rgba(255,255,255,0.88);
   padding: 3px 8px;
   border-radius: 4px;
+  background: var(--bg);
   border: 1px solid var(--border);
   user-select: none;
+  font-variant-numeric: tabular-nums;
 }
 
 #trace-tip {
@@ -368,94 +346,97 @@ body.splitting, body.splitting * { cursor: col-resize !important; user-select: n
   border-radius: 4px;
   padding: 3px 9px;
   font-family: var(--font-mono);
-  font-size: calc(11.5px * var(--u));
+  font-size: calc(11px * var(--u));
   color: var(--text);
   box-shadow: 0 1px 6px rgba(0,0,0,0.07);
   white-space: nowrap;
   z-index: 5;
+  font-variant-numeric: tabular-nums;
 }
 
-/* Zoom buttons */
+/* Zoom buttons, and the rotate handles that replace them in 3D */
 #zoom-btns {
   position: absolute;
   right: 10px;
   bottom: 10px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
 .zoom-btn {
-  width: 28px; height: 28px;
+  width: calc(var(--ctl-h) * 0.95); height: calc(var(--ctl-h) * 0.95);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: rgba(255,255,255,0.9);
+  background: var(--bg);
   color: var(--text-2);
-  font-size: calc(15px * var(--u));
+  font-size: calc(13px * var(--u));
   line-height: 1;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  transition: background 0.1s, color 0.1s, border-color 0.1s;
+  transition: background var(--dur), color var(--dur), border-color var(--dur);
   font-family: var(--font-ui);
   font-weight: 500;
 }
 .zoom-btn:hover { background: var(--bg-subtle); border-color: var(--border-med); color: var(--text); }
 
-/* Viewer toast */
-#viewer-toast {
-  position: fixed;
-  bottom: 14px; right: 14px;
-  background: var(--text);
-  color: #fff;
-  font-size: calc(11.5px * var(--u));
-  font-family: var(--font-ui);
-  padding: 5px 12px;
-  border-radius: 5px;
-  opacity: 0.8;
-  pointer-events: none;
-  display: none;
-  z-index: 100;
-}
-
-/* Scrollbar */
-#expr-list::-webkit-scrollbar { width: 4px; }
-#expr-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+/* The audience gets the graph, nothing to press. */
+#viewer-toast { display: none !important; }
+body.is-viewer #mode-seg,
+body.is-viewer #btn-grid,
+body.is-viewer #btn-labels,
+body.is-viewer #btn-reset,
+body.is-viewer .bw-toolbar .bw-sep { display: none !important; }
+body.is-viewer #expr-panel,
+body.is-viewer .split-handle,
+body.is-viewer #zoom-btns,
+body.is-viewer #coord-display,
+body.is-viewer #trace-tip { display: none !important; }
 </style>
 </head>
 <body>
+<div id="shell" class="bw-shell">
 
-<!-- ── Toolbar ──────────────────────────────────────────── -->
-<div id="toolbar" data-bw-topbar>
-  <span class="toolbar-title">Function Plotter</span>
-  <div class="sep"></div>
-  <button class="tb-btn active"  id="btn-grid">Grid</button>
-  <button class="tb-btn active"  id="btn-labels">Labels</button>
-  <button class="tb-btn"         id="btn-reset">Reset View</button>
-</div>
+  <!-- ── Toolbar (moved into the host bar by the settings kit) ──────────── -->
+  <div id="toolbar" class="bw-toolbar" data-bw-topbar>
+    <span class="bw-toolbar-title">Function Plotter</span>
+    <div class="bw-sep"></div>
+    <div class="seg" id="mode-seg">
+      <button class="bw-btn is-active" id="btn-2d" title="Curves y = f(x)">2D</button>
+      <button class="bw-btn"           id="btn-3d" title="Surfaces z = f(x, y)">3D</button>
+    </div>
+    <div class="bw-sep"></div>
+    <button class="bw-btn is-active" id="btn-grid">Grid</button>
+    <button class="bw-btn is-active" id="btn-labels">Labels</button>
+    <div class="bw-spacer"></div>
+    <button class="bw-btn" id="btn-reset">Reset view</button>
+  </div>
 
-<!-- ── Main ──────────────────────────────────────────────── -->
-<div id="main">
+  <!-- ── Main ──────────────────────────────────────────────── -->
+  <div id="main">
 
-  <!-- Left: expression list -->
-  <div id="expr-panel">
-    <div id="expr-list"></div>
-    <div id="add-expr-row">
-      <button class="add-expr-btn" id="add-expr-btn">＋ Add expression</button>
+    <!-- Left: expression list -->
+    <div id="expr-panel">
+      <div id="expr-list"></div>
+      <div id="add-expr-row">
+        <button class="add-expr-btn" id="add-expr-btn">＋ Add expression</button>
+      </div>
+    </div>
+
+    <div class="split-handle" id="split-handle" title="Drag to resize · double-click to reset"></div>
+
+    <!-- Right: canvas -->
+    <div id="canvas-wrap">
+      <canvas id="plot-canvas"></canvas>
+      <div id="coord-display">x: 0.00&ensp;y: 0.00</div>
+      <div id="trace-tip"></div>
+      <div id="zoom-btns">
+        <button class="zoom-btn" id="btn-zin"  title="Zoom in">+</button>
+        <button class="zoom-btn" id="btn-zout" title="Zoom out">−</button>
+        <button class="zoom-btn" id="btn-zfit" title="Fit" style="font-size:12px">⌂</button>
+      </div>
     </div>
   </div>
 
-  <div class="split-handle" id="split-handle" title="Drag to resize · double-click to reset"></div>
-
-  <!-- Right: canvas -->
-  <div id="canvas-wrap">
-    <canvas id="plot-canvas"></canvas>
-    <div id="coord-display">x: 0.00&ensp;y: 0.00</div>
-    <div id="trace-tip"></div>
-    <div id="zoom-btns">
-      <button class="zoom-btn" id="btn-zin"  title="Zoom in">+</button>
-      <button class="zoom-btn" id="btn-zout" title="Zoom out">−</button>
-      <button class="zoom-btn" id="btn-zfit" title="Fit" style="font-size:12px">⌂</button>
-    </div>
-  </div>
 </div>
 
 <div id="viewer-toast">View-only · synced with presenter</div>
@@ -503,6 +484,14 @@ let mouseX        = null;   // screen coords, set on mousemove
 let mouseY        = null;
 let traceInfo     = null;   // { gx, gy, sx, sy, color } — set during plot()
 let syncTimer     = null;
+let DPR           = 1;      // canvas backing scale; drawing is in CSS pixels
+
+// 2D draws curves y = f(x); 3D draws surfaces z = f(x, y) over the same
+// window, seen through an orthographic camera the presenter can spin.
+let mode  = '2d';
+const CAM = { yaw: -0.62, pitch: 0.48, scale: 1 };
+const CAM0 = { ...CAM };
+let zRange = { min: -1, max: 1 };   // recomputed from the surfaces on each draw
 
 // ─────────────────────────────────────────────────────────
 // Socket.IO
@@ -603,6 +592,77 @@ function cycleColor(id) {
   emitState();
 }
 
+// Pick a colour: one of the palette, or any colour from the system picker.
+let colorPop = null, colorFor = null;
+
+function setColor(id, color) {
+  const row = expressions.find(e => e.id === id);
+  if (!row || !/^#[0-9a-f]{6}$/i.test(color)) return;
+  row.color = color.toLowerCase();
+  const sw = document.getElementById(`sw-${id}`);
+  if (sw) sw.style.background = row.color;
+  if (colorPop) colorPop.querySelectorAll('.cp-chip').forEach(c =>
+    c.classList.toggle('on', c.dataset.c === row.color));
+  plot();
+  emitState();
+}
+
+function buildColorPop() {
+  colorPop = document.createElement('div');
+  colorPop.id = 'color-pop';
+  colorPop.setAttribute('role', 'dialog');
+  colorPop.setAttribute('aria-label', 'Choose a colour');
+  colorPop.innerHTML =
+    '<div class="cp-grid">' +
+    PALETTE.map(c => `<button type="button" class="cp-chip" data-c="${c}" style="background:${c}" aria-label="${c}"></button>`).join('') +
+    '</div>' +
+    '<label class="cp-custom"><input type="color" id="cp-input"> Custom colour…</label>';
+  colorPop.addEventListener('click', e => {
+    const chip = e.target.closest('.cp-chip');
+    if (!chip || colorFor == null) return;
+    setColor(colorFor, chip.dataset.c);
+    closeColorPicker();
+  });
+  // `input` fires while dragging in the system picker, so the curve follows.
+  colorPop.querySelector('#cp-input').addEventListener('input', e => {
+    if (colorFor != null) setColor(colorFor, e.target.value);
+  });
+  document.body.appendChild(colorPop);
+  document.addEventListener('pointerdown', e => {
+    if (!colorPop.classList.contains('open')) return;
+    if (e.target.closest('#color-pop, .color-swatch')) return;
+    closeColorPicker();
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeColorPicker(); });
+  window.addEventListener('resize', closeColorPicker);
+  document.getElementById('expr-list').addEventListener('scroll', closeColorPicker);
+}
+
+function openColorPicker(id, anchor) {
+  if (IS_VIEWER) return;
+  const row = expressions.find(e => e.id === id);
+  if (!row) return;
+  if (!colorPop) buildColorPop();
+  if (colorPop.classList.contains('open') && colorFor === id) { closeColorPicker(); return; }
+  colorFor = id;
+  colorPop.querySelectorAll('.cp-chip').forEach(c =>
+    c.classList.toggle('on', c.dataset.c === row.color.toLowerCase()));
+  colorPop.querySelector('#cp-input').value = /^#[0-9a-f]{6}$/i.test(row.color) ? row.color : '#2563eb';
+  colorPop.classList.add('open');
+  // Under the swatch, kept inside the frame.
+  const r = anchor.getBoundingClientRect();
+  const w = colorPop.offsetWidth, h = colorPop.offsetHeight;
+  let top = r.bottom + 6;
+  if (top + h > window.innerHeight - 6) top = Math.max(6, r.top - h - 6);
+  colorPop.style.top  = top + 'px';
+  colorPop.style.left = Math.max(6, Math.min(r.left - 4, window.innerWidth - w - 6)) + 'px';
+}
+
+function closeColorPicker() {
+  if (colorPop) colorPop.classList.remove('open');
+  colorFor = null;
+}
+
 function toggleVisible(id) {
   const row = expressions.find(e => e.id === id);
   if (!row) return;
@@ -663,14 +723,14 @@ function renderList() {
       <div class="expr-main">
         <div class="color-swatch" id="sw-${row.id}"
              style="background:${row.color}"
-             title="Click to change colour"
-             ${IS_VIEWER ? '' : `onclick="cycleColor(${row.id})"`}></div>
+             title="Choose a colour"
+             ${IS_VIEWER ? '' : `onclick="openColorPicker(${row.id}, this)"`}></div>
 
         <input class="expr-input${row.visible ? '' : ' hidden-expr'}"
                id="ei-${row.id}"
                type="text"
                value="${escHtml(row.expr)}"
-               placeholder="y = f(x), a = 3, (1,2)…"
+               placeholder="${mode === '3d' ? 'z = f(x, y), a = 3…' : 'y = f(x), a = 3, (1,2)…'}"
                spellcheck="false"
                autocomplete="off"
                autocorrect="off"
@@ -728,8 +788,8 @@ function renderList() {
 // ─────────────────────────────────────────────────────────
 // Coordinate transforms
 // ─────────────────────────────────────────────────────────
-const W = () => canvas.width;
-const H = () => canvas.height;
+const W = () => canvas.width  / DPR;
+const H = () => canvas.height / DPR;
 const toSX = (gx) => ((gx - xmin) / (xmax - xmin)) * W();
 const toSY = (gy) => ((ymax - gy) / (ymax - ymin)) * H();
 const toGX = (sx) => xmin + (sx / W()) * (xmax - xmin);
@@ -787,11 +847,41 @@ function normaliseExpr(expr) {
 // ─────────────────────────────────────────────────────────
 // DRAW
 // ─────────────────────────────────────────────────────────
+// Every colour and size comes from the shared tokens, so the plot matches
+// the rest of the deck and grows with the text-size control instead of
+// staying at a size only the front row can read.
+let ST = null;
+function readStyle() {
+  const cs = getComputedStyle(document.documentElement);
+  const v  = (n, f) => (cs.getPropertyValue(n) || '').trim() || f;
+  const u  = parseFloat(v('--u', '1')) || 1;
+  ST = {
+    u,
+    grid:  v('--border', '#e9e9e6'),
+    axis:  v('--border-med', '#d4d4cf'),
+    text:  v('--text-2', '#6b6b65'),
+    faint: v('--text-3', '#aeaea5'),
+    ink:   v('--text', '#1a1a18'),
+    bg:    v('--bg', '#ffffff'),
+    mono:  v('--font-mono', 'monospace'),
+    ui:    v('--font-ui', 'sans-serif'),
+    tickFs: Math.max(9, Math.round(10.5 * u)),
+    nameFs: Math.max(10, Math.round(12 * u)),
+    hair:  Math.max(1, 0.9 * u),
+    axisW: Math.max(1.2, 1.2 * u),
+    curveW: Math.max(1.8, 2 * u),
+  };
+  return ST;
+}
+
 function plot() {
+  readStyle();
   const Wc = W(), Hc = H();
   ctx.clearRect(0, 0, Wc, Hc);
 
   const scope = buildScope();
+
+  if (mode === '3d') { draw3D(scope, Wc, Hc); return; }
 
   if (showGrid) drawGrid(Wc, Hc);
   drawAxes(Wc, Hc);
@@ -804,8 +894,8 @@ function drawGrid(Wc, Hc) {
   const xStep = niceStep(xmax - xmin);
   const yStep = niceStep(ymax - ymin);
 
-  ctx.strokeStyle = '#e9e9e6';
-  ctx.lineWidth   = 1;
+  ctx.strokeStyle = ST.grid;
+  ctx.lineWidth   = ST.hair;
 
   const x0 = Math.ceil(xmin / xStep) * xStep;
   for (let x = x0; x <= xmax + xStep * 0.001; x += xStep) {
@@ -825,18 +915,18 @@ function drawAxes(Wc, Hc) {
   const ax0 = Math.max(0, Math.min(Wc, toSX(0)));  // x-axis screen x-intercept
   const ay0 = Math.max(0, Math.min(Hc, toSY(0)));  // y-axis screen y-intercept
 
-  ctx.strokeStyle = '#b8b8b0';
-  ctx.lineWidth   = 1.5;
+  ctx.strokeStyle = ST.axis;
+  ctx.lineWidth   = ST.axisW;
 
   ctx.beginPath(); ctx.moveTo(0, ay0);  ctx.lineTo(Wc, ay0);  ctx.stroke(); // x-axis
   ctx.beginPath(); ctx.moveTo(ax0, 0);  ctx.lineTo(ax0, Hc);  ctx.stroke(); // y-axis
 
   // Arrowheads
-  const arr = 6, aw = 3.5;
+  const arr = 6 * ST.u, aw = 3.5 * ST.u;
   // right arrowhead on x-axis
   ctx.beginPath();
   ctx.moveTo(Wc - arr, ay0 - aw); ctx.lineTo(Wc, ay0); ctx.lineTo(Wc - arr, ay0 + aw);
-  ctx.strokeStyle = '#c8c8c0'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.strokeStyle = ST.axis; ctx.lineWidth = ST.hair; ctx.stroke();
   // top arrowhead on y-axis
   ctx.beginPath();
   ctx.moveTo(ax0 - aw, arr); ctx.lineTo(ax0, 0); ctx.lineTo(ax0 + aw, arr);
@@ -847,10 +937,10 @@ function drawAxes(Wc, Hc) {
   const xStep = niceStep(xmax - xmin);
   const yStep = niceStep(ymax - ymin);
 
-  ctx.font        = `11px var(--font-mono, monospace)`;
-  ctx.fillStyle   = '#6b6b65';
-  ctx.strokeStyle = '#b8b8b0';
-  ctx.lineWidth   = 1;
+  ctx.font        = `${ST.tickFs}px ${ST.mono}`;
+  ctx.fillStyle   = ST.text;
+  ctx.strokeStyle = ST.axis;
+  ctx.lineWidth   = ST.hair;
 
   // X ticks + labels
   ctx.textBaseline = 'top';
@@ -860,10 +950,12 @@ function drawAxes(Wc, Hc) {
     if (Math.abs(x) < xStep * 0.01) continue; // skip 0
     const sx = toSX(x);
     // tick
-    ctx.beginPath(); ctx.moveTo(sx, ay0 - 3); ctx.lineTo(sx, ay0 + 3); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(sx, ay0 - 3 * ST.u); ctx.lineTo(sx, ay0 + 3 * ST.u); ctx.stroke();
     // label — clamp to canvas
-    const ly = Math.min(Hc - 15, Math.max(1, ay0 + 5));
-    ctx.fillText(fmtTick(x), sx, ly);
+    const ly = Math.min(Hc - ST.tickFs - 4, Math.max(1, ay0 + 4 * ST.u));
+    const tx = fmtTick(x);
+    const tw = ctx.measureText(tx).width;
+    ctx.fillText(tx, Math.max(tw / 2 + 2, Math.min(Wc - tw / 2 - 2, sx)), ly);
   }
 
   // Y ticks + labels
@@ -873,28 +965,30 @@ function drawAxes(Wc, Hc) {
   for (let y = yStart; y <= ymax + yStep * 0.001; y += yStep) {
     if (Math.abs(y) < yStep * 0.01) continue;
     const sy = toSY(y);
-    ctx.beginPath(); ctx.moveTo(ax0 - 3, sy); ctx.lineTo(ax0 + 3, sy); ctx.stroke();
-    const lx = Math.max(28, Math.min(Wc - 5, ax0 - 6));
-    ctx.fillText(fmtTick(y), lx, sy);
+    ctx.beginPath(); ctx.moveTo(ax0 - 3 * ST.u, sy); ctx.lineTo(ax0 + 3 * ST.u, sy); ctx.stroke();
+    const ty = fmtTick(y);
+    const lx = Math.max(ctx.measureText(ty).width + 4, Math.min(Wc - 5, ax0 - 5 * ST.u));
+    const ly2 = Math.max(ST.tickFs * 0.7, Math.min(Hc - ST.tickFs * 0.7, sy));
+    ctx.fillText(ty, lx, ly2);
   }
 
   // Origin label
-  ctx.fillStyle    = '#aeaea5';
+  ctx.fillStyle    = ST.faint;
   ctx.textAlign    = 'right';
   ctx.textBaseline = 'top';
-  const ox = Math.max(14, Math.min(Wc - 6, ax0 - 4));
-  const oy = Math.max(1,  Math.min(Hc - 15, ay0 + 4));
+  const ox = Math.max(ST.tickFs, Math.min(Wc - 6, ax0 - 4 * ST.u));
+  const oy = Math.max(1,  Math.min(Hc - ST.tickFs - 4, ay0 + 4 * ST.u));
   ctx.fillText('0', ox, oy);
 
   // Axis name labels
-  ctx.font      = `italic 12px 'DM Sans', sans-serif`;
-  ctx.fillStyle = '#6b6b65';
-  ctx.textAlign    = 'left';
+  ctx.font      = `italic ${ST.nameFs}px ${ST.ui}`;
+  ctx.fillStyle = ST.text;
+  ctx.textAlign    = 'right';
   ctx.textBaseline = 'middle';
-  ctx.fillText('x', Math.min(Wc - 16, Wc - 14), Math.max(10, Math.min(Hc - 10, ay0 - 13)));
-  ctx.textAlign    = 'center';
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillText('y', Math.max(10, Math.min(Wc - 10, ax0 + 9)), Math.max(14, 12));
+  ctx.fillText('x', Wc - 4 * ST.u, Math.max(ST.nameFs, Math.min(Hc - ST.nameFs, ay0 - ST.nameFs)));
+  ctx.textAlign    = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText('y', Math.max(4, Math.min(Wc - ST.nameFs, ax0 + 6 * ST.u)), 4 * ST.u);
 }
 
 // ── Functions ─────────────────────────────────────────────
@@ -914,11 +1008,11 @@ function drawFunctions(scope, Wc, Hc) {
         const gx = parseFloat(m[1]), gy = parseFloat(m[2]);
         const sx = toSX(gx), sy = toSY(gy);
         ctx.beginPath();
-        ctx.arc(sx, sy, 5, 0, Math.PI * 2);
+        ctx.arc(sx, sy, 4 * ST.u, 0, Math.PI * 2);
         ctx.fillStyle   = row.color;
         ctx.fill();
-        ctx.strokeStyle = 'white';
-        ctx.lineWidth   = 1.5;
+        ctx.strokeStyle = ST.bg;
+        ctx.lineWidth   = 1.5 * ST.u;
         ctx.stroke();
       }
       if (errEl) errEl.textContent = '';
@@ -981,7 +1075,7 @@ function evaluateFunction(rawExpr, scope, Wc, Hc) {
 function strokeCurve(pts, color, Hc) {
   const JUMP = Hc * 3; // asymptote gap threshold
   ctx.strokeStyle = color;
-  ctx.lineWidth   = 2;
+  ctx.lineWidth   = ST.curveW;
   ctx.lineJoin    = 'round';
   ctx.lineCap     = 'round';
 
@@ -1009,17 +1103,333 @@ function strokeCurve(pts, color, Hc) {
   if (started) ctx.stroke();
 }
 
+// ─────────────────────────────────────────────────────────
+// 3D — surfaces z = f(x, y)
+// ─────────────────────────────────────────────────────────
+// An orthographic camera the presenter spins by dragging. The surface is a
+// mesh of quads painted back to front, so there is no depth buffer to keep
+// and no library to load: the whole thing is arithmetic and fill().
+
+// Anything that reads like "z =" or "f(x, y) =" in front of the body is a
+// label, not arithmetic.
+function body3D(expr) {
+  return String(expr || '').replace(/^\s*(?:z|[a-zA-Z]\s*\([^)]*\))\s*=(?!=)/, '').trim();
+}
+
+// World coordinates run over the plot window in x and y, and over the
+// surfaces' own height in z, all mapped into a cube so the picture keeps its
+// proportions whatever the function does.
+function camProject(x, y, z, Wc, Hc) {
+  const cy = Math.cos(CAM.yaw),   sy = Math.sin(CAM.yaw);
+  const cp = Math.cos(CAM.pitch), sp = Math.sin(CAM.pitch);
+  const X1 = x * cy - y * sy;
+  const Y1 = x * sy + y * cy;
+  const unit = Math.min(Wc, Hc) * 0.30 * CAM.scale;
+  return {
+    x: Wc / 2 + X1 * unit,
+    y: Hc / 2 - (z * cp - Y1 * sp) * unit,
+    // The eye is above the scene and on the near side of it, so a point is
+    // farther the deeper into the picture and the lower down it sits.
+    d: -(Y1 * cp + z * sp),       // larger = farther from the eye
+  };
+}
+
+function hexRGB(hex) {
+  const c = String(hex || '').replace('#', '');
+  const n = c.length === 3 ? c.split('').map(ch => ch + ch).join('') : c;
+  const v = [parseInt(n.slice(0, 2), 16), parseInt(n.slice(2, 4), 16), parseInt(n.slice(4, 6), 16)];
+  return v.some(isNaN) ? [37, 99, 235] : v;
+}
+
+// t > 0 lifts the colour toward white, t < 0 sinks it toward black.
+function tint(rgb, t) {
+  const k = t > 0 ? 255 : 0, a = Math.abs(t);
+  return rgb.map(v => v + (k - v) * a);
+}
+
+// The light: high and over the presenter's left shoulder.
+const LIGHT = (() => { const v = [-0.38, -0.46, 0.80]; const m = Math.hypot(...v); return v.map(c => c / m); })();
+
+// Sample every visible surface over the window. Returns one entry per row.
+function sampleSurfaces(scope, N) {
+  const out = [];
+  for (const row of expressions) {
+    if (!row.visible || row.type === 'slider' || row.type === 'point') continue;
+    const src = body3D(row.expr);
+    const errEl = document.getElementById(`ee-${row.id}`);
+    const rowEl = document.getElementById(`er-${row.id}`);
+    if (!src) { if (errEl) errEl.textContent = ''; continue; }
+
+    let fn;
+    try { fn = math.compile(normaliseExpr(src)); }
+    catch (err) {
+      if (errEl) errEl.textContent = err.message.split('\n')[0];
+      if (rowEl) rowEl.classList.add('has-error');
+      continue;
+    }
+
+    const z = new Float64Array((N + 1) * (N + 1));
+    let bad = 0, msg = '';
+    for (let j = 0; j <= N; j++) {
+      const yv = ymin + (ymax - ymin) * (j / N);
+      for (let i = 0; i <= N; i++) {
+        const xv = xmin + (xmax - xmin) * (i / N);
+        let v;
+        try { v = fn.evaluate({ ...scope, x: xv, y: yv }); }
+        catch (err) { v = NaN; if (!msg) msg = err.message.split('\n')[0]; }
+        if (typeof v !== 'number' || !isFinite(v)) { v = NaN; bad++; }
+        z[j * (N + 1) + i] = v;
+      }
+    }
+    if (bad === (N + 1) * (N + 1)) {
+      if (errEl) errEl.textContent = msg || 'nothing to draw over this window';
+      if (rowEl) rowEl.classList.add('has-error');
+      continue;
+    }
+    if (errEl) errEl.textContent = '';
+    if (rowEl) rowEl.classList.remove('has-error');
+    out.push({ row, z, N, rgb: hexRGB(row.color) });
+  }
+  return out;
+}
+
+// The height axis, clipped so one asymptote cannot flatten the whole surface.
+function heightRange(surfaces) {
+  const all = [];
+  for (const s of surfaces) for (let i = 0; i < s.z.length; i++) {
+    const v = s.z[i];
+    if (isFinite(v)) all.push(v);
+  }
+  if (!all.length) return { min: -1, max: 1 };
+  all.sort((a, b) => a - b);
+  const q = t => all[Math.min(all.length - 1, Math.max(0, Math.round(t * (all.length - 1))))];
+  let lo = q(0.01), hi = q(0.99);
+  if (!(hi > lo)) { lo -= 1; hi += 1; }
+  const pad = (hi - lo) * 0.04;
+  return { min: lo - pad, max: hi + pad };
+}
+
+function draw3D(scope, Wc, Hc) {
+  const N = Math.max(12, Math.min(isDragging ? 30 : 60,
+                                  Math.round(Math.min(Wc, Hc) / (isDragging ? 14 : 8))));
+  const surfaces = sampleSurfaces(scope, N);
+  zRange = heightRange(surfaces);
+
+  // World coordinates: the window in x and y, the height range in z, each
+  // mapped to [-1, 1] so the box is a cube whatever the numbers are.
+  const nx = v => ((v - xmin) / (xmax - xmin)) * 2 - 1;
+  const ny = v => ((v - ymin) / (ymax - ymin)) * 2 - 1;
+  // Heights outside the box are flattened onto its lid or its floor rather
+  // than drawn through them, the way a plot clips at its axis.
+  const nz = v => Math.max(-1, Math.min(1, ((v - zRange.min) / (zRange.max - zRange.min)) * 2 - 1));
+  const P  = (x, y, z) => camProject(x, y, z, Wc, Hc);
+
+  drawFloor3D(P, nx, ny, Wc, Hc);
+
+  // Every quad of every surface, painted far to near.
+  const quads = [];
+  for (const s of surfaces) {
+    const n = s.N, stride = n + 1;
+    const cell = 2 / n;
+    for (let j = 0; j < n; j++) {
+      for (let i = 0; i < n; i++) {
+        const z00 = s.z[j * stride + i],         z10 = s.z[j * stride + i + 1];
+        const z01 = s.z[(j + 1) * stride + i],   z11 = s.z[(j + 1) * stride + i + 1];
+        if (!isFinite(z00) || !isFinite(z10) || !isFinite(z01) || !isFinite(z11)) continue;
+
+        const x0 = xmin + (xmax - xmin) * (i / n),     x1 = xmin + (xmax - xmin) * ((i + 1) / n);
+        const y0 = ymin + (ymax - ymin) * (j / n),     y1 = ymin + (ymax - ymin) * ((j + 1) / n);
+        const h  = (z00 + z10 + z01 + z11) / 4;
+        const c00 = nz(z00), c10 = nz(z10), c01 = nz(z01), c11 = nz(z11);
+        const p00 = P(nx(x0), ny(y0), c00);
+        const p10 = P(nx(x1), ny(y0), c10);
+        const p11 = P(nx(x1), ny(y1), c11);
+        const p01 = P(nx(x0), ny(y1), c01);
+
+        // Height decides the tint, the facet's own normal decides how much
+        // light it catches. Together they read as a solid object rather than
+        // a coloured blanket.
+        const t  = Math.max(0, Math.min(1, (h - zRange.min) / (zRange.max - zRange.min)));
+        const gx = ((c10 - c00) + (c11 - c01)) / 2 / cell;
+        const gy = ((c01 - c00) + (c11 - c10)) / 2 / cell;
+        const len = Math.sqrt(gx * gx + gy * gy + 1);
+        const lam = Math.max(0, (-gx * LIGHT[0] - gy * LIGHT[1] + LIGHT[2]) / len);
+        const f   = 0.55 + 0.45 * Math.pow(lam, 0.75);
+        const lit = tint(s.rgb, -0.20 + 0.40 * t);
+        quads.push({
+          d: (p00.d + p10.d + p11.d + p01.d) / 4,
+          pts: [p00, p10, p11, p01],
+          fill: `rgb(${lit.map(v => Math.round(v * f)).join(',')})`,
+          edge: `rgb(${lit.map(v => Math.round(v * f * 0.78)).join(',')})`,
+        });
+      }
+    }
+  }
+
+  quads.sort((a, b) => b.d - a.d);
+  ctx.lineJoin = 'round';
+  const edge = quads.length < 3000 && ST.u >= 1;
+  for (const q of quads) {
+    ctx.beginPath();
+    ctx.moveTo(q.pts[0].x, q.pts[0].y);
+    for (let k = 1; k < 4; k++) ctx.lineTo(q.pts[k].x, q.pts[k].y);
+    ctx.closePath();
+    ctx.fillStyle = q.fill;
+    ctx.fill();
+    if (edge) {
+      ctx.strokeStyle = q.edge;
+      ctx.lineWidth = 0.4;
+      ctx.globalAlpha = 0.25;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  drawLabels3D(P, nx, ny, Wc, Hc);
+
+  if (!surfaces.length) {
+    ctx.fillStyle = ST.faint;
+    ctx.font = `${Math.round(13 * ST.u)}px ${ST.ui}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('z = f(x, y)', Wc / 2, Hc / 2);
+  }
+}
+
+// Which corner is at the back, and which is nearest: the back one carries the
+// vertical axis, and the two edges meeting at the near one carry the x and y
+// numbers, so nothing is read through the surface.
+function corners3D(P) {
+  const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(c => ({ c, p: P(c[0], c[1], -1) }));
+  let far = corners[0], near = corners[0], left = corners[0];
+  for (const k of corners) {
+    if (k.p.d > far.p.d)  far = k;
+    if (k.p.d < near.p.d) near = k;
+    if (k.p.x < left.p.x) left = k;
+  }
+  return { corners, far, near, left };
+}
+
+// Numbers over a drawing need to survive whatever is behind them: the same
+// text, once as a thick stroke in the background colour, once as ink.
+let LBL = [];
+function haloText(txt, x, y, always) {
+  if (!always) {
+    const near = ST.tickFs * 1.5;
+    for (const q of LBL) {
+      if (Math.abs(q[0] - x) < near * 1.6 && Math.abs(q[1] - y) < near) return false;
+    }
+  }
+  // Keep the whole label on the canvas, whichever way it is aligned.
+  const w = ctx.measureText(txt).width, al = ctx.textAlign;
+  const loX = al === 'center' ? w / 2 + 2 : al === 'right' ? w + 2 : 2;
+  const hiX = al === 'center' ? W() - w / 2 - 2 : al === 'right' ? W() - 2 : W() - w - 2;
+  x = Math.max(loX, Math.min(Math.max(loX, hiX), x));
+  y = Math.max(ST.tickFs * 0.7, Math.min(H() - ST.tickFs * 0.7, y));
+
+  LBL.push([x, y]);
+  ctx.strokeStyle = ST.bg;
+  ctx.lineWidth   = Math.max(2.5, 3 * ST.u);
+  ctx.lineJoin    = 'round';
+  ctx.strokeText(txt, x, y);
+  ctx.fillStyle   = ST.text;
+  ctx.fillText(txt, x, y);
+  return true;
+}
+
+// The floor and the axis lines, under the surfaces.
+function drawFloor3D(P, nx, ny, Wc, Hc) {
+  const { corners, left } = corners3D(P);
+
+  if (showGrid) {
+    const xStep = niceStep(xmax - xmin, 6), yStep = niceStep(ymax - ymin, 6);
+    ctx.strokeStyle = ST.grid;
+    ctx.lineWidth   = ST.hair;
+    for (let x = Math.ceil(xmin / xStep) * xStep; x <= xmax + xStep * 0.001; x += xStep) {
+      const a = P(nx(x), -1, -1), b = P(nx(x), 1, -1);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
+    for (let y = Math.ceil(ymin / yStep) * yStep; y <= ymax + yStep * 0.001; y += yStep) {
+      const a = P(-1, ny(y), -1), b = P(1, ny(y), -1);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
+  }
+
+  // The floor outline and the vertical at the far corner.
+  ctx.strokeStyle = ST.axis;
+  ctx.lineWidth   = ST.axisW;
+  ctx.beginPath();
+  corners.forEach((k, i) => { const q = k.p; i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y); });
+  ctx.closePath();
+  ctx.stroke();
+
+  const vTop = P(left.c[0], left.c[1], 1);
+  ctx.beginPath(); ctx.moveTo(left.p.x, left.p.y); ctx.lineTo(vTop.x, vTop.y); ctx.stroke();
+}
+
+// The numbers and the axis names, over the surfaces so they stay readable.
+function drawLabels3D(P, nx, ny, Wc, Hc) {
+  if (!showLabels) return;
+  const { near, left } = corners3D(P);
+
+  LBL = [];
+
+  // x and y numbers along the two floor edges that meet at the near corner.
+  const ySide = near.c[1];     // the y edge the x numbers sit on
+  const xSide = near.c[0];
+
+  ctx.font = `italic ${ST.nameFs}px ${ST.ui}`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const xn = P(-xSide * 1.34, ySide * 1.1, -1);
+  const yn = P(xSide * 1.1, -ySide * 1.34, -1);
+  const zn = P(left.c[0], left.c[1], 1.2);
+  haloText('x', xn.x, xn.y, true);
+  haloText('y', yn.x, yn.y, true);
+  haloText('z', zn.x, zn.y, true);
+
+  ctx.font      = `${ST.tickFs}px ${ST.mono}`;
+  ctx.fillStyle = ST.text;
+  const xStep = niceStep(xmax - xmin, 5), yStep = niceStep(ymax - ymin, 5);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (let x = Math.ceil(xmin / xStep) * xStep; x <= xmax + xStep * 0.001; x += xStep) {
+    const o = P(nx(x), ySide * 1.16, -1);
+    if (!haloText(fmtTick(x), o.x, o.y)) continue;
+    const a = P(nx(x), ySide, -1);
+    const t = P(nx(x), ySide * 1.04, -1);
+    ctx.strokeStyle = ST.axis; ctx.lineWidth = ST.hair;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(t.x, t.y); ctx.stroke();
+  }
+  for (let y = Math.ceil(ymin / yStep) * yStep; y <= ymax + yStep * 0.001; y += yStep) {
+    const o = P(xSide * 1.18, ny(y), -1);
+    if (!haloText(fmtTick(y), o.x, o.y)) continue;
+    const a = P(xSide, ny(y), -1);
+    const t = P(xSide * 1.04, ny(y), -1);
+    ctx.strokeStyle = ST.axis; ctx.lineWidth = ST.hair;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(t.x, t.y); ctx.stroke();
+  }
+
+  // z numbers beside the left-hand vertical.
+  const zStep = niceStep(zRange.max - zRange.min, 5);
+  ctx.textAlign = 'right';
+  for (let z = Math.ceil(zRange.min / zStep) * zStep; z <= zRange.max + zStep * 0.001; z += zStep) {
+    const zz = ((z - zRange.min) / (zRange.max - zRange.min)) * 2 - 1;
+    const a = P(left.c[0], left.c[1], zz);
+    haloText(fmtTick(z), a.x - 6 * ST.u, a.y);
+  }
+
+}
+
 // ── Trace dot ─────────────────────────────────────────────
 function drawTrace({ sx, sy, gx, gy, color }) {
   // Outer ring
   ctx.beginPath();
-  ctx.arc(sx, sy, 6.5, 0, Math.PI * 2);
+  ctx.arc(sx, sy, 5 * ST.u, 0, Math.PI * 2);
   ctx.strokeStyle = color;
-  ctx.lineWidth   = 2;
+  ctx.lineWidth   = 1.8 * ST.u;
   ctx.stroke();
   // Inner fill
   ctx.beginPath();
-  ctx.arc(sx, sy, 3.5, 0, Math.PI * 2);
+  ctx.arc(sx, sy, 2.8 * ST.u, 0, Math.PI * 2);
   ctx.fillStyle = color;
   ctx.fill();
 
@@ -1046,6 +1456,17 @@ canvas.addEventListener('mousemove', (e) => {
   const mx   = e.clientX - rect.left;
   const my   = e.clientY - rect.top;
   const gx   = toGX(mx), gy = toGY(my);
+
+  if (mode === '3d') {
+    coordDisp.textContent = `yaw ${Math.round(CAM.yaw * 180 / Math.PI)}°\u2002 tilt ${Math.round(CAM.pitch * 180 / Math.PI)}°`;
+    traceTip.style.display = 'none';
+    if (isDragging) {
+      CAM.yaw   = dragStart.yaw + (mx - dragStart.mx) * 0.008;
+      CAM.pitch = Math.max(0.10, Math.min(1.45, dragStart.pitch - (my - dragStart.my) * 0.006));
+      plot(); emitState();
+    }
+    return;
+  }
 
   coordDisp.textContent = `x: ${fmtCoord(gx)}\u2002 y: ${fmtCoord(gy)}`;
 
@@ -1087,7 +1508,8 @@ canvas.addEventListener('mousedown', (e) => {
   dragStart = {
     mx: e.clientX - rect.left,
     my: e.clientY - rect.top,
-    xmin, xmax, ymin, ymax
+    xmin, xmax, ymin, ymax,
+    yaw: CAM.yaw, pitch: CAM.pitch
   };
 });
 
@@ -1099,6 +1521,7 @@ canvas.addEventListener('mouseup', () => {
 canvas.addEventListener('wheel', (e) => {
   if (IS_VIEWER) return;
   e.preventDefault();
+  if (mode === '3d') { zoom3D(e.deltaY > 0 ? 1 / 1.1 : 1.1); return; }
   const rect = canvas.getBoundingClientRect();
   const mx   = e.clientX - rect.left;
   const my   = e.clientY - rect.top;
@@ -1131,6 +1554,11 @@ canvas.addEventListener('touchstart', (e) => {
     );
   }
 }, { passive: false });
+
+function zoom3D(f) {
+  CAM.scale = Math.max(0.35, Math.min(4, CAM.scale * f));
+  plot(); emitState();
+}
 
 canvas.addEventListener('touchmove', (e) => {
   if (IS_VIEWER) return;
@@ -1172,27 +1600,48 @@ canvas.addEventListener('touchend', (e) => {
 // ─────────────────────────────────────────────────────────
 document.getElementById('btn-grid').addEventListener('click', function () {
   showGrid = !showGrid;
-  this.classList.toggle('active', showGrid);
+  this.classList.toggle('is-active', showGrid);
   plot(); emitState();
 });
 
 document.getElementById('btn-labels').addEventListener('click', function () {
   showLabels = !showLabels;
-  this.classList.toggle('active', showLabels);
+  this.classList.toggle('is-active', showLabels);
   plot(); emitState();
 });
 
+// Reset puts back whatever the current mode can move: the window in 2D, the
+// camera in 3D.
 document.getElementById('btn-reset').addEventListener('click', () => {
-  xmin = -10; xmax = 10; ymin = -10; ymax = 10;
+  if (mode === '3d') { Object.assign(CAM, CAM0); }
+  else { xmin = -10; xmax = 10; ymin = -10; ymax = 10; }
   plot(); emitState();
 });
+
+function setMode(next, quiet) {
+  const m = next === '3d' ? '3d' : '2d';
+  mode = m;
+  document.body.classList.toggle('mode-3d', m === '3d');
+  document.getElementById('btn-2d').classList.toggle('is-active', m === '2d');
+  document.getElementById('btn-3d').classList.toggle('is-active', m === '3d');
+  traceInfo = null;
+  traceTip.style.display = 'none';
+  coordDisp.textContent = m === '3d' ? 'drag to rotate' : 'x: 0.00\u2002 y: 0.00';
+  renderList();
+  plot();
+  if (!quiet) emitState();
+}
+
+document.getElementById('btn-2d').addEventListener('click', () => setMode('2d'));
+document.getElementById('btn-3d').addEventListener('click', () => setMode('3d'));
 
 document.getElementById('add-expr-btn').addEventListener('click', () => addExpression('', null, true));
 
-document.getElementById('btn-zin').addEventListener('click', () => zoom(0.8));
-document.getElementById('btn-zout').addEventListener('click', () => zoom(1.25));
+document.getElementById('btn-zin').addEventListener('click', () => mode === '3d' ? zoom3D(1.15) : zoom(0.8));
+document.getElementById('btn-zout').addEventListener('click', () => mode === '3d' ? zoom3D(1 / 1.15) : zoom(1.25));
 document.getElementById('btn-zfit').addEventListener('click', () => {
-  xmin = -10; xmax = 10; ymin = -10; ymax = 10;
+  if (mode === '3d') { Object.assign(CAM, CAM0); }
+  else { xmin = -10; xmax = 10; ymin = -10; ymax = 10; }
   plot(); emitState();
 });
 
@@ -1210,9 +1659,13 @@ function zoom(factor) {
 // ─────────────────────────────────────────────────────────
 function resize() {
   const cont = document.getElementById('canvas-wrap');
-  const rect  = cont.getBoundingClientRect();
-  canvas.width  = rect.width;
-  canvas.height = rect.height;
+  const rect = cont.getBoundingClientRect();
+  DPR = Math.max(1, Math.min(2.5, window.devicePixelRatio || 1));
+  canvas.style.width  = rect.width  + 'px';
+  canvas.style.height = rect.height + 'px';
+  canvas.width  = Math.max(1, Math.round(rect.width  * DPR));
+  canvas.height = Math.max(1, Math.round(rect.height * DPR));
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   plot();
 }
 window.addEventListener('resize', resize);
@@ -1228,7 +1681,7 @@ if (typeof ResizeObserver !== 'undefined') {
   const handle  = document.getElementById('split-handle');
   const panel   = document.getElementById('expr-panel');
   const main    = document.getElementById('main');
-  const DEFAULT = 264, MIN_PANEL = 160, MIN_PLOT = 200;
+  const DEFAULT = 340, MIN_PANEL = 160, MIN_PLOT = 200;
 
   function setWidth(w) {
     const max = Math.max(MIN_PANEL, main.clientWidth - MIN_PLOT);
@@ -1266,7 +1719,8 @@ function getState() {
       id: r.id, expr: r.expr, color: r.color, visible: r.visible,
       type: r.type, sliderMin: r.sliderMin, sliderMax: r.sliderMax, sliderVal: r.sliderVal
     })),
-    xmin, xmax, ymin, ymax, showGrid, showLabels
+    xmin, xmax, ymin, ymax, showGrid, showLabels,
+    mode, yaw: CAM.yaw, pitch: CAM.pitch, scale: CAM.scale
   };
 }
 
@@ -1277,8 +1731,12 @@ function applyState(s) {
     renderList();
   }
   if (s.xmin != null) { xmin = s.xmin; xmax = s.xmax; ymin = s.ymin; ymax = s.ymax; }
-  if (s.showGrid   != null) { showGrid   = s.showGrid;   document.getElementById('btn-grid').classList.toggle('active', showGrid); }
-  if (s.showLabels != null) { showLabels = s.showLabels; document.getElementById('btn-labels').classList.toggle('active', showLabels); }
+  if (s.showGrid   != null) { showGrid   = s.showGrid;   document.getElementById('btn-grid').classList.toggle('is-active', showGrid); }
+  if (s.showLabels != null) { showLabels = s.showLabels; document.getElementById('btn-labels').classList.toggle('is-active', showLabels); }
+  if (s.yaw   != null) CAM.yaw   = s.yaw;
+  if (s.pitch != null) CAM.pitch = s.pitch;
+  if (s.scale != null) CAM.scale = s.scale;
+  if (s.mode  != null && s.mode !== mode) setMode(s.mode, true);
   plot();
 }
 
@@ -1288,9 +1746,9 @@ function applyState(s) {
 function applyConfig(cfg) {
   if (!cfg) return;
   if (cfg.viewer || IS_VIEWER) {
-    document.getElementById('viewer-toast').style.display = 'block';
+    document.body.classList.add('is-viewer');
     canvas.classList.add('viewer');
-    document.getElementById('add-expr-btn').style.display = 'none';
+    resize();
   }
   if (cfg.expressions?.length) {
     cfg.expressions.forEach((e, i) => {
@@ -1299,8 +1757,9 @@ function applyConfig(cfg) {
     });
   }
   if (cfg.xmin != null) { xmin = cfg.xmin; xmax = cfg.xmax; ymin = cfg.ymin; ymax = cfg.ymax; }
-  if (cfg.showGrid   != null) { showGrid   = cfg.showGrid;   document.getElementById('btn-grid').classList.toggle('active', showGrid); }
-  if (cfg.showLabels != null) { showLabels = cfg.showLabels; document.getElementById('btn-labels').classList.toggle('active', showLabels); }
+  if (cfg.showGrid   != null) { showGrid   = cfg.showGrid;   document.getElementById('btn-grid').classList.toggle('is-active', showGrid); }
+  if (cfg.showLabels != null) { showLabels = cfg.showLabels; document.getElementById('btn-labels').classList.toggle('is-active', showLabels); }
+  if (cfg.mode === '3d' || cfg.mode === '2d') setMode(cfg.mode, true);
   if (cfg.socketUrl) initSocket(cfg.socketUrl);
   plot();
 }
@@ -1327,9 +1786,8 @@ initSocket();
 resize();
 
 if (IS_VIEWER) {
-  document.getElementById('viewer-toast').style.display = 'block';
+  document.body.classList.add('is-viewer');
   canvas.classList.add('viewer');
-  document.getElementById('add-expr-btn').style.display = 'none';
 }
 
 // Start with a single blank row so there's somewhere to type — no preset functions.

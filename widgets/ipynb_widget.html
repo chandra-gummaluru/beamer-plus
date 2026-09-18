@@ -3,7 +3,7 @@
 <head>
 <script id="widget-schema" type="application/json">
 {
-  "label": "Coding Notebook",
+  "label": "Python Notebook",
   "category": "Computer Science",
   "fields": [
     { "key": "notebook", "label": "Notebook file", "type": "file", "accept": ".ipynb", "folder": "assets" },
@@ -12,9 +12,28 @@
   ]
 }
 </script>
+<!-- Standalone fallback. Inside Beamer+ the host injects the shared widget
+     base (tokens, fonts, toolbar, buttons) ahead of everything else. Opened
+     directly (a file in Edge, a plain web server) nothing does, so load the
+     same stylesheet from the repo, relative to this file, at the same point in
+     the cascade. Beamer+ is unaffected: its link is already present. -->
+<script id="bw-standalone">
+(function () {
+  if (document.querySelector('link[href*="widget-base.css"]')) return;
+  var head = document.head || document.getElementsByTagName('head')[0];
+  [['preconnect', 'https://fonts.googleapis.com'],
+   ['stylesheet', 'https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@400;500;600&display=swap'],
+   ['stylesheet', '../static/css/widget-base.css']].forEach(function (l) {
+    var el = document.createElement('link');
+    el.rel = l[0]; el.href = l[1];
+    head.appendChild(el);
+  });
+  document.documentElement.setAttribute('data-bw-standalone', '');
+})();
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Notebook — Beamer+</title>
+<title>Python Notebook — Beamer+</title>
 
 <!-- Pyodide (presenter only — viewer skips this) -->
 <script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"></script>
@@ -448,13 +467,12 @@ body {
 #notebook-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
 #notebook-area::-webkit-scrollbar-thumb:hover { background: var(--border-med); }
 
-/* ── Printing (the PDF export) ──────────────────────────────────────
-   "Download → PDF" hands the notebook to the browser's own print pipeline
-   and lets it write the file, which keeps the text, the maths and the
-   figures as vectors — a rasterised screenshot of the page would not.
-   What that needs from us is a document that isn't a fixed-height
-   scrolling pane: everything unrolls, the chrome goes, and cells are asked
-   not to break across pages. */
+/* ── Paper: the PDF export, and Ctrl+P ─────────────────────────────
+   One look for both, the same as the Python Workspace's PDF: a title
+   block, a quiet grey panel for code, white boxes for output, a red card
+   for errors. Everything is scoped to .paper — the PDF button builds an
+   offscreen copy of the notebook inside it, and printing puts the class on
+   the notebook itself for as long as the print dialog is open. */
 @media print {
   html, body {
     height: auto;
@@ -462,14 +480,14 @@ body {
     display: block;
     background: #fff;
     color: #000;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
   /* The widget's own bar, the one the settings kit builds around it, and
      every per-cell control: furniture, not content. */
   #toolbar,
   .bw-topbar,
-  .cell-controls,
-  .add-row,
   #viewer-toast { display: none !important; }
 
   /* The kit wraps the widget's body in .bw-topbar-body, which is a flex
@@ -483,17 +501,143 @@ body {
     padding: 0;
   }
 
-  #notebook { max-width: none; padding: 0; }
-
   .cell-block { break-inside: avoid; page-break-inside: avoid; }
-  .cell-card  { border-color: #ccc; box-shadow: none; }
 
-  /* Source textareas are already grown to fit their content by autoResize(),
-     so they print whole — don't touch their height here, `auto` would
-     collapse them back to their `rows` attribute. */
-  .code-ta { overflow: visible; }
+  @page {
+    size: letter;
+    margin: 0.55in 0.6in 0.7in;
+    @bottom-left {
+      content: "Beamer+ \00B7  Python Notebook";
+      font: 7pt 'DM Sans', Helvetica, Arial, sans-serif;
+      color: #85857D;
+    }
+    @bottom-right {
+      content: "Page " counter(page) " of " counter(pages);
+      font: 7pt 'DM Sans', Helvetica, Arial, sans-serif;
+      color: #85857D;
+    }
+  }
+}
 
-  .out-image img, .md-view img { max-width: 100%; }
+/* Only on paper. */
+#print-header, .print-code { display: none; }
+
+.paper {
+  --u: 1;
+  background: #fff;
+  font-family: 'DM Sans', Helvetica, Arial, sans-serif;
+  color: #1A1A18;
+}
+.paper #notebook { max-width: none; padding: 0; margin: 0; }
+.paper .cell-controls,
+.paper .add-row,
+.paper #boot-state { display: none !important; }
+
+.paper #print-header { display: block; margin: 0 0 18pt; }
+.paper .ph-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 24pt; }
+.paper .ph-eyebrow, .paper .ph-section {
+  font-size: 6.8pt;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: #85857D;
+}
+.paper .ph-title {
+  margin-top: 3pt;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-size: 17pt;
+  font-weight: 500;
+  color: #1A1A18;
+  word-break: break-all;
+}
+.paper .ph-meta    { text-align: right; white-space: nowrap; }
+.paper .ph-date    { font-size: 8.5pt; color: #85857D; padding-bottom: 3pt; }
+.paper .ph-rule    { border: 0; border-top: 0.8pt solid #1A1A18; margin: 10pt 0 0; }
+.paper .ph-section { margin-top: 14pt; }
+
+/* Cells: breathing room, and a narrow prompt column. */
+.paper .cell-block { margin-bottom: 10pt; }
+.paper .cell-gutter { width: 40pt; padding-right: 7pt; }
+.paper .exec-num,
+.paper .exec-num.ran { font-size: 7.5pt; color: #85857D; }
+.paper .exec-num::before { content: "In "; }
+/* Inside the output box the prompt column is just an indent; the "In"
+   number beside the cell already says which run this is. */
+.paper .out-gutter,
+.paper .md-gutter-label { display: none; }
+
+.paper .cell-card,
+.paper .cell-card.focused,
+.paper .cell-card.running {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
+}
+.paper .cell-card::before { display: none; }
+
+/* Code: a textarea can't carry colour, so a highlighted copy made just
+   before export stands in for it. */
+.paper .code-area { background: #F6F6F3; border-radius: 3pt; }
+.paper .code-area .code-ta { display: none; }
+.paper .code-area .print-code {
+  display: block;
+  margin: 0;
+  padding: 7pt 10pt;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-size: 8.6pt;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #1A1A18;
+  font-variant-ligatures: none;
+}
+.paper .pk-kw  { color: #7A3EAD; font-weight: 600; }
+.paper .pk-str { color: #0E7C6B; }
+.paper .pk-num { color: #2F5DD1; }
+.paper .pk-bi  { color: #A03A82; }
+.paper .pk-com { color: #8A938E; font-style: italic; }
+.paper .pk-def { font-weight: 600; }
+.paper .pk-dec { color: #A03A82; }
+
+.paper .cell-output.has-output {
+  margin-top: 4pt;
+  background: #FFFFFF;
+  border: 0.75pt solid #DAD9D4;
+  border-radius: 3pt;
+}
+.paper .out-content { padding: 6pt 9pt; }
+.paper .out-text { font-size: 8.2pt; line-height: 1.5; color: #1A1A18; }
+.paper .out-text.is-stderr { color: #9A5A00; }
+.paper .out-text.is-error {
+  color: #1A1A18;
+  background: #FCECEA;
+  border-left: 2.5pt solid #B3261E;
+  border-radius: 2pt;
+  padding: 5pt 8pt;
+}
+.paper .out-image img { max-width: 100%; border: 0; border-radius: 0; }
+/* An error is its own card; no box around the box. */
+.paper .cell-output.has-output:has(.out-text.is-error) { border-color: transparent; background: none; }
+.paper .out-content:has(> .out-text.is-error) { padding: 0; }
+
+/* Markdown reads as the document's prose, aligned with the code. */
+.paper .md-view { padding: 2pt 0; font-size: 10pt; line-height: 1.55; background: none; }
+.paper .md-view img { max-width: 100%; }
+.paper .md-view h1 { font-size: 15pt; margin: 4pt 0 5pt; }
+.paper .md-view h2 { font-size: 12.5pt; margin: 4pt 0 4pt; }
+.paper .md-view h3 { font-size: 10.5pt; margin: 3pt 0 3pt; }
+.paper .md-view code { font-size: 8.6pt; background: #F6F6F3; border: 0; }
+.paper .md-view pre  { background: #F6F6F3; border: 0; border-radius: 3pt; }
+
+/* The offscreen copy the PDF is drawn from: exactly the page's text width
+   (US Letter less 0.6in margins), so a CSS point lands as a PDF point. */
+.pdf-stage {
+  position: fixed;
+  left: -12000px;
+  top: 0;
+  width: 526pt;
+  pointer-events: none;
 }
 </style>
 </head>
@@ -511,15 +655,6 @@ body {
   <button class="tb-btn primary" id="btn-run-all" disabled onclick="runAll()">
     Run All
   </button>
-  <button class="tb-btn" id="btn-run" disabled onclick="runSelected()">
-    Run Cell
-  </button>
-
-  <div class="sep"></div>
-
-  <button class="tb-btn" id="btn-clear" disabled onclick="clearAllOutputs(true)">
-    Clear
-  </button>
 
   <div class="sep"></div>
 
@@ -532,14 +667,28 @@ body {
     Notebook
   </button>
   <button class="tb-btn" id="btn-download-pdf" disabled onclick="downloadPdf()"
-          title="Print the notebook — choose “Save as PDF” in the dialog">
+          title="Download the notebook as a PDF">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-    PDF
+    <span class="pdf-label">PDF</span>
   </button>
 </div>
 
 <!-- ── Notebook ───────────────────────────────────────────────────────── -->
 <div id="notebook-area">
+  <!-- Paper only. Filled in just before printing: see fillPrintHeader(). -->
+  <div id="print-header" aria-hidden="true">
+    <div class="ph-row">
+      <div>
+        <div class="ph-eyebrow">Python Notebook</div>
+        <div class="ph-title" id="ph-title"></div>
+      </div>
+      <div class="ph-meta">
+        <div class="ph-date" id="ph-date"></div>
+      </div>
+    </div>
+    <hr class="ph-rule">
+    <div class="ph-section">Cells</div>
+  </div>
   <div id="notebook">
     <div id="boot-state">
       <div class="boot-spinner"></div>
@@ -1479,19 +1628,29 @@ function deleteCell(id) {
   refreshAddRows();
 }
 
-function moveCellUp(id) {
-  const b = document.querySelector(`.cell-block[data-id="${id}"]`);
-  const prev = b?.previousElementSibling;
-  if (b && prev?.classList.contains('cell-block')) prev.before(b);
-  refreshAddRows();
+// The neighbouring cell, skipping the "+ Code / + Markdown" rows that sit
+// between cells for the presenter — the immediate sibling is usually one of
+// those, which is why moving used to do nothing.
+function siblingCell(b, dir) {
+  let el = dir < 0 ? b.previousElementSibling : b.nextElementSibling;
+  while (el && !el.classList.contains('cell-block')) {
+    el = dir < 0 ? el.previousElementSibling : el.nextElementSibling;
+  }
+  return el;
 }
 
-function moveCellDown(id) {
+function moveCell(id, dir) {
   const b = document.querySelector(`.cell-block[data-id="${id}"]`);
-  const next = b?.nextElementSibling;
-  if (b && next?.classList.contains('cell-block')) next.after(b);
+  const other = b && siblingCell(b, dir);
+  if (!other) return;
+  if (dir < 0) other.before(b); else other.after(b);
   refreshAddRows();
+  selectCell(id);
+  b.scrollIntoView({ block: 'nearest' });
 }
+
+function moveCellUp(id)   { moveCell(id, -1); }
+function moveCellDown(id) { moveCell(id, +1); }
 
 function selectCell(id) {
   if (selectedId) document.getElementById(`card-${selectedId}`)?.classList.remove('focused');
@@ -1589,7 +1748,7 @@ function removeBoot() {
 }
 
 function enablePresenterToolbar() {
-  ['btn-run-all', 'btn-run', 'btn-clear',
+  ['btn-run-all',
    'btn-download', 'btn-download-pdf'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.disabled = false;
@@ -1760,15 +1919,207 @@ function downloadNotebook() {
   saveBlob(new Blob([JSON.stringify(buildIpynb(), null, 1)], { type: 'application/json' }), name);
 }
 
-function downloadPdf() {
-  // Markdown left open for editing would print its textarea instead of its
+// ── Print styling ────────────────────────────────────────────────────────────
+// A textarea prints in one colour, so each code cell gets a highlighted copy
+// for paper. Same tokens and palette as the Python Workspace's PDF.
+const PK_KW = 'False|None|True|and|as|assert|async|await|break|class|continue|def|del|elif|else|except|finally|for|from|global|if|import|in|is|lambda|nonlocal|not|or|pass|raise|return|try|while|with|yield|match|case';
+const PK_BI = 'print|input|len|range|int|float|str|list|dict|set|tuple|bool|type|isinstance|enumerate|zip|map|filter|sorted|reversed|sum|min|max|abs|round|open|super|self|object|any|all|repr|chr|ord|iter|next';
+const PK_TOK = new RegExp(
+  '(#[^\\n]*)' +
+  '|([rbfuRBFU]{0,2}(?:"""[\\s\\S]*?(?:"""|(?![\\s\\S]))|\'\'\'[\\s\\S]*?(?:\'\'\'|(?![\\s\\S]))|"(?:\\\\.|[^"\\\\\\n])*"?|\'(?:\\\\.|[^\'\\\\\\n])*\'?))' +
+  '|\\b(def|class)(\\s+)([A-Za-z_]\\w*)' +
+  '|\\b(' + PK_KW + ')\\b' +
+  '|\\b(' + PK_BI + ')\\b' +
+  '|(@[A-Za-z_][\\w.]*)' +
+  '|\\b(0[xXoObB][\\da-fA-F_]+|\\d[\\d_]*\\.?\\d*(?:[eE][+-]?\\d+)?j?)\\b',
+  'g');
+
+function printHighlight(src) {
+  const sp = (c, t) => `<span class="pk-${c}">${escHtml(t)}</span>`;
+  let out = '', last = 0, m;
+  PK_TOK.lastIndex = 0;
+  while ((m = PK_TOK.exec(src))) {
+    out += escHtml(src.slice(last, m.index));
+    if      (m[1]) out += sp('com', m[1]);
+    else if (m[2]) out += sp('str', m[2]);
+    else if (m[3]) out += sp('kw', m[3]) + m[4] + sp('def', m[5]);
+    else if (m[6]) out += sp('kw', m[6]);
+    else if (m[7]) out += sp('bi', m[7]);
+    else if (m[8]) out += sp('dec', m[8]);
+    else if (m[9]) out += sp('num', m[9]);
+    last = PK_TOK.lastIndex;
+    if (m[0] === '') PK_TOK.lastIndex++;
+  }
+  return out + escHtml(src.slice(last));
+}
+
+function fillPrintHeader() {
+  const name  = (document.getElementById('notebook-title')?.textContent || 'Untitled.ipynb').trim();
+  let date;
+  try { date = new Date().toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' }); }
+  catch (_) { date = new Date().toDateString(); }
+  document.getElementById('ph-title').textContent  = name;
+  document.getElementById('ph-date').textContent   = date;
+}
+
+function preparePrint() {
+  document.querySelectorAll('#notebook .cell-block[data-cell-type="code"]').forEach(b => {
+    const ta = b.querySelector('.code-ta');
+    if (!ta) return;
+    let pre = b.querySelector('.print-code');
+    if (!pre) {
+      pre = document.createElement('pre');
+      pre.className = 'print-code';
+      ta.after(pre);
+    }
+    pre.innerHTML = printHighlight(ta.value.replace(/\s+$/, '')) || ' ';
+  });
+  fillPrintHeader();
+}
+
+// Ctrl+P gets the same page as the PDF, styled for as long as the dialog is up.
+window.addEventListener('beforeprint', () => {
+  preparePrint();
+  document.getElementById('notebook-area').classList.add('paper');
+});
+window.addEventListener('afterprint', () => {
+  document.getElementById('notebook-area').classList.remove('paper');
+});
+
+// ── PDF download ─────────────────────────────────────────────────────────────
+// Builds the file in the page and downloads it: an offscreen copy of the
+// notebook in its paper style, each cell captured with html2canvas and laid
+// onto US Letter pages with jsPDF. The title block and footer are real text.
+// Both libraries load on first use, so a slide that never exports never
+// fetches them.
+const PDF_LIBS = [
+  'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+];
+let pdfLibsReady = null;
+function loadPdfLibs() {
+  if (!pdfLibsReady) {
+    pdfLibsReady = PDF_LIBS.reduce((p, src) => p.then(() => new Promise((ok, bad) => {
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = ok;
+      s.onerror = () => bad(new Error('could not load ' + src.split('/').slice(-2).join('/')));
+      document.head.appendChild(s);
+    })), Promise.resolve()).catch(err => { pdfLibsReady = null; throw err; });
+  }
+  return pdfLibsReady;
+}
+
+let pdfBusy = false;
+
+async function downloadPdf() {
+  if (pdfBusy) return;
+  const btn = document.getElementById('btn-download-pdf');
+  const label = btn?.querySelector('.pdf-label');
+  pdfBusy = true;
+  if (btn) btn.disabled = true;
+  if (label) label.textContent = 'PDF…';
+
+  // Markdown left open for editing would show its textarea instead of its
   // rendered form, so close every editor first.
   document.querySelectorAll('.cell-block[data-cell-type="markdown"]').forEach(b => {
     const edit = document.getElementById('md-edit-' + b.dataset.id);
     if (edit && edit.style.display !== 'none') commitMarkdown(b.dataset.id);
   });
-  // Let the layout settle before handing the document to the print engine.
-  setTimeout(() => { try { window.print(); } catch (e) { console.warn('print failed', e); } }, 60);
+  preparePrint();
+
+  let stage = null;
+  try {
+    await loadPdfLibs();
+    if (document.fonts?.ready) await document.fonts.ready;
+
+    stage = document.createElement('div');
+    stage.className = 'paper pdf-stage';
+    stage.setAttribute('aria-hidden', 'true');
+    const nb = document.getElementById('notebook').cloneNode(true);
+    // The copy keeps id="notebook" (the paper rules key on it); it only
+    // exists for the moment the cells are being captured.
+    stage.appendChild(nb);
+    document.body.appendChild(stage);
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'pt', format: 'letter', compress: true });
+    const PW = 612, PH = 792, ML = 43, CW = PW - 2 * ML;
+    const TOP = 40, BOTTOM = PH - 52;
+    const pxToPt = CW / stage.getBoundingClientRect().width;
+    const INK = [26, 26, 24], DIM = [133, 133, 125], RULE = [218, 217, 212];
+
+    // Title block, as text.
+    const name = (document.getElementById('notebook-title')?.textContent || 'Untitled.ipynb').trim();
+    let date;
+    try { date = new Date().toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' }); }
+    catch (_) { date = new Date().toDateString(); }
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.8); doc.setTextColor(...DIM);
+    doc.text('PYTHON NOTEBOOK', ML, TOP + 5.5, { charSpace: 0.9 });
+    doc.setFont('courier', 'bold'); doc.setFontSize(17); doc.setTextColor(...INK);
+    doc.text(doc.splitTextToSize(name, CW - 140)[0], ML, TOP + 25);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...DIM);
+    doc.text(date, ML + CW, TOP + 24, { align: 'right' });
+    doc.setDrawColor(...INK); doc.setLineWidth(0.8);
+    doc.line(ML, TOP + 40, ML + CW, TOP + 40);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.8); doc.setTextColor(...DIM);
+    doc.text('CELLS', ML, TOP + 61.5, { charSpace: 0.9 });
+    let y = TOP + 72;
+
+    const SCALE = 3, GAP = 10;
+    const blocks = [...nb.querySelectorAll(':scope > .cell-block')];
+    for (const block of blocks) {
+      const canvas = await html2canvas(block, {
+        scale: SCALE, backgroundColor: '#ffffff', logging: false, useCORS: true,
+      });
+      const hPt = canvas.height / SCALE * pxToPt;
+      const wPt = canvas.width  / SCALE * pxToPt;
+      if (y + hPt > BOTTOM && y > TOP) { doc.addPage(); y = TOP; }
+      if (y + hPt <= BOTTOM) {
+        doc.addImage(canvas, 'PNG', ML, y, wPt, hPt, undefined, 'FAST');
+        y += hPt + GAP;
+        continue;
+      }
+      // Taller than a page: slice it.
+      const perPagePx = Math.floor((BOTTOM - TOP) / pxToPt * SCALE);
+      for (let sy = 0; sy < canvas.height; sy += perPagePx) {
+        const part = document.createElement('canvas');
+        part.width = canvas.width;
+        part.height = Math.min(perPagePx, canvas.height - sy);
+        part.getContext('2d').drawImage(canvas, 0, sy, canvas.width, part.height, 0, 0, canvas.width, part.height);
+        if (sy > 0) { doc.addPage(); y = TOP; }
+        const ph = part.height / SCALE * pxToPt;
+        doc.addImage(part, 'PNG', ML, y, wPt, ph, undefined, 'FAST');
+        y += ph + GAP;
+      }
+    }
+
+    // Footer on every page.
+    const pages = doc.getNumberOfPages();
+    for (let i = 1; i <= pages; i++) {
+      doc.setPage(i);
+      doc.setDrawColor(...RULE); doc.setLineWidth(0.5);
+      doc.line(ML, PH - 36, ML + CW, PH - 36);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...DIM);
+      doc.text('Beamer+ · Python Notebook', ML, PH - 26);
+      doc.text(`Page ${i} of ${pages}`, ML + CW, PH - 26, { align: 'right' });
+    }
+
+    const stem = name.replace(/\.ipynb$/i, '').replace(/[^\w.-]+/g, '-') || 'notebook';
+    doc.save(stem + '.pdf');
+    if (label) label.textContent = 'PDF';
+  } catch (err) {
+    console.error('[notebook] PDF export failed', err);
+    if (label) {
+      label.textContent = 'Failed';
+      setTimeout(() => { label.textContent = 'PDF'; }, 2000);
+    }
+  } finally {
+    stage?.remove();
+    pdfBusy = false;
+    if (btn) btn.disabled = false;
+  }
 }
 
 
@@ -1781,7 +2132,7 @@ function escHtml(s) {
 // ─────────────────────────────────────────────────────────────────────────────
 if (IS_VIEWER) {
   document.addEventListener('DOMContentLoaded', () => {
-    ['btn-run-all', 'btn-run', 'btn-clear',
+    ['btn-run-all',
    'btn-download', 'btn-download-pdf'].forEach(id => {
       document.getElementById(id)?.remove();
     });

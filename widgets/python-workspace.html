@@ -38,6 +38,25 @@
   ]
 }
 </script>
+<!-- Standalone fallback. Inside Beamer+ the host injects the shared widget
+     base (tokens, fonts, toolbar, buttons) ahead of everything else. Opened
+     directly (a file in Edge, a plain web server) nothing does, so load the
+     same stylesheet from the repo, relative to this file, at the same point in
+     the cascade. Beamer+ is unaffected: its link is already present. -->
+<script id="bw-standalone">
+(function () {
+  if (document.querySelector('link[href*="widget-base.css"]')) return;
+  var head = document.head || document.getElementsByTagName('head')[0];
+  [['preconnect', 'https://fonts.googleapis.com'],
+   ['stylesheet', 'https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@400;500;600&display=swap'],
+   ['stylesheet', '../static/css/widget-base.css']].forEach(function (l) {
+    var el = document.createElement('link');
+    el.rel = l[0]; el.href = l[1];
+    head.appendChild(el);
+  });
+  document.documentElement.setAttribute('data-bw-standalone', '');
+})();
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Python Workspace — Beamer+</title>
@@ -3640,22 +3659,24 @@ function setupKeys(){
 
 var PDF = {
   pw: 792, ph: 612,      /* US Letter, landscape, in points        */
-  margin: 30,
-  gutter: 16,            /* between the two columns                */
-  leftFrac: 0.38,        /* share of the width the program gets    */
+  margin: 36,
+  gutter: 22,            /* between the two columns                */
+  leftFrac: 0.39,        /* share of the width the program gets    */
   res: 3,                /* raster pixels per point, ~216 dpi      */
   maxPx: 4.5e6,          /* ceiling on the raster, to stay modest  */
-  maxPtPerUnit: 1.5      /* a one-frame diagram must not balloon   */
+  maxPtPerUnit: 1.6      /* a one-frame diagram must not balloon   */
 };
 
 var PDF_FONTS = [
-  ['F1', 'Courier'], ['F2', 'Courier-Bold'], ['F3', 'Courier-Oblique'], ['F4', 'Helvetica']
+  ['F1', 'Courier'], ['F2', 'Courier-Bold'], ['F3', 'Courier-Oblique'], ['F4', 'Helvetica'],
+  ['F5', 'Helvetica-Bold']
 ];
 
 /* The light palette, frozen: the PDF does not follow the theme. */
 var PDF_COL = {
-  ink: '#16211D', dim: '#8A938E', rule: '#DCE1DC', paper: '#FFFFFF',
-  mark: '#E6ECFB', markBar: '#3A3A36', err: '#FBE9E7', errBar: '#B3261E',
+  ink: '#1A1A18', dim: '#85857D', rule: '#DAD9D4', paper: '#FFFFFF', code: '#F6F6F3',
+  mark: '#E4EBFA', markBar: '#2F5DD1', err: '#FCECEA', errBar: '#B3261E',
+  mutate: '#C46A00',
   't-kw': '#7A3EAD', 't-str': '#0E7C6B', 't-num': '#2F5DD1',
   't-com': '#8A938E', 't-bi': '#A03A82'
 };
@@ -3914,7 +3935,9 @@ function pdfEncodeRaster(canvas, ctx, base){
   if (!rgba) return Promise.resolve(pdfJpeg(canvas, base));
   var rgb = new Uint8Array(base.w * base.h * 3);
   for (var i = 0, j = 0; i < rgba.length; i += 4){
-    rgb[j++] = rgba[i]; rgb[j++] = rgba[i + 1]; rgb[j++] = rgba[i + 2];
+    var r = rgba[i], g = rgba[i + 1], bl = rgba[i + 2];
+    if (r >= 250 && g >= 250 && bl >= 250){ r = g = bl = 255; }
+    rgb[j++] = r; rgb[j++] = g; rgb[j++] = bl;
   }
   return pdfDeflate(rgb).then(function(z){
     if (!z) return pdfJpeg(canvas, base);
@@ -3925,7 +3948,7 @@ function pdfEncodeRaster(canvas, ctx, base){
 
 function pdfDiagram(slotW, slotH){
   var snap = pdfSvgSnapshot();
-  var k = Math.min(slotW / snap.w, slotH / snap.h, PDF.maxPtPerUnit);
+  var k = Math.min(slotW / snap.w, slotH / snap.h, app.mode === 'draw' ? 0.9 : PDF.maxPtPerUnit);
   var ptW = snap.w * k, ptH = snap.h * k;
 
   var res = PDF.res;
@@ -3962,63 +3985,170 @@ function pdfCodeLines(){
   return lines;
 }
 
-function pdfProgram(page, x, y, w, h){
+/* ---------------------------------------------------------------------------
+   TYPE METRICS
+   Helvetica's advance widths (per 1000 em) for printable ASCII, so labels can
+   be right-aligned and messages wrapped without a text engine. Courier needs
+   none: every glyph is 600.
+--------------------------------------------------------------------------- */
+var HELV = [278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,
+  556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,
+  667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,
+  278,278,278,469,556,333,
+  556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,
+  334,260,334,584];
+var HELV_B = [278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,
+  556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,
+  722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,
+  333,278,333,584,556,333,
+  556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,
+  389,280,389,584];
+
+/* Width of `str` in points. Tracking is added per glyph, as Tc does. */
+function pdfWidth(str, size, font, tracking){
+  str = String(str == null ? '' : str);
+  if (font === 'F1' || font === 'F2' || font === 'F3') return str.length * (size * CW + (tracking || 0));
+  var t = font === 'F5' ? HELV_B : HELV, w = 0;
+  for (var i = 0; i < str.length; i++){
+    var c = str.charCodeAt(i);
+    w += (c >= 32 && c <= 126 ? t[c - 32] : 556) * size / 1000 + (tracking || 0);
+  }
+  return w;
+}
+
+/* Greedy word wrap in Helvetica. A word longer than the line is cut. */
+function pdfWrap(str, size, font, maxW){
+  var out = [];
+  String(str || '').split('\n').forEach(function(para){
+    var line = '';
+    para.split(/\s+/).forEach(function(word){
+      if (!word) return;
+      var next = line ? line + ' ' + word : word;
+      if (pdfWidth(next, size, font) <= maxW){ line = next; return; }
+      if (line) out.push(line);
+      while (pdfWidth(word, size, font) > maxW && word.length > 1){
+        var k = word.length - 1;
+        while (k > 1 && pdfWidth(word.slice(0, k), size, font) > maxW) k--;
+        out.push(word.slice(0, k));
+        word = word.slice(k);
+      }
+      line = word;
+    });
+    out.push(line);
+  });
+  return out;
+}
+
+/* Text with the options the layout needs: alignment and letter-spacing. */
+PdfPage.prototype.label = function(x, top, str, size, hex, font, opts){
+  opts = opts || {};
+  var s = pdfEsc(str);
+  if (!s.length) return;
+  var tr = opts.tracking || 0;
+  var w = pdfWidth(str, size, font || 'F4', tr);
+  if (opts.align === 'right') x -= w;
+  else if (opts.align === 'center') x -= w / 2;
+  this.rgb(hex || PDF_COL.ink, false);
+  this.op('BT /' + (font || 'F4') + ' ' + pdfN(size) + ' Tf ' + pdfN(tr) + ' Tc ' +
+          pdfN(x) + ' ' + pdfN(this.h - top - size * 0.8) + ' Td (' + s + ') Tj 0 Tc ET');
+  return w;
+};
+
+PdfPage.prototype.rule = function(x1, y1, x2, y2, hex, width){
+  this.rgb(hex, true);
+  this.op(pdfN(width || 0.6) + ' w 0 J');
+  this.op(pdfN(x1) + ' ' + pdfN(this.h - y1) + ' m ' + pdfN(x2) + ' ' + pdfN(this.h - y2) + ' l S');
+};
+
+/* ---------------------------------------------------------------------------
+   THE PAGE, SECTION BY SECTION
+--------------------------------------------------------------------------- */
+
+/* An uppercase, tracked section heading — the same voice as the widget's
+   pane labels. */
+function pdfSection(page, x, y, text){
+  page.label(x, y, text.toUpperCase(), 6.8, PDF_COL.dim, 'F5', { tracking: 0.9 });
+  return y + 13;
+}
+
+function pdfTitle(){
+  var f = document.getElementById('filename');
+  var name = f && f.value.trim();
+  return name || 'main.py';
+}
+
+function pdfDate(){
+  try {
+    return new Date().toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' });
+  } catch (e){ return new Date().toDateString(); }
+}
+
+function pdfHeader(page, x, y, w){
+  var drawing = app.mode === 'draw';
+  page.label(x, y, 'MEMORY MODEL', 6.8, PDF_COL.dim, 'F5', { tracking: 0.9 });
+  page.label(x, y + 12, drawing ? 'Drawing' : pdfTitle(), 17, PDF_COL.ink, drawing ? 'F5' : 'F2');
+  page.label(x + w, y + 18, pdfDate(), 8.5, PDF_COL.dim, 'F4', { align: 'right' });
+  page.rule(x, y + 40, x + w, y + 40, PDF_COL.ink, 0.8);
+  return y + 56;
+}
+
+function pdfFooter(page, x, y, w){
+  page.rule(x, y, x + w, y, PDF_COL.rule, 0.5);
+  var ty = y + 7;
+  page.label(x, ty, 'Beamer+ · Python Workspace', 7, PDF_COL.dim, 'F4');
+  if (app.mode === 'draw') return;
+  /* The legend reads right to left from the page edge. */
+  var rx = x + w;
+  var put = function(text, swatch, bar){
+    var tw = page.label(rx, ty, text, 7, PDF_COL.dim, 'F4', { align: 'right' });
+    rx -= tw + 5;
+    page.fillRect(rx - 9, ty - 0.5, 9, 7, swatch);
+    if (bar) page.fillRect(rx - 9, ty - 0.5, 1.5, 7, bar);
+    rx -= 9 + 14;
+  };
+  put('changed by the last step', PDF_COL.mutate);
+  put('line about to run', PDF_COL.mark, PDF_COL.markBar);
+}
+
+/* The program, line-numbered and coloured. Returns the height used. */
+function pdfCode(page, x, y, w, maxH){
   var lines = pdfCodeLines();
   var state = app.painted;
-  /* Before the first step nothing has run, so nothing is marked - the same
-     rule the editor follows. */
   var current = app.idx === 0 ? null : (state && state.line);
   var errLine = (app.revealErrors && state && state.error) ? state.error.line : null;
-  var output = (state && state.output) || '';
 
-  /* The console is sized by what it holds, and never takes more than a third
-     of the column. */
-  var outFs = 7.2, outLead = 9.4, outRows = [], outH = 0;
-  if (output){
-    var per = Math.max(8, Math.floor((w - 18) / (outFs * CW)));
-    output.replace(/\n+$/, '').split('\n').forEach(function(ln){
-      if (!ln.length) return outRows.push('');
-      for (var i = 0; i < ln.length; i += per) outRows.push(ln.substr(i, per));
-    });
-    var room = Math.max(1, Math.floor((h * 0.34 - 24) / outLead));
-    if (outRows.length > room){ outRows = outRows.slice(0, room); outRows[room - 1] = '...'; }
-    outH = outRows.length * outLead + 22;
-  }
-  var avail = h - (outH ? outH + 12 : 0);
-
-  /* The largest size at which the whole program fits the column. Height is
-     the hard constraint; width gives way once the type would get too small to
-     read, and the few over-long lines are cut off at the edge instead. */
+  /* The largest size at which the whole program fits. Height is the hard
+     limit; width gives way once the type would be too small to read, and
+     over-long lines are cut at the edge instead. */
   var longest = 0;
   lines.forEach(function(l){ longest = Math.max(longest, l.length); });
-  var digits = String(lines.length).length, fs, lead;
-  for (fs = 11; fs > 5; fs -= 0.25){
-    lead = fs * 1.42;
-    var fitsW = digits * fs * CW + 8 + longest * fs * CW + 18 <= w;
-    if (lines.length * lead + 16 <= avail && (fitsW || fs <= 6.5)) break;
+  var digits = Math.max(2, String(lines.length).length), fs, lead, padY = 9;
+  for (fs = 9.5; fs > 5.5; fs -= 0.25){
+    lead = fs * 1.55;
+    var fitsW = (digits + 2) * fs * CW + 20 + longest * fs * CW <= w;
+    if (lines.length * lead + 2 * padY <= maxH && (fitsW || fs <= 7)) break;
   }
-  lead = fs * 1.42;
-  var gutW = digits * fs * CW + 8;
+  lead = fs * 1.55;
+  var gutW = (digits + 1.6) * fs * CW + 8;
+  var h = Math.min(maxH, lines.length * lead + 2 * padY);
 
-  /* The box is the size of the program, not the size of the column: an
-     eight-line example should not sit in a tall empty rectangle. */
-  var codeH = Math.min(avail, lines.length * lead + 18);
-
-  page.box(x, y, w, codeH, PDF_COL.paper, PDF_COL.rule, 6);
-  page.clipIn(x + 1, y + 1, w - 2, codeH - 2);
-  var ty = y + 9, rows = Math.floor((codeH - 14) / lead);
+  page.box(x, y, w, h, PDF_COL.code, null, 3);
+  page.fillRect(x + gutW, y, 0.5, h, PDF_COL.rule);
+  page.clipIn(x, y, w, h);
+  var ty = y + padY, rows = Math.floor((h - 2 * padY) / lead + 0.01);
   for (var i = 0; i < lines.length && i < rows; i++){
     var n = i + 1;
-    if (n === current || n === errLine){
-      var bg = n === errLine ? PDF_COL.err : PDF_COL.mark;
-      var bar = n === errLine ? PDF_COL.errBar : PDF_COL.markBar;
-      page.fillRect(x + 1, ty - 1.5, w - 2, lead, bg);
-      page.fillRect(x + 1, ty - 1.5, 2, lead, bar);
+    var hit = n === current || n === errLine;
+    if (hit){
+      page.fillRect(x, ty, w, lead, n === errLine ? PDF_COL.err : PDF_COL.mark);
+      page.fillRect(x, ty, 2, lead, n === errLine ? PDF_COL.errBar : PDF_COL.markBar);
     }
-    page.text(x + 9 + (digits - String(n).length) * fs * CW, ty, String(n), fs, PDF_COL.dim);
-    var cx = x + 9 + gutW;
+    var base = ty + (lead - fs) / 2;
+    page.text(x + gutW - 7 - String(n).length * fs * CW, base, String(n), fs,
+              hit ? PDF_COL.ink : PDF_COL.dim, hit ? 'F2' : 'F1');
+    var cx = x + gutW + 8;
     highlightRuns(lines[i]).forEach(function(r){
-      page.text(cx, ty, r.text, fs,
+      page.text(cx, base, r.text, fs,
                 r.cls ? PDF_COL[r.cls] : PDF_COL.ink,
                 r.cls === 't-kw' ? 'F2' : r.cls === 't-com' ? 'F3' : 'F1');
       cx += r.text.length * fs * CW;
@@ -4026,52 +4156,104 @@ function pdfProgram(page, x, y, w, h){
     ty += lead;
   }
   page.clipOut();
-
-  if (outH){
-    var oy = y + codeH + 12;
-    page.box(x, oy, w, outH, PDF_COL.paper, PDF_COL.rule, 6);
-    page.text(x + 9, oy + 6, 'output', 6.6, PDF_COL.dim, 'F4');
-    page.clipIn(x + 1, oy + 1, w - 2, outH - 2);
-    var ly = oy + 19;
-    outRows.forEach(function(ln){
-      page.text(x + 9, ly, ln, outFs, PDF_COL.ink);
-      ly += outLead;
-    });
-    page.clipOut();
+  if (rows < lines.length){
+    page.label(x + w - 8, y + h - 10, '+' + (lines.length - rows) + ' more lines', 6.5, PDF_COL.dim, 'F4', { align: 'right' });
   }
+  return h;
 }
 
-/* ---------------------------------------------------------------------------
-   THE PAGE
---------------------------------------------------------------------------- */
+/* What the program printed, wrapped. Returns the height used. */
+function pdfOutput(page, x, y, w, maxH){
+  var output = ((app.painted && app.painted.output) || '').replace(/\n+$/, '');
+  var fs = 8, lead = 11, pad = 8;
+  var per = Math.max(8, Math.floor((w - 2 * pad) / (fs * CW)));
+  var rows = [];
+  if (output){
+    output.split('\n').forEach(function(ln){
+      if (!ln.length) return rows.push('');
+      for (var i = 0; i < ln.length; i += per) rows.push(ln.substr(i, per));
+    });
+  }
+  var room = Math.max(1, Math.floor((maxH - 2 * pad) / lead));
+  if (rows.length > room){ rows = rows.slice(rows.length - room); rows[0] = '…'; }
+  var h = Math.max(1, rows.length) * lead + 2 * pad - 3;
+  page.box(x, y, w, h, PDF_COL.paper, PDF_COL.rule, 3);
+  if (!rows.length){
+    page.label(x + pad, y + pad, 'Nothing printed yet.', 7.5, PDF_COL.dim, 'F4');
+    return h;
+  }
+  var ty = y + pad;
+  rows.forEach(function(r){ page.text(x + pad, ty, r, fs, PDF_COL.ink, 'F1'); ty += lead; });
+  return h;
+}
+
+/* The error, explained in words. Returns the height used. */
+function pdfError(page, x, y, w){
+  var st = app.painted;
+  if (!st || !st.error || !app.revealErrors) return 0;
+  var e = st.error, pad = 9, inner = w - 2 * pad - 3;
+  var msg = pdfWrap(e.message, 8.5, 'F4', inner);
+  var src = (app.code.split('\n')[e.line - 1] || '').trim();
+  var h = pad + 12 + msg.length * 11.5 + 6 + 10 + pad;
+  page.box(x, y, w, h, PDF_COL.err, null, 3);
+  page.fillRect(x, y, 2.5, h, PDF_COL.errBar);
+  var ty = y + pad;
+  page.label(x + pad + 3, ty, e.type, 10, PDF_COL.errBar, 'F5');
+  ty += 15;
+  msg.forEach(function(m){ page.label(x + pad + 3, ty, m, 8.5, PDF_COL.ink, 'F4'); ty += 11.5; });
+  ty += 3;
+  var where = 'Line ' + e.line + (src ? ':  ' : '');
+  var ww = page.label(x + pad + 3, ty, where, 7.5, PDF_COL.dim, 'F4');
+  if (src){
+    var fit = Math.floor((inner - ww) / (7.5 * CW));
+    page.text(x + pad + 3 + ww, ty, src.length > fit ? src.slice(0, fit - 1) + '…' : src, 7.5, PDF_COL.dim, 'F1');
+  }
+  return h;
+}
+
 function buildPdf(){
   var page = new PdfPage(PDF.pw, PDF.ph);
-  var x0 = PDF.margin, y0 = PDF.margin;
-  var cw = PDF.pw - 2 * PDF.margin, ch = PDF.ph - 2 * PDF.margin;
-
-  /* Draw mode has no program to show, so the drawing takes the whole page. */
+  var M = PDF.margin, W = PDF.pw - 2 * M;
   var drawing = app.mode === 'draw';
-  var leftW = drawing ? 0 : Math.round((cw - PDF.gutter) * PDF.leftFrac);
-  var rightX = drawing ? x0 : x0 + leftW + PDF.gutter;
-  var rightW = drawing ? cw : cw - leftW - PDF.gutter;
 
-  var pad = 12;
-  return pdfDiagram(rightW - 2 * pad, ch - 2 * pad).then(function(img){
-    if (!drawing) pdfProgram(page, x0, y0, leftW, ch);
+  var top = pdfHeader(page, M, M, W);
+  var footY = PDF.ph - M - 10;
+  var bottom = footY - 14;
 
-    /* Like the code box, the diagram box is the size of what it holds rather
-       than the size of the column, so a wide flat diagram is not marooned in
-       the middle of a tall empty rectangle. Both columns start on the same
-       line at the top of the page, so the eye reads across from the first
-       line of the program to the frames. */
-    var bw = Math.min(rightW, img.ptW + 2 * pad);
-    var bh = Math.min(ch, img.ptH + 2 * pad);
-    var bx = rightX + (rightW - bw) / 2;
-    page.box(bx, y0, bw, bh, PDF_COL.paper, PDF_COL.rule, 6);
-    page.image(bx + (bw - img.ptW) / 2, y0 + (bh - img.ptH) / 2, img.ptW, img.ptH);
+  var leftW  = drawing ? 0 : Math.round((W - PDF.gutter) * PDF.leftFrac);
+  var rightX = drawing ? M : M + leftW + PDF.gutter;
+  var rightW = drawing ? W : W - leftW - PDF.gutter;
+
+  var boxY = top + 13, boxH = bottom - boxY, pad = 18;
+  return pdfDiagram(rightW - 2 * pad, boxH - 2 * pad).then(function(img){
+    var leftEnd = boxY;
+    if (!drawing){
+      var y = pdfSection(page, M, top, 'Program');
+      /* Leave the output and any error their room before sizing the code. */
+      var errReserve = (app.painted && app.painted.error && app.revealErrors) ? 90 : 0;
+      var codeH = pdfCode(page, M, y, leftW, bottom - y - 70 - errReserve);
+      y += codeH + 16;
+      y = pdfSection(page, M, y, 'Output');
+      y += pdfOutput(page, M, y, leftW, bottom - y - errReserve - 10);
+      leftEnd = y;
+      if (errReserve) leftEnd = y + 12 + pdfError(page, M, y + 12, leftW);
+    }
+
+    pdfSection(page, rightX, top, drawing ? 'Drawing' : 'Memory');
+    /* As tall as the diagram needs, and at least as tall as the column
+       beside it, so the two columns end together. */
+    var bh = Math.min(boxH, Math.max(img.ptH + 2 * pad, leftEnd - boxY));
+    page.box(rightX, boxY, rightW, bh, PDF_COL.paper, PDF_COL.rule, 3);
+    /* Hung from the top, like the program beside it, so the eye reads across
+       from line 1 to the global frame. */
+    page.image(rightX + (rightW - img.ptW) / 2, boxY + pad, img.ptW, img.ptH);
+
+    pdfFooter(page, M, footY, W);
+
+    var stem = pdfTitle().replace(/\.[^.]+$/, '').replace(/[^\w.-]+/g, '-') || 'memory-model';
     return {
       blob: pdfFile(PDF.pw, PDF.ph, page.ops.join('\n'), img),
-      name: drawing ? 'memory-model-drawing.pdf' : 'memory-model-step-' + app.idx + '.pdf'
+      name: drawing ? stem + '-drawing.pdf' : stem + '-step-' + app.idx + '.pdf'
     };
   });
 }

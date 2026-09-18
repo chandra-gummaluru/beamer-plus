@@ -1,0 +1,3819 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Circuit Simulator — Beamer+</title>
+<script id="widget-schema" type="application/json">
+{
+  "label": "Circuit Simulator",
+  "category": "Engineering",
+  "fields": [
+    { "key": "circuit", "label": "Starting circuit", "type": "textarea", "rows": 4,
+      "placeholder": "{\"components\":[…],\"wires\":[…]}",
+      "note": "paste an exported circuit" },
+    { "key": "parts",   "label": "Palette parts", "type": "textarea", "rows": 4,
+      "placeholder": "[{\"name\":\"Majority\",\"equation\":\"Y = A B + B C + A C\"}]",
+      "note": "this deck only" },
+    { "key": "hop",     "label": "Seconds per hop", "type": "select", "default": 1,
+      "options": [ {"v": 0.25, "l": "¼s"}, {"v": 0.5, "l": "½s"}, {"v": 1, "l": "1s"}, {"v": 2, "l": "2s"} ] },
+    { "key": "running", "label": "Start running", "type": "checkbox", "default": true }
+  ]
+}
+</script>
+<!-- Standalone fallback. Inside Beamer+ the host injects the shared widget
+     base (tokens, fonts, toolbar, buttons) ahead of everything else. Opened
+     directly (a file in Edge, a plain web server) nothing does, so load the
+     same stylesheet from the repo, relative to this file, at the same point in
+     the cascade. Beamer+ is unaffected: its link is already present. -->
+<script id="bw-standalone">
+(function () {
+  if (document.querySelector('link[href*="widget-base.css"]')) return;
+  var head = document.head || document.getElementsByTagName('head')[0];
+  [['preconnect', 'https://fonts.googleapis.com'],
+   ['stylesheet', 'https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@400;500;600&display=swap'],
+   ['stylesheet', '../static/css/widget-base.css']].forEach(function (l) {
+    var el = document.createElement('link');
+    el.rel = l[0]; el.href = l[1];
+    head.appendChild(el);
+  });
+  document.documentElement.setAttribute('data-bw-standalone', '');
+})();
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<style>
+/* Tokens, reset, toolbar and buttons come from the shared widget base
+   (static/css/widget-base.css). This block only names the base tokens the
+   way the board code refers to them, and adds what's the circuit's own:
+   the grid, the HIGH/LOW signal colours, and a few extra surface steps. */
+:root {
+  --panel:     var(--bg-subtle);
+  --panel-2:   #f4f4f2;
+  --panel-3:   #ecebe8;
+  --border-md: var(--border-med);
+  --border-hi: #b9b8b0;
+  --ink:       var(--text);
+  --ink-2:     var(--text-2);
+  --ink-3:     var(--text-3);
+  --grid:      #e6e6e1;
+  --grid-major:#dbdad3;
+  --high:      #f59e0b;
+  --high-2:    #d97706;
+  --high-soft: #fef3c7;
+  --low:       #cfcec9;
+  --low-p:     #8a897f;
+  --accent-2:    #35352f;
+  --accent-soft: #e6e5e0;
+  --danger:      var(--err);
+  --danger-soft: var(--err-bg);
+  --shadow-xs:   0 1px 2px rgba(26,26,24,.06);
+  --shadow:      0 1px 0 rgba(26,26,24,.04), 0 6px 20px -8px rgba(26,26,24,.16);
+  --shadow-lg:   0 2px 4px rgba(26,26,24,.05), 0 18px 44px -14px rgba(26,26,24,.26);
+  --r-sm:      4px;
+  --r-lg:      var(--radius-lg);
+  --r-xl:      14px;
+  --ui:        var(--font-ui);
+}
+html,body { height:100%; margin:0; }
+/* The toolbar sits above the React root, so the host can adopt it into its
+   shared bar before React has rendered anything. */
+body {
+  display:flex; flex-direction:column;
+  font-family:var(--ui); color:var(--ink); background:var(--panel); overflow:hidden; font-size:13px;
+  -webkit-font-smoothing:antialiased;
+  -webkit-user-select:none; -moz-user-select:none; user-select:none;
+}
+input, textarea { -webkit-user-select:text; -moz-user-select:text; user-select:text; }
+button { font-family:inherit; }
+
+.app  { height:100%; display:flex; flex-direction:column; background:var(--panel); }
+#root { flex:1 1 auto; min-height:0; }
+#tb-slot, .tb-group-c { display:contents; }
+.main { flex:1; display:flex; min-height:0; }
+
+/* ───────────────────────── top bar ─────────────────────────
+   The bar itself is the base's .bw-toolbar (adopted into the host's shared
+   bar inside Beamer+). What's left is the circuit's own controls. */
+.tb-group { display:flex; align-items:center; gap:4px; flex:0 0 auto; }
+
+/* Segmented control, drawn like the base's toggle groups. */
+.seg { display:inline-flex; border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; flex:0 0 auto; }
+.seg-btn {
+  height:calc(var(--ctl-h) - 2px); padding:0 9px; border:0; background:var(--bg);
+  font-family:var(--font-mono); font-size:11px; color:var(--text-2); cursor:pointer;
+  transition:background var(--dur), color var(--dur);
+}
+.seg-btn + .seg-btn { border-left:1px solid var(--border); }
+.seg-btn:hover { background:var(--bg-subtle); color:var(--text); }
+.seg-btn.on { background:var(--text); color:var(--bg); font-weight:500; }
+
+.zoom-val { font-family:var(--font-mono); font-size:11px; color:var(--text-2); min-width:40px; text-align:center; }
+
+/* ───────────────────────── palette ───────────────────────── */
+.palette {
+  width:196px; flex:0 0 auto; background:var(--panel);
+  border-right:1px solid var(--border-md);
+  display:flex; flex-direction:column; min-height:0;
+}
+.pal-search { padding:9px 9px 6px; position:relative; flex:0 0 auto; }
+.pal-search input {
+  width:100%; height:27px; padding:0 8px 0 26px; font:inherit; font-size:12px;
+  border:1px solid var(--border); border-radius:var(--r); background:var(--bg);
+  color:var(--ink); outline:none; transition:border-color .12s, box-shadow .12s;
+}
+.pal-search input:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+.pal-search svg { position:absolute; left:17px; top:16px; color:var(--ink-3); pointer-events:none; }
+.pal-scroll { flex:1; overflow-y:auto; padding:2px 9px 18px; scrollbar-width:thin; scrollbar-color:var(--border-md) transparent; }
+.pal-scroll::-webkit-scrollbar { width:5px; }
+.pal-scroll::-webkit-scrollbar-thumb { background:var(--border-md); border-radius:4px; }
+.pal-group { margin-top:12px; }
+.pal-group:first-child { margin-top:4px; }
+.pal-group-head {
+  width:100%; display:flex; align-items:center; gap:5px; padding:3px 2px 6px;
+  background:none; border:none; cursor:pointer; color:var(--ink-3);
+  font-size:9.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+}
+.pal-group-head:hover { color:var(--ink-2); }
+.pal-group-head .chev { transition:transform .15s; }
+.pal-group-head.closed .chev { transform:rotate(-90deg); }
+.pal-group-count { font-family:var(--mono); font-weight:500; letter-spacing:0; opacity:.75; margin-left:auto; }
+.pal-grid { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
+.pal-item {
+  position:relative; background:var(--bg); border:1px solid var(--border); border-radius:var(--r);
+  padding:6px 3px 4px; display:flex; flex-direction:column; align-items:center; gap:2px;
+  cursor:grab; font:inherit; color:inherit;
+  transition:background .1s, border-color .1s, transform .1s, box-shadow .1s;
+}
+.pal-item:hover { background:#fff; border-color:var(--border-hi); transform:translateY(-1px); box-shadow:var(--shadow); }
+.pal-item:active { cursor:grabbing; transform:none; box-shadow:none; }
+.pal-label { font-size:9.5px; font-family:var(--mono); color:var(--ink-2); letter-spacing:-.01em; }
+.pal-empty { font-size:11px; color:var(--ink-3); padding:4px 2px 2px; }
+.pal-del-btn {
+  position:absolute; top:-5px; right:-5px; z-index:1;
+  width:15px; height:15px; border-radius:50%; padding:0;
+  background:var(--bg); border:1px solid var(--border-md); color:var(--ink-2);
+  display:flex; align-items:center; justify-content:center; cursor:pointer; line-height:1;
+  opacity:0; transition:opacity .12s, background .1s, border-color .1s, color .1s;
+}
+.pal-item:hover .pal-del-btn { opacity:1; }
+.pal-del-btn:hover { background:var(--danger); border-color:var(--danger); color:#fff; }
+.pal-del-btn svg { display:block; pointer-events:none; }
+
+/* ───────────────────────── canvas ───────────────────────── */
+.canvas-wrap { flex:1; position:relative; min-width:0; background:var(--bg); }
+.canvas-wrap::after {
+  content:''; position:absolute; inset:0; pointer-events:none;
+  box-shadow:inset 0 1px 0 rgba(26,26,24,.05), inset 0 0 60px rgba(26,26,24,.02);
+}
+.canvas { display:block; }
+.wiring-badge {
+  position:absolute; left:50%; transform:translateX(-50%); top:10px; z-index:22;
+  display:flex; align-items:center; gap:8px; pointer-events:none;
+  background:rgba(26,26,24,.9); color:#fff; padding:5px 11px; border-radius:999px;
+  font-size:11.5px; font-weight:500; box-shadow:var(--shadow-lg);
+}
+.wiring-badge kbd {
+  font-family:var(--mono); font-size:9.5px; background:rgba(255,255,255,.16);
+  padding:1px 4px; border-radius:3px; border:1px solid rgba(255,255,255,.18);
+}
+/* With no status bar to narrate into, a refused connection says its piece
+   right where the eye is — over the board, then fades out. */
+.wiring-badge.warn { background:var(--danger); top:46px; animation:toastIn .14s ease-out; }
+@keyframes toastIn { from { opacity:0; transform:translateX(-50%) translateY(-5px); } }
+.empty-hint {
+  position:absolute; inset:0; display:grid; place-items:center; pointer-events:none;
+}
+.empty-card {
+  text-align:center; color:var(--ink-3); max-width:280px;
+}
+.empty-card h3 { margin:0 0 4px; font-size:13.5px; font-weight:600; color:var(--ink-2); }
+.empty-card p  { margin:0; font-size:11.5px; line-height:1.5; }
+
+/* ───────────────────── selection panel ─────────────────────
+   Settings for whatever's selected live in the toolbar, not a card over
+   the board — so nothing on the canvas ever gets covered, and the eye
+   doesn't have to jump between the selection and its controls. Every part
+   has at most one thing worth editing, so the panel is always a single
+   compact row: a label field, a bit width, or a rate slider. */
+.sel-close {
+  width:19px; height:19px; border-radius:5px; padding:0; flex:0 0 auto;
+  display:grid; place-items:center; background:transparent; border:1px solid transparent;
+  color:var(--ink-3); cursor:pointer; transition:background .1s, color .1s, border-color .1s;
+}
+.sel-close:hover { background:var(--panel-2); border-color:var(--border); color:var(--ink); }
+.sel-key {
+  font-size:9.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--ink-3); flex:0 0 auto;
+}
+.sel-note { font-size:10.5px; color:var(--ink-3); line-height:1.4; margin:8px 0 0; }
+.prop-input {
+  width:118px; height:26px; padding:0 8px; border-radius:var(--r); border:1px solid var(--border);
+  font:inherit; font-size:12px; background:var(--bg); color:var(--ink); outline:none;
+  transition:border-color .12s, box-shadow .12s;
+}
+.prop-input:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+.mini-btn {
+  height:24px; padding:0 8px; border:1px solid var(--border); background:var(--bg);
+  border-radius:var(--r-sm); color:var(--ink-2); cursor:pointer; font-size:11px;
+  display:inline-flex; align-items:center; gap:5px;
+  transition:background .12s, border-color .12s, color .12s;
+}
+.mini-btn:hover { background:var(--panel-2); border-color:var(--border-hi); color:var(--ink); }
+.mini-btn.warn:hover { background:var(--danger-soft); border-color:#fecaca; color:var(--danger); }
+.hint-list { margin:0; padding:0; list-style:none; }
+.hint-list li { display:flex; align-items:baseline; gap:8px; padding:4px 0; font-size:12px; color:var(--ink-2); line-height:1.45; }
+.hint-cols { display:grid; grid-template-columns:1fr 1fr; gap:0 22px; }
+kbd.key {
+  font-family:var(--mono); font-size:9.5px; font-weight:500; color:var(--ink);
+  background:linear-gradient(#fff,#f2f2ef); border:1px solid var(--border-md);
+  border-bottom-width:2px; border-radius:4px; padding:1px 4px; flex:0 0 auto;
+  min-width:16px; text-align:center; white-space:nowrap;
+}
+.st-mono { font-family:var(--mono); font-size:10.5px; color:var(--ink-2); white-space:nowrap; }
+/* ── selection panel, now living in the toolbar itself ──────────────────
+   Same fields the floating card used to show, just laid out as another
+   toolbar group so the eye doesn't have to jump down to the canvas — and
+   nothing on the board gets covered while it's open. */
+.tb-selpanel { display:flex; align-items:center; gap:6px; padding:2px 8px 2px 9px; flex:0 0 auto;
+  background:var(--panel-2); border:1px solid var(--border); border-radius:var(--r); }
+.tb-selpanel .sel-key:first-child { color:var(--ink); opacity:.7; }
+.tb-clock {
+  font-family:var(--mono); font-size:11px; color:var(--ink-2);
+  background:var(--bg); border:1px solid var(--border); border-radius:var(--r);
+  height:var(--ctl-h); padding:0 10px; flex:0 0 auto; display:inline-flex; align-items:center; gap:6px;
+  cursor:pointer; transition:background .12s, border-color .12s, color .12s;
+}
+.tb-clock:hover { background:var(--bg); border-color:var(--border-hi); color:var(--ink); }
+.tb-clock.paused { background:var(--high-soft); border-color:#f3d590; color:#7c4a03; }
+.tb-clock b { font-weight:500; color:inherit; font-variant-numeric:tabular-nums; }
+/* Neutral while it ticks, amber when it's stopped — so amber always means
+   "something is happening here", on the board and in the chrome alike. */
+.tb-clock i { width:5px; height:5px; border-radius:50%; background:var(--ink-3); flex:0 0 auto; }
+.tb-clock.paused i { background:var(--high); }
+
+/* ───────────────────────── modal ───────────────────────── */
+.modal-bg { position:fixed; inset:0; background:rgba(26,26,24,.34); backdrop-filter:blur(3px); display:grid; place-items:center; z-index:100; }
+.modal { background:var(--bg); border-radius:var(--r-xl); padding:18px 20px 20px; width:420px; max-width:calc(100vw - 32px); box-shadow:var(--shadow-lg); border:1px solid var(--border-md); }
+.modal-title { font-size:15px; font-weight:600; margin-bottom:3px; }
+.modal-sub { font-size:11.5px; color:var(--ink-2); margin-bottom:14px; }
+.dialog-section-title { font-size:9.5px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--ink-3); margin:14px 0 6px; }
+.dialog-section-title:first-of-type { margin-top:0; }
+.file-btn { display:inline-flex; align-items:center; justify-content:center; width:100%; margin-top:8px; }
+.import-error { font-size:11.5px; color:var(--danger); margin-top:9px; white-space:pre-line; background:var(--danger-soft); border:1px solid #fecaca; border-radius:var(--r); padding:7px 9px; }
+.text-input { width:100%; padding:8px 10px; border-radius:var(--r); border:1px solid var(--border); font:inherit; font-size:13px; background:var(--bg); color:var(--ink); outline:none; transition:border-color .12s, box-shadow .12s; }
+.text-input:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+.json-input { font-family:var(--mono); font-size:12px; resize:vertical; }
+.dialog-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+.btn { font-family:var(--ui); font-size:12.5px; font-weight:500; height:30px; padding:0 13px; border-radius:var(--r); border:1px solid var(--border-md); cursor:pointer; transition:background .12s, border-color .12s, color .12s; display:inline-flex; align-items:center; justify-content:center; gap:6px; }
+.btn:disabled { opacity:.35; cursor:not-allowed; }
+.btn.ghost   { background:var(--bg); color:var(--ink); }
+.btn.ghost:hover:not(:disabled) { background:var(--panel-2); border-color:var(--border-hi); }
+.btn.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+.btn.primary:hover:not(:disabled) { background:var(--accent-2); border-color:var(--accent-2); }
+.btn.subtle  { background:var(--bg); color:var(--ink-2); flex:1; }
+.btn.subtle:hover { background:var(--panel-2); color:var(--ink); border-color:var(--border-hi); }
+.btn.warn    { background:var(--bg); color:var(--danger); border-color:#fecaca; flex:1; }
+.btn.warn:hover { background:var(--danger-soft); border-color:var(--danger); }
+
+.import-choices { display:flex; flex-direction:column; gap:8px; }
+.import-choice {
+  text-align:left; background:var(--bg); border:1px solid var(--border); border-radius:var(--r-lg);
+  padding:12px 14px; cursor:pointer; font:inherit; color:inherit;
+  transition:background .12s, border-color .12s, transform .12s, box-shadow .12s;
+}
+.import-choice:hover { background:var(--panel); border-color:var(--border-hi); transform:translateY(-1px); box-shadow:var(--shadow); }
+.import-choice-title { font-weight:600; font-size:13px; }
+.import-choice-sub { font-size:11.5px; color:var(--ink-2); margin-top:2px; }
+
+/* ───────────────────────── narrow layouts ─────────────────────────
+   Widgets get embedded at all sorts of sizes, so the chrome sheds its
+   least essential parts before anything starts overlapping. */
+@media (max-width: 1080px) {
+  .tb-clock { display:none; }
+}
+@media (max-width: 920px) {
+  .bw-btn .bl { display:none; }
+  .bw-btn:has(.bl) { width:var(--ctl-h); padding:0; }
+  .palette { width:168px; }
+}
+@media (max-width: 760px) {
+  .palette { width:150px; }
+  .pal-grid { grid-template-columns:1fr; }
+}
+
+/* ───────────────────────── canvas handles ───────────────────────── */
+.rotate-handle circle { fill:var(--bg); stroke:var(--border-hi); transition:fill .1s, stroke .1s; }
+.rotate-handle:hover circle { fill:var(--ink); stroke:var(--ink); }
+.rotate-handle path { stroke:var(--ink-2); transition:stroke .1s; }
+.rotate-handle:hover path { stroke:#fff; }
+.kill-handle circle { fill:var(--bg); stroke:var(--border-hi); transition:fill .1s, stroke .1s; }
+.kill-handle:hover circle { fill:var(--danger); stroke:var(--danger); }
+.kill-handle path { stroke:var(--ink-2); transition:stroke .1s; }
+.kill-handle:hover path { stroke:#fff; }
+</style>
+
+<script>
+/* ═══ MESSAGE BUFFER ════════════════════════════════════════════════════════
+   Beamer+ posts widget-config and widget-set-state the instant the iframe
+   fires `load`. This widget renders through ReactDOM.createRoot(), which
+   commits asynchronously — so at that moment the app's own message listener
+   usually doesn't exist yet, and a saved circuit would be dropped on the
+   floor. Worse, the now-empty board is what the *next* save reports back,
+   quietly overwriting the good state in the deck.
+
+   So this tiny listener is registered during parse, long before React, and
+   parks any protocol message it sees. App drains the queue on mount, in
+   order, and then takes over. Nothing else in the widget depends on it, so
+   there's no load-order requirement beyond "before the app". */
+(function () {
+  var KINDS = { 'widget-config':1, 'widget-set-state':1, 'widget-get-state':1 };
+  window.__widgetInbox = [];
+  window.__widgetAppReady = false;
+  window.addEventListener('message', function (e) {
+    if (!e.data || !KINDS[e.data.type]) return;
+    if (window.__widgetAppReady) return;   // the app is listening for itself now
+    window.__widgetInbox.push(e.data);
+  });
+})();
+</script>
+</head>
+<body>
+<!-- Static so Beamer+ can adopt it into its shared bar on load; React
+     renders the controls into #tb-slot through a portal. -->
+<div id="toolbar" class="bw-toolbar" data-bw-topbar>
+  <span class="bw-toolbar-title">Circuit Simulator</span>
+  <div class="bw-sep"></div>
+  <span id="tb-slot"></span>
+</div>
+<div id="root"></div>
+
+<script>
+/* ═══ PDF EXPORT ═══════════════════════════════════════════════════════════
+   The board on one page, laid out like the other Beamer+ exports (the Python
+   Workspace's memory model, the notebook): a title block, the drawing in a
+   hairline box, and a footer with a key to the colours.
+
+   No library and no print dialog: the page is written as a PDF by hand and
+   handed to the browser as a download. The text is real text; the circuit is
+   the live SVG, rasterised at print resolution and embedded losslessly —
+   gates, wires and labels exactly as they look on the board. */
+window.CircuitPdf = (function () {
+  'use strict';
+
+  const COL = {
+    ink: '#1A1A18', dim: '#85857D', rule: '#DAD9D4', paper: '#FFFFFF',
+    high: '#F59E0B', low: '#CFCEC9',
+  };
+  const RES = 3, MAX_PX = 6e6;
+
+  // Helvetica advance widths (1/1000 em), printable ASCII.
+  const HELV = [278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,
+    556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,
+    667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,
+    278,278,278,469,556,333,
+    556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,
+    334,260,334,584];
+  const HELV_B = [278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,
+    556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,
+    722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,
+    333,278,333,584,556,333,
+    556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,
+    389,280,389,584];
+  const FONTS = [['F1', 'Helvetica'], ['F2', 'Helvetica-Bold']];
+
+  const n = v => (Math.round(v * 100) / 100).toString();
+  function esc(s) {
+    s = String(s == null ? '' : s);
+    let out = '';
+    for (let i = 0; i < s.length; i++) {
+      const ch = s.charAt(i), c = s.charCodeAt(i);
+      if (ch === '\\' || ch === '(' || ch === ')') out += '\\' + ch;
+      else if (c < 32) out += ' ';
+      else if (c < 127) out += ch;
+      else if (c < 256) out += '\\' + ('000' + c.toString(8)).slice(-3);
+      else out += '?';
+    }
+    return out;
+  }
+  function width(str, size, font, tr) {
+    const t = font === 'F2' ? HELV_B : HELV;
+    let w = 0;
+    for (const ch of String(str)) {
+      const c = ch.charCodeAt(0);
+      w += (c >= 32 && c <= 126 ? t[c - 32] : 556) * size / 1000 + (tr || 0);
+    }
+    return w;
+  }
+
+  // A page addressed from the top left, like the screen.
+  function Page(w, h) { this.w = w; this.h = h; this.ops = []; }
+  Page.prototype.rgb = function (hex, stroke) {
+    const v = parseInt(hex.slice(1), 16);
+    this.ops.push([(v >> 16) & 255, (v >> 8) & 255, v & 255].map(x => (x / 255).toFixed(3)).join(' ') + (stroke ? ' RG' : ' rg'));
+  };
+  Page.prototype.text = function (x, top, str, size, hex, font, opts = {}) {
+    const tr = opts.tracking || 0;
+    const w = width(str, size, font, tr);
+    if (opts.align === 'right') x -= w;
+    this.rgb(hex, false);
+    this.ops.push(`BT /${font || 'F1'} ${n(size)} Tf ${n(tr)} Tc ${n(x)} ${n(this.h - top - size * 0.8)} Td (${esc(str)}) Tj 0 Tc ET`);
+    return w;
+  };
+  Page.prototype.rect = function (x, top, w, h, fill, stroke, lw) {
+    if (fill) this.rgb(fill, false);
+    if (stroke) { this.rgb(stroke, true); this.ops.push(n(lw || 0.75) + ' w'); }
+    this.ops.push(`${n(x)} ${n(this.h - top - h)} ${n(w)} ${n(h)} re ${fill && stroke ? 'B' : fill ? 'f' : 'S'}`);
+  };
+  Page.prototype.line = function (x1, y, x2, hex, lw) {
+    this.rgb(hex, true);
+    this.ops.push(`${n(lw)} w ${n(x1)} ${n(this.h - y)} m ${n(x2)} ${n(this.h - y)} l S`);
+  };
+  Page.prototype.image = function (x, top, w, h) {
+    this.ops.push(`q ${n(w)} 0 0 ${n(h)} ${n(x)} ${n(this.h - top - h)} cm /Im0 Do Q`);
+  };
+
+  function file(pw, ph, content, img) {
+    const objs = [
+      { dict: '<< /Type /Catalog /Pages 2 0 R >>' },
+      { dict: '<< /Type /Pages /Kids [3 0 R] /Count 1 >>' },
+      { dict: '' },
+    ];
+    const fonts = FONTS.map(f => {
+      objs.push({ dict: `<< /Type /Font /Subtype /Type1 /BaseFont /${f[1]} /Encoding /WinAnsiEncoding >>` });
+      return `/${f[0]} ${objs.length} 0 R`;
+    }).join(' ');
+    objs.push({ dict: `<< /Type /XObject /Subtype /Image /Width ${img.w} /Height ${img.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /${img.filter} /Length ${img.data.length} >>`, data: img.data });
+    const imgRef = objs.length;
+    objs.push({ dict: `<< /Length ${content.length} >>`, data: content });
+    objs[2].dict = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pw} ${ph}] /Resources << /Font << ${fonts} >> /XObject << /Im0 ${imgRef} 0 R >> >> /Contents ${objs.length} 0 R >>`;
+
+    const parts = []; let len = 0;
+    const put = p => { parts.push(p); len += p.length; };
+    put('%PDF-1.4\n%âãÏÓ\n');
+    const offsets = [];
+    objs.forEach((o, i) => {
+      offsets.push(len);
+      put(`${i + 1} 0 obj\n${o.dict}\n`);
+      if (o.data) { put('stream\n'); put(o.data); put('\nendstream\n'); }
+      put('endobj\n');
+    });
+    const xref = len;
+    put(`xref\n0 ${objs.length + 1}\n0000000000 65535 f \n` + offsets.map(o => ('0000000000' + o).slice(-10) + ' 00000 n \n').join(''));
+    put(`trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+    return new Blob(parts.map(p => {
+      if (typeof p !== 'string') return p;
+      const u = new Uint8Array(p.length);
+      for (let i = 0; i < p.length; i++) u[i] = p.charCodeAt(i) & 0xFF;
+      return u;
+    }), { type: 'application/pdf' });
+  }
+
+  // ── the drawing, as pixels ────────────────────────────────────────────────
+  const PROPS = ['fill', 'fill-opacity', 'stroke', 'stroke-width', 'stroke-opacity',
+    'stroke-linecap', 'stroke-linejoin', 'stroke-dasharray', 'opacity',
+    'font-family', 'font-size', 'font-weight', 'font-style', 'text-anchor', 'dominant-baseline'];
+
+  // A serialised SVG travels without the stylesheet that coloured it (every
+  // colour here is a var()), so each element carries its computed values.
+  function inlineStyles(live, clone) {
+    const a = [live, ...live.querySelectorAll('*')];
+    const b = [clone, ...clone.querySelectorAll('*')];
+    for (let i = 0; i < a.length && i < b.length; i++) {
+      const cs = getComputedStyle(a[i]);
+      for (const p of PROPS) {
+        const v = cs.getPropertyValue(p);
+        if (v) b[i].setAttribute(p, v.trim());
+      }
+      b[i].removeAttribute('class');
+      b[i].removeAttribute('style');
+    }
+  }
+
+  function snapshot(svg) {
+    const world = svg.querySelector(':scope > g');
+    if (!world) throw new Error('nothing to draw');
+    const bb = world.getBBox();
+    const pad = 28;
+    const vb = { x: bb.x - pad, y: bb.y - pad, w: Math.max(80, bb.width + 2 * pad), h: Math.max(60, bb.height + 2 * pad) };
+    const clone = svg.cloneNode(true);
+    inlineStyles(svg, clone);
+    // Interface, not circuit: the grid, selection, handles, hover halos,
+    // hit targets and anything half-drawn.
+    clone.querySelectorAll('[data-x]').forEach(el => el.remove());
+    const g = clone.querySelector(':scope > g');
+    g.removeAttribute('transform');
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    clone.setAttribute('viewBox', `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+    return { svg: clone, w: vb.w, h: vb.h };
+  }
+
+  async function deflate(bytes) {
+    if (typeof CompressionStream === 'undefined') return null;
+    try {
+      const cs = new CompressionStream('deflate');
+      const w = cs.writable.getWriter();
+      w.write(bytes); w.close();
+      return new Uint8Array(await new Response(cs.readable).arrayBuffer());
+    } catch (_) { return null; }
+  }
+
+  async function raster(snap, ptW, ptH) {
+    let res = RES;
+    while (ptW * res * ptH * res > MAX_PX && res > 1) res -= 0.25;
+    const pxW = Math.max(1, Math.round(ptW * res)), pxH = Math.max(1, Math.round(ptH * res));
+    snap.svg.setAttribute('width', pxW);
+    snap.svg.setAttribute('height', pxH);
+    const src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(snap.svg));
+    const img = await new Promise((ok, bad) => {
+      const im = new Image();
+      im.onload = () => ok(im);
+      im.onerror = () => bad(new Error('the circuit could not be rasterised'));
+      im.src = src;
+    });
+    const cv = document.createElement('canvas');
+    cv.width = pxW; cv.height = pxH;
+    const cx = cv.getContext('2d');
+    cx.fillStyle = '#FFFFFF';
+    cx.fillRect(0, 0, pxW, pxH);
+    cx.drawImage(img, 0, 0, pxW, pxH);
+    const rgba = cx.getImageData(0, 0, pxW, pxH).data;
+    const rgb = new Uint8Array(pxW * pxH * 3);
+    for (let i = 0, j = 0; i < rgba.length; i += 4) {
+      let r = rgba[i], g = rgba[i + 1], b = rgba[i + 2];
+      if (r >= 250 && g >= 250 && b >= 250) r = g = b = 255;   // paper is paper
+      rgb[j++] = r; rgb[j++] = g; rgb[j++] = b;
+    }
+    const z = await deflate(rgb);
+    if (z) return { w: pxW, h: pxH, data: z, filter: 'FlateDecode' };
+    const url = cv.toDataURL('image/jpeg', 0.95);
+    const bin = atob(url.slice(url.indexOf(',') + 1));
+    const u = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    return { w: pxW, h: pxH, data: u, filter: 'DCTDecode' };
+  }
+
+  function today() {
+    try { return new Date().toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' }); }
+    catch (_) { return new Date().toDateString(); }
+  }
+
+  /* info: { title } */
+  async function build(svg, info) {
+    const snap = snapshot(svg);
+    // The page turns to suit the circuit.
+    const landscape = snap.w >= snap.h * 0.9;
+    const PW = landscape ? 792 : 612, PH = landscape ? 612 : 792;
+    const M = 36, W = PW - 2 * M;
+    const page = new Page(PW, PH);
+
+    // Title block
+    page.text(M, M, 'CIRCUIT', 6.8, COL.dim, 'F2', { tracking: 0.9 });
+    page.text(M, M + 12, info.title || 'Circuit', 17, COL.ink, 'F2');
+    page.text(M + W, M + 18, today(), 8.5, COL.dim, 'F1', { align: 'right' });
+    page.line(M, M + 40, M + W, COL.ink, 0.8);
+
+    // The board
+    const top = M + 56;
+    page.text(M, top, 'BOARD', 6.8, COL.dim, 'F2', { tracking: 0.9 });
+    const boxY = top + 13, footY = PH - M - 10, boxH = footY - 14 - boxY, pad = 18;
+    const k = Math.min((W - 2 * pad) / snap.w, (boxH - 2 * pad) / snap.h, 1.4);
+    const ptW = snap.w * k, ptH = snap.h * k;
+    const img = await raster(snap, ptW, ptH);
+    const bh = Math.min(boxH, ptH + 2 * pad);
+    page.rect(M, boxY, W, bh, COL.paper, COL.rule, 0.75);
+    page.image(M + (W - ptW) / 2, boxY + pad, ptW, ptH);
+
+    // Footer, with a key to the only two colours that carry meaning
+    page.line(M, footY, M + W, COL.rule, 0.5);
+    const ty = footY + 7;
+    page.text(M, ty, 'Beamer+ · Circuit Simulator', 7, COL.dim, 'F1');
+    let rx = M + W;
+    for (const [label, sw] of [['LOW  0', COL.low], ['HIGH  1', COL.high]]) {
+      rx -= page.text(rx, ty, label, 7, COL.dim, 'F1', { align: 'right' }) + 5;
+      page.rect(rx - 12, ty + 1.5, 12, 2.6, sw);
+      rx -= 12 + 14;
+    }
+    return file(PW, PH, page.ops.join('\n'), img);
+  }
+
+  async function download(svg, info, name) {
+    const blob = await build(svg, info);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name || 'circuit.pdf';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 5000);
+  }
+
+  return { build, download };
+})();
+</script>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin></script>
+
+<script>
+/* ═══ MODULES ═══════════════════════════════════════════════════════════════
+   Minimal in-browser module registry. Each section calls
+   defineModule(name, deps, factory) exactly once; deps are resolved eagerly
+   against modules that already registered, so a missing/out-of-order
+   <script> tag fails loudly instead of silently handing back `undefined`. */
+window.Modules = {};
+window.defineModule = function defineModule(name, deps, factory) {
+  const resolved = deps.map(dep => {
+    if (!(dep in window.Modules)) {
+      throw new Error(`module "${name}" depends on "${dep}", which hasn't loaded yet`);
+    }
+    return window.Modules[dep];
+  });
+  window.Modules[name] = factory(...resolved);
+};
+</script>
+
+<script>
+/* ═══ STATE ════════════════════════════════════════════════════════════════
+   Central cross-section state. `now` is *simulation* time, not wall time:
+   the App's rAF loop only advances it while the sim is running, so pausing
+   freezes propagation, clocks and every wire animation together instead of
+   letting the visuals drift out of step with the logic. */
+defineModule('state', [], () => {
+  const widgetState = {
+    hopMs: 1000,          // fixed propagation time for one gate-to-gate hop
+    particleDensity: 3,
+    running: true,
+    now: 0,               // simulation clock (ms)
+    circuit: null,
+    numFormat: 'bin',     // how multi-bit bus values are displayed: bin | dec | hex
+  };
+  return { widgetState };
+});
+</script>
+
+<script>
+/* ═══ ENGINE ═══════════════════════════════════════════════════════════════
+
+   TIMING MODEL — "one hop, one delay"
+   ───────────────────────────────────
+   A signal's travel time depends only on how many gate-to-gate hops it
+   takes, never on how the wires happen to be drawn. The unit of delay is
+   the *net*: one driving output pin plus every wire and branch fed from it.
+   Whatever shape that tree has — one straight wire, five branches, a
+   detour around the canvas — every sink on it sees the new value exactly
+   `hopMs` after the value left the driving pin.
+
+       S ── G1 ── O           2 nets  → 2 × hopMs
+       S ── G1 ── G2 ── O     3 nets  → 3 × hopMs
+       S ── G1 ── G2 ── G3 ── O  4 nets → 4 × hopMs
+
+   Every timestamp handed downstream is the *exact scheduled* instant
+   (cause + delay), never "the animation frame that happened to notice".
+   Discovery-time timestamps would compound: each hop would silently add
+   up to a frame of lag, and a 4-hop path would land visibly later than
+   4 × hopMs. The only genuinely fresh timestamps in the whole chain are a
+   CLOCK's analytically-computed phase start and a manual INPUT toggle. */
+defineModule('engine', ['state'], (state) => {
+  'use strict';
+
+  // Kinds whose pins can be widened past 1 bit. Every pin on one of these
+  // components (other than a MUX's select line, which is always a single
+  // control bit) shares one width — set on the component itself and
+  // enforced at wiring time — rather than each pin negotiating its own.
+  const BIT_CAPABLE = { INPUT:1, OUTPUT:1, AND:1, OR:1, NOT:1, NAND:1, NOR:1, XOR:1, XNOR:1, MUX:1, REG:1, SHIFT:1, LOAD:1 };
+  const MAX_BITS = 16;
+  const clampBits = (n) => Math.max(1, Math.min(MAX_BITS, Math.round(Number(n)) || 1));
+  // COMBINE/SPLIT don't share one width across every pin the way the gates
+  // above do — instead their *pin count* on one side depends on the width.
+  // Each width gets its own concrete kind ("COMBINE:4", "SPLIT:8", …),
+  // registered on demand by the gates module, so this just recognizes one.
+  function busBaseOf(kind) {
+    if (typeof kind !== 'string') return null;
+    const i = kind.indexOf(':');
+    if (i < 0) return null;
+    const base = kind.slice(0, i);
+    return (base === 'COMBINE' || base === 'SPLIT') ? base : null;
+  }
+  // AND/OR/NAND/NOR/XOR/XNOR/MUX can also be widened past their default
+  // input count — same "each arity is its own concrete kind" trick, e.g.
+  // "AND:4". kindBase strips that (or a bus-kind, or nothing) back to the
+  // family identity, so BIT_CAPABLE and friends still recognize a widened
+  // gate as the gate it is.
+  function kindBase(kind) {
+    if (typeof kind !== 'string') return kind;
+    const i = kind.indexOf(':');
+    return i < 0 ? kind : kind.slice(0, i);
+  }
+  // How many data inputs a MUX instance has (its select line is however
+  // many bits are needed to index them, and isn't counted here).
+  function muxDataCount(kind) {
+    if (kind === 'MUX') return 2;
+    const m = /^MUX:(\d+)$/.exec(kind);
+    return m ? Number(m[1]) : 2;
+  }
+  // Which input counts each adjustable-arity gate offers. NOT is strictly
+  // unary (inverting more than one signal at once isn't a single gate) so
+  // it's deliberately absent — its card only ever shows a width control.
+  const GATE_INPUT_CHOICES = {
+    AND:[2,3,4,5,6,8], OR:[2,3,4,5,6,8], NAND:[2,3,4,5,6,8],
+    NOR:[2,3,4,5,6,8], XOR:[2,3,4,5,6,8], XNOR:[2,3,4,5,6,8],
+    MUX:[2,4,8,16],
+  };
+  // `-1 & mask` reliably wraps to `mask` under JS's 32-bit bitwise ops, which
+  // is exactly the "decrement past 0" behaviour a bus should have.
+  const bitMask = (bits) => (1 << clampBits(bits)) - 1;
+
+  function formatBits(value, bits, fmt) {
+    bits = clampBits(bits);
+    const v = (value || 0) & bitMask(bits);
+    if (fmt === 'dec') return String(v);
+    if (fmt === 'hex') return '0x' + v.toString(16).toUpperCase().padStart(Math.ceil(bits / 4), '0');
+    return v.toString(2).padStart(bits, '0');
+  }
+  // Inverse of formatBits — used by the value editor on a multi-bit INPUT.
+  // Returns null for text that doesn't parse as the current format so the
+  // caller can leave the field alone rather than clobber it with 0.
+  function parseBits(str, bits, fmt) {
+    if (str == null) return null;
+    str = String(str).trim();
+    if (!str) return 0;
+    let n;
+    if (fmt === 'hex') { const s = str.replace(/^0x/i, ''); if (!/^[0-9a-f]+$/i.test(s)) return null; n = parseInt(s, 16); }
+    else if (fmt === 'dec') { if (!/^\d+$/.test(str)) return null; n = parseInt(str, 10); }
+    else { if (!/^[01]+$/.test(str)) return null; n = parseInt(str, 2); }
+    return Number.isNaN(n) ? null : (n & bitMask(bits));
+  }
+
+  const GATE_DEFS = {
+    INPUT:  { kind:'INPUT',  label:'IN',    inputs:0, outputs:1, family:'io',
+              compute:(i,s,bits) => [(s.value||0) & bitMask(bits)] },
+    OUTPUT: { kind:'OUTPUT', label:'OUT',   inputs:1, outputs:0, family:'io',
+              compute:()=>[] },
+    CLOCK:  { kind:'CLOCK',  label:'CLK',   inputs:0, outputs:1, family:'io',
+              compute:(i,s) => [s.value?1:0] },
+    SEVEN:  { kind:'SEVEN',  label:'7SEG',  inputs:7, outputs:0, family:'io',
+              compute:()=>[] },
+    AND:    { kind:'AND',  label:'AND',   inputs:2, outputs:1, family:'and',
+              compute:(iv,s,bits)=>{ let v=iv[0]||0; for(let i=1;i<iv.length;i++) v&=iv[i]; return [v&bitMask(bits)]; } },
+    OR:     { kind:'OR',   label:'OR',    inputs:2, outputs:1, family:'or',
+              compute:(iv,s,bits)=>{ let v=iv[0]||0; for(let i=1;i<iv.length;i++) v|=iv[i]; return [v&bitMask(bits)]; } },
+    NOT:    { kind:'NOT',  label:'NOT',   inputs:1, outputs:1, family:'not',  compute:([a],s,bits)=>[(~a)&bitMask(bits)] },
+    NAND:   { kind:'NAND', label:'NAND',  inputs:2, outputs:1, family:'and',
+              compute:(iv,s,bits)=>{ let v=iv[0]||0; for(let i=1;i<iv.length;i++) v&=iv[i]; return [(~v)&bitMask(bits)]; } },
+    NOR:    { kind:'NOR',  label:'NOR',   inputs:2, outputs:1, family:'or',
+              compute:(iv,s,bits)=>{ let v=iv[0]||0; for(let i=1;i<iv.length;i++) v|=iv[i]; return [(~v)&bitMask(bits)]; } },
+    XOR:    { kind:'XOR',  label:'XOR',   inputs:2, outputs:1, family:'xor',
+              compute:(iv,s,bits)=>{ let v=iv[0]||0; for(let i=1;i<iv.length;i++) v^=iv[i]; return [v&bitMask(bits)]; } },
+    XNOR:   { kind:'XNOR', label:'XNOR',  inputs:2, outputs:1, family:'xor',
+              compute:(iv,s,bits)=>{ let v=iv[0]||0; for(let i=1;i<iv.length;i++) v^=iv[i]; return [(~v)&bitMask(bits)]; } },
+    // Data inputs are pins 0..n-1; the select line is always the *last*
+    // input pin, however many data pins there are (see pinBits below for
+    // why its own width is derived rather than following `bits`).
+    MUX:    { kind:'MUX',  label:'MUX',   inputs:3, outputs:1, family:'mux',
+              compute:(iv,s,bits)=>{ const n=iv.length-1; const sel=(iv[n]||0)&(n-1); return [(iv[sel]||0)&bitMask(bits)]; } },
+    DFF:    { kind:'DFF',  label:'D-FF',  inputs:2, outputs:1, family:'seq',
+              compute:([d,clk],s)=>{ const r=clk&&!s.lastClk; s.lastClk=clk; if(r)s.q=d?1:0; return[s.q||0]; } },
+    TFF:    { kind:'TFF',  label:'T-FF',  inputs:2, outputs:1, family:'seq',
+              compute:([t,clk],s)=>{ const r=clk&&!s.lastClk; s.lastClk=clk; if(r&&t)s.q=s.q?0:1; return[s.q||0]; } },
+    JKFF:   { kind:'JKFF', label:'JK-FF', inputs:3, outputs:1, family:'seq',
+              compute:([j,k,clk],s)=>{ const r=clk&&!s.lastClk; s.lastClk=clk; if(r){if(j&&k)s.q=s.q?0:1; else if(j)s.q=1; else if(k)s.q=0;} return[s.q||0]; } },
+    SRFF:   { kind:'SRFF', label:'SR-FF', inputs:2, outputs:1, family:'seq',
+              compute:([s2,r],s)=>{ if(s2&&!r)s.q=1; else if(r&&!s2)s.q=0; return[s.q||0]; } },
+    // The n-bit generalization of a D flip-flop: captures the whole D bus
+    // on every rising clock edge. CLK stays a single control bit (see
+    // pinBits) no matter how wide the register itself is set.
+    REG:    { kind:'REG',   label:'REG',  inputs:2, outputs:1, family:'seq',
+              compute:([d,clk],s,bits)=>{ const r=clk&&!s.lastClk; s.lastClk=clk; if(r)s.q=(d||0)&bitMask(bits); return[s.q||0]; } },
+    // Shifts one new bit in from SI on every rising edge, toward the MSB;
+    // the bit that falls off the top comes out on SO the same cycle, so
+    // shift registers can be chained serially.
+    SHIFT:  { kind:'SHIFT', label:'SHIFT', inputs:2, outputs:2, family:'seq',
+              compute:([si,clk],s,bits)=>{
+                const r=clk&&!s.lastClk; s.lastClk=clk;
+                if (r) { const old=s.q||0; s.sout=(old>>(bits-1))&1; s.q=((old<<1)|(si?1:0))&bitMask(bits); }
+                return [s.q||0, s.sout||0];
+              } },
+    // A D register with an enable line: only latches D on a rising edge
+    // where LD is also asserted, otherwise holds whatever it already had.
+    LOAD:   { kind:'LOAD',  label:'LOAD', inputs:3, outputs:1, family:'seq',
+              compute:([d,ld,clk],s,bits)=>{ const r=clk&&!s.lastClk; s.lastClk=clk; if(r&&ld)s.q=(d||0)&bitMask(bits); return[s.q||0]; } },
+  };
+
+  const GRID = 20;
+  const snapGridVal = (v) => Math.round(v/GRID)*GRID;
+
+  /* ── A shared timing grid ────────────────────────────────────────────────
+     Every "root" event (anything not derived by adding a fixed delay to an
+     already-exact time) snaps to this, so an ad-hoc user toggle lands on the
+     same grid as a running clock instead of marching to its own arbitrary
+     offset. 6.25ms is the GCD of every fixed interval in the app: the
+     fastest clock half-period (1/16s → 31.25ms) and every selectable hop
+     time (250/500/1000/2000ms). Anything built by adding those intervals to
+     an already-snapped time lands back on the grid automatically. */
+  const GLOBAL_TICK_MS = 6.25;
+  const snapToGlobalTick = (t) => Math.round(t / GLOBAL_TICK_MS) * GLOBAL_TICK_MS;
+
+  /* ── Pin geometry ────────────────────────────────────────────────────── */
+  const FACE_ROT = { right:0, down:90, left:180, up:270 };
+
+  // Rotate a unit direction into the component's frame. 'left' is a
+  // horizontal mirror (not a 180° turn) so gate art stays right-side up,
+  // which matches how GateBody draws itself.
+  function rotDir(d, facing) {
+    if (facing === 'left') return { x:-d.x, y:d.y };
+    if (facing === 'up')   return { x:d.y,  y:-d.x };
+    if (facing === 'down') return { x:-d.y, y:d.x };
+    return { x:d.x, y:d.y };
+  }
+  const PIN_DIR_VEC = { left:{x:-1,y:0}, right:{x:1,y:0}, up:{x:0,y:-1}, down:{x:0,y:1} };
+
+  function visOf(kind) { return window.Modules.gates.GATE_VIS[kind]; }
+
+  function pinAbs(comp, kind, idx) {
+    const vis = visOf(comp.kind);
+    const p = (kind === 'in' ? vis.inputs[idx] : vis.outputs[idx]) || {x:0,y:0};
+    const cx = vis.w/2, cy = vis.h/2;
+    if (comp.facing === 'left') return { x: comp.x + (vis.w - p.x), y: comp.y + p.y };
+    const rad = (FACE_ROT[comp.facing] || 0) * Math.PI/180;
+    const dx = p.x - cx, dy = p.y - cy;
+    return {
+      x: comp.x + cx + (dx*Math.cos(rad) - dy*Math.sin(rad)),
+      y: comp.y + cy + (dx*Math.sin(rad) + dy*Math.cos(rad)),
+    };
+  }
+
+  // Unit vector pointing *out* of the component at this pin — the direction
+  // a wire should leave (outputs) or arrive from (inputs). Auto-routing uses
+  // it so wires always meet a pin head-on instead of clipping the body.
+  function pinOutDir(comp, kind, idx) {
+    const vis = visOf(comp.kind);
+    const p = (kind === 'in' ? vis.inputs[idx] : vis.outputs[idx]) || {};
+    const base = PIN_DIR_VEC[p.dir || (kind === 'in' ? 'left' : 'right')];
+    return rotDir(base, comp.facing || 'right');
+  }
+
+  /* ── Polyline helpers ───────────────────────────────────────────────── */
+  function resolveWire(x1,y1,x2,y2,pts=[]) {
+    const knots = [{x:x1,y:y1},...pts,{x:x2,y:y2}];
+    const out = [knots[0]];
+    for (let i=1;i<knots.length;i++) {
+      const a = out[out.length-1], b = knots[i];
+      if (a.x===b.x || a.y===b.y) out.push(b);
+      else out.push({x:b.x,y:a.y}, b);
+    }
+    // Collapse zero-length steps (so arc-length maths never divides by 0)
+    // and merge collinear runs, which keeps hit-testing, midpoint labels and
+    // pulse sampling working off the simplest possible polyline.
+    const dedup = out.filter((p,i)=> i===0 || p.x!==out[i-1].x || p.y!==out[i-1].y);
+    const simple = [];
+    for (let i=0;i<dedup.length;i++) {
+      const prev = simple[simple.length-1], next = dedup[i+1];
+      if (prev && next &&
+          ((prev.x===dedup[i].x && dedup[i].x===next.x) ||
+           (prev.y===dedup[i].y && dedup[i].y===next.y))) continue;
+      simple.push(dedup[i]);
+    }
+    return simple;
+  }
+  function pathD(p) { return p.map((v,i)=>(i?'L ':'M ')+v.x+' '+v.y).join(''); }
+  function polyLength(p) {
+    let t=0; for (let i=1;i<p.length;i++) t += Math.hypot(p[i].x-p[i-1].x, p[i].y-p[i-1].y);
+    return t;
+  }
+  function samplePoly(p, t) {
+    if (p.length===1) return [p[0].x,p[0].y];
+    const total = polyLength(p);
+    let d = Math.max(0,Math.min(1,t)) * total;
+    for (let i=1;i<p.length;i++) {
+      const l = Math.hypot(p[i].x-p[i-1].x, p[i].y-p[i-1].y);
+      if (d <= l || i===p.length-1) {
+        const f = l>0 ? Math.min(1,d/l) : 0;
+        return [p[i-1].x+(p[i].x-p[i-1].x)*f, p[i-1].y+(p[i].y-p[i-1].y)*f];
+      }
+      d -= l;
+    }
+    return [p[p.length-1].x, p[p.length-1].y];
+  }
+  function distToSeg(px,py,ax,ay,bx,by) {
+    const dx=bx-ax, dy=by-ay, l2=dx*dx+dy*dy;
+    if (l2===0) return Math.hypot(px-ax,py-ay);
+    const t = Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/l2));
+    return Math.hypot(px-(ax+t*dx), py-(ay+t*dy));
+  }
+  // Nearest point on a polyline, plus how far along it that point sits.
+  function projectOnPoly(p, x, y) {
+    let best = { d:Infinity, point:p[0]||{x,y}, index:0, along:0 };
+    let acc = 0;
+    for (let i=1;i<p.length;i++) {
+      const a=p[i-1], b=p[i];
+      const dx=b.x-a.x, dy=b.y-a.y, l2=dx*dx+dy*dy, len=Math.hypot(dx,dy);
+      const t = l2===0 ? 0 : Math.max(0,Math.min(1,((x-a.x)*dx+(y-a.y)*dy)/l2));
+      const q = { x:a.x+t*dx, y:a.y+t*dy };
+      const d = Math.hypot(q.x-x, q.y-y);
+      if (d < best.d) best = { d, point:q, index:i-1, along:acc + t*len };
+      acc += len;
+    }
+    return best;
+  }
+
+  /* ── Auto-routing ────────────────────────────────────────────────────────
+     Wires with no manual bends route themselves: leave the source pin along
+     its outward direction, approach the target pin head-on, and elbow
+     between the two. Because this is recomputed from live pin positions,
+     dragging a component keeps every attached wire tidy instead of leaving
+     the diagonal spaghetti a stored-points-only model produces. */
+  const STUB = 20;
+  function autoRoute(a, adir, b, bdir) {
+    const a1 = { x: snapGridVal(a.x + adir.x*STUB), y: snapGridVal(a.y + adir.y*STUB) };
+    const b1 = { x: snapGridVal(b.x + bdir.x*STUB), y: snapGridVal(b.y + bdir.y*STUB) };
+    const pts = [];
+    const aH = adir.y === 0, bH = bdir.y === 0;
+    if (Math.abs(a1.x-a.x) > 0.5 || Math.abs(a1.y-a.y) > 0.5) pts.push(a1);
+    if (aH && bH) {
+      if (Math.abs(a1.y - b1.y) > 0.5) {
+        const mid = snapGridVal((a1.x + b1.x)/2);
+        // Target sits behind the source: hop out and around rather than
+        // doubling back through the gate body.
+        const x = (b1.x - a1.x) * adir.x > 0 ? mid : a1.x;
+        pts.push({x, y:a1.y}, {x, y:b1.y});
+      }
+    } else if (!aH && !bH) {
+      if (Math.abs(a1.x - b1.x) > 0.5) {
+        const mid = snapGridVal((a1.y + b1.y)/2);
+        const y = (b1.y - a1.y) * adir.y > 0 ? mid : a1.y;
+        pts.push({x:a1.x, y}, {x:b1.x, y});
+      }
+    } else if (aH) {
+      pts.push({x:b1.x, y:a1.y});
+    } else {
+      pts.push({x:a1.x, y:b1.y});
+    }
+    if (Math.abs(b1.x-b.x) > 0.5 || Math.abs(b1.y-b.y) > 0.5) pts.push(b1);
+    return pts;
+  }
+
+  /* ══ CIRCUIT ═══════════════════════════════════════════════════════════ */
+  function createCircuit() {
+    let nextId = 1, nextIoId = 1;
+    const components = new Map();
+    const ioComponents = new Map();
+    const wires = new Map();
+    // One entry per driving output pin that has at least one wire on it.
+    // Key: "compId:pin". This is the unit of propagation delay.
+    const signals = new Map();
+
+    const isPin = (t) => !!t && typeof t.compId === 'string' && typeof t.pin === 'number';
+    const isTap = (t) => !!t && typeof t.wireId === 'string';
+    const sigKey = (compId, pin) => compId + ':' + pin;
+
+    /* ── geometry ─────────────────────────────────────────────────────── */
+    // Absolute coordinates of a wire endpoint. A tap keeps its stored point
+    // projected back onto its parent's *current* path, so branches stay
+    // welded to the wire they tap even as components move around.
+    function terminalCoords(term, depth = 0) {
+      if (!term) return { x:0, y:0 };
+      if (isPin(term)) {
+        const comp = components.get(term.compId);
+        if (!comp) return { x:term.x||0, y:term.y||0 };
+        return pinAbs(comp, term.type === 'in' ? 'in' : 'out', term.pin);
+      }
+      if (isTap(term) && depth < 12) {
+        const parent = wires.get(term.wireId);
+        if (parent) {
+          const p = wirePoints(parent, depth+1);
+          if (p.length) return projectOnPoly(p, term.x, term.y).point;
+        }
+      }
+      return { x:term.x||0, y:term.y||0 };
+    }
+    function terminalDir(term, depth = 0) {
+      if (isPin(term)) {
+        const comp = components.get(term.compId);
+        if (comp) return pinOutDir(comp, term.type === 'in' ? 'in' : 'out', term.pin);
+      }
+      if (isTap(term)) {
+        // Leave a tap perpendicular to the wire it branches off.
+        const parent = wires.get(term.wireId);
+        if (parent && depth < 12) {
+          const p = wirePoints(parent, depth+1);
+          const pr = projectOnPoly(p, term.x, term.y);
+          const a = p[pr.index], b = p[pr.index+1] || a;
+          if (a && b) {
+            const horiz = Math.abs(b.x-a.x) >= Math.abs(b.y-a.y);
+            return horiz ? {x:0,y:1} : {x:1,y:0};
+          }
+        }
+      }
+      return { x:1, y:0 };
+    }
+    // Full resolved polyline for a wire: manual bends if it has any,
+    // otherwise a freshly auto-routed path.
+    function wirePoints(wire, depth = 0) {
+      const a = terminalCoords(wire.from, depth);
+      const b = terminalCoords(wire.to, depth);
+      const mids = (wire.points && wire.points.length)
+        ? wire.points
+        : autoRoute(a, terminalDir(wire.from, depth), b, terminalDir(wire.to, depth));
+      return resolveWire(a.x, a.y, b.x, b.y, mids);
+    }
+
+    /* ── bit width ────────────────────────────────────────────────────────
+       Every pin on a BIT_CAPABLE component shares that component's `bits`
+       (a MUX's select line is the one exception — it's always a single
+       control bit regardless of how wide the data path is). Anything else
+       is fixed at 1 bit. A tap has no width of its own: it inherits
+       whatever its parent wire carries, chasing back to a real pin. */
+    function pinBits(comp, type, idx) {
+      if (!comp) return 1;
+      const base = kindBase(comp.kind);
+      if (base === 'MUX') {
+        const n = muxDataCount(comp.kind);
+        // The select line is the last input pin, however many data pins
+        // there are, and needs exactly enough bits to index them.
+        if (type === 'in' && idx === n) return Math.round(Math.log2(n));
+        return comp.bits || 1; // data inputs 0..n-1, and the output
+      }
+      if (base === 'REG') return (type === 'in' && idx === 1) ? 1 /* CLK */ : (comp.bits || 1);
+      if (base === 'LOAD') return (type === 'in' && idx !== 0) ? 1 /* LD, CLK */ : (comp.bits || 1);
+      if (base === 'SHIFT') {
+        if (type === 'in') return 1;                 // SI, CLK
+        return idx === 1 ? 1 : (comp.bits || 1);      // SO is 1 bit; Q is the register width
+      }
+      if (BIT_CAPABLE[base]) return comp.bits || 1;
+      const bb = busBaseOf(comp.kind);
+      // COMBINE's inputs and SPLIT's outputs are each a single bit; the
+      // *other* side is the one wide bus pin.
+      if (bb === 'COMBINE' && type === 'out') return comp.bits || 1;
+      if (bb === 'SPLIT' && type === 'in') return comp.bits || 1;
+      return 1;
+    }
+    function pinBitsAt(term, depth = 0) {
+      if (!term || depth > 24) return 1;
+      if (isPin(term)) return pinBits(components.get(term.compId), term.type === 'in' ? 'in' : 'out', term.pin);
+      if (isTap(term)) {
+        const parent = wires.get(term.wireId);
+        if (parent) return pinBitsAt(parent.from, depth + 1);
+      }
+      return 1;
+    }
+    function wireBits(wire) { return wire ? pinBitsAt(wire.from) : 1; }
+    // Does this component have any wire touching it at all — directly, not
+    // counting taps further downstream? Used to lock bit width once a part
+    // is wired up, so widening it can't silently orphan a connection.
+    function hasConnections(compId) {
+      for (const w of wires.values()) {
+        if ((isPin(w.from) && w.from.compId === compId) || (isPin(w.to) && w.to.compId === compId)) return true;
+      }
+      return false;
+    }
+    // Re-sizes a component's pin-indexed arrays to match a (just-switched-to)
+    // def's pin counts. Only ever called on a component with zero wires
+    // attached, so there's nothing live to preserve.
+    function rebuildPinArrays(c, def) {
+      c.inputVals = new Array(def.inputs).fill(0);
+      c.outputVals = new Array(def.outputs).fill(0);
+      c.outputChangeTime = new Array(def.outputs).fill(0);
+      c.pendingOutputVals = []; c.pendingOutputStart = [];
+    }
+
+    /* ── topology ─────────────────────────────────────────────────────── */
+    // Which signal (driving output pin) does this wire ultimately belong to?
+    // Taps chain back through their parents until a real output pin is hit.
+    function rootSignalOf(wire, depth = 0) {
+      if (!wire || depth > 24) return null;
+      if (isPin(wire.from)) return sigKey(wire.from.compId, wire.from.pin);
+      if (isTap(wire.from)) return rootSignalOf(wires.get(wire.from.wireId), depth+1);
+      return null;
+    }
+    // Rebuilt every step (cheap; topology is small) and shared by the
+    // compute / propagate / refresh stages below.
+    function topology() {
+      const rootOf = new Map();            // wireId  -> signal key
+      const members = new Map();           // signal key -> [wire, …]
+      const driversOf = new Map();         // compId -> [signal key per input pin]
+      for (const w of wires.values()) {
+        const root = rootSignalOf(w);
+        if (!root) continue;
+        rootOf.set(w.id, root);
+        if (!members.has(root)) members.set(root, []);
+        members.get(root).push(w);
+      }
+      for (const w of wires.values()) {
+        const root = rootOf.get(w.id);
+        if (!root || !isPin(w.to)) continue;
+        const def = GATE_DEFS[components.get(w.to.compId)?.kind];
+        if (!def) continue;
+        if (!driversOf.has(w.to.compId)) driversOf.set(w.to.compId, new Array(def.inputs).fill(null));
+        const arr = driversOf.get(w.to.compId);
+        if (w.to.pin < arr.length) arr[w.to.pin] = root;
+      }
+      // Keep the signal table in sync with live topology.
+      for (const key of members.keys()) {
+        if (!signals.has(key)) signals.set(key, { value:0, lastChange:0, queue:[] });
+      }
+      for (const key of [...signals.keys()]) if (!members.has(key)) signals.delete(key);
+      return { rootOf, members, driversOf };
+    }
+
+    /* ── mutation ─────────────────────────────────────────────────────── */
+    function addComponent(kind, x, y, facing = 'right', delay = 0, label = 'none') {
+      const def = GATE_DEFS[kind];
+      if (!def) throw new Error('unknown component kind: ' + kind);
+      const id = 'c' + (nextId++);
+      const ioId = (kind==='INPUT' || kind==='OUTPUT') ? 'io'+(nextIoId++) : '';
+      const comp = {
+        id, ioId, kind, x, y,
+        bits: BIT_CAPABLE[kindBase(kind)] ? 1 : (busBaseOf(kind) ? Number(kind.slice(kind.indexOf(':')+1)) || 1 : undefined),
+        state: kind==='INPUT' ? { value:0 }
+             : kind==='CLOCK' ? { value:0, period:1000, paused:false }
+             : kind==='DFF'   ? { q:0, lastClk:0 } : {},
+        inputVals:  new Array(def.inputs).fill(0),
+        outputVals: new Array(def.outputs).fill(0),
+        outputChangeTime: new Array(def.outputs).fill(0),
+        pendingOutputVals: [], pendingOutputStart: [],
+        label: label === 'none'
+          ? (ioId ? String.fromCharCode(Number(ioId.slice(2)) + 64) : def.label)
+          : label,
+        lastChange: 0, facing, delay,
+      };
+      components.set(id, comp);
+      if (ioId) ioComponents.set(ioId, comp);
+      return comp;
+    }
+
+    function removeComponent(id) {
+      const comp = components.get(id);
+      if (!comp) return;
+      components.delete(id);
+      if (comp.ioId) ioComponents.delete(comp.ioId);
+      for (const [wid,w] of [...wires]) {
+        if (w.from.compId === id || w.to.compId === id) removeWire(wid);
+      }
+    }
+
+    // Deleting a wire takes its branches with it — a tap has no meaning
+    // without the wire it taps.
+    function removeWire(id) {
+      if (!wires.has(id)) return;
+      wires.delete(id);
+      for (const [wid,w] of [...wires]) if (isTap(w.from) && w.from.wireId === id) removeWire(wid);
+      // The signal table itself is reconciled against live topology on the
+      // next step(), so there's nothing to clean up here.
+    }
+
+    // What an input pin is currently driven by, if anything.
+    function wireIntoInput(compId, pin) {
+      for (const w of wires.values()) {
+        if (isPin(w.to) && w.to.compId === compId && w.to.pin === pin) return w;
+      }
+      return null;
+    }
+
+    // Is this a legal connection? Returns a reason string when it isn't, so
+    // the canvas can say *why* a target is rejected rather than just
+    // refusing to snap to it.
+    function connectionProblem(from, to) {
+      if (!from || !to) return 'incomplete';
+      if (!isPin(to) || to.type !== 'in') return 'a wire has to end on an input pin';
+      if (isPin(from)) {
+        if (from.type !== 'out') return 'a wire has to start at an output pin';
+        if (from.compId === to.compId) return "can't wire a component to itself";
+        for (const w of wires.values()) {
+          if (isPin(w.from) && w.from.compId===from.compId && w.from.pin===from.pin &&
+              isPin(w.to) && w.to.compId===to.compId && w.to.pin===to.pin) return 'already connected';
+        }
+      } else if (isTap(from)) {
+        const parent = wires.get(from.wireId);
+        if (!parent) return 'that wire no longer exists';
+        if (isPin(parent.to) && parent.to.compId === to.compId && parent.to.pin === to.pin) return 'already connected';
+      } else return 'unsupported source';
+      const dstBits = pinBits(components.get(to.compId), 'in', to.pin);
+      const srcBits = pinBitsAt(from);
+      if (dstBits !== srcBits) return `bit width mismatch — this input is ${dstBits}-bit, source is ${srcBits}-bit`;
+      return null;
+    }
+
+    function addWire(from, to, points) {
+      if (connectionProblem(from, to)) return null;
+      // One driver per input: a new connection replaces the old one rather
+      // than silently OR-ing two sources together.
+      const existing = wireIntoInput(to.compId, to.pin);
+      if (existing) removeWire(existing.id);
+      const id = 'w' + (nextId++);
+      const wire = { id, from, to, points: points || [], label:'' };
+      wires.set(id, wire);
+      return wire;
+    }
+
+    /* ── simulation ───────────────────────────────────────────────────── */
+    function tickClocks(now) {
+      // Computed from absolute time, not incrementally, so every clock is
+      // phase-locked to the same origin regardless of when it was placed or
+      // how long it sat paused. phaseStart is the *exact* instant the phase
+      // began — the seed that makes everything downstream exact.
+      for (const c of components.values()) {
+        if (c.kind === 'CLOCK' && !c.state.paused) {
+          const half = Math.max(1, c.state.period / 2);
+          const phase = Math.floor(now / half) % 2;
+          if (c.state.value !== phase) {
+            c.state.value = phase;
+            c.state.phaseStart = snapToGlobalTick(Math.floor(now / half) * half);
+          }
+        }
+      }
+    }
+
+    function computeOutputs(now, driversOf, instant) {
+      let changed = false;
+      for (const c of components.values()) {
+        const def = GATE_DEFS[c.kind];
+        if (!def) continue;
+        const outs = def.compute(c.inputVals, c.state, c.bits || 1) || [];
+        for (let i=0;i<outs.length;i++) {
+          if (outs[i] !== c.pendingOutputVals[i]) {
+            if (outs[i] === c.outputVals[i]) {
+              // Input reverted before the pending change landed — drop the
+              // in-flight change instead of letting it commit as a stale
+              // glitch when the old timer expires.
+              c.pendingOutputVals[i] = undefined;
+              c.pendingOutputStart[i] = undefined;
+            } else {
+              let cause = snapToGlobalTick(now);
+              if (c.kind === 'CLOCK') {
+                if (typeof c.state.phaseStart === 'number') cause = c.state.phaseStart;
+              } else {
+                const drv = driversOf.get(c.id);
+                if (drv) {
+                  // The most recent input arrival is what triggered this new
+                  // result, so that's the exact instant to count from.
+                  let t = null;
+                  for (const key of drv) {
+                    if (!key) continue;
+                    const s = signals.get(key);
+                    if (s && (t === null || s.lastChange > t)) t = s.lastChange;
+                  }
+                  if (t !== null) cause = t;
+                }
+              }
+              c.pendingOutputVals[i] = outs[i];
+              c.pendingOutputStart[i] = cause;
+            }
+          }
+          const pend = c.pendingOutputVals[i];
+          if (pend !== undefined && (instant || now - (c.pendingOutputStart[i]||0) >= (c.delay||0))) {
+            if (c.outputVals[i] !== pend) {
+              c.outputVals[i] = pend;
+              c.lastChange = now;
+              // Exact scheduled commit time (cause + delay), never `now`.
+              c.outputChangeTime[i] = instant ? now : (c.pendingOutputStart[i]||0) + (c.delay||0);
+              changed = true;
+            }
+            c.pendingOutputVals[i] = undefined;
+            c.pendingOutputStart[i] = undefined;
+          }
+        }
+      }
+      return changed;
+    }
+
+    // Queue every distinct transition (compared against the last value
+    // already queued, not the committed one) so a source that flips faster
+    // than one hop puts a train of pulses on the net instead of losing the
+    // reverting edge. Each still commits exactly hopMs after it departed, so
+    // the output frequency always matches the source's — just phase-shifted.
+    function pumpSignals(now, hopMs, instant) {
+      let changed = false;
+      for (const [key, sig] of signals) {
+        const [cid, pinStr] = key.split(':');
+        const comp = components.get(cid);
+        if (!comp) continue;
+        const pin = Number(pinStr);
+        const val = comp.outputVals[pin] || 0;
+        const lastQueued = sig.queue.length ? sig.queue[sig.queue.length-1].value : sig.value;
+        if (val !== lastQueued) {
+          const t = comp.outputChangeTime[pin];
+          sig.queue.push({ value: val, time: typeof t === 'number' ? t : snapToGlobalTick(now) });
+          changed = true;
+        }
+      }
+      for (const sig of signals.values()) {
+        while (sig.queue.length && (instant || now - sig.queue[0].time >= hopMs)) {
+          const ev = sig.queue.shift();
+          if (sig.value !== ev.value) {
+            sig.value = ev.value;
+            // Exact scheduled arrival, not the frame that noticed it.
+            sig.lastChange = instant ? now : ev.time + hopMs;
+            changed = true;
+          }
+        }
+      }
+      return changed;
+    }
+
+    function refreshInputs(rootOf) {
+      const acc = new Map();
+      for (const c of components.values()) {
+        const def = GATE_DEFS[c.kind];
+        acc.set(c.id, new Array(def ? def.inputs : 0).fill(0));
+      }
+      for (const w of wires.values()) {
+        if (!isPin(w.to)) continue;
+        const a = acc.get(w.to.compId);
+        const sig = signals.get(rootOf.get(w.id));
+        if (a && sig && w.to.pin < a.length) a[w.to.pin] = a[w.to.pin] || (sig.value || 0);
+      }
+      let changed = false;
+      for (const c of components.values()) {
+        const next = acc.get(c.id);
+        if (c.inputVals.length !== next.length || next.some((v,i)=>v!==c.inputVals[i])) changed = true;
+        c.inputVals = next;
+      }
+      return changed;
+    }
+
+    // Looping the whole cycle a bounded number of times per instant lets a
+    // chain settle within one frame where possible. Signal commits stay
+    // gated on elapsed time, so extra passes can never make a value arrive
+    // before its hop is up.
+    const SETTLE_PASSES = 8;
+    function step(now, hopMs, instant) {
+      tickClocks(now);
+      const { rootOf, driversOf } = topology();
+      for (let pass=0; pass<SETTLE_PASSES; pass++) {
+        const a = computeOutputs(now, driversOf, instant);
+        const b = pumpSignals(now, hopMs, instant);
+        const c = refreshInputs(rootOf);
+        if (!a && !b && !c) break;
+      }
+    }
+
+    // Wipe every in-flight signal and latch back to a cold start, keeping
+    // the layout. Used by the toolbar's Reset.
+    function resetSim() {
+      for (const c of components.values()) {
+        const def = GATE_DEFS[c.kind];
+        c.inputVals = new Array(def.inputs).fill(0);
+        c.outputVals = new Array(def.outputs).fill(0);
+        c.outputChangeTime = new Array(def.outputs).fill(0);
+        c.pendingOutputVals = []; c.pendingOutputStart = [];
+        if (c.kind === 'CLOCK') { c.state.value = 0; delete c.state.phaseStart; }
+        if ('q' in c.state) c.state.q = 0;
+        if ('lastClk' in c.state) c.state.lastClk = 0;
+        if (c.state.sub) delete c.state.sub;
+      }
+      signals.clear();
+    }
+
+    /* ── persistence ──────────────────────────────────────────────────── */
+    function serialize() {
+      return {
+        version: 2,
+        components: [...components.values()].map(c=>({
+          id:c.id, ioId:c.ioId, kind:c.kind, x:c.x, y:c.y, facing:c.facing, delay:c.delay, label:c.label,
+          bits: BIT_CAPABLE[kindBase(c.kind)] ? (c.bits || 1) : undefined,
+          state: c.kind==='INPUT' ? { value:c.state.value }
+               : c.kind==='CLOCK' ? { period:c.state.period, paused:c.state.paused } : {},
+        })),
+        wires: [...wires.values()].map(w=>({ id:w.id, from:w.from, to:w.to, points:w.points||[], label:w.label||'' })),
+        nextId, nextIoId,
+      };
+    }
+
+    // v1 files could contain wires with free-floating endpoints and a
+    // separate junction registry. Those are converted to taps where a
+    // matching junction exists, and dropped otherwise — the current model
+    // has no representation for a wire that ends in mid-air.
+    function migrateWires(data) {
+      const junctions = data.junctions || [];
+      const near = (a,b) => Math.abs(a-b) < 1e-6;
+      const out = [];
+      for (const wd of data.wires || []) {
+        let from = wd.from, to = wd.to;
+        if (from && typeof from.x === 'number' && !from.compId && !from.wireId) {
+          const j = junctions.find(j => near(j.x, from.x) && near(j.y, from.y));
+          if (!j) continue;
+          from = { wireId: j.sourceWireId, x: j.x, y: j.y };
+        }
+        if (!to || typeof to.pin !== 'number' || typeof to.compId !== 'string') continue;
+        out.push({ ...wd, from, to:{ ...to, type:'in' } });
+      }
+      return out;
+    }
+
+    function load(data) {
+      components.clear(); ioComponents.clear(); wires.clear(); signals.clear();
+      if (!data) return;
+      // Two passes: addComponent mints throwaway sequential ids as a side
+      // effect, and those can collide with another entry's *saved* id when
+      // the original circuit had gaps from deletions. Mint everything first,
+      // then assign the real ids and populate the maps once.
+      const built = [];
+      for (const cd of data.components || []) {
+        const m = typeof cd.kind === 'string'
+          && /^(COMBINE|SPLIT|AND|OR|NAND|NOR|XOR|XNOR|MUX):(\d+)$/.exec(cd.kind);
+        if (m && !GATE_DEFS[cd.kind] && window.Modules.gates) {
+          if (m[1] === 'COMBINE' || m[1] === 'SPLIT') window.Modules.gates.ensureBusKind(m[1], Number(m[2]));
+          else window.Modules.gates.ensureGateKind(m[1], Number(m[2]));
+        }
+        if (!GATE_DEFS[cd.kind]) continue;
+        const c = addComponent(cd.kind, cd.x, cd.y, cd.facing, cd.delay);
+        components.delete(c.id); if (c.ioId) ioComponents.delete(c.ioId);
+        if (cd.label !== undefined) c.label = cd.label;
+        if (BIT_CAPABLE[kindBase(c.kind)] && cd.bits) c.bits = clampBits(cd.bits);
+        if (cd.state) Object.assign(c.state, cd.state);
+        built.push({ c, cd });
+      }
+      for (const { c, cd } of built) {
+        c.id = cd.id || c.id; c.ioId = cd.ioId || '';
+        components.set(c.id, c);
+        if (c.ioId) ioComponents.set(c.ioId, c);
+      }
+      for (const wd of migrateWires(data)) {
+        const from = wd.from && wd.from.compId ? { ...wd.from, type:'out' } : wd.from;
+        wires.set(wd.id, { id:wd.id, from, to:wd.to, points:wd.points||[], label:wd.label||'' });
+      }
+      nextId = Math.max(data.nextId || 1, nextId);
+      nextIoId = Math.max(data.nextIoId || 1, nextIoId);
+    }
+
+    return {
+      components, wires, ioComponents, signals,
+      isPin, isTap, sigKey,
+      terminalCoords, terminalDir, wirePoints, rootSignalOf, topology, wireIntoInput,
+      connectionProblem,
+      addComponent, removeComponent, addWire, removeWire,
+      step, resetSim, serialize, load,
+      signalOfWire(wire) { return signals.get(rootSignalOf(wire)); },
+      toggleInput(id){ const c=components.get(id); if(c&&c.kind==='INPUT') c.state.value=c.state.value?0:1; },
+      setInput(id,v){ const c=components.get(id); if(c&&c.kind==='INPUT') c.state.value=v?1:0; },
+      // Multi-bit INPUT value editing. `stepInput` wraps mod 2^bits in
+      // either direction — negative deltas rely on JS's 32-bit bitwise ops
+      // turning -1 into "all ones", which lands exactly on the mask.
+      setInputValue(id,v){ const c=components.get(id); if(c&&c.kind==='INPUT') c.state.value=(v|0)&bitMask(c.bits||1); },
+      stepInput(id,delta){ const c=components.get(id); if(c&&c.kind==='INPUT') c.state.value=((c.state.value||0)+delta)&bitMask(c.bits||1); },
+      pinBits, wireBits, hasConnections,
+      // Widening/narrowing a wired-up part could silently strand a
+      // connection at the old width, so it's refused once anything is
+      // attached — the person has to disconnect first.
+      setBits(id, n){
+        const c = components.get(id);
+        if (!c || hasConnections(id)) return false;
+        if (BIT_CAPABLE[kindBase(c.kind)]) {
+          c.bits = clampBits(n);
+          if (c.kind === 'INPUT') c.state.value = (c.state.value||0) & bitMask(c.bits);
+          return true;
+        }
+        const base = busBaseOf(c.kind);
+        if (base && window.Modules.gates) {
+          const newKind = window.Modules.gates.ensureBusKind(base, n);
+          rebuildPinArrays(c, GATE_DEFS[newKind]);
+          c.kind = newKind;
+          c.bits = clampBits(n);
+          return true;
+        }
+        return false;
+      },
+      // How many inputs an adjustable-arity gate (AND/OR/NAND/NOR/XOR/XNOR,
+      // or a MUX's data lines) has. Changing this swaps in a differently-
+      // sized concrete kind, same idea as widening a bus part, and is
+      // likewise refused once anything is wired to it.
+      setInputCount(id, n){
+        const c = components.get(id);
+        if (!c || hasConnections(id)) return false;
+        const base = kindBase(c.kind);
+        if (!GATE_INPUT_CHOICES[base] || !window.Modules.gates) return false;
+        const newKind = window.Modules.gates.ensureGateKind(base, n);
+        rebuildPinArrays(c, GATE_DEFS[newKind]);
+        c.kind = newKind;
+        return true;
+      },
+      toggleClock(id){ const c=components.get(id); if(c&&c.kind==='CLOCK') c.state.paused=!c.state.paused; },
+      setClockPeriod(id,p){ const c=components.get(id); if(c&&c.kind==='CLOCK') c.state.period=p; },
+      setLabel(id,l){ const c=components.get(id); if(c) c.label=l; },
+      setFacing(id,f){ const c=components.get(id); if(c) c.facing=f; },
+      setWireLabel(id,l){ const w=wires.get(id); if(w) w.label=l; },
+    };
+  }
+
+  return {
+    GATE_DEFS, GRID, snapGridVal, GLOBAL_TICK_MS, snapToGlobalTick,
+    pinAbs, pinOutDir, rotDir, FACE_ROT,
+    resolveWire, pathD, polyLength, samplePoly, distToSeg, projectOnPoly, autoRoute,
+    createCircuit,
+    BIT_CAPABLE, MAX_BITS, clampBits, bitMask, formatBits, parseBits, busBaseOf,
+    kindBase, muxDataCount, GATE_INPUT_CHOICES,
+  };
+});
+</script>
+
+<script type="text/babel">
+/* ═══ GATES ════════════════════════════════════════════════════════════════ */
+defineModule('gates', ['state', 'engine'], (state, engine) => {
+  'use strict';
+  const { GATE_DEFS } = engine;
+
+  const FAMILY_FILL = {
+    and:'#fff7e0', or:'#e8f8ee', not:'#f0ecfd', xor:'#e6f0fe',
+    mux:'#fff0e2', seq:'#fdeaf3', io:'#fffbe8', custom:'#ffffff', bus:'#eef2f7',
+  };
+  const FAMILY_EDGE = {
+    and:'#e0b64a', or:'#4fa877', not:'#7c6ce0', xor:'#4a86d8',
+    mux:'#dd8b45', seq:'#d4589a', io:'#c9a227', custom:'#b9b8b0', bus:'#5b7a9c',
+  };
+  const VIS = {};
+  const W=80,H=80,BX=12,YT=20,YB=60,YO=40,BT=8,BB=72;
+  const STROKE = 2;
+
+  // Shared pin-stacking layout: evenly space n pins over a box of height h,
+  // snapped to a 20px grid. Used by custom gates, COMBINE/SPLIT, and any
+  // gate widened past its default input count. n<=1 just centers the pin.
+  const PIN_MARGIN = 20, PIN_GAP = 30;
+  const snap20 = (v)=>Math.round(v/20)*20;
+  function pinYs(n, h) {
+    if (n <= 1) return [snap20(h/2)];
+    const usable = h - PIN_MARGIN*2;
+    return Array.from({length:n}, (_,i)=>snap20(PIN_MARGIN + usable*i/(n-1)));
+  }
+  // How tall a box needs to be to fit n pins at that spacing, snapped to the
+  // 40px grid gates are normally sized on.
+  function boxHeightFor(n) {
+    return Math.ceil(Math.max(H, PIN_MARGIN*2 + (Math.max(n,1)-1)*PIN_GAP)/40)*40;
+  }
+
+  // Fills left-to-right while a pending output counts down a component's own
+  // extra delay, so the bar reads as a progress meter for the value about to
+  // land. Most components have delay 0 and never show it.
+  function PendingBar({ pendingStart, delay, value }) {
+    const now = state.widgetState.now;
+    const t = delay > 0 ? Math.min(1, (now-(pendingStart||now))/delay) : 1;
+    return <g>
+      <rect x="20" y="-7" width="40" height="5" rx="2.5" fill="var(--panel-3)"/>
+      <rect x="20" y="-7" width={40*t} height="5" rx="2.5" fill={value ? 'var(--high)' : 'var(--low-p)'}/>
+    </g>;
+  }
+  function pendingBar(comp) {
+    return comp.pendingOutputVals && comp.pendingOutputVals[0] !== undefined && (comp.delay||0) > 0 &&
+      <PendingBar pendingStart={comp.pendingOutputStart[0]} delay={comp.delay||0} value={comp.pendingOutputVals[0]}/>;
+  }
+  // Every gate body shares the same ink: a soft inner highlight for a bit of
+  // dimensionality, then the family fill and a family-tinted outline.
+  function shape(d, f, edge, extra) {
+    return <g>
+      <path d={d} fill={f} stroke={edge} strokeWidth={STROKE} strokeLinejoin="round"/>
+      {extra}
+    </g>;
+  }
+
+  // Parametrized by box height so a widened gate (more inputs stacked down
+  // the left edge) gets a proportionally taller symbol rather than the same
+  // 2-input curve stretched or, worse, pins crammed into a fixed box.
+  // AND/NAND's bulge radius is fixed at what it was for the default 2-input
+  // box (32px) — only the *vertical* radius of the ellipse grows with h, so
+  // a wide gate gets a taller bulge, not one that swells past the box and
+  // away from its own output pin.
+  const BULGE_RX = 32;
+  const dAND  = (h)=>`M ${BX} 8 H ${W*.5} A ${BULGE_RX} ${(h-16)/2} 0 0 1 ${W*.5} ${h-8} H ${BX} Z`;
+  const dNAND = (h)=>`M ${BX} 8 H ${W*.45} A ${BULGE_RX} ${(h-16)/2} 0 0 1 ${W*.45} ${h-8} H ${BX} Z`;
+  const dOR   = (h)=>`M ${BX} 8 Q ${BX+15} ${h/2}, ${BX} ${h-8} Q ${W*.5} ${h-8}, ${W-3} ${h/2} Q ${W*.5} 8, ${BX} 8 Z`;
+  const dNOR  = (h)=>`M ${BX} 8 Q ${BX+15} ${h/2}, ${BX} ${h-8} Q ${W*.45} ${h-8}, ${W-13} ${h/2} Q ${W*.45} 8, ${BX} 8 Z`;
+  const xorArc= (h)=>`M ${BX-6} 8 Q ${BX+9} ${h/2}, ${BX-6} ${h-8}`;
+  // The two corner diagonals keep the exact vertical rise (18px) they had
+  // at the default 2-input size, so the angle never changes as more data
+  // pins are added — a wider MUX gets a longer straight run between the
+  // corners, the same trapezoid stretched, not a steeper-looking wedge.
+  const MUX_DIAG = 18;
+  const dMUX  = (h)=>`M ${BX} 8 L ${W-BX} ${8+MUX_DIAG} V ${h-8-MUX_DIAG} L ${BX} ${h-8} Z`;
+  const bubble= (cx,cy,edge,f)=><circle cx={cx} cy={cy} r="5" fill={f} stroke={edge} strokeWidth={STROKE}/>;
+
+  // Builds the VIS entry for one (base, inputCount) pair — n data inputs
+  // for AND/OR/etc., n data lines (plus however many select bits they need)
+  // for MUX. Called once per default arity below, and again lazily whenever
+  // ensureGateKind meets a width it hasn't registered yet.
+  function buildGateVis(base, n) {
+    const h = boxHeightFor(n);
+    const ys = pinYs(n, h);
+    const yo = h/2;
+    const bodies = {
+      AND:  (f,comp,edge)=><g>{pendingBar(comp)}{shape(dAND(h),f,edge)}</g>,
+      OR:   (f,comp,edge)=><g>{pendingBar(comp)}{shape(dOR(h),f,edge)}</g>,
+      NAND: (f,comp,edge)=><g>{pendingBar(comp)}{shape(dNAND(h),f,edge)}{bubble(W-7,yo,edge,f)}</g>,
+      NOR:  (f,comp,edge)=><g>{pendingBar(comp)}{shape(dNOR(h),f,edge)}{bubble(W-7,yo,edge,f)}</g>,
+      XOR:  (f,comp,edge)=><g>{pendingBar(comp)}
+              <path d={xorArc(h)} fill="none" stroke={edge} strokeWidth={STROKE}/>{shape(dOR(h),f,edge)}</g>,
+      XNOR: (f,comp,edge)=><g>{pendingBar(comp)}
+              <path d={xorArc(h)} fill="none" stroke={edge} strokeWidth={STROKE}/>{shape(dNOR(h),f,edge)}{bubble(W-7,yo,edge,f)}</g>,
+      MUX:  (f,comp,edge)=><g>{pendingBar(comp)}
+              {shape(dMUX(h),f,edge)}
+              {ys.map((y,i)=><text key={i} x={BX+7} y={y+4} fontFamily="var(--mono)" fontSize="8" fill="var(--ink)" opacity=".4">{i}</text>)}
+            </g>,
+    };
+    const inputs = base === 'MUX' ? [...ys.map(y=>({x:0,y})), {x:W*.5,y:0,dir:'up'}] : ys.map(y=>({x:0,y}));
+    return { w:W, h, inputs, outputs:[{x:W,y:yo}], body: bodies[base] };
+  }
+
+  ['AND','OR','NAND','NOR','XOR','XNOR'].forEach(base => { VIS[base] = buildGateVis(base, 2); });
+  VIS.MUX  = buildGateVis('MUX', 2);
+  VIS.NOT  = { w:W,h:H, inputs:[{x:0,y:YO}], outputs:[{x:W,y:YO}],
+    body:(f,comp,edge)=><g>{pendingBar(comp)}{shape('M 12 22 L 60 40 L 12 58 Z',f,edge)}{bubble(66,YO,edge,f)}</g> };
+
+  // A gate widened past its default arity is its own concrete kind — same
+  // trick as COMBINE/SPLIT — so every bit of machinery keyed off `kind`
+  // (pin counts, save/load, the "Nb"/width badge) just works unmodified.
+  function ensureGateKind(base, n) {
+    const choices = engine.GATE_INPUT_CHOICES[base];
+    if (!choices) return base;
+    if (!choices.includes(n)) n = choices[0];
+    if (n === choices[0]) return base; // canonical arity, already registered
+    const kind = base + ':' + n;
+    if (GATE_DEFS[kind]) return kind;
+    GATE_DEFS[kind] = { ...GATE_DEFS[base], kind, inputs: base === 'MUX' ? n+1 : n };
+    VIS[kind] = buildGateVis(base, n);
+    return kind;
+  }
+
+
+  /* ── in-place controls ────────────────────────────────────────────────
+     Some components carry a control that's worth clicking on its own: a
+     switch's knob, a clock's run/halt pad. Those get their own hit region so
+     operating the part and selecting the part are different gestures. The
+     rest of the body still selects, drags and renames as usual.
+
+     Coordinates are local and un-rotated — the canvas renders the hit target
+     inside the same transform as the artwork, so it follows a rotated or
+     mirrored component for free. */
+  const TOGGLE_HIT = {
+    INPUT: (comp)=>{
+      const bits = comp.bits || 1;
+      if (bits <= 1) return {
+        action:'input', title:'Flip this switch',
+        shape:{ type:'circle', cx: comp.state.value ? 60 : 20, cy:20, r:12 },
+      };
+      return {
+        action:'input', title:'Click the left half to step down, the right half to step up',
+        shape:{ type:'rect', x:4, y:4, w:72, h:32, rx:16 },
+      };
+    },
+    CLOCK: (comp)=>({
+      action:'clock', title: comp.state.paused ? 'Run this clock' : 'Halt this clock',
+      shape:{ type:'rect', x:7, y:8, w:24, h:24, rx:8 },
+    }),
+  };
+  function toggleHit(comp) {
+    const f = TOGGLE_HIT[comp.kind];
+    return f ? f(comp) : null;
+  }
+
+  VIS.INPUT = { w:80, h:40, inputs:[], outputs:[{x:80,y:20}],
+    body:(f,comp)=>{
+      const bits = comp.bits || 1;
+      const label = <text x="-13" y="26" fontFamily="var(--mono)" fontSize="15" fontWeight="600"
+              textAnchor="end" fill="var(--ink)" opacity=".85">{comp.label}</text>;
+      if (bits <= 1) {
+        const on = comp.state.value;
+        return <g>
+          <rect x="4" y="4" width="72" height="32" rx="16"
+                fill={on?'var(--high-soft)':'var(--panel-2)'} stroke={on?'var(--high-2)':'var(--border-hi)'} strokeWidth="2"/>
+          <circle cx={on?60:20} cy="20" r="11.5" fill="var(--bg)" stroke={on?'var(--high-2)':'var(--border-hi)'} strokeWidth="1.5"/>
+          <text x={on?60:20} y="24" fontFamily="var(--mono)" fontSize="11" fontWeight="600"
+                textAnchor="middle" fill={on?'var(--high-2)':'var(--ink-3)'}>{on?'1':'0'}</text>
+          {label}
+        </g>;
+      }
+      // Multi-bit: a numeric read-out (in the shared display format) with a
+      // left/right split for step-down / step-up, same in-place-control
+      // feel as the single-bit switch.
+      const val = comp.state.value || 0;
+      const text = engine.formatBits(val, bits, state.widgetState.numFormat);
+      const fontSize = text.length > 10 ? 8 : text.length > 6 ? 9.5 : 11;
+      return <g>
+        <rect x="4" y="4" width="72" height="32" rx="9"
+              fill={val?'var(--high-soft)':'var(--panel-2)'} stroke={val?'var(--high-2)':'var(--border-hi)'} strokeWidth="2"/>
+        <path d="M14 15 L9 20 L14 25" fill="none" stroke="var(--ink-3)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M66 15 L71 20 L66 25" fill="none" stroke="var(--ink-3)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+        <text x="40" y="24" fontFamily="var(--mono)" fontSize={fontSize} fontWeight="700"
+              textAnchor="middle" fill={val?'var(--high-2)':'var(--ink-2)'}>{text}</text>
+        {label}
+      </g>;
+    } };
+
+  // Split in two, like the switch: a run/halt pad on the left that reads as
+  // pressable, and the waveform on the right that's just a read-out. The pad
+  // shows the action it will perform, not the state it's in — the waveform
+  // and the fill already say whether it's ticking.
+  VIS.CLOCK = { w:80, h:40, inputs:[], outputs:[{x:80,y:20}],
+    body:(f,comp)=>{
+      const on = comp.state.value, paused = comp.state.paused;
+      const edge = paused ? 'var(--border-hi)' : 'var(--high-2)';
+      return <g>
+        <rect x="4" y="4" width="72" height="32" rx="9"
+              fill={paused?'var(--panel-2)':'#fffdf0'} stroke={edge} strokeWidth="2"/>
+        {/* A square pad centred on (19,20), with both glyphs optically
+            centred on the same point — a right-pointing triangle sits heavy
+            on its base, so it's set back a third of its width. Rounded joins
+            and caps keep them from looking chiselled at this size. */}
+        <rect x="7" y="8" width="24" height="24" rx="8"
+              fill="var(--bg)" stroke={edge} strokeWidth="1.2" opacity=".85"/>
+        {paused
+          ? <path d="M16.4 15.2 L24.3 20 L16.4 24.8 Z"
+                  fill="var(--ink-2)" stroke="var(--ink-2)" strokeWidth="1.7"
+                  strokeLinejoin="round" strokeLinecap="round"/>
+          : <g stroke="var(--ink-2)" strokeWidth="3" strokeLinecap="round">
+              <line x1="16.2" y1="15.6" x2="16.2" y2="24.4"/>
+              <line x1="21.8" y1="15.6" x2="21.8" y2="24.4"/>
+            </g>}
+        <path d="M 36 26 L 42 26 L 42 14 L 51 14 L 51 26 L 60 26 L 60 14 L 68 14"
+              fill="none" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
+              stroke={paused ? 'var(--border-hi)' : (on ? 'var(--high)' : 'var(--low)')}/>
+        {!paused && <circle cx={on?51:42} cy={on?14:26} r="2.6" fill={on?'var(--high-2)':'var(--ink-3)'}/>}
+      </g>;
+    } };
+
+  VIS.OUTPUT = { w:64, h:40, inputs:[{x:0,y:20}], outputs:[],
+    body:(f,comp)=>{
+      const bits = comp.bits || 1;
+      const on = comp.inputVals[0];
+      const label = <text x={bits<=1?52:60} y="26" fontFamily="var(--mono)" fontSize="15" fontWeight="600"
+              textAnchor="start" fill="var(--ink)" opacity=".85">{comp.label}</text>;
+      if (bits <= 1) {
+        return <g>
+          {on ? <circle cx="22" cy="20" r="19" fill="var(--high)" opacity=".16"/> : null}
+          <circle cx="22" cy="20" r="13" fill={on?'#fde68a':'var(--panel-2)'}
+                  stroke={on?'var(--high-2)':'var(--border-hi)'} strokeWidth="2"/>
+          <path d="M 17 25.5 L 17 30 L 27 30 L 27 25.5" fill="none" stroke="var(--ink-2)" strokeWidth="1.5" strokeLinecap="round"/>
+          {label}
+          {on ? <g stroke="var(--high-2)" strokeWidth="1.6" strokeLinecap="round">
+            <line x1="22" y1="2" x2="22" y2="5.5"/><line x1="38" y1="20" x2="41.5" y2="20"/>
+            <line x1="2.5" y1="20" x2="6" y2="20"/><line x1="33.5" y1="8.5" x2="36" y2="6"/>
+            <line x1="10.5" y1="8.5" x2="8" y2="6"/>
+          </g> : null}
+        </g>;
+      }
+      // Multi-bit: a read-only numeric pill, same amber-when-nonzero cue as
+      // every other signal on the board.
+      const text = engine.formatBits(on, bits, state.widgetState.numFormat);
+      const fontSize = text.length > 10 ? 7 : text.length > 6 ? 9 : 11;
+      return <g>
+        {on ? <rect x="0" y="3" width="56" height="34" rx="8" fill="var(--high)" opacity=".14"/> : null}
+        <rect x="2" y="5" width="52" height="30" rx="7" fill={on?'#fde68a':'var(--panel-2)'}
+              stroke={on?'var(--high-2)':'var(--border-hi)'} strokeWidth="2"/>
+        <text x="28" y="24" fontFamily="var(--mono)" fontSize={fontSize} fontWeight="700"
+              textAnchor="middle" fill={on?'var(--high-2)':'var(--ink-2)'}>{text}</text>
+        {label}
+      </g>;
+    } };
+
+  /* Seven-segment display. Light-themed like the rest of the board, and lit
+     in the same amber as every other high signal rather than a red LED — the
+     colour means "high" here exactly as it does on a wire. Pin *indices* keep
+     their historical segment mapping (0=g, 1=f, 2=a, 3=b, 4=e, 5=d, 6=c) and
+     their slot positions, so circuits saved against the old artwork still
+     light up the segments they used to. */
+  const S7 = { w:60, h:80 };
+  VIS.SEVEN = { w:S7.w, h:S7.h,
+    inputs:[{x:S7.w*0.2,y:0,dir:'up'},{x:S7.w*0.4,y:0,dir:'up'},{x:S7.w*0.6,y:0,dir:'up'},{x:S7.w*0.8,y:0,dir:'up'},
+            {x:S7.w*0.2,y:S7.h,dir:'down'},{x:S7.w*0.4,y:S7.h,dir:'down'},{x:S7.w*0.6,y:S7.h,dir:'down'}],
+    outputs:[],
+    body:(f,comp)=>{
+      const lit = (i)=>!!comp.inputVals[i];
+      const T = 4.6, R = 2.3;                       // segment thickness, radius
+      const L = 18.4, Rt = 41.6, Mid = 40;          // left / right / middle
+      const Top = 19, Bot = 61;
+      const bar = (i, x, y, w, h)=><rect key={i} x={x} y={y} width={w} height={h} rx={R}
+        fill={lit(i) ? 'var(--high)' : 'var(--border-md)'} opacity={lit(i) ? 1 : .5}/>;
+      const hBar = (i, y)=>bar(i, L + T*0.6, y - T/2, (Rt - L) - T*1.2, T);
+      const vBar = (i, y0, y1)=>bar(i, L - T/2, y0 + T*0.6, T, (y1 - y0) - T*1.2);
+      const vBarR = (i, y0, y1)=>bar(i, Rt - T/2, y0 + T*0.6, T, (y1 - y0) - T*1.2);
+      return <g>
+        <rect x="3" y="9" width={S7.w-6} height={S7.h-18} rx="8"
+              fill="var(--panel-2)" stroke="var(--border-hi)" strokeWidth="2"/>
+        {hBar(2, Top)}{hBar(0, Mid)}{hBar(5, Bot)}
+        {vBar(1, Top, Mid)}{vBar(4, Mid, Bot)}
+        {vBarR(3, Top, Mid)}{vBarR(6, Mid, Bot)}
+      </g>;
+    } };
+
+  function ffRect(f,h,edge,w=80){
+    return <rect x="6" y="6" width={w-12} height={h-12} rx="8" fill={f} stroke={edge} strokeWidth="2"/>;
+  }
+  const ffTxt = (x,y,t)=><text x={x} y={y} fontFamily="var(--mono)" fontSize="12" fontWeight="500" fill="var(--ink)" opacity=".8">{t}</text>;
+  const ffTxtR = (x,y,t)=><text x={x} y={y} textAnchor="end" fontFamily="var(--mono)" fontSize="12" fontWeight="500" fill="var(--ink)" opacity=".8">{t}</text>;
+  const ffSub = (t,y)=><text x="40" y={y} fontFamily="var(--ui)" fontSize="9" fontWeight="600" textAnchor="middle" fill="var(--ink)" opacity=".3">{t}</text>;
+  // Type + width together, centered: "REG" alone at the default 1 bit, or
+  // "REG · 8b" once it's been widened — sitting just above the value pill
+  // rather than tucked in a corner, since together they're the two things
+  // that actually describe what this box is doing.
+  const ffCap = (label, bits, y, w)=><text x={w/2} y={y} textAnchor="middle" fontFamily="var(--ui)"
+    fontSize="9" fontWeight="700" letterSpacing=".02em" fill="var(--ink)" opacity=".4">
+    {bits > 1 ? `${label} · ${bits}b` : label}</text>;
+  // What a register is actually holding, front and center — the whole
+  // point of the box. Auto-shrinks past a handful of characters so a wide
+  // register in binary doesn't spill out of it.
+  function ffVal(comp, cy, w) {
+    const bits = comp.bits || 1;
+    const val = comp.state.q || 0;
+    const text = engine.formatBits(val, bits, state.widgetState.numFormat);
+    const fontSize = text.length > 12 ? 6.5 : text.length > 8 ? 8 : text.length > 5 ? 10 : 12;
+    // Capped well short of the box edge so it can never grow into the D/▷/Q
+    // pin labels flanking it, no matter how long the text gets.
+    const pw = Math.min(w - 46, Math.max(30, 10 + text.length * fontSize * 0.64));
+    return <g>
+      <rect x={w/2-pw/2} y={cy-11} width={pw} height="22" rx="7"
+            fill={val ? 'var(--high-soft)' : 'var(--panel-2)'} stroke={val ? 'var(--high-2)' : 'var(--border-hi)'} strokeWidth="1.5"/>
+      <text x={w/2} y={cy+4} textAnchor="middle" fontFamily="var(--mono)" fontSize={fontSize} fontWeight="700"
+            fill={val ? 'var(--high-2)' : 'var(--ink-2)'}>{text}</text>
+    </g>;
+  }
+
+  VIS.DFF  = { w:80,h:80, inputs:[{x:0,y:20},{x:0,y:60}], outputs:[{x:80,y:40}],
+    body:(f,comp,e)=><g>{pendingBar(comp)}{ffRect(f,80,e)}{ffTxt(14,25,'D')}{ffTxt(14,65,'▷')}{ffTxt(64,45,'Q')}{ffSub('D',44)}</g> };
+  VIS.TFF  = { w:80,h:80, inputs:[{x:0,y:20},{x:0,y:60}], outputs:[{x:80,y:40}],
+    body:(f,comp,e)=><g>{pendingBar(comp)}{ffRect(f,80,e)}{ffTxt(14,25,'T')}{ffTxt(14,65,'▷')}{ffTxt(64,45,'Q')}{ffSub('T',44)}</g> };
+  VIS.SRFF = { w:80,h:80, inputs:[{x:0,y:20},{x:0,y:60}], outputs:[{x:80,y:40}],
+    body:(f,comp,e)=><g>{pendingBar(comp)}{ffRect(f,80,e)}{ffTxt(14,25,'S')}{ffTxt(14,65,'R')}{ffTxt(64,45,'Q')}{ffSub('SR',44)}</g> };
+  VIS.JKFF = { w:80,h:120, inputs:[{x:0,y:20},{x:0,y:60},{x:0,y:100}], outputs:[{x:80,y:40}],
+    body:(f,comp,e)=><g>{pendingBar(comp)}{ffRect(f,120,e)}{ffTxt(14,25,'J')}{ffTxt(14,65,'K')}{ffTxt(14,105,'▷')}{ffTxt(64,45,'Q')}{ffSub('JK',64)}</g> };
+
+  // The multi-bit family: wider than the 1-bit flip-flops above, and tall
+  // enough to fit a type/width caption and a value pill below the pins
+  // without crowding either — the whole reason someone reaches for a
+  // register instead of a flip-flop is to watch a bus's worth of state, so
+  // that value (and what it's measured in) belongs front and center.
+  const REG_W = 100;
+  VIS.REG  = { w:REG_W,h:130, inputs:[{x:0,y:20},{x:0,y:60}], outputs:[{x:REG_W,y:40}],
+    body:(f,comp,e)=><g>{pendingBar(comp)}{ffRect(f,130,e,REG_W)}
+      {ffTxt(14,25,'D')}{ffTxt(14,65,'▷')}{ffTxtR(REG_W-14,45,'Q')}
+      {ffCap('REG',comp.bits||1,86,REG_W)}{ffVal(comp,106,REG_W)}</g> };
+  VIS.LOAD = { w:REG_W,h:170, inputs:[{x:0,y:20},{x:0,y:60},{x:0,y:100}], outputs:[{x:REG_W,y:40}],
+    body:(f,comp,e)=><g>{pendingBar(comp)}{ffRect(f,170,e,REG_W)}
+      {ffTxt(14,25,'D')}{ffTxt(14,65,'LD')}{ffTxt(14,105,'▷')}{ffTxtR(REG_W-14,45,'Q')}
+      {ffCap('LOAD',comp.bits||1,124,REG_W)}{ffVal(comp,144,REG_W)}</g> };
+  VIS.SHIFT = { w:REG_W,h:130, inputs:[{x:0,y:20},{x:0,y:60}], outputs:[{x:REG_W,y:25},{x:REG_W,y:65}],
+    body:(f,comp,e)=><g>{pendingBar(comp)}{ffRect(f,130,e,REG_W)}
+      {ffTxt(14,25,'SI')}{ffTxt(14,65,'▷')}{ffTxtR(REG_W-14,29,'Q')}{ffTxtR(REG_W-14,69,'SO')}
+      {ffCap('SHIFT',comp.bits||1,86,REG_W)}{ffVal(comp,106,REG_W)}</g> };
+
+  /* ── pin stubs ─────────────────────────────────────────────────────────
+     Each stub normally points 'left' (inputs) or 'right' (outputs) toward
+     the body, but a pin can override with its own `dir` to poke out another
+     side — e.g. a mux select facing 'up' — independent of gate facing. */
+  const PIN_DIR_VEC = { left:[-1,0], right:[1,0], up:[0,-1], down:[0,1] };
+  function pinStub(p, defaultDir) {
+    const [dx,dy] = PIN_DIR_VEC[p.dir || defaultDir];
+    return { x1:p.x-dx*12, y1:p.y-dy*12, x2:p.x, y2:p.y };
+  }
+
+  function GateBody({ comp, ghost }) {
+    const def = GATE_DEFS[comp.kind], vis = VIS[comp.kind];
+    if (!vis || !def) return null;
+    const fill = FAMILY_FILL[def.family] || '#fff';
+    const edge = ghost ? 'var(--border-hi)' : (FAMILY_EDGE[def.family] || 'var(--ink)');
+    const label = def.label;
+    return <g transform={comp.facing==='left'
+              ? `translate(${vis.w} 0) scale(-1 1)`
+              : `rotate(${comp.facing==='up'?270:comp.facing==='down'?90:0} ${vis.w/2} ${vis.h/2})`}>
+      {vis.inputs.map((p,i)=>{ const s=pinStub(p,'left');
+        return <line key={'i'+i} {...s} stroke="var(--ink-2)" strokeWidth="2" strokeLinecap="round"/>; })}
+      {vis.outputs.map((p,i)=>{ const s=pinStub(p,'right');
+        return <line key={'o'+i} {...s} stroke="var(--ink-2)" strokeWidth="2" strokeLinecap="round"/>; })}
+      {vis.body(fill, comp, edge)}
+      {['AND','OR','NAND','NOR','XOR','XNOR','MUX'].includes(engine.kindBase(comp.kind)) &&
+        <text x={vis.w/2+2} y={vis.h/2+4} textAnchor="middle" fontFamily="var(--mono)"
+              fontSize="9.5" fontWeight="600" fill="var(--ink)" opacity=".38" pointerEvents="none"
+              transform={comp.facing==='left' ? `translate(${vis.w/2+2} 0) scale(-1 1) translate(${-(vis.w/2+2)} 0)` : undefined}>{label}</text>}
+      {['AND','OR','NOT','NAND','NOR','XOR','XNOR','MUX'].includes(engine.kindBase(comp.kind)) && (comp.bits||1) > 1 &&
+        <text x={vis.w-3} y="10" textAnchor="end" fontFamily="var(--mono)"
+              fontSize="8" fontWeight="700" fill="var(--ink-2)" opacity=".55" pointerEvents="none"
+              transform={comp.facing==='left' ? `translate(${vis.w-3} 0) scale(-1 1) translate(${-(vis.w-3)} 0)` : undefined}>{(comp.bits||1)+'b'}</text>}
+    </g>;
+  }
+
+  /* ── custom gates ──────────────────────────────────────────────────────
+     Registers a saved circuit as a placeable component: a white box sized to
+     fit its inputs (left) / outputs (right), simulated as a black box by
+     settling a private nested circuit on every compute(). */
+  // Greedy word-wrap for the box label at ~6px/char, hard-breaking any single
+  // word too long for the line so it can't overflow the box.
+  function wrapLabel(text, maxChars) {
+    const words = String(text).split(/\s+/).filter(Boolean);
+    const lines = []; let cur = '';
+    for (const w of words) {
+      const test = cur ? cur+' '+w : w;
+      if (test.length > maxChars && cur) { lines.push(cur); cur = w; } else cur = test;
+    }
+    if (cur) lines.push(cur);
+    return lines.flatMap(line => {
+      if (line.length <= maxChars) return [line];
+      const chunks = [];
+      for (let i=0;i<line.length;i+=maxChars) chunks.push(line.slice(i,i+maxChars));
+      return chunks;
+    });
+  }
+  function registerCustomGate(name, data) {
+    const kindKey = 'CUSTOM:' + name;
+    const tmp = engine.createCircuit();
+    tmp.load(data);
+    // Ordered by y so the box's pin stack matches how the IO was laid out
+    // top-to-bottom in the saved circuit, not creation order.
+    const ins  = [...tmp.ioComponents.values()].filter(c=>c.kind==='INPUT').sort((a,b)=>a.y-b.y);
+    const outs = [...tmp.ioComponents.values()].filter(c=>c.kind==='OUTPUT').sort((a,b)=>a.y-b.y);
+    const inIds=ins.map(c=>c.ioId), outIds=outs.map(c=>c.ioId);
+    const inLabels=ins.map(c=>c.label), outLabels=outs.map(c=>c.label);
+
+    const h = boxHeightFor(Math.max(inIds.length, outIds.length, 1));
+    const inYs = pinYs(inIds.length, h), outYs = pinYs(outIds.length, h);
+    const nameLines = wrapLabel(name, Math.max(3, Math.floor((W-18)/6)));
+    const nameLineH = 12;
+    const nameStartY = h/2 - (nameLines.length-1)*nameLineH/2 + 4;
+
+    GATE_DEFS[kindKey] = {
+      kind:kindKey, label:name, inputs:inIds.length, outputs:outIds.length, family:'custom',
+      compute(inputVals, st) {
+        if (!st.sub) { st.sub = engine.createCircuit(); st.sub.load(data); }
+        const sub = st.sub;
+        inIds.forEach((ioId,i)=>{ const c=sub.ioComponents.get(ioId); if (c) c.state.value = inputVals[i]?1:0; });
+        // A custom gate is one hop from the outside, so its interior settles
+        // instantly rather than adding its own internal hop count.
+        for (let i=0;i<8;i++) sub.step(state.widgetState.now, 0, true);
+        return outIds.map(ioId=>{ const c=sub.ioComponents.get(ioId); return c ? (c.inputVals[0]||0) : 0; });
+      },
+    };
+
+    VIS[kindKey] = {
+      w:W, h,
+      inputs: inYs.map(y=>({x:0,y})),
+      outputs: outYs.map(y=>({x:W,y})),
+      body:(f,comp,edge)=><g>
+        <rect x="0" y="0" width={W} height={h} rx="8" fill="var(--bg)" stroke={edge} strokeWidth="2"/>
+        <text x={W/2} textAnchor="middle" fontFamily="var(--mono)" fontSize="10" fontWeight="600" fill="var(--ink)" opacity=".7">
+          {nameLines.map((line,i)=><tspan key={i} x={W/2} y={nameStartY+i*nameLineH}>{line}</tspan>)}
+        </text>
+        {inLabels.map((lbl,i)=><text key={'i'+i} x="8" y={inYs[i]+3.5} fontFamily="var(--mono)" fontSize="9" fill="var(--ink)" opacity=".6">{lbl}</text>)}
+        {outLabels.map((lbl,i)=><text key={'o'+i} x={W-8} y={outYs[i]+3.5} textAnchor="end" fontFamily="var(--mono)" fontSize="9" fill="var(--ink)" opacity=".6">{lbl}</text>)}
+      </g>,
+    };
+    return kindKey;
+  }
+
+  /* ── bus combine / split ──────────────────────────────────────────────
+     Two structural parts rather than one bidirectional "splitter": COMBINE
+     takes n separate 1-bit inputs and packs them into a single n-bit
+     output (input pin i becomes bit i); SPLIT takes one n-bit input and
+     unpacks it back into n separate 1-bit outputs the same way. Each width
+     is its own registered kind ("COMBINE:4", "SPLIT:8", …) exactly like a
+     custom gate gets its own kind — that way every bit of existing
+     machinery that keys off a component's `kind` (pin counts, save/load,
+     the palette thumbnail) just works with no special-casing. */
+  const BUS_W = 64;
+  function ensureBusKind(base, n) {
+    n = engine.clampBits(n);
+    const kind = base + ':' + n;
+    if (GATE_DEFS[kind]) return kind;
+    const h = boxHeightFor(n);
+    const ys = pinYs(n, h);
+    const isCombine = base === 'COMBINE';
+    GATE_DEFS[kind] = isCombine
+      ? { kind, label:'COMBINE', inputs:n, outputs:1, family:'bus',
+          compute(inputVals){ let v=0; for (let i=0;i<n;i++) if (inputVals[i]) v |= (1<<i); return [v & engine.bitMask(n)]; } }
+      : { kind, label:'SPLIT', inputs:1, outputs:n, family:'bus',
+          compute([v]){ v = v||0; const out=[]; for (let i=0;i<n;i++) out.push((v>>i)&1); return out; } };
+    // Drawn as a comb, not a funnel: every 1-bit pin ties into a spine with
+    // a short stub, and the spine joins the one wide-bus pin through a stub
+    // of its own. A funnel that has to reach every pin gets more lopsided
+    // and wedge-like the taller it is; a spine just gets longer — the part
+    // still reads cleanly at 16 bits, not just 2 or 4.
+    const SPINE = 8, ARM = 8, SPINE_PAD = 10;
+    const yTop = ys[0], yBot = ys[ys.length-1], yMid = h/2;
+    const defaultLabel = isCombine ? 'COMBINE' : 'SPLIT';
+    const hasSpine = ys.length > 1;
+    // Every pin already gets a 12px wire-stub drawn for free (same as any
+    // other gate); the spine sits flush against exactly where those end,
+    // so a wire visibly runs straight into the device with no dead air
+    // between the two — rather than the pin looking unconnected.
+    const spineX  = isCombine ? 12 + SPINE/2 : BUS_W - 12 - SPINE/2;
+    // Without a spine (a single pin on the many-bits side) the arm just
+    // runs straight across, same as any other pass-through.
+    const armFrom = isCombine ? (hasSpine ? spineX : 12) : 12;
+    const armTo   = isCombine ? BUS_W-12 : (hasSpine ? spineX : BUS_W-12);
+    VIS[kind] = {
+      w: BUS_W, h,
+      inputs:  isCombine ? ys.map(y=>({x:0,y}))   : [{x:0, y:yMid}],
+      outputs: isCombine ? [{x:BUS_W, y:yMid}]    : ys.map(y=>({x:BUS_W,y})),
+      body:(f,comp,edge)=><g>
+        {/* Runs a bit past the first and last pin rather than stopping
+            exactly on them, so it reads as one continuous spine those pins
+            tie into, not a bar that just barely reaches the outermost two. */}
+        {hasSpine && <rect x={spineX-SPINE/2} y={yTop-SPINE_PAD} width={SPINE} height={(yBot-yTop)+SPINE_PAD*2} rx={SPINE/2}
+                           fill={f} stroke={edge} strokeWidth={STROKE}/>}
+        <rect x={armFrom} y={yMid-ARM/2} width={Math.max(armTo-armFrom, ARM)} height={ARM} rx={ARM/2}
+              fill={f} stroke={edge} strokeWidth={STROKE}/>
+        {/* Covers the seam where the spine and arm overlap, and doubles as
+            an "everything merges here" marker. */}
+        {hasSpine && <circle cx={spineX} cy={yMid} r="4.5" fill={edge}/>}
+        {/* Tucked just above each pin's own stub rather than off to the
+            side of it, so there's no need to fight the spine for space —
+            the stub (and now the spine flush against it) stay uncluttered. */}
+        {isCombine
+          ? ys.map((y,i)=><text key={i} x="6" y={y-5} textAnchor="middle" fontFamily="var(--mono)" fontSize="7.5" fill="var(--ink)" opacity=".6">{i}</text>)
+          : ys.map((y,i)=><text key={i} x={BUS_W-6} y={y-5} textAnchor="middle" fontFamily="var(--mono)" fontSize="7.5" fill="var(--ink)" opacity=".6">{i}</text>)}
+        {/* Only show the name once it's been customized — a default
+            "COMBINE"/"SPLIT" caption on every instance would just be noise. */}
+        {comp.label && comp.label !== defaultLabel && (isCombine
+          ? <text x={BUS_W+8} y={yMid+4} fontFamily="var(--mono)" fontSize="12" fontWeight="600" fill="var(--ink)" opacity=".8">{comp.label}</text>
+          : <text x="-8" y={yMid+4} textAnchor="end" fontFamily="var(--mono)" fontSize="12" fontWeight="600" fill="var(--ink)" opacity=".8">{comp.label}</text>)}
+      </g>,
+    };
+    return kind;
+  }
+  // The palette needs something concrete to show before any instance
+  // exists; everyone else (custom sizes included) registers lazily.
+  ensureBusKind('COMBINE', 4);
+  ensureBusKind('SPLIT', 4);
+
+  return { GATE_VIS: VIS, FAMILY_FILL, FAMILY_EDGE, GateBody, registerCustomGate, toggleHit, ensureBusKind, ensureGateKind };
+});
+</script>
+
+<script type="text/babel">
+/* ═══ CANVAS ═══════════════════════════════════════════════════════════════
+
+   WIRING MODEL
+   ────────────
+   One gesture, two ways to perform it — press-drag-release for a quick
+   connection, or click-move-click for a considered one. Both run through the
+   same state machine, so there's no mode to learn and no way to end up
+   holding the mouse button wrong.
+
+     · Press or click any pin       → start a wire (either end works; the
+                                      engine sorts out which is the driver)
+     · Click empty canvas           → drop a corner and keep going
+     · Click / release on a pin     → connect
+     · Backspace                    → undo the last corner
+     · Esc or right-click           → cancel
+     · Drag off an existing wire    → branch from it (a junction tap)
+
+   Wires can't be left dangling in mid-air: every wire runs pin-to-pin, which
+   is what makes "one net = one hop" a well-defined unit of delay. */
+defineModule('canvas', ['state', 'engine', 'gates'], (state, engine, gates) => {
+'use strict';
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
+const { GATE_VIS, GateBody, toggleHit } = gates;
+const {
+  GATE_DEFS, GRID, resolveWire, pathD, polyLength, samplePoly,
+  projectOnPoly, autoRoute, pinAbs, pinOutDir,
+} = engine;
+
+const snap = (v, on=true) => on ? Math.round(v/GRID)*GRID : v;
+const DRAG_SLOP = 4;
+
+// Clock periods are powers of two in seconds, slowest → fastest.
+const CLOCK_PERIODS = [8000,4000,2000,1000,500,250,125,62.5];
+const CLOCK_PERIOD_LABELS = ['8s','4s','2s','1s','1/2s','1/4s','1/8s','1/16s'];
+function nearestClockPeriodIndex(ms) {
+  let best=0, bestDiff=Infinity;
+  CLOCK_PERIODS.forEach((p,i)=>{ const d=Math.abs(p-ms); if (d<bestDiff) { bestDiff=d; best=i; } });
+  return best;
+}
+
+/* ── net geometry ────────────────────────────────────────────────────────
+   A net's pulse animation is laid out by *distance travelled through the
+   tree*, not per wire: every wire knows how far along the net it starts
+   (`d0`) and how long it is, and the net's longest path sets the pace. A
+   branch therefore lights up when the pulse actually reaches its junction,
+   and every sink on the net still lands at exactly one hop. */
+function buildNetGeometry(circuit) {
+  const paths = new Map();   // wireId -> resolved polyline
+  const geom  = new Map();   // wireId -> {d0, len, root}
+  const nets  = new Map();   // signal key -> {total, wireIds:[]}
+  const wires = [...circuit.wires.values()];
+  for (const w of wires) paths.set(w.id, circuit.wirePoints(w));
+
+  const childrenOf = new Map();
+  const roots = [];
+  for (const w of wires) {
+    if (circuit.isTap(w.from)) {
+      if (!childrenOf.has(w.from.wireId)) childrenOf.set(w.from.wireId, []);
+      childrenOf.get(w.from.wireId).push(w);
+    } else if (circuit.isPin(w.from)) roots.push(w);
+  }
+  const walk = (w, d0, rootKey, net, depth) => {
+    if (geom.has(w.id) || depth > 24) return;
+    const len = polyLength(paths.get(w.id) || []);
+    geom.set(w.id, { d0, len, root: rootKey });
+    net.wireIds.push(w.id);
+    net.total = Math.max(net.total, d0 + len);
+    for (const child of (childrenOf.get(w.id) || [])) {
+      const along = projectOnPoly(paths.get(w.id) || [], child.from.x, child.from.y).along;
+      walk(child, d0 + along, rootKey, net, depth+1);
+    }
+  };
+  for (const w of roots) {
+    const key = circuit.sigKey(w.from.compId, w.from.pin);
+    if (!nets.has(key)) nets.set(key, { total:0, wireIds:[] });
+    walk(w, 0, key, nets.get(key), 0);
+  }
+  return { paths, geom, nets };
+}
+
+function Canvas({
+  circuit, selection, onSelect, paletteDrag, onClearPaletteDrag,
+  onChange, onCommit, viewApi, onViewChange,
+}) {
+  const svgRef = useRef(null);
+  const [view, setView] = useState({x:40,y:40,zoom:1});
+  const [wiring, setWiring] = useState(null);   // {from, bends:[], hoverKey}
+  const [cursor, setCursor] = useState({x:0,y:0});
+  const [hover, setHover] = useState({ pin:null, wire:null, comp:null, knob:null });
+  const [isPanning, setIsPanning] = useState(false);
+  const [flash, setFlash] = useState(null);     // transient rejection reason
+
+  // Drag state lives in refs so the global listeners never see a stale closure.
+  const panRef      = useRef(null);
+  const compDragRef = useRef(null);
+  const bendDragRef = useRef(null);
+  const tapPendRef  = useRef(null);
+  const wiringRef   = useRef(null);
+  const viewRef     = useRef(view);
+  const hoverRef    = useRef(hover);
+  const cbRef       = useRef({});
+  cbRef.current = { onChange, onCommit, onSelect, onClearPaletteDrag, paletteDrag };
+  useEffect(()=>{ viewRef.current = view; onViewChange?.(view); },[view]);
+  useEffect(()=>{ wiringRef.current = wiring; },[wiring]);
+  useEffect(()=>{ hoverRef.current = hover; },[hover]);
+
+  // One repaint per frame keeps the simulation display live.
+  const [, tick] = useState(0);
+  useEffect(()=>{
+    let r; const loop=()=>{ tick(n=>(n+1)%1e6); r=requestAnimationFrame(loop); };
+    r=requestAnimationFrame(loop); return ()=>cancelAnimationFrame(r);
+  },[]);
+
+  const screenToWorld = useCallback((sx,sy)=>{
+    const r = svgRef.current.getBoundingClientRect(), v = viewRef.current;
+    return { x:(sx-r.left)/v.zoom - v.x, y:(sy-r.top)/v.zoom - v.y };
+  },[]);
+
+  /* ── imperative view controls for the toolbar ───────────────────────── */
+  useEffect(()=>{
+    if (!viewApi) return;
+    viewApi.current = {
+      zoomBy(f) {
+        const el = svgRef.current; if (!el) return;
+        const r = el.getBoundingClientRect(), v = viewRef.current;
+        const cx = r.width/2/v.zoom - v.x, cy = r.height/2/v.zoom - v.y;
+        const nz = Math.max(.25, Math.min(3, v.zoom*f));
+        setView({ x:r.width/2/nz - cx, y:r.height/2/nz - cy, zoom:nz });
+      },
+      reset() { setView({x:40,y:40,zoom:1}); },
+      // The live board, for the PDF export.
+      svg() { return svgRef.current; },
+      // Where to drop something the user clicked (rather than dragged) in.
+      centerWorld() {
+        const el = svgRef.current, v = viewRef.current;
+        if (!el) return { x:120, y:120 };
+        const r = el.getBoundingClientRect();
+        return { x: r.width/2/v.zoom - v.x, y: r.height/2/v.zoom - v.y };
+      },
+      fit() {
+        const el = svgRef.current; if (!el) return;
+        const comps = [...circuit.components.values()];
+        if (!comps.length) { setView({x:40,y:40,zoom:1}); return; }
+        let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+        for (const c of comps) {
+          const vis = GATE_VIS[c.kind]; if (!vis) continue;
+          const rot = c.facing==='up'||c.facing==='down';
+          const w = rot?vis.h:vis.w, h = rot?vis.w:vis.h;
+          const cx = c.x+vis.w/2, cy = c.y+vis.h/2;
+          x0=Math.min(x0,cx-w/2); y0=Math.min(y0,cy-h/2);
+          x1=Math.max(x1,cx+w/2); y1=Math.max(y1,cy+h/2);
+        }
+        const pad = 60;
+        const r = el.getBoundingClientRect();
+        const nz = Math.max(.25, Math.min(2, Math.min(r.width/(x1-x0+pad*2), r.height/(y1-y0+pad*2))));
+        setView({ x: -x0 + (r.width/nz-(x1-x0))/2, y: -y0 + (r.height/nz-(y1-y0))/2, zoom:nz });
+      },
+    };
+  },[circuit, viewApi]);
+
+  /* ── wiring helpers ─────────────────────────────────────────────────── */
+  const pinKey = (compId, kind, idx) => compId+'/'+kind+'/'+idx;
+  const termOf = (comp, kind, idx) => ({ compId:comp.id, pin:idx, type: kind==='in'?'in':'out' });
+
+  // Would connecting the in-progress wire to this pin work? Returns null when
+  // it would, or the reason it wouldn't — the canvas dims rejected pins and
+  // the status bar explains why on a failed click.
+  const problemWith = useCallback((from, term) => {
+    if (!from) return 'no wire in progress';
+    if (circuit.isPin(from) && from.type === 'in') {
+      if (term.type !== 'out') return 'that end needs an output pin';
+      return circuit.connectionProblem(term, from);
+    }
+    return circuit.connectionProblem(from, term);
+  },[circuit]);
+
+  const cancelWiring = useCallback(()=>{ wiringRef.current=null; setWiring(null); },[]);
+
+  const reject = useCallback((reason)=>{
+    setFlash({ reason, at: performance.now() });
+  },[]);
+  useEffect(()=>{
+    if (!flash) return;
+    const t = setTimeout(()=>setFlash(null), 2200);
+    return ()=>clearTimeout(t);
+  },[flash]);
+
+  const finishWire = useCallback((term)=>{
+    const wf = wiringRef.current;
+    if (!wf) return false;
+    const problem = problemWith(wf.from, term);
+    if (problem) { reject(problem); return false; }
+    const reversed = circuit.isPin(wf.from) && wf.from.type === 'in';
+    const from = reversed ? term : wf.from;
+    const to   = reversed ? wf.from : term;
+    const bends = reversed ? [...wf.bends].reverse() : wf.bends;
+    // No manual corners → leave `points` empty so the wire keeps
+    // auto-routing itself as components move.
+    const w = circuit.addWire(from, to, bends.length ? bends.map(p=>({...p})) : []);
+    cancelWiring();
+    if (w) { cbRef.current.onCommit?.('connect'); cbRef.current.onSelect?.(w.id); }
+    return !!w;
+  },[circuit, problemWith, reject, cancelWiring]);
+
+  /* ── global mouse handling ──────────────────────────────────────────── */
+  useEffect(()=>{
+    const onMove = (e)=>{
+      const w = screenToWorld(e.clientX, e.clientY);
+      setCursor(w);
+      if (panRef.current) {
+        const p = panRef.current;
+        setView(v=>({ ...v, x:p.vx+(e.clientX-p.sx)/v.zoom, y:p.vy+(e.clientY-p.sy)/v.zoom }));
+      }
+      if (compDragRef.current) {
+        const d = compDragRef.current;
+        if (Math.hypot(e.clientX-d.sx, e.clientY-d.sy) > DRAG_SLOP) {
+          d.moved = true;
+          const c = circuit.components.get(d.id);
+          if (c) { c.x = snap(w.x-d.ox); c.y = snap(w.y-d.oy); cbRef.current.onChange?.(); }
+        }
+      }
+      if (bendDragRef.current) {
+        const d = bendDragRef.current, wire = circuit.wires.get(d.wireId);
+        if (wire?.points?.[d.idx]) {
+          d.moved = true;
+          wire.points[d.idx] = { x:snap(w.x+d.ox), y:snap(w.y+d.oy) };
+          cbRef.current.onChange?.();
+        }
+      }
+      // A press on a wire only becomes a branch once it actually moves;
+      // otherwise it's just a click that selects the wire.
+      if (tapPendRef.current && Math.hypot(e.clientX-tapPendRef.current.sx, e.clientY-tapPendRef.current.sy) > DRAG_SLOP) {
+        const t = tapPendRef.current; tapPendRef.current = null;
+        const wf = { from:{ wireId:t.wireId, x:t.x, y:t.y }, bends:[], live:true };
+        wiringRef.current = wf; setWiring(wf);
+      }
+    };
+
+    const onUp = (e)=>{
+      // A palette part only lands if the gesture actually finished over the
+      // board. Releasing back on the palette is a plain click, which the
+      // palette itself turns into a drop at the centre of the view — doing
+      // both here would place two copies.
+      const overBoard = !!(e.target && e.target.closest && e.target.closest('.canvas-wrap'));
+      if (cbRef.current.paletteDrag && overBoard) {
+        const pd = cbRef.current.paletteDrag;
+        const wp = screenToWorld(e.clientX, e.clientY);
+        const vis = GATE_VIS[pd.kind];
+        if (vis) {
+          const c = circuit.addComponent(pd.kind, snap(wp.x-vis.w/2), snap(wp.y-vis.h/2));
+          cbRef.current.onCommit?.('add '+pd.kind);
+          cbRef.current.onSelect?.(c.id);
+        }
+      }
+      if (cbRef.current.paletteDrag) cbRef.current.onClearPaletteDrag?.();
+      if (compDragRef.current) {
+        const d = compDragRef.current;
+        if (!d.moved) {
+          // Operating a control is a transient act, not an edit — it doesn't
+          // push an undo snapshot, the way flipping a real switch wouldn't
+          // change the wiring diagram.
+          if (d.action === 'input') {
+            const c = circuit.components.get(d.id);
+            const bits = c ? (c.bits||1) : 1;
+            if (bits > 1) {
+              const vis = GATE_VIS[c.kind];
+              let leftHalf = d.ox < (vis?.w||80)/2;
+              if (c.facing === 'left') leftHalf = !leftHalf;
+              circuit.stepInput(d.id, leftHalf ? -1 : 1);
+            } else {
+              circuit.toggleInput(d.id);
+            }
+            cbRef.current.onChange?.();
+          }
+          if (d.action === 'clock') { circuit.toggleClock(d.id); cbRef.current.onChange?.(); }
+        } else cbRef.current.onCommit?.('move');
+        compDragRef.current = null;
+      }
+      if (bendDragRef.current) {
+        if (bendDragRef.current.moved) cbRef.current.onCommit?.('reshape wire');
+        bendDragRef.current = null;
+      }
+      if (tapPendRef.current) {
+        cbRef.current.onSelect?.(tapPendRef.current.wireId);
+        tapPendRef.current = null;
+      }
+      panRef.current = null;
+      setIsPanning(false);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return ()=>{ window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+  },[circuit, screenToWorld]);
+
+  /* ── keyboard ──────────────────────────────────────────────────────── */
+  useEffect(()=>{
+    const onKey = (e)=>{
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      const wf = wiringRef.current;
+      if (e.key === 'Escape') {
+        if (wf) cancelWiring(); else cbRef.current.onSelect?.(null);
+        return;
+      }
+      if (wf && (e.key === 'Backspace' || e.key === 'Delete')) {
+        // Consume it here: mid-wire, Backspace means "drop that last corner",
+        // not "delete whatever happens to be selected".
+        e.preventDefault(); e.stopImmediatePropagation();
+        if (wf.bends.length) {
+          const next = { ...wf, bends: wf.bends.slice(0,-1) };
+          wiringRef.current = next; setWiring(next);
+        } else cancelWiring();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return ()=>window.removeEventListener('keydown', onKey);
+  },[cancelWiring]);
+
+  /* ── canvas background ───────────────────────────────────────────────
+     Wheel-to-zoom is bound natively with {passive:false}: React registers
+     wheel handlers as passive, so preventDefault() there is ignored and the
+     page (or the embedding frame) scrolls out from under the canvas. */
+  useEffect(()=>{
+    const el = svgRef.current;
+    if (!el) return;
+    const onWheel = (e)=>{
+      e.preventDefault();
+      const r = el.getBoundingClientRect(), v = viewRef.current;
+      const cx = (e.clientX-r.left)/v.zoom - v.x, cy = (e.clientY-r.top)/v.zoom - v.y;
+      const nz = Math.max(.25, Math.min(3, v.zoom*Math.exp(-e.deltaY*.0015)));
+      setView({ x:(e.clientX-r.left)/nz - cx, y:(e.clientY-r.top)/nz - cy, zoom:nz });
+    };
+    el.addEventListener('wheel', onWheel, { passive:false });
+    return ()=>el.removeEventListener('wheel', onWheel);
+  },[]);
+
+  const onBgMouseDown = (e)=>{
+    if (e.button === 2) { if (wiringRef.current) cancelWiring(); return; }
+    const isBg = e.target === svgRef.current || e.target.classList?.contains('canvas-bg');
+    if (!isBg) return;
+    const wf = wiringRef.current;
+    if (wf && e.button === 0) {
+      // Drop a corner and keep wiring.
+      const p = { x:snap(cursor.x), y:snap(cursor.y) };
+      const last = wf.bends[wf.bends.length-1];
+      if (!last || last.x !== p.x || last.y !== p.y) {
+        const next = { ...wf, bends:[...wf.bends, p] };
+        wiringRef.current = next; setWiring(next);
+      }
+      return;
+    }
+    if (e.button !== 0 && e.button !== 1) return;
+    panRef.current = { sx:e.clientX, sy:e.clientY, vx:view.x, vy:view.y };
+    setIsPanning(true);
+    cbRef.current.onSelect?.(null);
+  };
+
+  /* ── components ────────────────────────────────────────────────────── */
+  // `action` distinguishes the two things a component can be clicked for.
+  // When set, the pointer went down on an in-place control (a switch knob, a
+  // clock's run/halt pad): it operates the part and deliberately leaves the
+  // selection alone — otherwise the properties card would pop up every time
+  // someone flicks a switch. A plain press anywhere else selects. Either way
+  // a drag moves the component, so a control doubles as a handle.
+  const onCompMouseDown = (e, comp, action)=>{
+    e.stopPropagation();
+    if (e.button === 2) return;
+    if (wiringRef.current) return;      // don't grab gates mid-wire
+    const w = screenToWorld(e.clientX, e.clientY);
+    compDragRef.current = {
+      id:comp.id, action, moved:false,
+      ox:w.x-comp.x, oy:w.y-comp.y, sx:e.clientX, sy:e.clientY,
+    };
+    if (!action) onSelect(comp.id);
+  };
+  const onCompContext = (e, comp)=>{
+    e.preventDefault(); e.stopPropagation();
+    if (wiringRef.current) { cancelWiring(); return; }
+    circuit.removeComponent(comp.id);
+    onCommit?.('delete component');
+    if (selection === comp.id) onSelect(null);
+  };
+  const ROTATE_ORDER = ['right','down','left','up'];
+  const rotateComp = (e, comp)=>{
+    e.stopPropagation();
+    circuit.setFacing(comp.id, ROTATE_ORDER[(ROTATE_ORDER.indexOf(comp.facing||'right')+1)%4]);
+    onCommit?.('rotate');
+  };
+
+  /* ── pins ──────────────────────────────────────────────────────────── */
+  const onPinMouseDown = (e, comp, kind, idx)=>{
+    e.stopPropagation();
+    if (e.button === 2) { if (wiringRef.current) cancelWiring(); return; }
+    const term = termOf(comp, kind, idx);
+    const wf = wiringRef.current;
+    if (wf) {
+      const sameOrigin = circuit.isPin(wf.from) && wf.from.compId === term.compId && wf.from.pin === term.pin
+                         && wf.from.type === term.type;
+      if (sameOrigin) return;
+      if (finishWire(term)) return;
+      // Rejected: rather than leaving the user stuck, start over from the
+      // pin they just clicked.
+      const fresh = { from:term, bends:[], startS:{x:e.clientX,y:e.clientY} };
+      wiringRef.current = fresh; setWiring(fresh);
+      return;
+    }
+    const fresh = { from:term, bends:[], startS:{x:e.clientX,y:e.clientY} };
+    wiringRef.current = fresh; setWiring(fresh);
+  };
+  const onPinMouseUp = (e, comp, kind, idx)=>{
+    const wf = wiringRef.current;
+    if (!wf) return;
+    const term = termOf(comp, kind, idx);
+    const sameOrigin = circuit.isPin(wf.from) && wf.from.compId === term.compId && wf.from.pin === term.pin
+                       && wf.from.type === term.type;
+    if (sameOrigin) return;             // press-and-release on the origin: stay armed
+    e.stopPropagation();
+    finishWire(term);
+  };
+
+  /* ── wires ─────────────────────────────────────────────────────────── */
+  const onWireMouseDown = (e, wire, path)=>{
+    if (e.button === 2) return;
+    e.stopPropagation();
+    if (wiringRef.current) { reject('a wire has to end on an input pin'); return; }
+    const w = screenToWorld(e.clientX, e.clientY);
+    const pr = projectOnPoly(path, w.x, w.y);
+    tapPendRef.current = { wireId:wire.id, x:pr.point.x, y:pr.point.y, sx:e.clientX, sy:e.clientY };
+  };
+  const onWireContext = (e, wireId)=>{
+    e.preventDefault(); e.stopPropagation();
+    if (wiringRef.current) { cancelWiring(); return; }
+    circuit.removeWire(wireId);
+    onCommit?.('delete wire');
+    if (selection === wireId) onSelect(null);
+  };
+  const onBendMouseDown = (e, wire, idx, pt)=>{
+    e.stopPropagation();
+    if (e.button === 2) return;
+    const w = screenToWorld(e.clientX, e.clientY);
+    bendDragRef.current = { wireId:wire.id, idx, ox:pt.x-w.x, oy:pt.y-w.y, moved:false };
+    onSelect(wire.id);
+  };
+  const onBendContext = (e, wire, idx)=>{
+    e.preventDefault(); e.stopPropagation();
+    wire.points.splice(idx,1);
+    onCommit?.('remove corner');
+  };
+
+  /* ── derived render data ───────────────────────────────────────────── */
+  const now = state.widgetState.now;
+  const hopMs = state.widgetState.hopMs;
+  // Rebuilt every frame on purpose: components move, wires re-route
+  // themselves, and this is cheap next to the SVG repaint it feeds.
+  const { paths, geom, nets } = buildNetGeometry(circuit);
+
+  const components = [...circuit.components.values()];
+  const wires = [...circuit.wires.values()];
+  const tx = view.x*view.zoom, ty = view.y*view.zoom;
+
+  // Where the in-progress wire's loose end sits: snapped to the grid, or
+  // locked onto a compatible pin when one is under the cursor.
+  let wiringTail = cursor, wiringTailValid = null;
+  if (wiring) {
+    const h = hover.pin;
+    if (h) {
+      const comp = circuit.components.get(h.compId);
+      if (comp) {
+        const term = termOf(comp, h.kind, h.idx);
+        const problem = problemWith(wiring.from, term);
+        const p = pinAbs(comp, h.kind, h.idx);
+        wiringTail = p;
+        wiringTailValid = !problem;
+      }
+    } else wiringTail = { x:snap(cursor.x), y:snap(cursor.y) };
+  }
+
+  const wiringPreview = (()=>{
+    if (!wiring) return null;
+    const a = circuit.terminalCoords(wiring.from);
+    const dir = circuit.terminalDir(wiring.from);
+    const mids = wiring.bends.length
+      ? wiring.bends
+      : [{ x:snap(a.x+dir.x*GRID), y:snap(a.y+dir.y*GRID) }];
+    return resolveWire(a.x, a.y, wiringTail.x, wiringTail.y, mids);
+  })();
+
+  return <>
+    <svg ref={svgRef} className="canvas"
+         style={{ width:'100%', height:'100%',
+                  cursor: isPanning ? 'grabbing' : wiring ? 'crosshair' : 'default' }}
+         onMouseDown={onBgMouseDown}
+         onContextMenu={e=>e.preventDefault()}>
+      <defs>
+        <pattern id="grid-minor" width={GRID} height={GRID} patternUnits="userSpaceOnUse">
+          <path d={`M ${GRID} 0 L 0 0 0 ${GRID}`} fill="none" stroke="var(--grid)" strokeWidth="1"/>
+        </pattern>
+        <pattern id="grid-major" width={GRID*5} height={GRID*5} patternUnits="userSpaceOnUse">
+          <rect width={GRID*5} height={GRID*5} fill="url(#grid-minor)"/>
+          <path d={`M ${GRID*5} 0 L 0 0 0 ${GRID*5}`} fill="none" stroke="var(--grid-major)" strokeWidth="1.2"/>
+        </pattern>
+        <filter id="pulse-glow" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="2.4" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <rect className="canvas-bg" data-x="1" x="-6000" y="-6000" width="12000" height="12000"
+            fill="url(#grid-major)"
+            transform={`translate(${tx},${ty}) scale(${view.zoom})`}/>
+
+      <g transform={`translate(${tx},${ty}) scale(${view.zoom})`}>
+        {/* ── wires ── */}
+        {wires.map(w=>{
+          const path = paths.get(w.id) || [];
+          if (path.length < 2) return null;
+          const d = pathD(path);
+          const g = geom.get(w.id);
+          const sig = g ? circuit.signals.get(g.root) : null;
+          const net = g ? nets.get(g.root) : null;
+          const high = !!(sig && sig.value);
+          const isSel = selection === w.id;
+          const isHov = hover.wire === w.id;
+
+          // Each transition still in flight paints the stretch of this wire
+          // it has already crossed, in its own value's colour. Several can be
+          // airborne at once when the source flips faster than one hop —
+          // drawn oldest first so newer pulses overwrite from the source end,
+          // which reads as a train of pulses rather than one smeared dot.
+          const inFlight = [];
+          if (sig && net && g && g.len > 0 && net.total > 0) {
+            for (const ev of sig.queue) {
+              const travelled = ((now - ev.time)/hopMs) * net.total;
+              const local = (travelled - g.d0)/g.len;
+              if (local > 0) inFlight.push({ value:ev.value, t:Math.min(1,local) });
+            }
+          }
+          const head = inFlight.length ? inFlight[inFlight.length-1] : null;
+          const headPt = head && head.t < 1 ? samplePoly(path, head.t) : null;
+
+          return <g key={w.id}>
+            <path d={d} fill="none" stroke="var(--ink)" strokeWidth="5"
+                  strokeLinejoin="round" strokeLinecap="round" opacity=".05"/>
+            {/* A grey accent needs a touch more weight than a coloured one to
+                register as "selected" behind a grey wire. */}
+            {(isSel||isHov) && <path data-x="1" d={d} fill="none" stroke="var(--accent)" strokeWidth="8"
+                  strokeLinejoin="round" strokeLinecap="round" opacity={isSel?.3:.15}/>}
+            <path d={d} fill="none" stroke={high?'var(--high)':'var(--low)'}
+                  strokeWidth="2.6" strokeLinejoin="round" strokeLinecap="round"/>
+            {inFlight.map((p,i)=>
+              <path key={'f'+i} d={d} fill="none" pathLength="1"
+                    stroke={p.value?'var(--high)':'var(--low-p)'}
+                    strokeWidth="2.6" strokeLinejoin="round" strokeLinecap="round"
+                    strokeDasharray={`${p.t} ${1-p.t}`}/>)}
+            {high && !inFlight.length && <ParticleStream path={path}/>}
+            {headPt && <g pointerEvents="none" filter="url(#pulse-glow)">
+              <circle cx={headPt[0]} cy={headPt[1]} r="7" fill={head.value?'var(--high)':'var(--low-p)'} opacity=".2"/>
+              <circle cx={headPt[0]} cy={headPt[1]} r="3.4" fill={head.value?'var(--high)':'var(--low-p)'}/>
+            </g>}
+            {/* fat invisible hit target */}
+            <path data-x="1" d={d} fill="none" stroke="transparent" strokeWidth="14"
+                  style={{ cursor: wiring ? 'crosshair' : 'cell' }}
+                  onMouseDown={e=>onWireMouseDown(e,w,path)}
+                  onMouseEnter={()=>setHover(h=>({...h, wire:w.id}))}
+                  onMouseLeave={()=>setHover(h=>(h.wire===w.id?{...h, wire:null}:h))}
+                  onContextMenu={e=>onWireContext(e,w.id)}/>
+            {w.label && (()=>{
+              const [lx,ly] = samplePoly(path, .5);
+              const wd = 10 + w.label.length*6.4;
+              return <g transform={`translate(${lx},${ly})`} pointerEvents="none">
+                <rect x={-wd/2} y="-9" width={wd} height="18" rx="5"
+                      fill="var(--bg)" stroke="var(--border-md)" strokeWidth="1"/>
+                <text y="4" textAnchor="middle" fontFamily="var(--mono)" fontSize="10.5"
+                      fontWeight="600" fill="var(--ink)">{w.label}</text>
+              </g>;
+            })()}
+            {/* Multi-bit bus: the live value, in whatever base the toolbar
+                is set to, floating just above the wire — stacked above a
+                custom label when the wire has one of those too. */}
+            {(()=>{
+              const bits = circuit.wireBits(w);
+              if (bits <= 1) return null;
+              const [lx,ly] = samplePoly(path, .5);
+              const val = sig ? (sig.value||0) : 0;
+              const text = engine.formatBits(val, bits, state.widgetState.numFormat);
+              const wd = 12 + text.length*6.6;
+              const dy = w.label ? -27 : -13;
+              return <g transform={`translate(${lx},${ly+dy})`} pointerEvents="none">
+                <rect x={-wd/2} y="-9" width={wd} height="18" rx="5"
+                      fill="var(--bg)" stroke="var(--border-md)" strokeWidth="1"/>
+                <text y="4" textAnchor="middle" fontFamily="var(--mono)" fontSize="10.5"
+                      fontWeight="700" fill={val ? 'var(--high-2)' : 'var(--ink-2)'}>{text}</text>
+              </g>;
+            })()}
+            {isSel && (w.points||[]).map((pt,idx)=>(
+              <circle data-x="1" key={'b'+idx} cx={pt.x} cy={pt.y} r="4.5"
+                      fill="var(--bg)" stroke="var(--accent)" strokeWidth="1.8"
+                      style={{cursor:'move'}}
+                      onMouseDown={e=>onBendMouseDown(e,w,idx,pt)}
+                      onContextMenu={e=>onBendContext(e,w,idx)}/>
+            ))}
+          </g>;
+        })}
+
+        {/* ── junction dots, drawn over the wires they join ── */}
+        {wires.filter(w=>circuit.isTap(w.from)).map(w=>{
+          const p = circuit.terminalCoords(w.from);
+          const g = geom.get(w.id);
+          const sig = g ? circuit.signals.get(g.root) : null;
+          return <circle key={'j'+w.id} cx={p.x} cy={p.y} r="4"
+                         fill={sig?.value ? 'var(--high)' : 'var(--low-p)'}
+                         stroke="var(--bg)" strokeWidth="1.4" pointerEvents="none"/>;
+        })}
+
+        {/* ── components ── */}
+        {components.map(comp=>{
+          const vis = GATE_VIS[comp.kind];
+          if (!vis) return null;
+          const isSel = selection === comp.id;
+          const rotT = comp.facing==='left'
+            ? `translate(${vis.w} 0) scale(-1 1)`
+            : `rotate(${comp.facing==='up'?270:comp.facing==='down'?90:0} ${vis.w/2} ${vis.h/2})`;
+          return <g key={comp.id} transform={`translate(${comp.x},${comp.y})`}>
+            <g onMouseDown={e=>onCompMouseDown(e,comp)}
+               onContextMenu={e=>onCompContext(e,comp)}
+               onMouseEnter={()=>setHover(h=>({...h, comp:comp.id}))}
+               onMouseLeave={()=>setHover(h=>(h.comp===comp.id?{...h, comp:null}:h))}
+               style={{ cursor: wiring ? 'crosshair' : 'move' }}>
+              {isSel && <rect data-x="1" x="-7" y="-7" width={vis.w+14} height={vis.h+14} rx="11"
+                              fill="var(--accent)" opacity=".06" transform={rotT}/>}
+              {isSel && <rect data-x="1" x="-7" y="-7" width={vis.w+14} height={vis.h+14} rx="11"
+                              fill="none" stroke="var(--accent)" strokeWidth="1.5"
+                              strokeDasharray="5 4" opacity=".75" transform={rotT}/>}
+              <GateBody comp={comp}/>
+            </g>
+            {/* In-place control (switch knob, clock run/halt pad) — its own
+                hit region, sitting over the body */}
+            {!wiring && (()=>{
+              const hit = toggleHit(comp);
+              if (!hit) return null;
+              const s = hit.shape;
+              const hot = hover.knob === comp.id;
+              const handlers = {
+                fill:'transparent', style:{cursor:'pointer'},
+                onMouseDown:e=>onCompMouseDown(e, comp, hit.action),
+                onMouseEnter:()=>setHover(h=>({...h, knob:comp.id})),
+                onMouseLeave:()=>setHover(h=>(h.knob===comp.id?{...h, knob:null}:h)),
+                onContextMenu:e=>onCompContext(e,comp),
+              };
+              const pad = 2.5;
+              return <g data-x="1" transform={rotT}>
+                {hot && (s.type === 'circle'
+                  ? <circle cx={s.cx} cy={s.cy} r={s.r+pad} fill="var(--accent)" opacity=".14"/>
+                  : <rect x={s.x-pad} y={s.y-pad} width={s.w+pad*2} height={s.h+pad*2}
+                          rx={(s.rx||4)+pad} fill="var(--accent)" opacity=".14"/>)}
+                {s.type === 'circle'
+                  ? <circle cx={s.cx} cy={s.cy} r={s.r} {...handlers}><title>{hit.title}</title></circle>
+                  : <rect x={s.x} y={s.y} width={s.w} height={s.h} rx={s.rx} {...handlers}>
+                      <title>{hit.title}</title>
+                    </rect>}
+              </g>;
+            })()}
+            {isSel && !wiring && <>
+              <g className="rotate-handle" data-x="1" transform={`translate(${vis.w+11},-11)`} style={{cursor:'pointer'}}
+                 onMouseDown={e=>e.stopPropagation()} onClick={e=>rotateComp(e,comp)}>
+                <title>Rotate 90° (R)</title>
+                <circle r="9.5" strokeWidth="1.5"/>
+                <path d="M4.4 1.5a4.6 4.6 0 1 1 -1.1 -4.8L5.7 -1" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M5.7 -4.1L5.7 -1L2.6 -1" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </g>
+              <g className="kill-handle" data-x="1" transform={`translate(${vis.w+11},${vis.h+11})`} style={{cursor:'pointer'}}
+                 onMouseDown={e=>e.stopPropagation()}
+                 onClick={e=>{ e.stopPropagation(); circuit.removeComponent(comp.id); onCommit?.('delete component'); onSelect(null); }}>
+                <title>Delete (Del)</title>
+                <circle r="9.5" strokeWidth="1.5"/>
+                <path d="M -3.2 -3.2 L 3.2 3.2 M 3.2 -3.2 L -3.2 3.2" fill="none" strokeWidth="1.7" strokeLinecap="round"/>
+              </g>
+            </>}
+            <Pins comp={comp} vis={vis} circuit={circuit} wiring={wiring} hover={hover}
+                  problemWith={problemWith} termOf={termOf} pinKey={pinKey}
+                  setHover={setHover} onDown={onPinMouseDown} onUp={onPinMouseUp}/>
+          </g>;
+        })}
+
+        {/* ── in-progress wire ── */}
+        {wiringPreview && <g data-x="1" pointerEvents="none">
+          <path d={pathD(wiringPreview)} fill="none"
+                stroke={wiringTailValid === false ? 'var(--danger)' : 'var(--accent)'}
+                strokeWidth="2.4" strokeDasharray="7 5" opacity=".85"
+                strokeLinejoin="round" strokeLinecap="round"/>
+          {wiring.bends.map((p,i)=>
+            <circle key={i} cx={p.x} cy={p.y} r="3.4" fill="var(--accent)" opacity=".85"/>)}
+          <circle cx={wiringTail.x} cy={wiringTail.y} r={wiringTailValid ? 6.5 : 4}
+                  fill="none" stroke={wiringTailValid === false ? 'var(--danger)' : 'var(--accent)'}
+                  strokeWidth="2" opacity=".9"/>
+        </g>}
+
+        {/* ── palette drag ghost ── */}
+        {paletteDrag && (()=>{
+          const vis = GATE_VIS[paletteDrag.kind], def = GATE_DEFS[paletteDrag.kind];
+          if (!vis || !def) return null;
+          const gx = snap(cursor.x-vis.w/2), gy = snap(cursor.y-vis.h/2);
+          return <g data-x="1" transform={`translate(${gx},${gy})`} opacity=".55" pointerEvents="none">
+            <rect x="-6" y="-6" width={vis.w+12} height={vis.h+12} rx="10"
+                  fill="var(--accent)" opacity=".06" stroke="var(--accent)" strokeWidth="1.2" strokeDasharray="4 4"/>
+            <GateBody ghost comp={{ kind:paletteDrag.kind, facing:'right', delay:0,
+              inputVals:new Array(def.inputs).fill(0), outputVals:new Array(def.outputs).fill(0), state:{value:0} }}/>
+          </g>;
+        })()}
+      </g>
+    </svg>
+
+    {wiring && <div className="wiring-badge">
+      <span>{circuit.isTap(wiring.from) ? 'Branching from wire' : 'Drawing wire'}</span>
+      <kbd>click pin</kbd><span style={{opacity:.5}}>connect</span>
+      <kbd>Esc</kbd><span style={{opacity:.5}}>cancel</span>
+    </div>}
+
+    {flash && <div className="wiring-badge warn" style={wiring ? undefined : { top:10 }}>
+      <span>Can’t connect — {flash.reason}</span>
+    </div>}
+  </>;
+}
+
+/* ── pins ───────────────────────────────────────────────────────────────
+   Pins are quiet until they matter: small dots normally, but the moment a
+   wire is in progress every compatible pin grows a halo and incompatible
+   ones fade back, so the legal targets are obvious without reading anything. */
+function Pins({ comp, vis, circuit, wiring, hover, problemWith, termOf, pinKey, setHover, onDown, onUp }) {
+  const render = (kind, list, values)=> list.map((_,i)=>{
+    const abs = pinAbs(comp, kind, i);
+    const px = abs.x-comp.x, py = abs.y-comp.y;
+    const key = pinKey(comp.id, kind, i);
+    const hovered = hover.pin && hover.pin.compId===comp.id && hover.pin.kind===kind && hover.pin.idx===i;
+    const on = !!values[i];
+    let mode = 'idle';
+    if (wiring) {
+      const isOrigin = circuit.isPin(wiring.from) && wiring.from.compId===comp.id
+        && wiring.from.pin===i && wiring.from.type===(kind==='in'?'in':'out');
+      mode = isOrigin ? 'origin' : (problemWith(wiring.from, termOf(comp,kind,i)) ? 'bad' : 'good');
+    }
+    const r = mode==='good' || hovered ? 6.5 : 5;
+    return <g key={kind+i} opacity={mode==='bad' ? .32 : 1}>
+      {(mode==='good' || mode==='origin') &&
+        <circle data-x="1" cx={px} cy={py} r="11" fill="var(--accent)" opacity={mode==='origin'?.26:.17}/>}
+      {mode==='good' && <circle data-x="1" cx={px} cy={py} r="9" fill="none" stroke="var(--accent)" strokeWidth="1.4" opacity=".7"/>}
+      <circle cx={px} cy={py} r={r}
+              fill={on ? 'var(--high)' : 'var(--bg)'}
+              stroke={hovered||mode==='good' ? 'var(--accent)' : on ? 'var(--high-2)' : 'var(--border-hi)'}
+              strokeWidth={hovered||mode==='good' ? 2 : 1.5}/>
+      <circle data-x="1" cx={px} cy={py} r="13" fill="transparent" style={{cursor:'crosshair'}}
+              onMouseEnter={()=>setHover(h=>({ ...h, pin:{ compId:comp.id, kind, idx:i, key } }))}
+              onMouseLeave={()=>setHover(h=>(h.pin?.key===key ? { ...h, pin:null } : h))}
+              onMouseDown={e=>onDown(e, comp, kind, i)}
+              onMouseUp={e=>onUp(e, comp, kind, i)}/>
+    </g>;
+  });
+  return <g>
+    {render('in',  vis.inputs,  comp.inputVals)}
+    {render('out', vis.outputs, comp.outputVals)}
+  </g>;
+}
+
+/* ── selection card ─────────────────────────────────────────────────────
+   The only properties UI: a small card anchored under whatever is selected.
+   It carries just the settings that can't be expressed on the canvas itself
+   (labels, clock rate, exact orientation) — moving, rotating and deleting
+   stay direct manipulation. */
+const CloseIcon = ()=><svg width="9" height="9" viewBox="0 0 9 9">
+  <path d="M1.5 1.5l6 6M7.5 1.5l-6 6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>;
+
+// Which selections have anything worth a card? Wires and I/O get a name
+// field; a clock gets its rate. Plain gates get nothing — moving, rotating
+// and deleting them all happen on the canvas already, so a card would just
+// restate what the handles do.
+function cardKindFor(circuit, selection) {
+  if (circuit.wires.has(selection)) return 'wire';
+  const comp = circuit.components.get(selection);
+  if (!comp) return null;
+  if (comp.kind === 'INPUT' || comp.kind === 'OUTPUT') return 'io';
+  if (comp.kind === 'CLOCK') return 'clock';
+  if (engine.BIT_CAPABLE[engine.kindBase(comp.kind)]) return 'gate';
+  if (engine.busBaseOf(comp.kind)) return 'bus';
+  return null;
+}
+const BIT_CHOICES = [1,2,3,4,6,8,12,16];
+
+// The settings panel for whatever's selected, meant to sit inline in the
+// toolbar rather than float over the board. Same fields as before — a
+// name, a bit width, a clock rate — just laid out as one more toolbar
+// group instead of a card anchored to the selection's position.
+function SelectionPanel({ circuit, selection, onChange, onCommit, onSelect }) {
+  const kind = cardKindFor(circuit, selection);
+  if (!kind) return null;
+  const comp = circuit.components.get(selection);
+  const wire = comp ? null : circuit.wires.get(selection);
+  if (!comp && !wire) return null;
+
+  // A wire, or an IN / OUT: a name, and — for IN/OUT — the bit width.
+  if (kind === 'wire' || kind === 'io') {
+    const value = wire ? (wire.label || '') : comp.label;
+    const commitLabel = (v)=>{
+      if (wire) circuit.setWireLabel(wire.id, v); else circuit.setLabel(comp.id, v);
+      onChange?.();
+    };
+    const isInput = comp && comp.kind === 'INPUT';
+    const bits = comp ? (comp.bits || 1) : 1;
+    const locked = comp ? circuit.hasConnections(comp.id) : false;
+    const fmt = state.widgetState.numFormat;
+    return <div className="tb-selpanel">
+      <span className="sel-key">{wire ? 'Wire' : comp.kind === 'INPUT' ? 'Input' : 'Output'}</span>
+      <input className="prop-input" style={{width:comp?76:118}} value={value} autoFocus={!comp}
+             placeholder={wire ? 'CLK, RESET…' : 'name'}
+             onChange={e=>commitLabel(e.target.value)}
+             onBlur={()=>onCommit?.('label')}
+             onKeyDown={e=>{ if (e.key === 'Enter') e.currentTarget.blur(); }}/>
+      {comp && <>
+        <span className="sel-key">Bits</span>
+        <select className="prop-input" style={{width:50,padding:'0 4px'}} value={bits} disabled={locked}
+                title={locked ? 'Disconnect its wire first to change bit width' : 'Bit width of this pin'}
+                onChange={e=>{ circuit.setBits(comp.id, Number(e.target.value)); onChange?.(); onCommit?.('bit width'); }}>
+          {BIT_CHOICES.map(n=><option key={n} value={n}>{n}</option>)}
+        </select>
+      </>}
+      {isInput && bits > 1 && <input className="prop-input" style={{width:72,fontFamily:'var(--mono)'}}
+             value={engine.formatBits(comp.state.value||0, bits, fmt)}
+             title={`Value in ${fmt === 'hex' ? 'hex' : fmt === 'dec' ? 'decimal' : 'binary'}`}
+             onChange={e=>{
+               const n = engine.parseBits(e.target.value, bits, fmt);
+               if (n !== null) { circuit.setInputValue(comp.id, n); onChange?.(); }
+             }}
+             onBlur={()=>onCommit?.('input value')}
+             onKeyDown={e=>{ if (e.key === 'Enter') e.currentTarget.blur(); }}/>}
+      <button className="sel-close" title="Deselect (Esc)" onClick={()=>onSelect(null)}><CloseIcon/></button>
+    </div>;
+  }
+
+  // A gate that can be widened past its default arity and/or past 1 bit.
+  // AND/OR/NAND/NOR/XOR/XNOR/MUX get an Inputs control; anything
+  // BIT_CAPABLE (those plus NOT and the registers) gets a Bits control.
+  // Locking one locks both — either change could strand an existing wire.
+  if (kind === 'gate') {
+    const base = engine.kindBase(comp.kind);
+    const arity = engine.GATE_INPUT_CHOICES[base];
+    const curInputs = base === 'MUX' ? engine.muxDataCount(comp.kind) : (GATE_DEFS[comp.kind]?.inputs || 2);
+    const bits = comp.bits || 1;
+    const locked = circuit.hasConnections(comp.id);
+    return <div className="tb-selpanel">
+      <span className="sel-key">{base}</span>
+      {arity && <>
+        <span className="sel-key">Inputs</span>
+        <select className="prop-input" style={{width:48,padding:'0 4px'}} value={curInputs} disabled={locked}
+                title={locked ? 'Disconnect its wires first to change input count' : 'How many inputs this gate has'}
+                onChange={e=>{ circuit.setInputCount(comp.id, Number(e.target.value)); onChange?.(); onCommit?.('input count'); }}>
+          {arity.map(n=><option key={n} value={n}>{n}</option>)}
+        </select>
+      </>}
+      <span className="sel-key">Bits</span>
+      <select className="prop-input" style={{width:56,padding:'0 4px'}} value={bits} disabled={locked}
+              title={locked ? 'Disconnect its wires first to change bit width' : 'Every pin on this gate shares this width'}
+              onChange={e=>{ circuit.setBits(comp.id, Number(e.target.value)); onChange?.(); onCommit?.('bit width'); }}>
+        {BIT_CHOICES.map(n=><option key={n} value={n}>{n}</option>)}
+      </select>
+      <button className="sel-close" title="Deselect (Esc)" onClick={()=>onSelect(null)}><CloseIcon/></button>
+    </div>;
+  }
+
+  // COMBINE / SPLIT: a name, and how many 1-bit lines it packs or unpacks.
+  if (kind === 'bus') {
+    const base = engine.busBaseOf(comp.kind);
+    const bits = comp.bits || 1;
+    const locked = circuit.hasConnections(comp.id);
+    return <div className="tb-selpanel">
+      <span className="sel-key">{base === 'COMBINE' ? 'Combine' : 'Split'}</span>
+      <input className="prop-input" style={{width:74}} value={comp.label}
+             placeholder="name"
+             onChange={e=>{ circuit.setLabel(comp.id, e.target.value); onChange?.(); }}
+             onBlur={()=>onCommit?.('label')}
+             onKeyDown={e=>{ if (e.key === 'Enter') e.currentTarget.blur(); }}/>
+      <span className="sel-key">Bits</span>
+      <select className="prop-input" style={{width:56,padding:'0 4px'}} value={bits} disabled={locked}
+              title={locked ? 'Disconnect its wires first to resize'
+                     : base === 'COMBINE' ? 'How many 1-bit inputs to pack into the output'
+                     : 'How many 1-bit outputs to unpack the input into'}
+              onChange={e=>{ circuit.setBits(comp.id, Number(e.target.value)); onChange?.(); onCommit?.('bit width'); }}>
+        {BIT_CHOICES.map(n=><option key={n} value={n}>{n}</option>)}
+      </select>
+      <button className="sel-close" title="Deselect (Esc)" onClick={()=>onSelect(null)}><CloseIcon/></button>
+    </div>;
+  }
+
+  // A clock: just its rate. Running and halting is the pad on the component
+  // itself, so the panel doesn't restate it.
+  const clkIdx = nearestClockPeriodIndex(comp.state.period);
+  return <div className="tb-selpanel">
+    <span className="sel-key">Clock</span>
+    <span className="sel-key">Rate</span>
+    <input type="range" min="0" max={CLOCK_PERIODS.length-1} step="1" value={clkIdx}
+           style={{width:100,accentColor:'var(--accent)'}}
+           onChange={e=>{ circuit.setClockPeriod(comp.id, CLOCK_PERIODS[Number(e.target.value)]); onChange?.(); }}
+           onMouseUp={()=>onCommit?.('clock period')}/>
+    <span className="st-mono" style={{width:30,textAlign:'right'}}>{CLOCK_PERIOD_LABELS[clkIdx]}</span>
+    <button className="sel-close" title="Deselect (Esc)" onClick={()=>onSelect(null)}><CloseIcon/></button>
+  </div>;
+}
+
+/* ── idle flow dots on a settled HIGH wire ───────────────────────────── */
+function ParticleStream({ path }) {
+  const N = state.widgetState.particleDensity ?? 3;
+  if (!N) return null;
+  const t = (state.widgetState.now * 0.00035) % 1;
+  return <g pointerEvents="none">{Array.from({length:N},(_,i)=>{
+    const [x,y] = samplePoly(path, (t + i/N) % 1);
+    return <circle key={i} cx={x} cy={y} r="2.2" fill="var(--high)" opacity=".55"/>;
+  })}</g>;
+}
+
+return { Canvas, CLOCK_PERIODS, CLOCK_PERIOD_LABELS, nearestClockPeriodIndex, SelectionPanel, cardKindFor };
+});
+</script>
+
+<script type="text/babel">
+/* ═══ PALETTE ══════════════════════════════════════════════════════════════ */
+defineModule('palette', ['engine', 'gates'], (engine, gates) => {
+'use strict';
+const { useState } = React;
+const { GATE_DEFS } = engine;
+const { GATE_VIS, GateBody } = gates;
+
+const GROUPS = [
+  { title:'Sources',    kinds:['INPUT','CLOCK'] },
+  { title:'Sinks',      kinds:['OUTPUT','SEVEN'] },
+  { title:'Logic',      kinds:['AND','OR','NOT','NAND','NOR','XOR','XNOR','MUX'] },
+  { title:'Bus',        kinds:['COMBINE:4','SPLIT:4'] },
+  { title:'Flip-flops', kinds:['DFF','TFF','JKFF','SRFF'] },
+  { title:'Registers',  kinds:['REG','SHIFT','LOAD'] },
+  { title:'Custom',     kinds:[], custom:true },
+];
+// Extra search terms so "invert" finds NOT, "select" finds MUX, and so on.
+const ALIASES = {
+  INPUT:'source switch toggle bit', CLOCK:'oscillator square pulse timer',
+  OUTPUT:'lamp led probe sink', SEVEN:'seven segment display digit',
+  NOT:'invert inverter complement', MUX:'multiplexer select 2to1',
+  DFF:'data flip flop register latch', TFF:'toggle flip flop',
+  JKFF:'jk flip flop', SRFF:'set reset latch',
+  'COMBINE:4':'combine merge pack bus bundle join wires',
+  'SPLIT:4':'split unpack bus bundle unbundle break out wires',
+  REG:'register d-register n-bit storage bus latch',
+  SHIFT:'shift register serial in out siso sipo',
+  LOAD:'load register enable parallel load latch',
+};
+
+function Thumb({ kind }) {
+  const vis = GATE_VIS[kind], def = GATE_DEFS[kind];
+  if (!vis || !def) return null;
+  const tw=60, th=42, sc=Math.min(tw/(vis.w+26), th/(vis.h+10));
+  const tx=(tw-(vis.w+14)*sc)/2, ty=(th-vis.h*sc)/2;
+  return <svg width={tw} height={th}><g transform={`translate(${tx},${ty}) scale(${sc})`}>
+    <GateBody comp={{ kind, facing:'right', delay:0, label:'',
+      inputVals:new Array(def.inputs).fill(0), outputVals:new Array(def.outputs).fill(0), state:{value:0} }}/>
+  </g></svg>;
+}
+
+const Chev = ()=><svg className="chev" width="9" height="9" viewBox="0 0 9 9">
+  <path d="M1.5 3L4.5 6L7.5 3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+
+function Palette({ onDragStart, onPlace, onImportClick, onDeleteCustom, customKinds=[] }) {
+  const [query, setQuery] = useState('');
+  const [closed, setClosed] = useState({});
+  const q = query.trim().toLowerCase();
+  const matches = (kind)=>{
+    if (!q) return true;
+    const def = GATE_DEFS[kind];
+    const hay = (kind+' '+(def?.label||'')+' '+(ALIASES[kind]||'')).toLowerCase();
+    return hay.includes(q);
+  };
+
+  return <div className="palette">
+    <div className="pal-search">
+      <svg width="11" height="11" viewBox="0 0 12 12">
+        <circle cx="5" cy="5" r="3.6" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+        <line x1="7.8" y1="7.8" x2="11" y2="11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      </svg>
+      <input value={query} placeholder="Search parts…" onChange={e=>setQuery(e.target.value)}
+             onKeyDown={e=>{ if (e.key==='Escape') setQuery(''); }}/>
+    </div>
+    <div className="pal-scroll">
+      {GROUPS.map(g=>{
+        const all = g.custom ? customKinds : g.kinds;
+        const kinds = all.filter(matches);
+        const isClosed = !!closed[g.title] && !q;
+        if (q && !kinds.length && !g.custom) return null;
+        if (q && g.custom && !kinds.length) return null;
+        return <div className="pal-group" key={g.title}>
+          <button className={'pal-group-head'+(isClosed?' closed':'')}
+                  onClick={()=>setClosed(c=>({ ...c, [g.title]: !c[g.title] }))}>
+            <Chev/>{g.title}<span className="pal-group-count">{kinds.length}</span>
+          </button>
+          {!isClosed && <div className="pal-grid">
+            {kinds.map(k=>(
+              <div key={k} className="pal-item" title={(GATE_DEFS[k]?.label||k)+' — drag onto the canvas, or click to drop it in'}
+                   onMouseDown={e=>{ if (e.button!==0) return; e.preventDefault(); onDragStart(k); }}
+                   onClick={()=>onPlace?.(k)}>
+                {g.custom && <button className="pal-del-btn" title="Remove from palette"
+                        onMouseDown={e=>e.stopPropagation()}
+                        onClick={e=>{ e.stopPropagation(); onDeleteCustom(k); }}>
+                  <svg width="7" height="7" viewBox="0 0 8 8">
+                    <line x1="1" y1="1" x2="7" y2="7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                    <line x1="7" y1="1" x2="1" y2="7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                  </svg>
+                </button>}
+                <Thumb kind={k}/>
+                <div className="pal-label">{GATE_DEFS[k]?.label || k}</div>
+              </div>
+            ))}
+            {g.custom && !q && <button className="pal-item" onClick={onImportClick} title="Build a new part">
+              <svg width="60" height="42">
+                <rect x="12" y="6" width="36" height="30" rx="7" fill="none" stroke="var(--border-hi)" strokeWidth="1.6" strokeDasharray="4 3"/>
+                <path d="M 27 14 H 33 V 18 H 37 V 24 H 33 V 28 H 27 V 24 H 23 V 18 H 27 Z" fill="var(--border-hi)"/>
+              </svg>
+              <div className="pal-label">New part</div>
+            </button>}
+          </div>}
+          {g.custom && !isClosed && !customKinds.length && !q &&
+            <div className="pal-empty">Bundle a circuit into a reusable part.</div>}
+        </div>;
+      })}
+    </div>
+  </div>;
+}
+
+return { Palette };
+});
+</script>
+
+<script type="text/babel">
+/* ═══ APP ══════════════════════════════════════════════════════════════════ */
+defineModule('app', ['state','engine','gates','canvas','palette'],
+             (state, engine, gates, canvas, palette) => {
+'use strict';
+const { useState, useEffect, useRef, useCallback } = React;
+const { createCircuit } = engine;
+const { Canvas, SelectionPanel } = canvas;
+const { Palette } = palette;
+
+const HOP_CHOICES = [
+  { ms:250,  label:'¼s' },
+  { ms:500,  label:'½s' },
+  { ms:1000, label:'1s' },
+  { ms:2000, label:'2s' },
+];
+
+/* ── custom-gate registry ──────────────────────────────────────────────────
+   registerCustomGate() only lives in memory, so a saved circuit referencing
+   a custom kind used to crash on load in a later session. This registry
+   makes imports durable. */
+const LS_KEY = 'dss_customs_v1';
+function loadCustomRegistry() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch { return []; }
+}
+function upsertCustomRegistry(name, data) {
+  const entries = loadCustomRegistry().filter(e=>e.name!==name);
+  entries.push({ name, data });
+  try { localStorage.setItem(LS_KEY, JSON.stringify(entries)); } catch {}
+}
+function removeFromCustomRegistry(name) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(loadCustomRegistry().filter(e=>e.name!==name))); } catch {}
+}
+function extractCustomDeps(data) {
+  const names = new Set();
+  for (const c of (data.components||[])) {
+    if (typeof c.kind === 'string' && c.kind.startsWith('CUSTOM:')) names.add(c.kind.slice(7));
+  }
+  return names;
+}
+// Would defining custom gate `name` as `data` make its dependency chain loop
+// back to itself? Checked against every other gate's current definition with
+// `name`'s entry swapped for the proposal — that's the only one changing.
+function findCustomCycle(name, data) {
+  const map = new Map(loadCustomRegistry().map(e=>[e.name, e.data]));
+  map.set(name, data);
+  const onPath = new Set(), path = [];
+  const dfs = (node)=>{
+    if (onPath.has(node)) { path.push(node); return true; }
+    onPath.add(node); path.push(node);
+    for (const dep of extractCustomDeps(map.get(node) || {})) if (dfs(dep)) return true;
+    onPath.delete(node); path.pop();
+    return false;
+  };
+  return dfs(name) ? path : null;
+}
+// A custom gate's sub-circuit can itself contain another custom gate and the
+// registry has no guaranteed order, so retry whatever fails (unregistered
+// dependency) until a whole pass makes no more progress.
+function hydrateCustomGates() {
+  let pending = loadCustomRegistry();
+  const kinds = [];
+  let progressed = true;
+  while (pending.length && progressed) {
+    progressed = false;
+    const still = [];
+    for (const entry of pending) {
+      try { kinds.push(gates.registerCustomGate(entry.name, entry.data)); progressed = true; }
+      catch { still.push(entry); }
+    }
+    pending = still;
+  }
+  if (pending.length) console.warn('custom gate(s) missing a dependency:', pending.map(e=>e.name));
+  return kinds;
+}
+
+/* ── completeness check ────────────────────────────────────────────────────
+   A part is sealed up and handed out as a black box, so an unconnected input
+   inside it is a silent bug: it reads as a constant 0 forever, with nothing
+   on the outside to hint at why. Refuse to build one, and name the offenders
+   rather than just saying no. */
+function findDanglingInputs(circuit) {
+  const loose = [];
+  for (const comp of circuit.components.values()) {
+    const def = engine.GATE_DEFS[comp.kind];
+    if (!def) continue;
+    for (let pin = 0; pin < def.inputs; pin++) {
+      if (!circuit.wireIntoInput(comp.id, pin)) loose.push({ comp, pin, def });
+    }
+  }
+  return loose;
+}
+function describeDanglingInputs(circuit) {
+  const loose = findDanglingInputs(circuit);
+  if (!loose.length) return null;
+  const named = loose.slice(0, 5).map(({comp, def, pin}) => {
+    const who = comp.label && comp.label !== def.label ? `${def.label} “${comp.label}”` : def.label;
+    return def.inputs > 1 ? `${who} · input ${pin}` : who;
+  });
+  const more = loose.length - named.length;
+  return `${loose.length} input${loose.length>1?'s':''} still unconnected:\n`
+       + named.join('\n') + (more > 0 ? `\n…and ${more} more` : '')
+       + '\n\nWire every input before turning this into a part.';
+}
+
+/* ── toolbar icons ─────────────────────────────────────────────────────── */
+const I = {
+  reset: <svg width="13" height="13" viewBox="0 0 14 14"><path d="M11.5 7a4.5 4.5 0 1 1-1.6-3.45" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M11.6 1.2v3h-3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  zin:   <svg width="14" height="14" viewBox="0 0 14 14"><circle cx="6" cy="6" r="4.2" fill="none" stroke="currentColor" strokeWidth="1.5"/><path d="M6 4.2v3.6M4.2 6h3.6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><line x1="9.2" y1="9.2" x2="12.4" y2="12.4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>,
+  zout:  <svg width="14" height="14" viewBox="0 0 14 14"><circle cx="6" cy="6" r="4.2" fill="none" stroke="currentColor" strokeWidth="1.5"/><path d="M4.2 6h3.6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><line x1="9.2" y1="9.2" x2="12.4" y2="12.4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>,
+  fit:   <svg width="14" height="14" viewBox="0 0 14 14"><path d="M2 5V2.6h3M12 5V2.6H9M2 9v2.4h3M12 9v2.4H9" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  save:  <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 1.8v6.4M4.4 6l2.6 2.6L9.6 6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M2.4 10.4v1.2h9.2v-1.2" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>,
+  pdf:   <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3.2 1.6h5l2.6 2.6v8.2H3.2z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/><path d="M8.2 1.6v2.6h2.6M5 8.8h4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  load:  <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 8.2V1.8M4.4 4l2.6-2.6L9.6 4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M2.4 10.4v1.2h9.2v-1.2" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>,
+};
+
+function App() {
+  const [circuit] = useState(()=>createCircuit());
+  state.widgetState.circuit = circuit;
+  const [, tick] = useState(0);
+  const refresh = useCallback(()=>tick(n=>(n+1)%1e6),[]);
+
+  const [selection, setSelection] = useState(null);
+  const [palDrag, setPalDrag] = useState(null);
+  const [customKinds, setCustomKinds] = useState(()=>hydrateCustomGates());
+  const [running, setRunning] = useState(true);
+  const [hopMs, setHopMs] = useState(1000);
+  const [zoom, setZoom] = useState(1);
+  const [simTime, setSimTime] = useState(0);
+  const [numFormat, setNumFormat] = useState('bin');
+
+  const [showHelp, setShowHelp] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [importStep, setImportStep] = useState('choose');
+  const [importName, setImportName] = useState('');
+  const [importEquation, setImportEquation] = useState('');
+  const [importJsonText, setImportJsonText] = useState('');
+  const [importErr, setImportErr] = useState('');
+
+  const viewApi = useRef(null);
+  const runningRef = useRef(running);
+  const hopRef = useRef(hopMs);
+  useEffect(()=>{ runningRef.current = running; state.widgetState.running = running; },[running]);
+  useEffect(()=>{ hopRef.current = hopMs; state.widgetState.hopMs = hopMs; },[hopMs]);
+  useEffect(()=>{ state.widgetState.numFormat = numFormat; },[numFormat]);
+
+  /* ── history ────────────────────────────────────────────────────────────
+     Snapshots of serialize(), pushed on discrete edits (a drag commits once
+     on release, not per frame). Layout only — simulation state is derived.
+     Keyboard-only: ⌘Z / ⇧⌘Z, with no toolbar buttons to feed. */
+  const hist = useRef({ stack:[], idx:-1 });
+  const commit = useCallback((label)=>{
+    const snap = JSON.stringify(circuit.serialize());
+    const h = hist.current;
+    if (h.stack[h.idx] === snap) { refresh(); return; }
+    h.stack = h.stack.slice(0, h.idx+1);
+    h.stack.push(snap);
+    if (h.stack.length > 80) h.stack.shift();
+    h.idx = h.stack.length-1;
+    refresh();
+  },[circuit, refresh]);
+  const travel = useCallback((delta)=>{
+    const h = hist.current;
+    const next = h.idx + delta;
+    if (next < 0 || next >= h.stack.length) return;
+    h.idx = next;
+    circuit.load(JSON.parse(h.stack[next]));
+    circuit.resetSim();
+    setSelection(null);
+    refresh();
+  },[circuit, refresh]);
+  useEffect(()=>{ commit('init'); },[]);
+
+  /* ── simulation clock ───────────────────────────────────────────────────
+     Advances only while running, so pausing freezes logic, clocks and every
+     wire animation in lockstep instead of letting the picture drift away
+     from the state. */
+  useEffect(()=>{
+    let r, last = performance.now();
+    const loop = ()=>{
+      const t = performance.now();
+      const dt = Math.min(80, t - last);
+      last = t;
+      if (runningRef.current) state.widgetState.now += dt;
+      circuit.step(state.widgetState.now, hopRef.current);
+      r = requestAnimationFrame(loop);
+    };
+    r = requestAnimationFrame(loop);
+    return ()=>cancelAnimationFrame(r);
+  },[circuit]);
+  // The clock read-out only needs a few updates a second.
+  useEffect(()=>{
+    const id = setInterval(()=>setSimTime(state.widgetState.now), 100);
+    return ()=>clearInterval(id);
+  },[]);
+
+  const stepOnce = useCallback(()=>{
+    // Nudge time forward by exactly one hop so a paused circuit can be
+    // walked through gate by gate.
+    state.widgetState.now += hopRef.current;
+    circuit.step(state.widgetState.now, hopRef.current);
+    refresh();
+  },[circuit, refresh]);
+  const resetSim = useCallback(()=>{
+    circuit.resetSim();
+    state.widgetState.now = 0;
+    setSimTime(0); refresh();
+  },[circuit, refresh]);
+
+  /* ── keyboard ─────────────────────────────────────────────────────────── */
+  useEffect(()=>{
+    const onKey = (e)=>{
+      const typing = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
+      // Esc closes a dialog first, even from inside one of its fields.
+      if (e.key === 'Escape' && (showHelp || showImport)) {
+        e.stopImmediatePropagation();
+        if (showHelp) setShowHelp(false); else closeImport();
+        return;
+      }
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault();
+        travel(e.shiftKey ? 1 : -1);
+        return;
+      }
+      if (mod && (e.key === 'y' || e.key === 'Y')) { e.preventDefault(); travel(1); return; }
+      if (typing) return;
+      if (e.key === ' ') { e.preventDefault(); setRunning(v=>!v); return; }
+      if (e.key === '.') { e.preventDefault(); stepOnce(); return; }
+      // The shortcut reference has no button any more; "?" still summons it.
+      if (e.key === '?') { e.preventDefault(); setShowHelp(true); return; }
+      if ((e.key === 'r' || e.key === 'R') && selection) {
+        const c = circuit.components.get(selection);
+        if (c) {
+          const order = ['right','down','left','up'];
+          circuit.setFacing(c.id, order[(order.indexOf(c.facing||'right')+1)%4]);
+          commit('rotate');
+        }
+        return;
+      }
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selection) {
+        e.preventDefault();
+        if (circuit.components.has(selection)) circuit.removeComponent(selection);
+        else if (circuit.wires.has(selection)) circuit.removeWire(selection);
+        setSelection(null); commit('delete');
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return ()=>window.removeEventListener('keydown', onKey);
+  },[selection, circuit, commit, travel, stepOnce, showHelp, showImport]);
+
+  /* ── Beamer+ slide config ───────────────────────────────────────────────
+     Beamer+ spreads the widget's node from the slide's config JSON onto
+     window.WIDGET_CONFIG (and re-sends it as a 'widget-config' message), so
+     any key an author writes there arrives here. Supported keys:
+
+       parts    [{name, equation}] or [{name, data}]  → palette parts
+       circuit  serialized circuit                    → what's on the board
+       hop      seconds per gate-to-gate hop          → 0.25 | 0.5 | 1 | 2
+       running  false to start halted
+
+     Objects may also be given as JSON strings, so the same keys work whether
+     they're authored by hand or typed into the editor's text fields.
+
+     Parts land in the palette for this deck only — they're deliberately not
+     written to the browser's saved-parts registry, so a slide can't quietly
+     add clutter to someone's local palette. They're registered *before* the
+     board circuit loads, since that circuit may place them. */
+  const configuredRef = useRef(false);
+  const applyConfig = useCallback((cfg)=>{
+    if (!cfg || configuredRef.current) return;
+    configuredRef.current = true;
+    const asObject = (v)=>{
+      if (!v) return null;
+      if (typeof v === 'object') return v;
+      try { return JSON.parse(String(v)); } catch { return null; }
+    };
+
+    if (cfg.running === false) setRunning(false);
+    const hopSec = typeof cfg.hop === 'string' ? parseFloat(cfg.hop) : cfg.hop;
+    const wanted = typeof cfg.hopMs === 'number' ? cfg.hopMs
+                 : (Number.isFinite(hopSec) ? hopSec*1000 : null);
+    if (wanted) {
+      // Snap to an offered rate so the toolbar's segmented control still
+      // shows which one is active.
+      const best = HOP_CHOICES.reduce((a,b)=>Math.abs(b.ms-wanted)<Math.abs(a.ms-wanted)?b:a);
+      setHopMs(best.ms);
+    }
+
+    const parts = asObject(cfg.parts) || [];
+    const added = [];
+    for (const p of (Array.isArray(parts) ? parts : [])) {
+      try {
+        let name = p.name, data = asObject(p.data || p.circuit);
+        if (!data && p.equation) {
+          const built = buildEquationCircuit(p.equation);
+          if (built.error) throw new Error(built.error);
+          data = built.data;
+          name = name || built.outputLabel;
+        }
+        if (!data || !name) throw new Error('needs a name plus either data or equation');
+        added.push(gates.registerCustomGate(name, data));
+      } catch (err) {
+        console.warn('[circuit] slide config: skipping part', p && p.name, '—', err.message);
+      }
+    }
+    if (added.length) setCustomKinds(prev=>[...new Set([...prev, ...added])]);
+
+    const board = asObject(cfg.circuit);
+    if (board && Array.isArray(board.components)) {
+      circuit.load(board);
+      circuit.resetSim();
+      hist.current = { stack:[JSON.stringify(circuit.serialize())], idx:0 };
+    }
+    refresh();
+  },[circuit, refresh]);
+  useEffect(()=>{ applyConfig(window.WIDGET_CONFIG); },[applyConfig]);
+
+  /* ── Beamer+ state protocol ─────────────────────────────────────────────
+     widget-set-state arrives after widget-config, so a circuit the presenter
+     saved into the deck's widget-states.json wins over the config's starting
+     circuit — the live state is the newer truth. */
+  useEffect(()=>{
+    const wid = (window.WIDGET_CONFIG || {}).id || 'circuit-sim';
+    const handler = (e)=>{
+      if (!e.data) return;
+      if (e.data.type === 'widget-config') {
+        applyConfig(e.data.config);
+      } else if (e.data.type === 'widget-get-state') {
+        window.parent.postMessage({ type:'widget-state', widgetId:wid, state:circuit.serialize() }, '*');
+      } else if (e.data.type === 'widget-set-state' && e.data.state) {
+        circuit.load(e.data.state);
+        circuit.resetSim();
+        hist.current = { stack:[JSON.stringify(circuit.serialize())], idx:0 };
+        refresh();
+      }
+    };
+    window.addEventListener('message', handler);
+    // Take over from the early buffer, then replay whatever it caught while
+    // React was still committing — in arrival order, so a saved state still
+    // lands after the config it should override.
+    window.__widgetAppReady = true;
+    const queued = window.__widgetInbox || [];
+    window.__widgetInbox = [];
+    for (const data of queued) handler({ data });
+    return ()=>{
+      window.removeEventListener('message', handler);
+      window.__widgetAppReady = false;
+    };
+  },[circuit, refresh, applyConfig]);
+
+  /* ── custom gates ─────────────────────────────────────────────────────── */
+  const onDeleteCustom = (kind)=>{
+    if (!confirm('Remove this part from the palette? Copies already on the canvas keep working.')) return;
+    removeFromCustomRegistry(kind.slice(7));
+    setCustomKinds(prev=>prev.filter(k=>k!==kind));
+  };
+  const registerCustom = (name, data)=>{
+    if (customKinds.includes('CUSTOM:'+name)) {
+      const cycle = findCustomCycle(name, data);
+      if (cycle) {
+        setImportErr(`"${name}" already exists and would depend on itself:\n${cycle.join(' → ')}`);
+        return false;
+      }
+    }
+    let kind;
+    try { kind = gates.registerCustomGate(name, data); }
+    catch (err) { setImportErr('Could not build that part: ' + err.message); return false; }
+    upsertCustomRegistry(name, data);
+    setCustomKinds(prev=>prev.includes(kind) ? prev : [...prev, kind]);
+    return true;
+  };
+
+  // Builds a small circuit from a "Y = A·B + C'" style equation in a private
+  // off-canvas instance, so it can be registered directly as a part.
+  const buildEquationCircuit = (eqStr)=>{
+    const eq = eqStr.trim();
+    const match = /^([A-Za-z])\s*=\s*(.+)$/.exec(eq);
+    if (!match) return { error:"Enter an equation like  Y = A B + C'" };
+    const outputLabel = match[1], rhs = match[2];
+    const literalLabels = [...new Set(rhs.match(/[A-Za-z]/g) || [])].filter(l=>l!==outputLabel);
+    if (!literalLabels.length) return { error:'No input variables found on the right-hand side' };
+
+    const temp = createCircuit();
+    const labelsToComps = new Map();
+    literalLabels.forEach((label,idx)=>{
+      labelsToComps.set(label, temp.addComponent('INPUT', 0, idx*60, 'right', 0, label));
+    });
+    const outputComp = temp.addComponent('OUTPUT', 400, 0, 'right', 0, outputLabel);
+    let numAnds=0, numNots=0;
+    const pinRef = (comp,pin=0)=>({ compId:comp.id, pin, type:'out' });
+    const inRef  = (comp,pin=0)=>({ compId:comp.id, pin, type:'in' });
+    const parseLiteral = (literal)=>{
+      const comp = labelsToComps.get(literal[0]);
+      if (!comp) throw new Error('Unknown input ' + literal[0]);
+      if (literal.endsWith("'")) {
+        const n = temp.addComponent('NOT', 100, (numNots++)*70);
+        temp.addWire(pinRef(comp), inRef(n));
+        return pinRef(n);
+      }
+      return pinRef(comp);
+    };
+    const andTerm = (term)=>{
+      const literals = term.match(/[A-Za-z]'?/g) || [];
+      if (!literals.length) return null;
+      let cur = parseLiteral(literals[0]);
+      for (let i=1;i<literals.length;i++) {
+        const next = parseLiteral(literals[i]);
+        const a = temp.addComponent('AND', 200, (numAnds++)*70);
+        temp.addWire(cur, inRef(a,0));
+        temp.addWire(next, inRef(a,1));
+        cur = pinRef(a);
+      }
+      return cur;
+    };
+    const orTerms = rhs.split('+').map(t=>t.trim()).filter(Boolean);
+    if (!orTerms.length) return { error:'No terms found in the equation' };
+    try {
+      let src = andTerm(orTerms[0]);
+      for (let i=1;i<orTerms.length;i++) {
+        const next = andTerm(orTerms[i]);
+        const o = temp.addComponent('OR', 300, i*70);
+        temp.addWire(src, inRef(o,0));
+        temp.addWire(next, inRef(o,1));
+        src = pinRef(o);
+      }
+      temp.addWire(src, inRef(outputComp,0));
+    } catch (err) { return { error: err.message }; }
+    return { outputLabel, data: temp.serialize() };
+  };
+
+  const closeImport = ()=>{
+    setShowImport(false); setImportStep('choose');
+    setImportName(''); setImportEquation(''); setImportJsonText(''); setImportErr('');
+  };
+  const createFromEquation = ()=>{
+    setImportErr('');
+    const built = buildEquationCircuit(importEquation);
+    if (built.error) { setImportErr(built.error); return; }
+    if (registerCustom(importName.trim() || built.outputLabel, built.data)) closeImport();
+  };
+  const createFromJson = ()=>{
+    setImportErr('');
+    let parsed;
+    try { parsed = JSON.parse(importJsonText); }
+    catch { setImportErr("That doesn't look like valid JSON."); return; }
+    const data = parsed.data || parsed;
+    if (!data || !Array.isArray(data.components)) { setImportErr("That JSON doesn't look like a circuit."); return; }
+    // Same rule as building from the canvas — check it on a throwaway copy.
+    const probe = createCircuit();
+    try { probe.load(data); } catch { setImportErr("That circuit couldn't be loaded."); return; }
+    const loose = describeDanglingInputs(probe);
+    if (loose) { setImportErr(loose); return; }
+    const name = importName.trim() || parsed.name || `Part ${customKinds.length+1}`;
+    if (registerCustom(name, data)) closeImport();
+  };
+  const createFromCanvas = ()=>{
+    setImportErr('');
+    const data = circuit.serialize();
+    const ios = data.components.filter(c=>c.kind==='INPUT'||c.kind==='OUTPUT');
+    if (!ios.some(c=>c.kind==='INPUT') || !ios.some(c=>c.kind==='OUTPUT')) {
+      setImportErr('The canvas needs at least one IN and one OUT to become a part —\nthose are what turn into its pins.');
+      return;
+    }
+    const loose = describeDanglingInputs(circuit);
+    if (loose) { setImportErr(loose); return; }
+    const name = importName.trim();
+    if (!name) { setImportErr('Give the part a name.'); return; }
+    if (registerCustom(name, data)) closeImport();
+  };
+  const onJsonFile = (e)=>{
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      setImportJsonText(String(reader.result));
+      try {
+        const parsed = JSON.parse(String(reader.result));
+        if (parsed.name && !importName.trim()) setImportName(parsed.name);
+      } catch {}
+    };
+    reader.readAsText(file);
+  };
+
+  const exportJson = ()=>{
+    const blob = new Blob([JSON.stringify(circuit.serialize(), null, 2)], { type:'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'circuit.json';
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+  };
+  // The board as a one-page PDF, laid out like the other Beamer+ exports.
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const exportPdf = async ()=>{
+    const svg = viewApi.current?.svg?.();
+    if (!svg || pdfBusy) return;
+    setPdfBusy(true);
+    try {
+      await window.CircuitPdf.download(svg, { title:'Circuit' }, 'circuit.pdf');
+    } catch (err) {
+      console.error('[circuit] PDF export failed', err);
+      alert('The PDF could not be made: ' + err.message);
+    } finally {
+      setPdfBusy(false);
+    }
+  };
+  const importFileRef = useRef(null);
+  const importCircuitFile = (e)=>{
+    const file = e.target.files?.[0];
+    e.target.value = ''; // so picking the same file twice still fires onChange
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      let parsed;
+      try { parsed = JSON.parse(String(reader.result)); }
+      catch { alert("That doesn't look like valid JSON."); return; }
+      // Exported files are the raw serialize() shape; tolerate a stray
+      // {name, data} wrapper too, since that's what a custom-part JSON
+      // (the other place this app writes JSON) looks like.
+      const data = Array.isArray(parsed?.components) ? parsed : parsed?.data;
+      if (!data || !Array.isArray(data.components)) { alert("That JSON doesn't look like a circuit export."); return; }
+      const probe = createCircuit();
+      try { probe.load(data); } catch { alert("That circuit couldn't be loaded."); return; }
+      if (circuit.components.size > 0 &&
+          !confirm('Importing replaces everything currently on the canvas. Continue?')) return;
+      circuit.load(data);
+      circuit.resetSim();
+      setSelection(null);
+      commit('import');
+      viewApi.current?.fit?.();
+    };
+    reader.readAsText(file);
+  };
+  const placeFromPalette = (kind)=>{
+    const vis = gates.GATE_VIS[kind];
+    const c0 = viewApi.current?.centerWorld?.() || { x:120, y:120 };
+    const g = (v)=>Math.round(v/engine.GRID)*engine.GRID;
+    const c = circuit.addComponent(kind, g(c0.x - (vis?.w||80)/2), g(c0.y - (vis?.h||80)/2));
+    setSelection(c.id);
+    commit('add '+kind);
+  };
+
+  const compCount = circuit.components.size;
+  // Surfaced live in the "new part" dialog so the block is refused before the
+  // click, not after it.
+  const danglingReport = (showImport && importStep === 'canvas') ? describeDanglingInputs(circuit) : null;
+
+  return <div className="app">
+    {/* ── toolbar ── rendered into the static bar above the root */}
+    {ReactDOM.createPortal(<>
+      <div className="tb-group" title="Propagation time for one gate-to-gate hop">
+        <div className="seg">
+          {HOP_CHOICES.map(h=>(
+            <button key={h.ms} className={'seg-btn'+(hopMs===h.ms?' on':'')}
+                    onClick={()=>setHopMs(h.ms)}>{h.label}</button>
+          ))}
+        </div>
+      </div>
+      {/* The clock read-out doubles as the run/halt control, so pausing stays
+          reachable without a dedicated transport button. */}
+      <button className={'tb-clock'+(running?'':' paused')} onClick={()=>setRunning(v=>!v)}
+              title={running ? 'Halt (Space) · time advances while running' : 'Run (Space) · halted'}>
+        <i/><span>t</span><b>{(simTime/1000).toFixed(2)}s</b>
+      </button>
+      <button className="bw-btn bw-btn--icon" onClick={resetSim} title="Reset signals to cold start">{I.reset}</button>
+      {selection && canvas.cardKindFor(circuit, selection) && <><div className="bw-sep"/>
+        <SelectionPanel circuit={circuit} selection={selection}
+                        onChange={refresh} onCommit={commit} onSelect={setSelection}/>
+      </>}
+      <div className="bw-spacer"/>
+      <div className="tb-group">
+        <button className="bw-btn bw-btn--icon" onClick={()=>viewApi.current?.zoomBy(1/1.25)} title="Zoom out">{I.zout}</button>
+        <span className="zoom-val">{Math.round(zoom*100)}%</span>
+        <button className="bw-btn bw-btn--icon" onClick={()=>viewApi.current?.zoomBy(1.25)} title="Zoom in">{I.zin}</button>
+        <button className="bw-btn bw-btn--icon" onClick={()=>viewApi.current?.fit()} title="Fit circuit to view">{I.fit}</button>
+      </div>
+      <div className="bw-sep"/>
+      <div className="tb-group" title="How multi-bit bus values are displayed">
+        <div className="seg">
+          {[['bin','BIN'],['dec','DEC'],['hex','HEX']].map(([v,l])=>(
+            <button key={v} className={'seg-btn'+(numFormat===v?' on':'')}
+                    onClick={()=>setNumFormat(v)}>{l}</button>
+          ))}
+        </div>
+      </div>
+      <div className="bw-sep"/>
+      <div className="tb-group">
+        <button className="bw-btn" onClick={()=>importFileRef.current?.click()} title="Load a circuit from a JSON file">{I.load}<span className="bl">Import</span></button>
+        <button className="bw-btn" onClick={exportJson} title="Download this circuit as JSON">{I.save}<span className="bl">Export</span></button>
+        <button className="bw-btn" onClick={exportPdf} disabled={pdfBusy || !compCount}
+                title={compCount ? 'Download the board as a PDF' : 'Nothing on the board yet'}>
+          {I.pdf}<span className="bl">{pdfBusy ? 'PDF…' : 'PDF'}</span>
+        </button>
+        <input ref={importFileRef} type="file" accept="application/json,.json" onChange={importCircuitFile} hidden/>
+      </div>
+    </>, document.getElementById('tb-slot'))}
+
+    {/* ── body ── */}
+    <div className="main">
+      <Palette onDragStart={kind=>setPalDrag({kind})}
+               onPlace={placeFromPalette}
+               onImportClick={()=>setShowImport(true)}
+               onDeleteCustom={onDeleteCustom}
+               customKinds={customKinds}/>
+      <div className="canvas-wrap">
+        <Canvas circuit={circuit}
+                selection={selection}
+                onSelect={setSelection}
+                paletteDrag={palDrag}
+                onClearPaletteDrag={()=>setPalDrag(null)}
+                onChange={refresh}
+                onCommit={commit}
+                viewApi={viewApi}
+                onViewChange={v=>setZoom(z=>z===v.zoom?z:v.zoom)}/>
+        {!compCount && !palDrag && <div className="empty-hint"><div className="empty-card">
+          <h3>Empty board</h3>
+          <p>Drag a part in from the left — or click it to drop one in the middle.
+             Then click one pin and the next to wire them together.</p>
+        </div></div>}
+      </div>
+    </div>
+
+    {showHelp && <Dialog title="Wiring & shortcuts"
+        sub={`Every gate-to-gate hop costs the same ${(hopMs/1000).toFixed(2)}s, however the wires are drawn — a three-gate chain lands three hops after its source.`}
+        onClose={()=>setShowHelp(false)}>
+      <div className="dialog-section-title">Drawing wires</div>
+      <ul className="hint-list">
+        <li><kbd className="key">click</kbd><span>a pin to start — either end works</span></li>
+        <li><kbd className="key">click</kbd><span>empty space to drop a corner</span></li>
+        <li><kbd className="key">drag</kbd><span>off an existing wire to branch from it</span></li>
+        <li><kbd className="key">⌫</kbd><span>undo the last corner</span></li>
+        <li><kbd className="key">Esc</kbd><span>cancel the wire in progress</span></li>
+      </ul>
+      <div className="dialog-section-title">Keys</div>
+      <div className="hint-cols">
+        <ul className="hint-list">
+          <li><kbd className="key">Space</kbd><span>run / halt</span></li>
+          <li><kbd className="key">.</kbd><span>one hop</span></li>
+          <li><kbd className="key">R</kbd><span>rotate</span></li>
+        </ul>
+        <ul className="hint-list">
+          <li><kbd className="key">Del</kbd><span>delete</span></li>
+          <li><kbd className="key">⌘Z</kbd><span>undo</span></li>
+          <li><kbd className="key">?</kbd><span>this list</span></li>
+        </ul>
+      </div>
+      <div className="dialog-section-title">Board</div>
+      <ul className="hint-list">
+        <li><kbd className="key">knob</kbd><span>click a switch’s knob to flip it, a clock’s pad to run or halt it</span></li>
+        <li><kbd className="key">body</kbd><span>click the rest of a part to select and configure it</span></li>
+        <li><kbd className="key">scroll</kbd><span>zoom · drag empty space to pan</span></li>
+        <li><kbd className="key">right-click</kbd><span>delete a part or a wire outright</span></li>
+      </ul>
+      <div className="dialog-actions">
+        <button className="btn primary" onClick={()=>setShowHelp(false)}>Got it</button>
+      </div>
+    </Dialog>}
+
+    {showImport && <Dialog title="New part"
+        sub="Bundle logic into a reusable block that behaves as a single hop."
+        onClose={closeImport}>
+      {importStep === 'choose' && <>
+        <div className="import-choices">
+          <button className="import-choice" onClick={()=>setImportStep('canvas')}>
+            <div className="import-choice-title">From what’s on the canvas</div>
+            <div className="import-choice-sub">Its IN and OUT components become the part’s pins</div>
+          </button>
+          <button className="import-choice" onClick={()=>setImportStep('equation')}>
+            <div className="import-choice-title">From a Boolean equation</div>
+            <div className="import-choice-sub">Something like  Y = A B + C'</div>
+          </button>
+          <button className="import-choice" onClick={()=>setImportStep('json')}>
+            <div className="import-choice-title">From a saved circuit</div>
+            <div className="import-choice-sub">Paste or upload exported JSON</div>
+          </button>
+        </div>
+        <div className="dialog-actions"><button className="btn ghost" onClick={closeImport}>Cancel</button></div>
+      </>}
+
+      {importStep === 'canvas' && <>
+        <div className="dialog-section-title">Part name</div>
+        <input className="text-input" placeholder="e.g. Half adder" value={importName} autoFocus
+               onChange={e=>setImportName(e.target.value)}
+               onKeyDown={e=>e.key==='Enter'&&createFromCanvas()}/>
+        <p className="sel-note" style={{marginTop:9,fontSize:11.5}}>
+          {circuit.components.size} components will be captured. The canvas itself is left alone.
+        </p>
+        {danglingReport && <div className="import-error">{danglingReport}</div>}
+        {importErr && importErr !== danglingReport && <div className="import-error">{importErr}</div>}
+        <div className="dialog-actions">
+          <button className="btn ghost" onClick={()=>{ setImportStep('choose'); setImportErr(''); }}>Back</button>
+          <button className="btn primary" disabled={!!danglingReport} onClick={createFromCanvas}>Create part</button>
+        </div>
+      </>}
+
+      {importStep === 'equation' && <>
+        <div className="dialog-section-title">Equation</div>
+        <input className="text-input" placeholder="Y = A B + C'" value={importEquation} autoFocus
+               onChange={e=>setImportEquation(e.target.value)}
+               onKeyDown={e=>e.key==='Enter'&&createFromEquation()}/>
+        <div className="dialog-section-title">Name (optional)</div>
+        <input className="text-input" placeholder="defaults to the output label" value={importName}
+               onChange={e=>setImportName(e.target.value)}
+               onKeyDown={e=>e.key==='Enter'&&createFromEquation()}/>
+        {importErr && <div className="import-error">{importErr}</div>}
+        <div className="dialog-actions">
+          <button className="btn ghost" onClick={()=>{ setImportStep('choose'); setImportErr(''); }}>Back</button>
+          <button className="btn primary" onClick={createFromEquation}>Create part</button>
+        </div>
+      </>}
+
+      {importStep === 'json' && <>
+        <div className="dialog-section-title">Circuit JSON</div>
+        <textarea className="text-input json-input" rows={6} placeholder='{"components":[…],"wires":[…]}'
+                  value={importJsonText} onChange={e=>setImportJsonText(e.target.value)}/>
+        <label className="btn ghost file-btn">
+          Choose a .json file…
+          <input type="file" accept="application/json,.json" onChange={onJsonFile} hidden/>
+        </label>
+        <div className="dialog-section-title">Name (optional)</div>
+        <input className="text-input" placeholder="defaults to the file’s name" value={importName}
+               onChange={e=>setImportName(e.target.value)}/>
+        {importErr && <div className="import-error">{importErr}</div>}
+        <div className="dialog-actions">
+          <button className="btn ghost" onClick={()=>{ setImportStep('choose'); setImportErr(''); }}>Back</button>
+          <button className="btn primary" onClick={createFromJson}>Create part</button>
+        </div>
+      </>}
+    </Dialog>}
+  </div>;
+}
+
+function Dialog({ title, sub, children, onClose }) {
+  return <div className="modal-bg" onMouseDown={onClose}>
+    <div className="modal" onMouseDown={e=>e.stopPropagation()}>
+      <div className="modal-title">{title}</div>
+      {sub && <div className="modal-sub">{sub}</div>}
+      {children}
+    </div>
+  </div>;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+});
+</script>
+</body>
+</html>
