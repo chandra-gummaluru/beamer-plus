@@ -228,7 +228,7 @@ async function load() {
       showCard('error-card'); return;
     }
     const data = await res.json();
-    if (data.closed) { showCard('closed-card'); return; }
+    if (data.active === false) { showCard('closed-card'); return; }
     document.getElementById('question-text').textContent = data.question || 'Please select an option:';
     renderOptions(data.options || []);
     document.getElementById('loading-area').style.display = 'none';

@@ -6,17 +6,45 @@
   "label": "Audience Response",
   "category": "Audience Response",
   "fields": [
-    { "key": "responseType", "label": "Question type", "type": "select",
-      "options": [ { "v": "choice", "l": "Multiple choice" }, { "v": "open", "l": "Open-ended" } ],
-      "default": "choice" },
+    { "key": "responseType", "label": "Question type", "type": "select", "default": "choice",
+      "options": [ { "v": "choice",    "l": "Multiple choice" },
+                   { "v": "truefalse", "l": "True / False" },
+                   { "v": "rating",    "l": "Rating scale" },
+                   { "v": "numeric",   "l": "Numeric estimate" },
+                   { "v": "wordcloud", "l": "Word cloud" },
+                   { "v": "open",      "l": "Open-ended" } ] },
     { "key": "question", "label": "Question", "type": "textarea", "rows": 3,
       "placeholder": "Enter the question…" },
+
     { "key": "options", "label": "Answer options (one per line)", "type": "textarea-lines", "rows": 4,
       "placeholder": "Option A\nOption B\nOption C", "showIf": { "responseType": "choice" } },
     { "key": "correctAnswer", "label": "Correct option (1-based, blank = none)", "type": "number-nullable",
       "min": 1, "step": 1, "showIf": { "responseType": "choice" } },
+
+    { "key": "correctTF", "label": "Correct answer", "type": "select", "default": "",
+      "options": [ { "v": "", "l": "None" }, { "v": "true", "l": "True" }, { "v": "false", "l": "False" } ],
+      "showIf": { "responseType": "truefalse" } },
+
+    { "key": "ratingMax", "label": "Scale", "type": "select", "default": "5",
+      "options": [ { "v": "5", "l": "1 – 5" }, { "v": "7", "l": "1 – 7" }, { "v": "10", "l": "1 – 10" } ],
+      "showIf": { "responseType": "rating" } },
+    { "key": "ratingLow",  "label": "Label for the low end",  "type": "text", "placeholder": "Strongly disagree",
+      "showIf": { "responseType": "rating" } },
+    { "key": "ratingHigh", "label": "Label for the high end", "type": "text", "placeholder": "Strongly agree",
+      "showIf": { "responseType": "rating" } },
+
+    { "key": "numericAnswer", "label": "Actual value (revealed on click, optional)", "type": "number-nullable",
+      "showIf": { "responseType": "numeric" } },
+    { "key": "numericUnit", "label": "Unit (optional)", "type": "text", "placeholder": "ms",
+      "showIf": { "responseType": "numeric" } },
+
+    { "key": "wordsPerResponse", "label": "Each response counts as", "type": "select", "default": "1",
+      "options": [ { "v": "1", "l": "One word" }, { "v": "2", "l": "Up to two words" }, { "v": "3", "l": "Up to three words" } ],
+      "showIf": { "responseType": "wordcloud" } },
+
     { "key": "autoStart", "label": "Start collecting when the slide opens", "type": "checkbox", "default": true },
     { "key": "showLiveResults", "label": "Show results while collecting", "type": "checkbox", "default": false },
+
     { "key": "minResponses", "label": "Min. responses before closing", "type": "number",
       "min": 1, "step": 1, "default": 1, "showIf": { "responseType": "open" } },
     { "key": "model", "label": "AI model for summaries", "type": "ai-model", "showIf": { "responseType": "open" } },
@@ -24,6 +52,7 @@
       "min": 1, "step": 1, "default": 3, "showIf": { "responseType": "open" } },
     { "key": "apiKey", "label": "API key", "type": "password", "placeholder": "Paste API key…",
       "showIf": { "responseType": "open" } },
+
     { "key": "scale", "label": "Text size", "type": "select", "options": ["1", "1.4", "1.8", "2.2"], "default": "1.4" }
   ]
 }
@@ -62,8 +91,9 @@
 <style>
 /* Tokens, reset, toolbar, buttons, cards, banners and the spinner come from
    the shared widget base (static/css/widget-base.css). What's left here is the
-   poll itself: the question, the answer rows that double as result bars, the
-   join panel, the response wall, the spotlight and the AI summary card.
+   poll itself: the question, the join panel, and one results view per
+   question type — answer bars, a column chart (rating and numeric share it),
+   a word cloud, a response wall with its spotlight, and the AI summary card.
 
    Everything the room reads is sized off --u, so the host's text-size control
    grows the results without inflating the toolbar. */
@@ -95,8 +125,8 @@
   gap: calc(14px * var(--u));
   padding-bottom: 6%;           /* bias slightly above true centre */
 }
-/* The wall and a long answer list want the top edge, not the middle. */
-#stage.is-wall #prompt { justify-content: flex-start; padding-bottom: 0; }
+/* Views that fill the space want the top edge, not the middle. */
+#stage.is-fill #prompt { justify-content: flex-start; padding-bottom: calc(6px * var(--u)); }
 
 #kicker { display: flex; align-items: center; gap: 10px; }
 #kicker-meta:not(:empty)::before { content: '·'; margin-right: 10px; }
@@ -110,16 +140,45 @@
   overflow-wrap: anywhere;
 }
 /* Once there is data to look at, the question steps back a size. */
-#stage.is-results #question,
-#stage.is-wall #question { font-size: var(--fs-lead); }
-
+#stage.is-data #question { font-size: var(--fs-lead); }
 #banner { display: none; }
-#notice { display: none; }
 
-/* ── Answer rows (and result bars) ──────────────────── */
+/* Every results view starts hidden; render() shows the one that applies. */
+#choices, #chart, #stats, #cloud, #wall, #summary { display: none; }
+
+/* ── Preview (not configured yet) ───────────────────── */
+/* Sample data, faded, so the presenter sees the finished layout before
+   typing anything — rather than a bare instruction on an empty slide. */
+#stage.is-preview #prompt,
+#stage.is-preview #join { opacity: 0.38; filter: grayscale(1); pointer-events: none; user-select: none; }
+#preview-tag {
+  position: absolute;
+  left: 50%;
+  bottom: calc(18px * var(--u));
+  transform: translateX(-50%);
+  z-index: 4;
+  display: none;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100% - 32px);
+  padding: 8px 8px 8px 14px;
+  background: var(--bg);
+  border: 1px solid var(--border-med);
+  border-radius: 999px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
+  font-size: var(--fs-chrome);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+#preview-tag .bw-hint { color: var(--text); }
+#preview-msg { overflow: hidden; text-overflow: ellipsis; }
+#stage.is-preview #preview-tag { display: flex; }
+#stage.is-preview { padding-bottom: calc(18px * var(--u) + 56px); }
+#preview-open { height: 26px; border-radius: 999px; }
+
+/* ── Answer rows (choice, true/false) ───────────────── */
 #choices {
   list-style: none;
-  display: flex;
   flex-direction: column;
   gap: calc(8px * var(--u));
   min-height: 0;
@@ -153,7 +212,6 @@
 .badge svg { width: 58%; height: 58%; }
 .choice-body { min-width: 0; }
 .choice-label { font-size: var(--fs-body); line-height: 1.35; color: var(--text); overflow-wrap: anywhere; }
-
 .track {
   height: calc(9px * var(--u));
   margin-top: calc(7px * var(--u));
@@ -196,6 +254,11 @@
 #choices.show-results .track  { display: block; }
 #choices.show-results .figure { display: flex; }
 
+/* True / False: two big tiles side by side instead of a list. */
+#choices.is-tf { flex-direction: row; gap: calc(12px * var(--u)); }
+#choices.is-tf .choice { flex: 1; padding: calc(16px * var(--u)) calc(18px * var(--u)); }
+#choices.is-tf .choice-label { font-size: var(--fs-lead); font-weight: 500; }
+
 /* Leader(s): full ink. Ties all lead. */
 .choice.is-lead { border-color: var(--border-med); background: var(--bg); }
 .choice.is-lead .fill  { background: var(--text); }
@@ -211,56 +274,143 @@
 .choice.is-correct .pct   { color: var(--ok); }
 .choice.is-dim { opacity: 0.45; }
 
-/* ── Join panel ─────────────────────────────────────── */
-#join {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: calc(10px * var(--u));
-  padding-bottom: 6%;
-  min-height: 0;
+/* ── Headline numbers (rating, numeric) ─────────────── */
+#stats {
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: calc(10px * var(--u)) calc(34px * var(--u));
 }
-#qr-wrap {
-  /* Stays white in dark mode too — a QR code has to keep its contrast to scan. */
-  width: min(38vh, 30vw, 300px);
-  padding: 10px;
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  line-height: 0;
-}
-#qr img, #qr canvas { width: 100% !important; height: auto !important; }
-#join-url {
-  font-family: var(--font-mono);
-  font-size: var(--fs-chrome-sm);
-  color: var(--text-3);
-  text-align: center;
-  max-width: min(38vh, 30vw, 300px);
-  word-break: break-all;
-  cursor: pointer;
-  padding: 3px 8px;
-  border-radius: 4px;
-  transition: color var(--dur), background var(--dur);
-}
-#join-url:hover { background: var(--bg-subtle); color: var(--text-2); }
-#tally { display: flex; align-items: baseline; gap: 8px; margin-top: 4px; }
-#tally-n {
+.stat { display: flex; flex-direction: column; gap: 4px; }
+.stat-v {
   font-family: var(--font-mono);
   font-size: var(--fs-head);
   font-weight: 600;
   line-height: 1;
   font-variant-numeric: tabular-nums;
   color: var(--text);
-  display: inline-block;
+  white-space: nowrap;
 }
-#tally-n.bump { animation: ar-bump 0.35s ease-out; }
+.stat-v small { font-size: 0.5em; font-weight: 500; color: var(--text-3); margin-left: 4px; }
+.stat.is-minor .stat-v { font-size: var(--fs-lead); color: var(--text-2); }
+.stat.is-answer .stat-v { color: var(--ok); }
+
+/* ── Column chart (rating, numeric) ─────────────────── */
+#chart {
+  flex: 1 1 auto;
+  min-height: calc(110px * var(--u));
+  flex-direction: column;
+}
+.hist-plot {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  gap: calc(6px * var(--u));
+  border-bottom: 1px solid var(--border-med);
+}
+.hcol { position: relative; flex: 1 1 0; min-width: 0; }
+.hbar {
+  position: absolute;
+  left: 8%; right: 8%; bottom: 0;
+  height: 0;
+  max-width: calc(80px * var(--u));
+  margin: 0 auto;
+  background: var(--text-3);
+  border-radius: 5px 5px 1px 1px;
+  transition: height 0.7s cubic-bezier(.22, 1, .36, 1), background 0.2s;
+}
+.hn {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  font-weight: 600;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  transition: bottom 0.7s cubic-bezier(.22, 1, .36, 1);
+}
+.hcol.is-top .hbar { background: var(--text); }
+.hcol.is-top .hn   { color: var(--text); }
+.hcol.is-hit .hbar { background: var(--ok); }
+/* Numeric bins are labelled by their lower edge, so the label sits under it. */
+#chart.is-edges .hlab { text-align: left; }
+.hist-axis { display: flex; gap: calc(6px * var(--u)); padding-top: calc(6px * var(--u)); }
+.hlab {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.hist-ends {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: calc(4px * var(--u));
+  font-size: var(--fs-small);
+  color: var(--text-3);
+}
+.hist-ends:empty { display: none; }
+/* The actual value, dropped onto the histogram when revealed. */
+.marker {
+  position: absolute;
+  top: 0; bottom: -1px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--ok);
+  display: none;
+}
+.marker span {
+  position: absolute;
+  top: 0;
+  left: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--ok);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: var(--fs-chrome-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.marker.flip span { left: auto; right: 6px; }
+
+/* ── Word cloud ─────────────────────────────────────── */
+#cloud {
+  flex: 1 1 auto;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 0 4% 3%;
+}
+#cloud-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: calc(4px * var(--u) * var(--ck, 1)) calc(18px * var(--u) * var(--ck, 1));
+  max-width: 100%;
+}
+.word {
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  white-space: nowrap;
+  transition: opacity 0.3s;    /* not font-size: the fit loop measures sizes synchronously */
+}
+.word.is-new { animation: ar-pop 0.45s cubic-bezier(.22, 1, .36, 1); }
+#cloud-empty { display: none; margin: auto; }
 
 /* ── Response wall (open-ended) ─────────────────────── */
 #wall {
   flex: 1 1 auto;
   min-height: 0;
-  display: none;
   flex-wrap: wrap;
   align-content: flex-start;
   justify-content: center;
@@ -345,7 +495,6 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
 #summary {
   flex: 1 1 auto;
   min-height: 0;
-  display: none;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -378,28 +527,79 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
 #sum-dots span.is-on { background: var(--text); transform: scale(1.2); }
 #sum-busy { display: none; }
 
+/* ── Join panel ─────────────────────────────────────── */
+#join {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(10px * var(--u));
+  padding-bottom: 6%;
+  min-height: 0;
+}
+#qr-wrap {
+  /* Stays white in dark mode too — a QR code has to keep its contrast to scan. */
+  width: min(38vh, 30vw, 300px);
+  padding: 10px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  line-height: 0;
+}
+#qr img, #qr canvas { width: 100% !important; height: auto !important; }
+/* The preview draws a stand-in code, so the panel keeps its real proportions. */
+#qr-fake {
+  display: none;
+  aspect-ratio: 1;
+  background:
+    repeating-linear-gradient(90deg, #1a1a18 0 8%, transparent 8% 14%),
+    repeating-linear-gradient(0deg,  #1a1a18 0 8%, transparent 8% 17%);
+  opacity: 0.55;
+}
+#join-url {
+  font-family: var(--font-mono);
+  font-size: var(--fs-chrome-sm);
+  color: var(--text-3);
+  text-align: center;
+  max-width: min(38vh, 30vw, 300px);
+  word-break: break-all;
+  cursor: pointer;
+  padding: 3px 8px;
+  border-radius: 4px;
+  transition: color var(--dur), background var(--dur);
+}
+#join-url:hover { background: var(--bg-subtle); color: var(--text-2); }
+#tally { display: flex; align-items: baseline; gap: 8px; margin-top: 4px; }
+#tally-n {
+  font-family: var(--font-mono);
+  font-size: var(--fs-head);
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  display: inline-block;
+}
+#tally-n.bump { animation: ar-bump 0.35s ease-out; }
+
 /* ── Motion ─────────────────────────────────────────── */
 @keyframes ar-in   { from { opacity: 0; transform: translateY(8px) scale(0.97); } }
+@keyframes ar-pop  { from { opacity: 0; transform: scale(0.6); } }
 @keyframes ar-fade { from { opacity: 0; } }
 @keyframes ar-bump { 40% { transform: scale(1.18); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .fill, .meter-fill, .choice { transition: none; }
-  .resp.is-new, #spot.is-open, #tally-n.bump { animation: none; }
+  .fill, .meter-fill, .choice, .hbar, .hn { transition: none; }
+  .resp.is-new, .word.is-new, #spot.is-open, #tally-n.bump { animation: none; }
 }
 
 /* ── Narrow or tall regions: stack, join panel becomes a strip ─ */
 @media (max-width: 620px), (max-aspect-ratio: 1/1) {
   #stage { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; gap: 14px; }
-  #join {
-    flex-direction: row;
-    flex-wrap: wrap;
-    padding-bottom: 0;
-    gap: 12px;
-  }
+  #join { flex-direction: row; flex-wrap: wrap; padding-bottom: 0; gap: 12px; }
   #qr-wrap { width: min(22vh, 40vw, 180px); padding: 6px; }
   /* No room for the caption and link beside a small QR; the code is enough. */
   #join > .bw-hint:first-child, #join-url { display: none; }
+  #choices.is-tf { flex-direction: column; }
 }
 
 /* Scrollbars: hairline, never louder than the content. */
@@ -432,8 +632,14 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
       <div id="banner" class="bw-banner bw-banner--error"></div>
       <div id="kicker"><span class="bw-hint" id="kicker-text">Multiple choice</span><span class="bw-hint" id="kicker-meta"></span></div>
       <div id="question" class="bw-md"></div>
-      <div id="notice" class="bw-empty"></div>
+      <div id="stats"></div>
       <ol id="choices"></ol>
+      <div id="chart">
+        <div class="hist-plot" id="hist-plot"><div class="marker" id="marker"><span id="marker-label"></span></div></div>
+        <div class="hist-axis" id="hist-axis"></div>
+        <div class="hist-ends" id="hist-ends"></div>
+      </div>
+      <div id="cloud"><div id="cloud-inner"></div><div id="cloud-empty" class="bw-empty">Words will appear here.</div></div>
       <div id="wall"><div id="wall-empty" class="bw-empty">Responses will appear here.</div></div>
       <div id="summary">
         <div id="sum-busy" class="bw-center"><div class="bw-spinner"></div><div class="bw-boot-sub">Summarising responses…</div></div>
@@ -452,10 +658,16 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
 
     <aside id="join">
       <div class="bw-hint">Scan to respond</div>
-      <div id="qr-wrap"><div id="qr"></div></div>
+      <div id="qr-wrap"><div id="qr"></div><div id="qr-fake"></div></div>
       <div id="join-url" title="Click to copy"></div>
       <div id="tally"><span id="tally-n">0</span><span class="bw-hint" id="tally-label">responses</span></div>
     </aside>
+
+    <div id="preview-tag">
+      <span class="bw-hint">Preview</span>
+      <span id="preview-msg">Sample data — add a question in the settings to start.</span>
+      <button class="bw-btn" id="preview-open">Open settings</button>
+    </div>
 
     <div id="spot">
       <div id="spot-card">
@@ -487,69 +699,103 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
 
   const LETTERS  = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   const letter   = i => LETTERS[i] || String(i + 1);
-  const MAX_SYNC = 400;     // response groups carried to viewers / saved with the deck
   const POLL_MS  = 3000;
+  const CAP      = { groups: 400, nums: 2000, words: 150 };   // what travels to viewers / the deck
+
+  const TYPES = {
+    choice:    { title: 'Multiple Choice',  kicker: 'Multiple choice' },
+    truefalse: { title: 'True or False',    kicker: 'True or false' },
+    rating:    { title: 'Rating Scale',     kicker: 'Rating' },
+    numeric:   { title: 'Numeric Estimate', kicker: 'Estimate' },
+    wordcloud: { title: 'Word Cloud',       kicker: 'Word cloud' },
+    open:      { title: 'Open Response',    kicker: 'Open question' },
+  };
+  const isChoiceLike = t => t === 'choice' || t === 'truefalse';
 
   const CHECK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>';
 
+  const STOP = new Set(('the a an is are was were be been being it in on at to of and or but for with this that ' +
+    'these those i we you he she they my your our its not so if as by do did has have had will would can ' +
+    'could should may might shall very just also up out about than then there here what which who how when where')
+    .split(' '));
+
   // ── DOM ─────────────────────────────────────────────────────────────────────
   const $ = id => document.getElementById(id);
-  const stage      = $('stage');
-  const titleEl    = $('wtitle');
-  const dotEl      = $('dot');
-  const statusText = $('status-text');
-  const viewerBadge= $('viewer-badge');
-  const liveBtn    = $('live-btn');
-  const viewSeg    = $('view-seg');
-  const viewWall   = $('view-wall');
-  const viewSum    = $('view-summary');
-  const primaryBtn = $('primary-btn');
-  const bannerEl   = $('banner');
-  const kickerText = $('kicker-text');
-  const kickerMeta = $('kicker-meta');
-  const questionEl = $('question');
-  const noticeEl   = $('notice');
-  const choicesEl  = $('choices');
-  const wallEl     = $('wall');
-  const wallEmpty  = $('wall-empty');
-  const joinEl     = $('join');
-  const qrEl       = $('qr');
-  const joinUrlEl  = $('join-url');
-  const tallyN     = $('tally-n');
-  const tallyLabel = $('tally-label');
-  const spotEl     = $('spot');
-  const spotText   = $('spot-text');
-  const spotCount  = $('spot-count');
-  const spotPos    = $('spot-pos');
-  const summaryEl  = $('summary');
-  const sumBusy    = $('sum-busy');
-  const sumCard    = $('sum-card');
-  const sumText    = $('sum-text');
-  const sumMeter   = $('sum-meter');
-  const sumMeta    = $('sum-meta');
-  const sumDots    = $('sum-dots');
-  const sumNav     = $('sum-nav');
+  const stage       = $('stage');
+  const titleEl     = $('wtitle');
+  const dotEl       = $('dot');
+  const statusText  = $('status-text');
+  const viewerBadge = $('viewer-badge');
+  const liveBtn     = $('live-btn');
+  const viewSeg     = $('view-seg');
+  const viewWall    = $('view-wall');
+  const viewSum     = $('view-summary');
+  const primaryBtn  = $('primary-btn');
+  const bannerEl    = $('banner');
+  const kickerText  = $('kicker-text');
+  const kickerMeta  = $('kicker-meta');
+  const questionEl  = $('question');
+  const statsEl     = $('stats');
+  const choicesEl   = $('choices');
+  const chartEl     = $('chart');
+  const plotEl      = $('hist-plot');
+  const axisEl      = $('hist-axis');
+  const endsEl      = $('hist-ends');
+  const markerEl    = $('marker');
+  const markerLabel = $('marker-label');
+  const cloudEl     = $('cloud');
+  const cloudEmpty  = $('cloud-empty');
+  const cloudInner  = $('cloud-inner');
+  const wallEl      = $('wall');
+  const wallEmpty   = $('wall-empty');
+  const joinEl      = $('join');
+  const qrEl        = $('qr');
+  const qrFake      = $('qr-fake');
+  const joinUrlEl   = $('join-url');
+  const tallyN      = $('tally-n');
+  const tallyLabel  = $('tally-label');
+  const previewMsg  = $('preview-msg');
+  const previewBtn  = $('preview-open');
+  const spotEl      = $('spot');
+  const spotText    = $('spot-text');
+  const spotCount   = $('spot-count');
+  const spotPos     = $('spot-pos');
+  const summaryEl   = $('summary');
+  const sumBusy     = $('sum-busy');
+  const sumCard     = $('sum-card');
+  const sumText     = $('sum-text');
+  const sumMeter    = $('sum-meter');
+  const sumMeta     = $('sum-meta');
+  const sumDots     = $('sum-dots');
+  const sumNav      = $('sum-nav');
 
   // ── State ───────────────────────────────────────────────────────────────────
   // Everything a viewer needs to draw the same picture lives in S; the DOM is a
   // projection of it. `responses` is presenter-only raw data — viewers get the
-  // derived `votes` / `groups` instead, which are far smaller.
+  // derived tallies instead, which are far smaller.
   const S = {
-    type:      'choice',     // 'choice' | 'open'
+    type:      'choice',
     question:  '',
-    options:   [],
+    options:   [],           // choice / truefalse
     correct:   null,         // 0-based index, or null
+    scale:     { min: 1, max: 5, low: '', high: '' },   // rating
+    unit:      '',           // numeric
+    answer:    null,         // numeric: the actual value, or null
+    words:     1,            // wordcloud: words kept per response
     phase:     'idle',       // 'idle' | 'collect' | 'results'
     surveyId:  null,
     joinUrl:   '',
     responses: [],
     total:     0,
-    votes:     {},           // choice: { A: 3, B: 1 }
+    votes:     {},           // choice-like: { A: 3, B: 1 }
+    ratings:   {},           // rating: { 1: 2, 4: 7 }
+    nums:      [],           // numeric: every valid estimate
+    cloud:     [],           // wordcloud: [{ text, n }]
     groups:    [],           // open: [{ text, n }] in order of first appearance
     showLive:  false,
     revealed:  false,
     view:      'wall',       // open results: 'wall' | 'summary'
-    summaries: null,         // { summaries: [{summary, num_respondents}], num_responses }
+    summaries: null,
     sIdx:      0,
     sumBusy:   false,
     sumError:  '',
@@ -557,7 +803,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     error:     '',
   };
 
-  let pollKey    = null;     // [type, question, options] of the running poll
+  let pollKey    = null;     // identity of the running poll; a change starts a new one
   let lastLive   = undefined;// last showLiveResults seen in config, so a toggle survives re-config
   let startToken = 0;        // bumped to discard a create() that lost a race
   let pollTimer  = null;
@@ -627,27 +873,70 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
 
   function normaliseOptions(o) {
     const arr = Array.isArray(o) ? o : String(o || '').split('\n');
-    return arr.map(s => String(s).trim()).filter(Boolean).slice(0, LETTERS.length);
+    return arr.map(s => String(s).trim()).filter(Boolean).slice(0, 10);   // the phone page letters to J
   }
 
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
+  function fmtNum(x) {
+    if (x == null || !Number.isFinite(x)) return '–';
+    const a = Math.abs(x);
+    const digits = a >= 1000 ? 0 : a >= 100 ? 1 : a >= 1 ? 2 : 3;
+    return x.toLocaleString(undefined, { maximumFractionDigits: digits });
+  }
+
+  function quantile(sorted, q) {
+    if (!sorted.length) return NaN;
+    const i = (sorted.length - 1) * q, lo = Math.floor(i), hi = Math.ceil(i);
+    return sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo);
+  }
+
+  function niceStep(raw) {
+    if (!(raw > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(raw)));
+    const f = raw / p;
+    return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p;
+  }
+
+  // "Hash Tables!" and "hash tables" are the same answer in a cloud.
+  function toPhrase(text, k) {
+    const tokens = String(text || '').toLowerCase()
+      .replace(/[^\p{L}\p{N}\s'-]/gu, ' ')
+      .split(/\s+/)
+      .map(t => t.replace(/^['-]+|['-]+$/g, ''))
+      .filter(t => t.length > 1 && !STOP.has(t));
+    return tokens.slice(0, k).join(' ');
+  }
+
   // ── Derived data ────────────────────────────────────────────────────────────
   function recompute() {
     S.total = S.responses.length;
-    if (S.type === 'choice') {
+    const texts = S.responses.map(r => String(r.text || '').trim());
+    if (isChoiceLike(S.type)) {
       const v = {};
-      for (const r of S.responses) {
-        const k = String(r.text || '').trim().toUpperCase();
-        if (k) v[k] = (v[k] || 0) + 1;
-      }
+      for (const t of texts) { const k = t.toUpperCase(); if (k) v[k] = (v[k] || 0) + 1; }
       S.votes = v;
+    } else if (S.type === 'rating') {
+      const r = {};
+      for (const t of texts) {
+        const n = Math.round(Number(t));
+        if (n >= S.scale.min && n <= S.scale.max) r[n] = (r[n] || 0) + 1;
+      }
+      S.ratings = r;
+    } else if (S.type === 'numeric') {
+      S.nums = texts.map(t => Number(t.replace(/[\s,_]/g, ''))).filter(Number.isFinite);
+    } else if (S.type === 'wordcloud') {
+      const m = new Map();
+      for (const t of texts) {
+        const p = toPhrase(t, S.words);
+        if (p) m.set(p, (m.get(p) || 0) + 1);
+      }
+      S.cloud = [...m].map(([text, n]) => ({ text, n }));
     } else {
       // Identical answers ("yes", "Yes ") collapse into one card with a count,
       // so a room that agrees shows as agreement rather than as repetition.
       const m = new Map();
-      for (const r of S.responses) {
-        const t = String(r.text || '').trim();
+      for (const t of texts) {
         if (!t) continue;
         const k = t.toLowerCase().replace(/\s+/g, ' ');
         const g = m.get(k);
@@ -657,64 +946,114 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     }
   }
 
-  function ready() {
-    return !!S.question && (S.type === 'open' || S.options.length >= 2);
+  // What's missing before this poll can run, or '' when it's ready.
+  function missing() {
+    if (!S.question) return 'Add a question in the settings to start.';
+    if (S.type === 'choice' && S.options.length < 2) return 'Add at least two answer options in the settings.';
+    return '';
+  }
+  const ready = () => !missing();
+
+  // ── Preview data ────────────────────────────────────────────────────────────
+  // Shown faded, with a "Preview" tag, until the widget is configured — so an
+  // unconfigured slide shows what it will become instead of a bare instruction.
+  function sample(type) {
+    const base = {
+      type, phase: 'results', total: 24, revealed: false, showLive: false, view: 'wall',
+      options: [], correct: null, votes: {}, ratings: {}, nums: [], cloud: [], groups: [],
+      scale: S.scale, unit: '', answer: null, spotlight: -1, summaries: null,
+      joinUrl: '',
+    };
+    const q = S.question;
+    switch (type) {
+      case 'truefalse': return { ...base, question: q || 'Every binary search tree is balanced.',
+        options: ['True', 'False'], votes: { A: 7, B: 17 } };
+      case 'rating': return { ...base, question: q || 'How confident do you feel about recursion?',
+        scale: { ...S.scale, low: S.scale.low || 'Not at all', high: S.scale.high || 'Very' },
+        ratings: S.scale.max === 10 ? { 2: 1, 4: 2, 5: 3, 6: 4, 7: 6, 8: 5, 9: 2, 10: 1 }
+               : S.scale.max === 7 ? { 1: 1, 2: 2, 3: 3, 4: 5, 5: 7, 6: 4, 7: 2 }
+               : { 1: 1, 2: 3, 3: 7, 4: 9, 5: 4 } };
+      case 'numeric': return { ...base, question: q || 'How many comparisons does binary search need for 1,000,000 items?',
+        unit: S.unit, nums: [5, 8, 10, 12, 15, 18, 20, 20, 20, 21, 22, 25, 30, 30, 40, 50, 64, 100, 20, 19, 24, 16, 20, 25] };
+      case 'wordcloud': return { ...base, question: q || 'Describe today\'s lecture in one word.',
+        cloud: [['interesting', 7], ['fast', 5], ['confusing', 4], ['useful', 4], ['fun', 3], ['dense', 3],
+                ['clear', 2], ['recursion', 2], ['challenging', 2], ['long', 1], ['engaging', 1], ['abstract', 1],
+                ['practical', 1], ['neat', 1]].map(([text, n]) => ({ text, n })) };
+      case 'open': return { ...base, question: q || 'What is one thing from today you\'re still unsure about?',
+        groups: [['Hash collisions', 3], ['When to use a tree vs a hash table', 1], ['Big-O of amortised operations', 1],
+                 ['Recursion', 2], ['Why resizing doubles the array', 1], ['Proof on slide 14', 1]]
+                 .map(([text, n]) => ({ text, n })) };
+      default: return { ...base, question: q || 'Which data structure gives $O(1)$ average lookup?',
+        options: S.options.length >= 2 ? S.options : ['Linked list', 'Hash table', 'Binary search tree', 'Sorted array'],
+        votes: S.options.length >= 2 ? {} : { A: 3, B: 13, C: 6, D: 2 } };
+    }
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────
   function render() {
     document.body.classList.toggle('is-presenter', !IS_VIEWER);
-    const open    = S.type === 'open';
-    const results = S.phase === 'results';
-    const collect = S.phase === 'collect';
-    const showData = results || (collect && S.showLive);
 
-    // A presenter-set Name wins over the type label (see the settings kit).
-    const fallbackTitle = open ? 'Open Response' : 'Multiple Choice';
+    // A viewer only knows what the presenter sent; with no question yet it
+    // shows the preview of whatever type that is.
+    const preview = IS_VIEWER ? !S.question : !ready();
+    const D = preview ? sample(S.type) : S;
+    const t = D.type;
+
+    const results  = D.phase === 'results';
+    const collect  = D.phase === 'collect';
+    const showData = results || (collect && D.showLive);
+
+    const fallbackTitle = TYPES[t]?.title || 'Audience Response';
     titleEl.textContent = window.BeamerWidget?.name ? BeamerWidget.name(fallbackTitle) : fallbackTitle;
-    kickerText.textContent = open ? 'Open question' : 'Multiple choice';
-    kickerMeta.textContent = showData ? plural(S.total, 'response', 'responses') : '';
+    kickerText.textContent = TYPES[t]?.kicker || '';
+    kickerMeta.textContent = showData ? plural(D.total, 'response', 'responses') : '';
 
     // Status pill
-    dotEl.className = 'bw-dot ' + (collect ? 'is-ready' : 'is-idle');
+    dotEl.className = 'bw-dot ' + (S.phase === 'collect' ? 'is-ready' : 'is-idle');
     statusText.textContent =
-      collect ? `Live · ${plural(S.total, 'response', 'responses')}` :
-      results ? `Closed · ${plural(S.total, 'response', 'responses')}` : 'Not started';
+      S.phase === 'collect' ? `Live · ${plural(S.total, 'response', 'responses')}` :
+      S.phase === 'results' ? `Closed · ${plural(S.total, 'response', 'responses')}` :
+      preview ? 'Not set up' : 'Not started';
 
-    // Layout
-    stage.classList.toggle('no-join',    !collect);
-    stage.classList.toggle('is-results', results);
-    stage.classList.toggle('is-wall',    open && showData);
-    joinEl.style.display = collect ? 'flex' : 'none';
+    // Layout. The preview shows the join panel too, so the slide reads right.
+    const withJoin = collect || preview;
+    stage.classList.toggle('is-preview', preview);
+    stage.classList.toggle('no-join',    !withJoin);
+    stage.classList.toggle('is-data',    showData);
+    stage.classList.toggle('is-fill',    showData && !isChoiceLike(t));
+    joinEl.style.display = withJoin ? 'flex' : 'none';
+    previewMsg.textContent = IS_VIEWER ? 'Waiting for the presenter to set up this question.'
+                                       : 'Sample data — ' + missing().replace(/^A/, 'a');
+    previewBtn.style.display = IS_VIEWER || !window.BeamerWidget?.openSettings ? 'none' : '';
 
-    // Banner / setup notice
-    bannerEl.style.display = S.error ? 'flex' : 'none';
+    bannerEl.style.display = S.error && !preview ? 'flex' : 'none';
     bannerEl.textContent   = S.error;
-    let notice = '';
-    if (!IS_VIEWER && !S.question) notice = 'Add a question in the widget settings.';
-    else if (!IS_VIEWER && !open && S.options.length < 2) notice = 'Add at least two answer options.';
-    noticeEl.style.display = notice ? 'block' : 'none';
-    noticeEl.textContent   = notice;
 
-    setMd(questionEl, S.question);
+    setMd(questionEl, D.question);
 
-    choicesEl.style.display = open ? 'none' : 'flex';
-    if (!open) renderChoices(showData);
+    const show = (el, on, how) => { el.style.display = on ? (how || 'flex') : 'none'; };
+    show(choicesEl, isChoiceLike(t));
+    show(statsEl,   showData && (t === 'rating' || t === 'numeric'));
+    show(chartEl,   showData && (t === 'rating' || t === 'numeric'));
+    show(cloudEl,   showData && t === 'wordcloud');
+    const summary = t === 'open' && results && D.view === 'summary';
+    show(wallEl,    showData && t === 'open' && !summary);
+    show(summaryEl, summary);
 
-    const showWall = open && showData && !(results && S.view === 'summary');
-    wallEl.style.display = showWall ? 'flex' : 'none';
-    if (open) renderWall();
+    if (isChoiceLike(t))  renderChoices(D, showData);
+    if (showData && t === 'rating')    renderRating(D);
+    if (showData && t === 'numeric')   renderNumeric(D);
+    if (showData && t === 'wordcloud') renderCloud(D);
+    if (t === 'open')     renderWall(D);
+    if (summary)          renderSummary(D);
 
-    summaryEl.style.display = open && results && S.view === 'summary' ? 'flex' : 'none';
-    if (open && results && S.view === 'summary') renderSummary();
-
-    renderJoin();
-    renderSpotlight();
-    renderToolbar();
+    renderJoin(D, preview);
+    renderSpotlight(D);
+    renderToolbar(preview);
   }
 
-  function renderToolbar() {
-    const open = S.type === 'open', p = S.phase;
+  function renderToolbar(preview) {
+    const t = S.type, p = S.phase;
     viewerBadge.style.display = IS_VIEWER ? 'inline-flex' : 'none';
     if (IS_VIEWER) {
       [liveBtn, viewSeg, primaryBtn].forEach(b => { b.style.display = 'none'; });
@@ -723,22 +1062,24 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
 
     liveBtn.style.display = p === 'collect' ? 'inline-flex' : 'none';
     liveBtn.classList.toggle('is-active', S.showLive);
-    liveBtn.textContent = (S.showLive ? 'Hide ' : 'Show ') + (open ? 'responses' : 'results');
+    liveBtn.textContent = (S.showLive ? 'Hide ' : 'Show ') + (t === 'open' ? 'responses' : 'results');
 
-    const hasModel = !!cfg.model;
-    viewSeg.style.display = open && p === 'results' && hasModel ? 'inline-flex' : 'none';
+    viewSeg.style.display = t === 'open' && p === 'results' && cfg.model ? 'inline-flex' : 'none';
     viewWall.classList.toggle('is-active', S.view === 'wall');
     viewSum .classList.toggle('is-active', S.view === 'summary');
 
+    const canReveal = (isChoiceLike(t) && S.correct != null) || (t === 'numeric' && S.answer != null);
     let label = '', show = true, disabled = false;
-    if (p === 'idle') {
-      label = 'Start collecting'; disabled = !ready();
+    primaryBtn.title = '';
+    if (preview) {
+      show = false;
+    } else if (p === 'idle') {
+      label = 'Start collecting';
     } else if (p === 'collect') {
       label = 'Close & show results';
       const min = parseInt(cfg.minResponses, 10) || 1;
-      if (open && S.total < min) { disabled = true; primaryBtn.title = `Needs ${plural(min, 'response', 'responses')}`; }
-      else primaryBtn.title = '';
-    } else if (!open && S.correct != null) {
+      if (t === 'open' && S.total < min) { disabled = true; primaryBtn.title = `Needs ${plural(min, 'response', 'responses')}`; }
+    } else if (canReveal) {
       label = S.revealed ? 'Hide answer' : 'Reveal answer';
     } else {
       show = false;
@@ -748,20 +1089,22 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     primaryBtn.disabled      = disabled;
   }
 
-  // Answer rows are built once per option list and then only updated, so the
-  // bars animate from their last width instead of redrawing from zero.
+  // ── Choice / true-false rows ────────────────────────────────────────────────
+  // Rows are built once per option list and then only updated, so the bars
+  // animate from their last width instead of redrawing from zero.
   let choicesKey = null, choiceRows = [];
-  function renderChoices(showData) {
-    const key = JSON.stringify(S.options);
+  function renderChoices(D, showData) {
+    const key = JSON.stringify([D.type, D.options]);
     let fresh = false;
     if (key !== choicesKey) {
       choicesKey = key; fresh = true;
       choicesEl.textContent = '';
-      choiceRows = S.options.map((opt, i) => {
+      choicesEl.classList.toggle('is-tf', D.type === 'truefalse');
+      choiceRows = D.options.map((opt, i) => {
         const li    = document.createElement('li');   li.className = 'choice';
         const badge = document.createElement('span'); badge.className = 'badge';
         const body  = document.createElement('div');  body.className = 'choice-body';
-        const label = document.createElement('div'); label.className = 'choice-label bw-md';
+        const label = document.createElement('div');  label.className = 'choice-label bw-md';
         const track = document.createElement('div');  track.className = 'track';
         const fill  = document.createElement('div');  fill.className = 'fill';
         const fig   = document.createElement('div');  fig.className = 'figure';
@@ -775,18 +1118,18 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
         return { li, badge, label, fill, pct, votes, i };
       });
     }
-    choiceRows.forEach(r => setMd(r.label, S.options[r.i]));   // cached; KaTeX may arrive late
+    choiceRows.forEach(r => setMd(r.label, D.options[r.i]));   // cached; KaTeX may arrive late
 
     choicesEl.classList.toggle('show-results', showData);
-    const counts = S.options.map((_, i) => S.votes[letter(i)] || 0);
+    const counts = D.options.map((_, i) => D.votes[letter(i)] || 0);
     const total  = counts.reduce((a, b) => a + b, 0);
     const max    = Math.max(0, ...counts);
-    const reveal = S.revealed && S.correct != null;
+    const reveal = D.revealed && D.correct != null;
 
     choiceRows.forEach(r => {
       const n   = counts[r.i];
       const pct = total ? Math.round(n / total * 100) : 0;
-      const ok  = reveal && S.correct === r.i;
+      const ok  = reveal && D.correct === r.i;
       r.li.classList.toggle('is-lead',    showData && !reveal && total > 0 && n === max);
       r.li.classList.toggle('is-correct', ok);
       r.li.classList.toggle('is-dim',     reveal && !ok);
@@ -800,17 +1143,201 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     });
   }
 
+  // ── Headline numbers ────────────────────────────────────────────────────────
+  function renderStats(items) {
+    statsEl.textContent = '';
+    for (const it of items) {
+      const s = document.createElement('div');
+      s.className = 'stat' + (it.minor ? ' is-minor' : '') + (it.answer ? ' is-answer' : '');
+      const v = document.createElement('div'); v.className = 'stat-v';
+      v.textContent = it.value;
+      if (it.small) { const sm = document.createElement('small'); sm.textContent = it.small; v.appendChild(sm); }
+      const l = document.createElement('div'); l.className = 'bw-hint'; l.textContent = it.label;
+      s.appendChild(v); s.appendChild(l);
+      statsEl.appendChild(s);
+    }
+  }
+
+  // ── Column chart (rating + numeric) ─────────────────────────────────────────
+  // Columns are keyed by their labels and reused while those stay the same, so
+  // new votes grow the bars rather than rebuilding them.
+  let histKey = null, histCols = [];
+  function renderColumns(bins, ends) {
+    const key = JSON.stringify(bins.map(b => b.label));
+    let fresh = false;
+    if (key !== histKey) {
+      histKey = key; fresh = true;
+      histCols.forEach(c => c.col.remove());
+      axisEl.textContent = '';
+      const every = bins.length > 10 ? 2 : 1;
+      histCols = bins.map((b, i) => {
+        const col = document.createElement('div'); col.className = 'hcol';
+        const bar = document.createElement('div'); bar.className = 'hbar';
+        const n   = document.createElement('div'); n.className = 'hn';
+        col.appendChild(bar); col.appendChild(n);
+        plotEl.insertBefore(col, markerEl);
+        const lab = document.createElement('div'); lab.className = 'hlab';
+        lab.textContent = i % every === 0 ? b.label : '';
+        axisEl.appendChild(lab);
+        return { col, bar, n };
+      });
+    }
+    const max = Math.max(1, ...bins.map(b => b.n));
+    bins.forEach((b, i) => {
+      const c = histCols[i];
+      const h = b.n ? Math.max(2, (b.n / max) * 84) : 0;   // headroom for the count
+      const apply = () => { c.bar.style.height = h + '%'; c.n.style.bottom = `calc(${h}% + 4px)`; };
+      if (fresh) requestAnimationFrame(() => requestAnimationFrame(apply)); else apply();
+      c.n.textContent = b.n || '';
+      c.col.classList.toggle('is-top', !!b.top);
+      c.col.classList.toggle('is-hit', !!b.hit);
+    });
+    endsEl.textContent = '';
+    if (ends && (ends[0] || ends[1])) {
+      const a = document.createElement('span'); a.textContent = ends[0] || '';
+      const z = document.createElement('span'); z.textContent = ends[1] || '';
+      endsEl.appendChild(a); endsEl.appendChild(z);
+    }
+  }
+
+  function renderRating(D) {
+    const { min, max, low, high } = D.scale;
+    let n = 0, sum = 0, top = 0;
+    for (let v = min; v <= max; v++) {
+      const c = D.ratings[v] || 0;
+      n += c; sum += c * v; top = Math.max(top, c);
+    }
+    const avg  = n ? sum / n : null;
+    const mode = [];
+    for (let v = min; v <= max; v++) if (top && (D.ratings[v] || 0) === top) mode.push(v);
+    renderStats([
+      { value: avg == null ? '–' : avg.toFixed(1), small: `/ ${max}`, label: 'Average' },
+      { value: mode.length ? mode.join(', ') : '–', label: mode.length > 1 ? 'Most common (tied)' : 'Most common', minor: true },
+    ]);
+    const bins = [];
+    for (let v = min; v <= max; v++) {
+      const c = D.ratings[v] || 0;
+      bins.push({ label: String(v), n: c, top: top > 0 && c === top });
+    }
+    markerEl.style.display = 'none';
+    chartEl.classList.remove('is-edges');
+    renderColumns(bins, [low, high]);
+  }
+
+  function renderNumeric(D) {
+    const xs = D.nums.slice().sort((a, b) => a - b);
+    const u  = D.unit ? ' ' + D.unit : '';
+    const reveal = D.revealed && D.answer != null;
+    const stats = [
+      { value: fmtNum(quantile(xs, 0.5)), small: D.unit, label: 'Median' },
+      { value: xs.length ? fmtNum(xs.reduce((a, b) => a + b, 0) / xs.length) : '–', label: 'Mean', minor: true },
+      { value: xs.length ? `${fmtNum(xs[0])} – ${fmtNum(xs[xs.length - 1])}` : '–', label: 'Range', minor: true },
+    ];
+    let closest = null;
+    if (reveal && xs.length) {
+      closest = xs.reduce((b, x) => Math.abs(x - D.answer) < Math.abs(b - D.answer) ? x : b, xs[0]);
+      stats.unshift({ value: fmtNum(D.answer), small: D.unit, label: 'Actual', answer: true });
+      stats.push({ value: fmtNum(closest), label: 'Closest guess', minor: true });
+    }
+    renderStats(stats);
+
+    if (!xs.length) { renderColumns([], null); markerEl.style.display = 'none'; return; }
+
+    // Bin inside Tukey's fences (1.5 × IQR past the quartiles), so one joke
+    // answer of 10^9 doesn't squash everyone else into a single bar. Outliers
+    // still count — they're clamped into the end bins, and the axis says so.
+    const q1 = quantile(xs, 0.25), q3 = quantile(xs, 0.75), iqr = q3 - q1;
+    let lo = xs.length >= 5 ? Math.max(xs[0], q1 - 1.5 * iqr) : xs[0];
+    let hi = xs.length >= 5 ? Math.min(xs[xs.length - 1], q3 + 1.5 * iqr) : xs[xs.length - 1];
+    if (reveal) { lo = Math.min(lo, D.answer); hi = Math.max(hi, D.answer); }
+    if (hi === lo) { lo -= 1; hi += 1; }
+    const step  = niceStep((hi - lo) / 10);
+    const start = Math.floor(lo / step) * step;
+    const count = Math.min(40, Math.floor((hi - start) / step + 1e-9) + 1);   // hi lands in the last bin
+    const bins  = Array.from({ length: count }, (_, i) => ({ label: fmtNum(start + i * step), n: 0 }));
+    for (const x of xs) bins[Math.min(count - 1, Math.max(0, Math.floor((x - start) / step)))].n++;
+    const top = Math.max(...bins.map(b => b.n));
+    bins.forEach(b => { b.top = !reveal && b.n === top; });
+    if (reveal) bins[Math.min(count - 1, Math.max(0, Math.floor((D.answer - start) / step)))].hit = true;
+    const below = xs.filter(x => x < start).length;
+    const above = xs.filter(x => x >= start + count * step).length;
+    chartEl.classList.add('is-edges');
+    renderColumns(bins, [
+      below ? `${plural(below, 'answer', 'answers')} below ${fmtNum(start)} counted in the first bar` : '',
+      above ? `${plural(above, 'answer', 'answers')} above ${fmtNum(start + count * step)} counted in the last bar` : '',
+    ]);
+
+    markerEl.style.display = reveal ? 'block' : 'none';
+    if (reveal) {
+      const f = Math.min(1, Math.max(0, (D.answer - start) / (count * step)));
+      markerEl.style.left = (f * 100) + '%';
+      markerEl.classList.toggle('flip', f > 0.7);
+      markerLabel.textContent = 'Actual ' + fmtNum(D.answer) + u;
+    }
+  }
+
+  // ── Word cloud ──────────────────────────────────────────────────────────────
+  // Laid out by the browser (flex-wrap, centred) rather than on a canvas, so
+  // it's crisp at any size, takes the deck's font and theme, and new words
+  // can animate in. The biggest words are dealt into the middle.
+  let cloudEls = new Map();
+  function renderCloud(D) {
+    const list = D.cloud.slice().sort((a, b) => b.n - a.n || a.text.localeCompare(b.text)).slice(0, CAP.words);
+    cloudEmpty.style.display = list.length ? 'none' : 'block';
+    const max  = Math.max(1, ...list.map(w => w.n));
+    const minPx = 16, maxPx = list.length > 40 ? 48 : 64;
+
+    const order = [];
+    list.forEach((w, i) => { if (i % 2) order.push(w); else order.unshift(w); });
+
+    const keep = new Set(list.map(w => w.text));
+    for (const [k, el] of cloudEls) if (!keep.has(k)) { el.remove(); cloudEls.delete(k); }
+
+    order.forEach((w, rank) => {
+      let el = cloudEls.get(w.text);
+      if (!el) {
+        el = document.createElement('span');
+        el.className = 'word' + (D.phase === 'collect' || cloudEls.size ? ' is-new' : '');
+        el.textContent = w.text;
+        el.addEventListener('animationend', () => el.classList.remove('is-new'), { once: true });
+        cloudEls.set(w.text, el);
+      }
+      // One-off words sit at the floor; size and ink climb with agreement.
+      const k  = max > 1 ? Math.pow((w.n - 1) / (max - 1), 0.8) : 0.5;
+      el.style.fontSize = `calc(${Math.round(minPx + (maxPx - minPx) * k)}px * var(--u) * var(--ck, 1))`;
+      el.style.opacity  = (0.5 + 0.5 * k).toFixed(2);
+      el.title = plural(w.n, 'response', 'responses');
+      cloudInner.appendChild(el);    // re-appending moves it into order
+    });
+    fitCloud();
+  }
+
+  // Shrink the whole cloud until it fits the space it has, rather than
+  // clipping the words that wrapped past the edge.
+  function fitCloud() {
+    let k = 1;
+    cloudInner.style.setProperty('--ck', '1');
+    const room = () => cloudEl.clientHeight - 8;
+    if (!room()) return;
+    for (let i = 0; i < 14 && cloudInner.offsetHeight > room(); i++) {
+      k *= 0.9;
+      cloudInner.style.setProperty('--ck', k.toFixed(3));
+    }
+  }
+  window.addEventListener('resize', () => { if (cloudEl.style.display !== 'none') fitCloud(); });
+
+  // ── Response wall (open-ended) ──────────────────────────────────────────────
   // Cards are appended as responses arrive and never rebuilt, so only the new
   // ones animate in and a card being read doesn't jump.
   let wallCards = [];
-  function renderWall() {
-    const g = S.groups;
+  function renderWall(D) {
+    const g = D.groups;
     if (g.length < wallCards.length ||
         (wallCards.length && wallCards[0].text !== g[0]?.text)) {
       wallCards.forEach(c => c.el.remove());
       wallCards = [];
     }
-    const animate = wallCards.length > 0 || S.phase === 'collect';
+    const animate = wallCards.length > 0 || D.phase === 'collect';
     for (let i = 0; i < g.length; i++) {
       let c = wallCards[i];
       if (!c) {
@@ -836,42 +1363,47 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   }
 
   let lastTally = 0;
-  function renderJoin() {
+  function renderJoin(D, preview) {
+    qrFake.style.display = preview ? 'block' : 'none';
+    qrEl.style.display   = preview ? 'none' : 'block';
+    if (preview) {
+      joinUrlEl.textContent = 'Join link appears here';
+      tallyN.textContent = '0'; tallyLabel.textContent = 'responses';
+      return;
+    }
     if (S.phase !== 'collect') return;
     if (qrEl.dataset.url !== S.joinUrl) {
       qrEl.textContent = '';
       qrEl.dataset.url = S.joinUrl;
-      joinUrlEl.textContent = S.joinUrl;
       if (S.joinUrl && typeof QRCode !== 'undefined') {
         new QRCode(qrEl, { text: S.joinUrl, width: 320, height: 320,
                            colorDark: '#1a1a18', colorLight: '#ffffff' });
       }
     }
-    if (S.total !== lastTally) {
-      if (S.total > lastTally) {
-        tallyN.classList.remove('bump'); void tallyN.offsetWidth; tallyN.classList.add('bump');
-      }
-      lastTally = S.total;
+    joinUrlEl.textContent = S.joinUrl;
+    if (S.total > lastTally) {
+      tallyN.classList.remove('bump'); void tallyN.offsetWidth; tallyN.classList.add('bump');
     }
+    lastTally = S.total;
     tallyN.textContent     = S.total;
     tallyLabel.textContent = S.total === 1 ? 'response' : 'responses';
   }
 
-  function renderSpotlight() {
-    const g = S.groups[S.spotlight];
-    const on = S.type === 'open' && !!g;
+  function renderSpotlight(D) {
+    const g  = D.groups[D.spotlight];
+    const on = D.type === 'open' && !!g;
     spotEl.classList.toggle('is-open', on);
     if (!on) return;
     spotText.textContent  = g.text;
     spotCount.textContent = g.n > 1 ? `${g.n} people said this` : '';
-    spotPos.textContent   = `${S.spotlight + 1} / ${S.groups.length}`;
+    spotPos.textContent   = `${D.spotlight + 1} / ${D.groups.length}`;
     ['spot-prev', 'spot-next', 'spot-close'].forEach(id => { $(id).style.display = IS_VIEWER ? 'none' : ''; });
-    $('spot-prev').disabled = S.spotlight === 0;
-    $('spot-next').disabled = S.spotlight >= S.groups.length - 1;
+    $('spot-prev').disabled = D.spotlight === 0;
+    $('spot-next').disabled = D.spotlight >= D.groups.length - 1;
   }
 
-  function renderSummary() {
-    const list = S.summaries?.summaries || [];
+  function renderSummary(D) {
+    const list = D.summaries?.summaries || [];
     sumBusy.style.display = S.sumBusy ? 'flex' : 'none';
     const show = !S.sumBusy && (list.length || S.sumError);
     sumCard.style.display = show ? 'block' : 'none';
@@ -884,9 +1416,9 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
       sumMeta.textContent = '';
       return;
     }
-    const i   = Math.min(S.sIdx, list.length - 1);
+    const i   = Math.min(D.sIdx, list.length - 1);
     const s   = list[i];
-    const tot = S.summaries.num_responses || S.total || 1;
+    const tot = D.summaries.num_responses || D.total || 1;
     sumText.textContent  = s.summary;
     sumMeter.style.width = Math.round(Math.min(1, s.num_respondents / tot) * 100) + '%';
     sumMeta.textContent  = `${plural(s.num_respondents, 'respondent', 'respondents')} of ${tot}`;
@@ -906,7 +1438,8 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     stopPolling();
     Object.assign(S, {
       phase: 'idle', surveyId: null, joinUrl: '', responses: [], total: 0,
-      votes: {}, groups: [], revealed: false, view: 'wall', summaries: null,
+      votes: {}, ratings: {}, nums: [], cloud: [], groups: [],
+      revealed: false, view: 'wall', summaries: null,
       sIdx: 0, sumBusy: false, sumError: '', spotlight: -1, error: '',
     });
     lastTally = 0;
@@ -916,23 +1449,28 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     if (sid) fetch(`${serverUrl()}/api/survey/${sid}/close`, { method: 'POST' }).catch(() => {});
   }
 
+  // What the phone page needs to draw the right input for this type.
+  function createBody() {
+    const body = { question: S.question, kind: S.type, model: null };
+    if (isChoiceLike(S.type)) body.options = S.options;
+    if (S.type === 'rating')    body.meta = { ...S.scale };
+    if (S.type === 'numeric')   body.meta = { unit: S.unit };
+    if (S.type === 'wordcloud') body.meta = { words: S.words };
+    if (S.type === 'open') {
+      body.model         = cfg.model || null;
+      body.num_summaries = parseInt(cfg.numSummaries, 10) || 3;
+      if (cfg.apiKey) body.api_key = cfg.apiKey;
+    }
+    return body;
+  }
+
   async function startPoll() {
     if (IS_VIEWER || !ready()) return;
     const token = ++startToken;
     stopPolling();
-    const open = S.type === 'open';
-    const body = { question: S.question };
-    if (open) {
-      body.model         = cfg.model || null;
-      body.num_summaries = parseInt(cfg.numSummaries, 10) || 3;
-      if (cfg.apiKey) body.api_key = cfg.apiKey;
-    } else {
-      body.options = S.options;
-      body.model   = null;
-    }
     try {
       const res  = await fetch(`${serverUrl()}/api/survey/create`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(createBody()),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
@@ -1013,7 +1551,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     if (IS_VIEWER) return;
     if (S.phase === 'idle')         startPoll();
     else if (S.phase === 'collect') closePoll();
-    else if (S.correct != null)     { S.revealed = !S.revealed; render(); emitState(); }
+    else { S.revealed = !S.revealed; render(); emitState(); }
   }
 
   function toggleLive() {
@@ -1030,7 +1568,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   }
 
   function openSpotlight(i) {
-    if (IS_VIEWER) return;
+    if (IS_VIEWER || !ready()) return;
     S.spotlight = i; render(); emitState();
   }
   function stepSpotlight(d) {
@@ -1060,7 +1598,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   }
 
   function copyUrl() {
-    navigator.clipboard?.writeText(S.joinUrl).catch(() => {});
+    if (S.joinUrl) navigator.clipboard?.writeText(S.joinUrl).catch(() => {});
   }
 
   // ── Socket.IO sync ──────────────────────────────────────────────────────────
@@ -1108,11 +1646,20 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   function getState() {
     return {
       type: S.type, question: S.question, options: S.options, correct: S.correct,
+      scale: S.scale, unit: S.unit, answer: S.answer, words: S.words,
       phase: S.phase, surveyId: S.surveyId, joinUrl: S.joinUrl, total: S.total,
-      votes: S.votes, groups: S.groups.slice(0, MAX_SYNC),
+      votes: S.votes, ratings: S.ratings,
+      nums: S.nums.slice(-CAP.nums),
+      cloud: S.cloud.slice().sort((a, b) => b.n - a.n).slice(0, CAP.words),
+      groups: S.groups.slice(0, CAP.groups),
       showLive: S.showLive, revealed: S.revealed, view: S.view,
       summaries: S.summaries, sIdx: S.sIdx, spotlight: S.spotlight,
     };
+  }
+
+  function pollIdentity(type, question, options, scale, unit, words) {
+    return JSON.stringify([type, question, options || [], type === 'rating' ? scale : null,
+                           type === 'numeric' ? unit : null, type === 'wordcloud' ? words : null]);
   }
 
   function applyState(s) {
@@ -1122,21 +1669,27 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
       // Presenter restore (the host re-sends saved state after a reload). Only
       // adopt a poll for the same question; a changed question means a new one.
       if (!s.surveyId || s.surveyId === S.surveyId) return;
-      const key = JSON.stringify([s.type, s.question, s.options || []]);
-      if (key !== pollKey) return;
+      if (pollIdentity(s.type, s.question, s.options, s.scale, s.unit, s.words) !== pollKey) return;
       startToken++;            // drop the auto-start that's racing this restore
       stopPolling();
     }
 
-    S.type      = s.type === 'open' ? 'open' : 'choice';
+    S.type      = TYPES[s.type] ? s.type : 'choice';
     S.question  = s.question || '';
     S.options   = Array.isArray(s.options) ? s.options : [];
     S.correct   = s.correct ?? null;
+    S.scale     = s.scale && typeof s.scale === 'object' ? { ...S.scale, ...s.scale } : S.scale;
+    S.unit      = s.unit || '';
+    S.answer    = Number.isFinite(s.answer) ? s.answer : null;
+    S.words     = s.words || 1;
     S.phase     = ['idle', 'collect', 'results'].includes(s.phase) ? s.phase : 'idle';
     S.surveyId  = s.surveyId || null;
     S.joinUrl   = s.joinUrl || '';
     S.total     = s.total || 0;
     S.votes     = s.votes || {};
+    S.ratings   = s.ratings || {};
+    S.nums      = Array.isArray(s.nums) ? s.nums : [];
+    S.cloud     = Array.isArray(s.cloud) ? s.cloud : [];
     S.groups    = Array.isArray(s.groups) ? s.groups : [];
     S.showLive  = !!s.showLive;
     S.revealed  = !!s.revealed;
@@ -1164,25 +1717,44 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     initSocket(cfg.socketUrl);
     if (IS_VIEWER) { render(); return; }
 
-    S.type     = cfg.responseType === 'open' ? 'open' : 'choice';
+    S.type     = TYPES[cfg.responseType] ? cfg.responseType : 'choice';
     S.question = String(cfg.question || '').trim();
-    S.options  = S.type === 'choice' ? normaliseOptions(cfg.options) : [];
-    const ca   = parseInt(cfg.correctAnswer, 10);
-    S.correct  = S.type === 'choice' && ca >= 1 && ca <= S.options.length ? ca - 1 : null;
-    if (S.correct == null) S.revealed = false;
+
+    S.options = S.type === 'choice' ? normaliseOptions(cfg.options)
+              : S.type === 'truefalse' ? ['True', 'False'] : [];
+    if (S.type === 'choice') {
+      const ca = parseInt(cfg.correctAnswer, 10);
+      S.correct = ca >= 1 && ca <= S.options.length ? ca - 1 : null;
+    } else if (S.type === 'truefalse') {
+      S.correct = cfg.correctTF === 'true' ? 0 : cfg.correctTF === 'false' ? 1 : null;
+    } else {
+      S.correct = null;
+    }
+
+    const max = Math.min(10, Math.max(2, parseInt(cfg.ratingMax, 10) || 5));
+    S.scale  = { min: 1, max, low: String(cfg.ratingLow || '').trim(), high: String(cfg.ratingHigh || '').trim() };
+    const ans = cfg.numericAnswer === '' || cfg.numericAnswer == null ? NaN : Number(cfg.numericAnswer);
+    S.answer = Number.isFinite(ans) ? ans : null;
+    S.unit   = String(cfg.numericUnit || '').trim();
+    S.words  = Math.min(3, Math.max(1, parseInt(cfg.wordsPerResponse, 10) || 1));
+
+    const canReveal = S.correct != null || (S.type === 'numeric' && S.answer != null);
+    if (!canReveal) S.revealed = false;
 
     // Take the config's live-results setting only when it changes, so the
     // presenter's toolbar toggle isn't undone by an unrelated edit.
     const live = !!cfg.showLiveResults;
     if (live !== lastLive) { lastLive = live; S.showLive = live; }
 
-    const key = JSON.stringify([S.type, S.question, S.options]);
+    const key = pollIdentity(S.type, S.question, S.options, S.scale, S.unit, S.words);
     if (key !== pollKey) {
       pollKey = key;
       startToken++;
       closeOnServer(S.phase === 'collect' ? S.surveyId : null);
       resetPoll();
       if (ready() && cfg.autoStart !== false) startPoll();
+    } else if (S.phase !== 'idle') {
+      recompute();   // e.g. the words-per-response setting changes the tallies
     }
     render(); emitState();
   }
@@ -1212,6 +1784,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   viewWall  .addEventListener('click', () => setView('wall'));
   viewSum   .addEventListener('click', () => setView('summary'));
   joinUrlEl .addEventListener('click', copyUrl);
+  previewBtn.addEventListener('click', () => window.BeamerWidget?.openSettings?.());
   $('spot-prev') .addEventListener('click', () => stepSpotlight(-1));
   $('spot-next') .addEventListener('click', () => stepSpotlight(1));
   $('spot-close').addEventListener('click', closeSpotlight);

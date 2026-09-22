@@ -85,6 +85,41 @@ textarea::placeholder { color: var(--text-3); }
 .submit-btn:hover:not(:disabled) { background: #2d2d2a; }
 .submit-btn:disabled { opacity: 0.4; cursor: default; }
 
+/* One-line answers: a word for the cloud, a number for an estimate. */
+.line-input {
+  width: 100%; height: 52px; padding: 0 14px;
+  font-family: var(--font-ui); font-size: 18px; color: var(--text);
+  background: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius);
+  outline: none; -webkit-appearance: none; text-align: center;
+  transition: border-color 0.15s, background 0.15s;
+}
+.line-input:focus { border-color: var(--border-med); background: var(--bg); }
+.line-input::placeholder { color: var(--text-3); }
+.line-input:disabled { opacity: 0.5; }
+.line-wrap { position: relative; }
+.line-unit {
+  position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+  font-family: var(--font-mono); font-size: 14px; color: var(--text-3); pointer-events: none;
+}
+.field-error { min-height: 16px; font-size: 13px; color: var(--red); text-align: center; }
+
+/* Rating scale: one button per point, the scale's end labels underneath. */
+.scale { display: grid; gap: 8px; }
+.scale-btn {
+  height: 52px; border-radius: var(--radius);
+  background: var(--bg-subtle); border: 1px solid var(--border);
+  font-family: var(--font-mono); font-size: 17px; font-weight: 600; color: var(--text-2);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.scale-btn.selected { background: var(--text); border-color: var(--text); color: #fff; }
+.scale-btn:disabled { cursor: default; }
+.scale-ends {
+  display: flex; justify-content: space-between; gap: 16px;
+  font-size: 12px; color: var(--text-2); margin-top: 8px;
+}
+.scale-ends span:last-child { text-align: right; }
+
 .hint-text {
   font-size: 12px; color: var(--text-3);
   text-align: center; font-family: var(--font-mono);
@@ -119,9 +154,10 @@ textarea::placeholder { color: var(--text-3); }
 
 <div id="main-area">
   <div class="question-text" id="question-text"></div>
-  <textarea id="response-input" placeholder="Type your response…"></textarea>
+  <div id="input-slot"></div>
+  <div class="field-error" id="field-error"></div>
   <button class="submit-btn" id="submit-btn" onclick="submit()">Submit</button>
-  <div class="hint-text">Ctrl + Enter to submit</div>
+  <div class="hint-text" id="hint-text">Ctrl + Enter to submit</div>
 </div>
 
 <div class="status-card ok" id="thanks-card">
@@ -157,12 +193,111 @@ function showCard(id) {
   CARDS.forEach(c => document.getElementById(c).classList.toggle('visible', c === id));
 }
 
+// ── Answer input, by survey kind ─────────────────────────────────────────
+// Every kind posts plain text; the presenter's widget interprets it.
+let kind = 'open', rating = null, inputEl = null;
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+
+function buildInput(data) {
+  kind = data.kind || 'open';
+  const meta = data.meta || {};
+  const slot = document.getElementById('input-slot');
+  const hint = document.getElementById('hint-text');
+  const btn  = document.getElementById('submit-btn');
+  slot.textContent = '';
+
+  if (kind === 'rating') {
+    const lo = Number.isFinite(+meta.min) ? +meta.min : 1;
+    const hi = Number.isFinite(+meta.max) ? Math.min(+meta.max, lo + 10) : 5;
+    const grid = el('div', 'scale');
+    const pts = hi - lo + 1;
+    grid.style.gridTemplateColumns = `repeat(${pts > 7 ? Math.ceil(pts / 2) : pts}, 1fr)`;
+    for (let v = lo; v <= hi; v++) {
+      const b = el('button', 'scale-btn', String(v));
+      b.type = 'button';
+      b.addEventListener('click', () => {
+        rating = v;
+        grid.querySelectorAll('.scale-btn').forEach(x => x.classList.toggle('selected', x === b));
+        btn.disabled = false;
+      });
+      grid.appendChild(b);
+    }
+    slot.appendChild(grid);
+    if (meta.low || meta.high) {
+      const ends = el('div', 'scale-ends');
+      ends.appendChild(el('span', '', `${lo} · ${meta.low || ''}`));
+      ends.appendChild(el('span', '', `${meta.high || ''} · ${hi}`));
+      slot.appendChild(ends);
+    }
+    btn.disabled = true;
+    hint.textContent = 'Tap a number, then submit';
+    return;
+  }
+
+  if (kind === 'numeric' || kind === 'wordcloud') {
+    const wrap = el('div', 'line-wrap');
+    inputEl = el('input', 'line-input');
+    inputEl.type = 'text';
+    inputEl.autocomplete = 'off';
+    if (kind === 'numeric') {
+      inputEl.inputMode = 'decimal';
+      inputEl.placeholder = 'Your estimate';
+      if (meta.unit) wrap.appendChild(el('span', 'line-unit', meta.unit));
+    } else {
+      inputEl.maxLength = 60;
+      inputEl.placeholder = (+meta.words || 1) > 1 ? 'A short phrase' : 'One word';
+      inputEl.autocapitalize = 'none';
+    }
+    inputEl.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+    wrap.insertBefore(inputEl, wrap.firstChild);
+    slot.appendChild(wrap);
+    hint.textContent = 'Enter to submit';
+    setTimeout(() => inputEl.focus(), 50);
+    return;
+  }
+
+  inputEl = el('textarea');
+  inputEl.id = 'response-input';
+  inputEl.placeholder = 'Type your response…';
+  inputEl.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') submit();
+  });
+  slot.appendChild(inputEl);
+  hint.textContent = 'Ctrl + Enter to submit';
+}
+
+// The answer to send, or null (with the reason shown) if there isn't one yet.
+function readAnswer() {
+  const err = document.getElementById('field-error');
+  err.textContent = '';
+  if (kind === 'rating') return rating == null ? null : String(rating);
+  const text = (inputEl?.value || '').trim();
+  if (!text) { inputEl?.focus(); return null; }
+  if (kind === 'numeric') {
+    const n = Number(text.replace(/[\s,_]/g, ''));
+    if (!Number.isFinite(n)) { err.textContent = 'Please enter a number.'; inputEl.focus(); return null; }
+    return String(n);
+  }
+  return text;
+}
+
+function setInputsDisabled(off) {
+  document.getElementById('submit-btn').disabled = off;
+  if (inputEl) inputEl.disabled = off;
+  document.querySelectorAll('.scale-btn').forEach(b => { b.disabled = off; });
+}
+
 async function submit() {
-  const text = document.getElementById('response-input').value.trim();
-  if (!text) { document.getElementById('response-input').focus(); return; }
+  const text = readAnswer();
+  if (text == null) return;
   const btn = document.getElementById('submit-btn');
-  btn.disabled = true;
-  document.getElementById('response-input').disabled = true;
+  setInputsDisabled(true);
   try {
     const res = await fetch(`${API_PREFIX}/${SURVEY_ID}/respond`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -176,8 +311,7 @@ async function submit() {
     sessionStorage.setItem(SESSION_KEY, '1');
     showCard('thanks-card');
   } catch (e) {
-    btn.disabled = false;
-    document.getElementById('response-input').disabled = false;
+    setInputsDisabled(false);
   }
 }
 
@@ -189,6 +323,7 @@ async function load() {
     const data = await res.json();
     if (!data.active) { showCard('closed-card'); return; }
     document.getElementById('question-text').textContent = data.question || 'Share your thoughts';
+    buildInput(data);
     document.getElementById('loading-area').style.display = 'none';
     document.getElementById('main-area').style.display = 'flex';
     try {
@@ -201,10 +336,6 @@ async function load() {
     showCard('error-card');
   }
 }
-
-document.getElementById('response-input').addEventListener('keydown', e => {
-  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') submit();
-});
 
 load();
 </script>

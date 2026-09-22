@@ -236,6 +236,23 @@ def test_mcq_and_wordcloud_urls(client):
     assert wc['url'] == f'/s/{session_id}/wordcloud/{wc["survey_id"]}'
 
 
+def test_survey_kinds_route_to_the_right_page(client):
+    session_id = create_session(client)
+    pre = session_prefix(session_id)
+    tf = create_survey(client, session_id, question='T?', options=['True', 'False'], kind='truefalse')
+    assert tf['url'] == f'/s/{session_id}/mcq/{tf["survey_id"]}'
+    rating = create_survey(client, session_id, question='Rate', kind='rating',
+                           meta={'min': 1, 'max': 5, 'low': 'Bad', 'high': 'Good', 'nested': {'x': 1}})
+    assert rating['url'] == f'/s/{session_id}/survey/{rating["survey_id"]}'
+    info = client.get(f'{pre}/api/survey/{rating["survey_id"]}').get_json()
+    assert info['kind'] == 'rating'
+    assert info['meta'] == {'min': 1, 'max': 5, 'low': 'Bad', 'high': 'Good'}
+    wc = create_survey(client, session_id, question='Word', kind='wordcloud')
+    assert wc['url'] == f'/s/{session_id}/wordcloud/{wc["survey_id"]}'
+    odd = create_survey(client, session_id, question='Q', kind='bogus')
+    assert client.get(f'{pre}/api/survey/{odd["survey_id"]}').get_json()['kind'] == 'open'
+
+
 def test_create_survey_with_unknown_model_rejected(client):
     session_id = create_session(client)
     resp = client.post(f'{session_prefix(session_id)}/api/survey/create', json={'question': 'Q', 'model': 'nope'})

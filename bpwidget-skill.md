@@ -47,7 +47,7 @@ Rules:
   generated bundle with a `GENERATED FILE — do not edit by hand` banner at the top.)
 - The script body lives in an **IIFE with `'use strict'`**. The only exception is when
   inline `onclick="…"` handlers need globals — then skip the IIFE and explicitly
-  `window.foo = foo;` at the bottom (see `word-cloud.html`).
+  `window.foo = foo;` at the bottom (e.g. `calculator.html`).
 - `<title>` is always `<Widget Name> — Beamer+`.
 
 ---
@@ -141,7 +141,7 @@ Open the `<style>` with a comment saying what the base provides and what is left
 toolbar, a 28px button) stays in raw px.
 
 **Canvas and other non-CSS surfaces** must read the tokens at draw time — see
-`themeInk()` in `word-cloud.html` — otherwise they bake light-mode ink onto a dark deck.
+a `themeInk()`-style helper that reads `getComputedStyle` at draw time — otherwise they bake light-mode ink onto a dark deck.
 
 **A widget that also has to run standalone** (opened outside Beamer+) consumes with a
 fallback and namespaces its own aliases, as `cortexc.html` does:
@@ -293,7 +293,7 @@ Two event shapes exist in the codebase. Pick one per widget and stay with it:
 
 ```js
 socket.emit('widget_state', { widgetId, state });                      // most widgets
-socket.emit('widget_event', { id: widgetId, type: 'state', payload }); // calculator, plotter, word-cloud
+socket.emit('widget_event', { id: widgetId, type: 'state', payload }); // calculator, plotter
 ```
 
 Emission is **always debounced** (80–300ms) so a drag, a keystroke burst or a slider
@@ -315,7 +315,7 @@ because the literal would be wrong in the other theme. Cap what you keep
 
 | Route | Use |
 |-------|-----|
-| `POST /api/survey/create` | `{ question, options?, model, num_summaries, is_wordcloud? }` → `{ survey_id, url }` |
+| `POST /api/survey/create` | `{ question, kind?, options?, meta?, model, num_summaries }` — `kind`: open · choice · truefalse · rating · numeric · wordcloud → `{ survey_id, url }` |
 | `GET  /api/survey/<id>/responses?after=<n>` | poll responses (3s interval is the convention) |
 | `POST /api/survey/<id>/close` | close the poll |
 | `POST /api/survey/<id>/analyze` | AI summaries |
@@ -327,7 +327,7 @@ Socket events from the server: `widget_state`, `widget_event`, `survey_response`
 Vendored libraries under `/static/vendor/`: `socket.io.min.js`, `qrcode.min.js`,
 `pdfjs/pdf.min.mjs` + `pdf.worker.min.mjs`. Anything else comes from a CDN **with an
 exact pinned version** (mathjs 11.11.0, marked 9.1.6, KaTeX 0.16.x, Pyodide 0.25.0,
-Leaflet 1.9.4, wordcloud2 1.2.2). Prefer a version a sibling widget already uses so a
+Leaflet 1.9.4). Prefer a version a sibling widget already uses so a
 deck downloads it once.
 
 ---
@@ -363,7 +363,7 @@ deck downloads it once.
 ### Avoid
 
 - `localStorage` — `sessionStorage` only, and only where a reload must not lose a live
-  poll (`word-cloud.html`); it is cleared on a genuine reload.
+  poll; it is cleared on a genuine reload.
 - Redefining host tokens in a new widget.
 - Bare `io()`, unpinned CDN versions, icon fonts, frameworks.
 - Blocking `alert()` / `confirm()`.
@@ -638,7 +638,7 @@ Copy this and delete what the widget doesn't need.
 
 | Need | Look at |
 |------|---------|
-| Audience poll: QR → collect → results | `audience-response.html`, `word-cloud.html` |
+| Audience poll: QR → collect → results | `audience-response.html` (six question types, one widget) |
 | Two-pane editor + output | `python-repl.html`, `cortexc.html` |
 | Real REPL transcript with history, Tab completion, Ctrl+L/C | `python-shell.html` |
 | Canvas with pan / wheel-zoom / pinch | `function-plotter.html`, `pdf.html` |

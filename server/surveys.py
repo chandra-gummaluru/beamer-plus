@@ -12,6 +12,21 @@ from .sessions import get_session_or_404, presenter_room, survey_room
 
 surveys_bp = Blueprint('surveys', __name__)
 
+# What the audience is asked to give. Decides which response page they get
+# and what that page asks for; the server stores every answer as text either way.
+SURVEY_KINDS = {'open', 'choice', 'truefalse', 'rating', 'numeric', 'wordcloud'}
+
+
+def _clean_meta(meta):
+    """Small, flat, public display hints for the response page (scale ends, a unit)."""
+    if not isinstance(meta, dict):
+        return {}
+    out = {}
+    for k, v in list(meta.items())[:12]:
+        if isinstance(k, str) and isinstance(v, (str, int, float, bool)) or v is None:
+            out[str(k)[:40]] = v[:120] if isinstance(v, str) else v
+    return out
+
 
 @surveys_bp.route('/s/<session_id>/api/survey/create', methods=['POST'])
 def create_survey(session_id):
@@ -31,6 +46,10 @@ def create_survey(session_id):
     if options is not None:
         if not isinstance(options, list) or not all(isinstance(o, str) for o in options):
             return jsonify({'error': 'options must be a list of strings'}), 400
+    is_wordcloud = bool(data.get('is_wordcloud', False))
+    kind = data.get('kind')
+    if kind not in SURVEY_KINDS:
+        kind = 'choice' if options else ('wordcloud' if is_wordcloud else 'open')
     sess.surveys[survey_id] = {
         'question': str(data.get('question', 'What do you think?')),
         'created_at': time.time(),
@@ -39,13 +58,15 @@ def create_survey(session_id):
         'api_key': data.get('api_key') or None,
         'num_summaries': num_summaries,
         'options': options,
+        'kind': kind,
+        'meta': _clean_meta(data.get('meta')),
     }
-    is_wordcloud = data.get('is_wordcloud', False)
-    is_mcq = bool(data.get('options'))
-    url = (
-        f'/s/{session_id}/mcq/{survey_id}' if is_mcq
-        else (f'/s/{session_id}/wordcloud/{survey_id}' if is_wordcloud else f'/s/{session_id}/survey/{survey_id}')
-    )
+    if options and kind in ('choice', 'truefalse'):
+        url = f'/s/{session_id}/mcq/{survey_id}'
+    elif kind == 'wordcloud':
+        url = f'/s/{session_id}/wordcloud/{survey_id}'
+    else:
+        url = f'/s/{session_id}/survey/{survey_id}'
     return jsonify({
         'survey_id': survey_id,
         'url': url,
@@ -62,6 +83,8 @@ def get_survey(session_id, survey_id):
         'survey_id': survey_id,
         'question': s.get('question'),
         'options': s.get('options'),
+        'kind': s.get('kind', 'open'),
+        'meta': s.get('meta', {}),
         'active': s.get('active', False),
     })
 
