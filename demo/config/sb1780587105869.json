@@ -2,7 +2,7 @@
   "widgets": [
     {
       "id": "widget_1780587115686",
-      "type": "survey",
+      "type": "audience-response",
       "src": "",
       "x": 0,
       "y": 0,
@@ -14,7 +14,8 @@
       "minResponses": 1,
       "numSummaries": 3,
       "question": "What do you think about Beamer+?",
-      "model": "claude"
+      "model": "claude",
+      "responseType": "open"
     }
   ]
 }

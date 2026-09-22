@@ -19,6 +19,7 @@
     { "key": "secondary", "label": "Second pane", "type": "select", "default": "memory",
       "options": [ { "v": "editor", "l": "Editor" }, { "v": "shell", "l": "Shell" }, { "v": "memory", "l": "Memory model" } ] },
     { "key": "filename", "label": "File name", "type": "text", "placeholder": "main.py" },
+    { "key": "downloadName", "label": "Download file name", "type": "text", "placeholder": "Defaults to the file name" },
     { "key": "code", "label": "Starting code", "type": "textarea", "rows": 8,
       "placeholder": "a = [1, 2]\nb = a\na.append(3)\nprint(b)" },
     { "key": "scale", "label": "Text size", "type": "select", "default": "1.4",
@@ -4071,6 +4072,15 @@ function pdfSection(page, x, y, text){
   return y + 13;
 }
 
+/* The presenter's "Download file name" setting as a safe file stem, or ''.
+   Read from WIDGET_CONFIG at download time, so an edit made after the widget
+   loaded still applies. Only a known extension is stripped: "Lecture 3.2"
+   must stay "Lecture 3.2". */
+function downloadStem(){
+  var raw = String((window.WIDGET_CONFIG || {}).downloadName || '').trim();
+  return raw.replace(/\.(pdf|ipynb|py|json)$/i, '').replace(/[\\/:*?"<>|\x00-\x1f]+/g, '_').trim();
+}
+
 function pdfTitle(){
   var f = document.getElementById('filename');
   var name = f && f.value.trim();
@@ -4250,10 +4260,12 @@ function buildPdf(){
 
     pdfFooter(page, M, footY, W);
 
+    var custom = downloadStem();
     var stem = pdfTitle().replace(/\.[^.]+$/, '').replace(/[^\w.-]+/g, '-') || 'memory-model';
     return {
       blob: pdfFile(PDF.pw, PDF.ph, page.ops.join('\n'), img),
-      name: drawing ? stem + '-drawing.pdf' : stem + '-step-' + app.idx + '.pdf'
+      name: custom ? custom + '.pdf'
+          : drawing ? stem + '-drawing.pdf' : stem + '-step-' + app.idx + '.pdf'
     };
   });
 }

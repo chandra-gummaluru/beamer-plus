@@ -8,7 +8,8 @@
   "fields": [
     { "key": "notebook", "label": "Notebook file", "type": "file", "accept": ".ipynb", "folder": "assets" },
     { "key": "packages", "label": "Extra packages (one per line)", "type": "textarea-lines", "rows": 4, "placeholder": "pandas\nsympy\nrequests==2.31.0" },
-    { "key": "autoImport", "label": "Auto-load packages from imports", "type": "checkbox", "default": true }
+    { "key": "autoImport", "label": "Auto-load packages from imports", "type": "checkbox", "default": true },
+    { "key": "downloadName", "label": "Download file name", "type": "text", "placeholder": "Defaults to the notebook name" }
   ]
 }
 </script>
@@ -1765,7 +1766,18 @@ function enablePresenterToolbar() {
 // block for the document it prints.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/* The presenter's "Download file name" setting as a safe file stem, or ''.
+   Read from WIDGET_CONFIG at download time, so an edit made after the widget
+   loaded still applies. Only a known extension is stripped: "Lecture 3.2"
+   must stay "Lecture 3.2". */
+function downloadStem(){
+  var raw = String((window.WIDGET_CONFIG || {}).downloadName || '').trim();
+  return raw.replace(/\.(pdf|ipynb|py|json)$/i, '').replace(/[\\/:*?"<>|\x00-\x1f]+/g, '_').trim();
+}
+
 function notebookFilename() {
+  const custom = downloadStem();
+  if (custom) return custom + '.ipynb';
   const raw = (notebookName || 'Untitled.ipynb').trim();
   return raw.replace(/[\\/:*?"<>|]/g, '_') || 'Untitled.ipynb';
 }
@@ -2106,7 +2118,7 @@ async function downloadPdf() {
       doc.text(`Page ${i} of ${pages}`, ML + CW, PH - 26, { align: 'right' });
     }
 
-    const stem = name.replace(/\.ipynb$/i, '').replace(/[^\w.-]+/g, '-') || 'notebook';
+    const stem = downloadStem() || name.replace(/\.ipynb$/i, '').replace(/[^\w.-]+/g, '-') || 'notebook';
     doc.save(stem + '.pdf');
     if (label) label.textContent = 'PDF';
   } catch (err) {

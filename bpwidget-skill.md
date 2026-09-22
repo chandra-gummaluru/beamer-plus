@@ -47,7 +47,7 @@ Rules:
   generated bundle with a `GENERATED FILE — do not edit by hand` banner at the top.)
 - The script body lives in an **IIFE with `'use strict'`**. The only exception is when
   inline `onclick="…"` handlers need globals — then skip the IIFE and explicitly
-  `window.foo = foo;` at the bottom (see `word-cloud.html`, `mcq.html`).
+  `window.foo = foo;` at the bottom (see `word-cloud.html`).
 - `<title>` is always `<Widget Name> — Beamer+`.
 
 ---
@@ -59,7 +59,7 @@ The first thing in `<head>`. Beamer+ reads it to build the slide's config panel.
 ```html
 <script id="widget-schema" type="application/json">
 {
-  "label": "Multiple Choice",
+  "label": "Audience Response",
   "category": "Audience Response",
   "fields": [
     { "key": "question", "label": "Question", "type": "textarea", "rows": 3,
@@ -89,6 +89,14 @@ The first thing in `<head>`. Beamer+ reads it to build the slide's config panel.
 | `file`            | `accept`, `folder` (`"assets"`)   | relative path — resolve via `/api/zip-asset/` |
 | `password`        | `placeholder`                     | string |
 | `ai-model`        | —                                 | model id string |
+
+Any field may add `"showIf": { "otherKey": "value" }` (or a list of values) to
+appear only while another field holds that value — e.g. the answer list in
+`audience-response.html` shows only when `responseType` is `"choice"`. Hidden
+fields keep their values.
+
+Widgets that download a file declare a `downloadName` text field
+(`"Download file name"`) and use it as the file stem when set.
 
 Conventional field keys reused across widgets: `autoStart`, `autoplay`, `readOnly`,
 `scale` (text size, `select` of `"1" | "1.4" | "1.8" | "2.2"`, default `"1.4"`).
@@ -626,7 +634,7 @@ Copy this and delete what the widget doesn't need.
 
 | Need | Look at |
 |------|---------|
-| Audience poll: QR → collect → results | `mcq.html`, `survey.html`, `word-cloud.html` |
+| Audience poll: QR → collect → results | `audience-response.html`, `word-cloud.html` |
 | Two-pane editor + output | `python-repl.html`, `cortexc.html` |
 | Real REPL transcript with history, Tab completion, Ctrl+L/C | `python-shell.html` |
 | Canvas with pan / wheel-zoom / pinch | `function-plotter.html`, `pdf.html` |
