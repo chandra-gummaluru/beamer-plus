@@ -431,6 +431,27 @@
         selfDispatch = false;
     }
 
+    // `showIf: { otherKey: value | [values] }` on a field hides it unless
+    // another field currently holds one of those values. Mirrors the editor's
+    // properties panel so both surfaces show the same form.
+    function syncVisibility() {
+        var values = {};
+        rows.forEach(function (r) {
+            var res = r.read();
+            values[r.key] = res.remove ? (r.field ? r.field['default'] : undefined) : res.value;
+        });
+        rows.forEach(function (r) {
+            var cond = r.field && r.field.showIf, show = true;
+            if (cond && typeof cond === 'object') {
+                show = Object.keys(cond).every(function (k) {
+                    var want = Array.isArray(cond[k]) ? cond[k] : [cond[k]];
+                    return want.some(function (w) { return String(w) === String(values[k]); });
+                });
+            }
+            r.node.style.display = show ? '' : 'none';
+        });
+    }
+
     function scheduleCommit() {
         if (commitTimer) clearTimeout(commitTimer);
         commitTimer = setTimeout(function () { commitTimer = null; commit(); }, 150);
@@ -465,11 +486,14 @@
             empty.textContent = 'This widget has no settings.';
             body.appendChild(empty);
         } else {
+            var onFieldChange = function () { syncVisibility(); scheduleCommit(); };
             fields.forEach(function (f) {
-                var row = buildRow(f, scheduleCommit);
+                var row = buildRow(f, onFieldChange);
+                row.field = f;
                 rows.push(row);
                 body.appendChild(row.node);
             });
+            syncVisibility();
         }
 
         root.appendChild(head);
@@ -663,6 +687,13 @@
                     for (var j = 0; j < added.length; j++) {
                         var n = added[j];
                         if (n === barEl || n === wrap) continue;
+                        // Never re-parent an iframe: moving one reloads it and
+                        // throws away its document. html2canvas renders into a
+                        // hidden iframe it appends to <body>; moving that emptied
+                        // the clone mid-capture, and every computed style came
+                        // back "" ("Error parsing CSS component value,
+                        // unexpected EOF" on PDF export).
+                        if (n.nodeName === 'IFRAME') continue;
                         if (n.parentNode === body) wrap.appendChild(n);
                     }
                 }

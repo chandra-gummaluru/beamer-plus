@@ -1,0 +1,639 @@
+\documentclass[mathserif, handout]{beamer}
+\usepackage{url}
+\input{includes}
+\input{tikz_figures}
+\usetikzlibrary{shapes.gates.logic.US, calc}
+\newcommand{\ttab}[1]{\texttt{#1}}
+
+% bus-width marks, drawn like the hand-placed ones elsewhere in this deck:
+% \mhbus{x}{y}{width} on a horizontal wire, \mvbus{x}{y}{width} on a vertical one
+\newcommand{\mhbus}[3]{%
+  \draw[thick] ($(#1,#2)+(-0.08,-0.15)$) -- ($(#1,#2)+(0.08,0.15)$);%
+  \node[smallgraytext] at ($(#1,#2)+(0,0.32)$) {\ttab{#3}};}
+\newcommand{\mvbus}[3]{%
+  \draw[thick] ($(#1,#2)+(-0.15,-0.08)$) -- ($(#1,#2)+(0.15,0.08)$);%
+  \node[smallgraytext, anchor=west] at ($(#1,#2)+(0.15,0)$) {\ttab{#3}};}
+
+% title
+\title{Arithmetic Circuits}
+\subtitle{Computer Organization}
+\author[C. Gummaluru]{Chandra Gummaluru}
+\titlegraphic{\includegraphics[width=0.15\linewidth]{images/signature.pdf}}
+\institute[]{\url{chandra-gummaluru.github.io} }
+\date[Computer Organization]{}
+\begin{document}
+\begin{frame}
+  \maketitle
+\end{frame}
+\begin{frame}
+  \begin{center}
+    \highlight{\textbf{arithmetic circuit}} \\[2mm]
+    \graytext{a combinational circuit that \\ computes on numbers}
+  \end{center}
+\end{frame}
+
+\begin{frame}{Addition}
+  \begin{center}
+    \Large \highlight{\textbf{adders}}
+  \end{center}
+\end{frame}
+
+\begin{frame}
+  A \highlight{\textbf{half-adder}} adds two bits. It produces a sum bit and a carry bit.\\[3mm]
+    \begin{minipage}{0.5\textwidth}
+      \begin{figure}
+    \centering
+    \begin{tikzpicture}[>=stealth]
+      \node[xor gate US, draw, thick, scale=1.3] (x) at (0.6,1.0) {};
+      \node[and gate US, draw, thick, scale=1.3] (a) at (0.6,-1.0) {};
+      % input a rail
+      \draw[thick] (x.input 1) -- ++(-0.8,0) coordinate (adot);
+      \draw[thick] (adot) -- ++(-0.8,0) node[left, smallgraytext] {\ttab{a}};
+      \draw[thick] (adot) |- (a.input 1);
+      \fill (adot) circle (1.5pt);
+      % input b rail
+      \draw[thick] (x.input 2) -- ++(-0.4,0) coordinate (bdot);
+      \draw[thick] (bdot) -- ++(-1.2,0) node[left, smallgraytext] {\ttab{b}};
+      \draw[thick] (bdot) |- (a.input 2);
+      \fill (bdot) circle (1.5pt);
+      % outputs
+      \draw[thick] (x.output) -- ++(0.7,0) node[right, smallgraytext] {\ttab{s} \graytext{(sum)}};
+      \draw[thick] (a.output) -- ++(0.7,0) node[right, smallgraytext] {\ttab{c} \graytext{(carry)}};
+    \end{tikzpicture}
+  \end{figure}
+  \end{minipage}%
+  \begin{minipage}{0.5\textwidth}
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabular}{cc|cc}
+      \ttab{a} & \ttab{b} & \ttab{s} & \ttab{c} \\ \hline
+      \ttab{0} & \ttab{0} & \ttab{0} & \ttab{0} \\
+      \ttab{0} & \ttab{1} & \ttab{1} & \ttab{0} \\
+      \ttab{1} & \ttab{0} & \ttab{1} & \ttab{0} \\
+      \ttab{1} & \ttab{1} & \ttab{0} & \ttab{1} \\
+    \end{tabular}
+  \end{minipage}%
+\end{frame}
+
+\begin{frame}
+  Wiring the two half-adders together gives a \highlight{\textbf{full-adder}} circuit. The first adds \ttab{a} and \ttab{b}, the second adds a carry in.\\[1mm]
+  \begin{minipage}{0.6\textwidth}
+  \begin{figure}
+    \centering
+    \begin{tikzpicture}[>=stealth, scale=0.92, transform shape]
+      % first half-adder
+      \node[xor gate US, draw, thick, scale=1.1] (x1) at (0,2.2) {};
+      \node[and gate US, draw, thick, scale=1.1] (a1) at (0,0.9) {};
+      % input a rail
+      \draw[thick] (x1.input 1) -- ++(-0.5,0) coordinate (adot);
+      \draw[thick] (adot) -- ++(-0.5,0) node[left, smallgraytext] {\ttab{a}};
+      \draw[thick] (adot) |- (a1.input 1);
+      \fill (adot) circle (1.3pt);
+      % input b rail
+      \draw[thick] (x1.input 2) -- ++(-0.15,0) coordinate (bdot);
+      \draw[thick] (bdot) -- ++(-0.85,0) node[left, smallgraytext] {\ttab{b}};
+      \draw[thick] (bdot) |- (a1.input 2);
+      \fill (bdot) circle (1.3pt);
+      % p and g
+      \draw[thick] (x1.output) -- ++(1.1,0) coordinate (p);
+      \draw[thick] (a1.output) -- ++(3.0,0) coordinate (g);
+      % second half-adder -- x2 raised so its input 1 lines up exactly
+      % with x1.output, giving a straight run in on p instead of a bend
+      \node[xor gate US, draw, thick, scale=1.1] (x2) at (2.2,2.09) {};
+      \node[and gate US, draw, thick, scale=1.1] (a2) at (2.2,0.0) {};
+      % p feeds both
+      \draw[thick] (p) -- (x2.input 1);
+      \draw[thick] (p) |- (a2.input 1);
+      % cin feeds both
+      \draw[thick] (-0.2,-1.1) node[left, smallgraytext] {\ttab{cin}} -- (1.6,-1.1);
+      \draw[thick] (1.6,-1.1) |- (a2.input 2);
+      \draw[thick] (1.3,-1.1) |- (x2.input 2);
+      \fill (1.3,-1.1) circle (1.3pt);
+      % s output
+      \draw[thick] (x2.output) -- ++(0.6,0) node[right, smallgraytext] {\ttab{s}};
+      % OR for cout -- lowered so its input 2 lines up exactly with
+      % a2.output, giving a straight run in from below
+      \node[or gate US, draw, thick, scale=1.1] (o) at (3.9,0.11) {};
+      \draw[thick] (a2.output) -- (o.input 2);
+      \draw[thick] (g) |- (o.input 1);
+      \draw[thick] (o.output) -- ++(0.5,0) node[right, smallgraytext] {\ttab{cout}};
+    \end{tikzpicture}
+  \end{figure}
+\end{minipage}%
+  \begin{minipage}{0.4\textwidth}
+    \centering
+    \renewcommand{\arraystretch}{1.1}
+    \begin{tabular}{ccc|cc}
+      \ttab{a} & \ttab{b} & \ttab{cin} & \ttab{s} & \ttab{cout} \\ \hline
+      \ttab{0} & \ttab{0} & \ttab{0} & \ttab{0} & \ttab{0} \\
+      \ttab{0} & \ttab{0} & \ttab{1} & \ttab{1} & \ttab{0} \\
+      \ttab{0} & \ttab{1} & \ttab{0} & \ttab{1} & \ttab{0} \\
+      \ttab{0} & \ttab{1} & \ttab{1} & \ttab{0} & \ttab{1} \\
+      \ttab{1} & \ttab{0} & \ttab{0} & \ttab{1} & \ttab{0} \\
+      \ttab{1} & \ttab{0} & \ttab{1} & \ttab{0} & \ttab{1} \\
+      \ttab{1} & \ttab{1} & \ttab{0} & \ttab{0} & \ttab{1} \\
+      \ttab{1} & \ttab{1} & \ttab{1} & \ttab{1} & \ttab{1} \\
+    \end{tabular}
+  \end{minipage}
+This lets us chain adders together.
+\end{frame}
+
+
+
+\begin{frame}
+  The resulting device looks like this:\\[4mm]
+  \begin{figure}
+  \centering
+    \begin{tikzpicture}
+      \draw[thick, fill=gray!30!white!20] (0,-1.1) rectangle (1.6,1.1);
+      \node at (0.8,0) {\small \ttab{FA}};
+      \draw[thick] (0,0.6) -- ++(-0.7,0) node[left, smallgraytext] {\ttab{a}};
+      \draw[thick] (0,-0.6) -- ++(-0.7,0) node[left, smallgraytext] {\ttab{b}};
+      \draw[thick] (0.8,-1.1) -- ++(0,-0.5) node[below, smallgraytext] {\ttab{cin}};
+      \draw[thick] (1.6,0) -- ++(0.7,0) node[right, smallgraytext] {\ttab{s}};
+      \draw[thick] (0.8,1.1) -- ++(0,0.5) node[above, smallgraytext] {\ttab{cout}};
+    \end{tikzpicture}
+  \end{figure}
+\end{frame}
+
+\begin{frame}
+  We chain full-adders so the carry out of one bit feeds the carry in of the next. This adds two whole numbers.\\[5mm]
+  \begin{figure}
+    \centering
+    \begin{tikzpicture}[scale=0.9]
+      \foreach \i/\x in {3/0, 2/2, 1/4, 0/6} {
+        \draw[thick, fill=gray!30!white!20] (\x,0) rectangle (\x+1.2,1.1);
+        \node[smallgraytext] at (\x+0.6,0.55) {\ttab{FA}};
+        \draw[thick] (\x+0.35,1.1) -- ++(0,0.4) node[above, smallgraytext] {$\ttab{a}_{\ttab{\i}}$};
+        \draw[thick] (\x+0.85,1.1) -- ++(0,0.4) node[above, smallgraytext] {$\ttab{b}_{\ttab{\i}}$};
+        \draw[thick] (\x+0.6,0) -- ++(0,-0.4) node[below, smallgraytext] {$\ttab{s}_{\ttab{\i}}$};
+      }
+      % carry chain, from right (LSB) to left (MSB)
+      \draw[thick, ->] (6,0.55) -- ++(-0.8,0);
+      \draw[thick, ->] (4,0.55) -- ++(-0.8,0);
+      \draw[thick, ->] (2,0.55) -- ++(-0.8,0);
+      \draw[thick] (7.2,0.55) -- ++(0.8,0) node[right, smallgraytext] {\ttab{cin}};
+      \draw[thick] (0,0.55) -- ++(-0.8,0) node[left, smallgraytext] {\ttab{cout}};
+    \end{tikzpicture}
+  \end{figure}
+  \begin{center}
+    \graytext{the carry ripples from the lowest bit to the highest}
+  \end{center}
+\end{frame}
+
+\begin{frame}
+  The resulting device looks like this:\\[4mm]
+  \begin{figure}
+    \centering
+    \begin{tikzpicture}
+      \draw[thick, fill=gray!30!white!20] (0,-1.2) rectangle (2.4,1.2);
+      \node at (1.2,0) {\small adder};
+      \draw[thick] (0,0.6) -- ++(-0.8,0) node[left, smallgraytext] {\ttab{a}};
+      \draw[thick] ($(-0.4,0.6)+(-0.08,-0.15)$) -- ($(-0.4,0.6)+(0.08,0.15)$);
+      \node[smallgraytext] at ($(-0.4,0.6)+(0,0.32)$) {\ttab{n}};
+      \draw[thick] (0,-0.6) -- ++(-0.8,0) node[left, smallgraytext] {\ttab{b}};
+      \draw[thick] ($(-0.4,-0.6)+(-0.08,-0.15)$) -- ($(-0.4,-0.6)+(0.08,0.15)$);
+      \node[smallgraytext] at ($(-0.4,-0.6)+(0,0.32)$) {\ttab{n}};
+      \draw[thick] (1.2,-1.2) -- ++(0,-0.5) node[below, smallgraytext] {\ttab{cin}};
+      \draw[thick] (2.4,0) -- ++(0.8,0) node[right, smallgraytext] {\ttab{res}};
+      \draw[thick] ($(2.8,0)+(-0.08,-0.15)$) -- ($(2.8,0)+(0.08,0.15)$);
+      \node[smallgraytext] at ($(2.8,0)+(0,0.32)$) {\ttab{n}};
+    \end{tikzpicture}
+  \end{figure}
+We typically wire \ttab{cin} to \ttab{0}.
+\end{frame}
+
+% ------------------------------------------------------------
+% subtraction
+% ------------------------------------------------------------
+\begin{frame}{Subtraction}
+  \begin{center}
+    \Large \highlight{\textbf{subtractors}}
+  \end{center}
+\end{frame}
+
+\begin{frame}
+To compute \highlight{a - b}, we add the negation of \ttab{b}, which means inverting its bits and then adding one.\\[3mm]
+  \begin{figure}
+    \centering
+    \begin{tikzpicture}[>=stealth]
+      % one bit slice
+      \draw[thick, fill=gray!30!white!20] (0,-0.7) rectangle (1.8,0.7);
+      \node[smallgraytext] at (0.9,0) {\ttab{FA}};
+      % a input (top-left, goes straight in)
+      \draw[thick] (0.5,0.7) -- ++(0,1.5) node[above, smallgraytext] {$\ttab{a}_{\ttab{i}}$};
+      % XOR inverts b when sub is 1
+      \node[xor gate US, draw, thick, scale=0.9, rotate=-90] (xo) at (1.3,1.55) {};
+      \draw[thick] (xo.output) -- (1.3,0.7);
+      \draw[thick] (xo.input 1) -- ++(0,0.35) node[above, smallgraytext] {$\ttab{b}_{\ttab{i}}$};
+      % sub feeds the xor and the lowest carry in
+      \draw[thick] (xo.input 2) -- ++(0,0.2) -| (3.4,-1.3);
+      \draw[thick] (1.8,-0.35) -- (2.6,-0.35) -- (2.6,-1.3) -- (3.4,-1.3);
+      \draw[thick] (3.4,-1.3) -- (4.1,-1.3) node[right, smallgraytext] {\ttab{sub}};
+      \node[smallgraytext] at (2.9,-0.15) {\ttab{cin}};
+      % outputs
+      \draw[thick] (0.9,-0.7) -- ++(0,-0.5) node[below, smallgraytext] {$\ttab{s}_{\ttab{i}}$};
+      \draw[thick] (0,-0.35) -- ++(-0.8,0) node[left, smallgraytext] {\ttab{cout}};
+    \end{tikzpicture}
+  \end{figure}
+  \begin{center}
+    \graytext{this slice is repeated for every bit, sharing the one \ttab{sub} line}
+  \end{center}
+The bit-inversion can be done using an \ttab{XOR}. The \texttt{+1} can be added separately using \ttab{cin}.
+\end{frame}
+
+\begin{frame}
+  The same adder now does both operations. One control bit selects whether to add or subtract.\\[4mm]
+  \begin{figure}
+    \centering
+    \begin{tikzpicture}
+      \draw[thick, fill=gray!30!white!20] (0,-1.2) rectangle (2.4,1.2);
+      \node at (1.2,0) {\small adder};
+      \draw[thick] (0,0.6) -- ++(-0.8,0) node[left, smallgraytext] {\ttab{a}};
+      \draw[thick] ($(-0.4,0.6)+(-0.08,-0.15)$) -- ($(-0.4,0.6)+(0.08,0.15)$);
+      \node[smallgraytext] at ($(-0.4,0.6)+(0,0.32)$) {\ttab{n}};
+      \draw[thick] (0,-0.6) -- ++(-0.8,0) node[left, smallgraytext] {\ttab{b}};
+      \draw[thick] ($(-0.4,-0.6)+(-0.08,-0.15)$) -- ($(-0.4,-0.6)+(0.08,0.15)$);
+      \node[smallgraytext] at ($(-0.4,-0.6)+(0,0.32)$) {\ttab{n}};
+      \draw[thick] (1.2,-1.2) -- ++(0,-0.5) node[below, smallgraytext] {\ttab{sub}};
+      \draw[thick] (2.4,0) -- ++(0.8,0) node[right, smallgraytext] {\ttab{res}};
+      \draw[thick] ($(2.8,0)+(-0.08,-0.15)$) -- ($(2.8,0)+(0.08,0.15)$);
+      \node[smallgraytext] at ($(2.8,0)+(0,0.32)$) {\ttab{n}};
+    \end{tikzpicture}
+  \end{figure}
+\end{frame}
+
+\begin{frame}{Overflow}
+  \begin{center}
+    \Large \highlight{\textbf{overflow}}
+  \end{center}
+\end{frame}
+\begin{frame}
+  A fixed width can hold only so large a result. When two numbers of the same sign give a result of the opposite sign, the answer has \highlight{\textbf{overflowed}}.\\[3mm]
+  \begin{center}
+    \renewcommand{\arraystretch}{1.3}
+    \begin{tabular}{r@{\hspace{2mm}}l@{\hspace{8mm}}l}
+       & \ttab{0110} & \graytext{\ttab{6}} \\
+      $+$ & \ttab{0011} & \graytext{\ttab{3}} \\ \hline
+       & \ttab{1001} & \graytext{\ttab{-7}, not \ttab{9}} \\
+    \end{tabular}
+  \end{center}
+\end{frame}
+
+\begin{frame}
+We can check if the \ttab{cin} around the sign bit differs from its \ttab{cout}.
+  \begin{figure}
+    \centering
+    \begin{tikzpicture}[>=stealth]
+      \draw[thick, fill=gray!30!white!20] (0,-0.9) rectangle (2,0.9);
+      \node[smallgraytext] at (1,0) {\ttab{FA}};
+      \draw[thick] (0.6,0.9) -- ++(0,0.9) node[above, smallgraytext] {$\ttab{a}_{n-1}$};
+      \node[xor gate US, draw, thick, scale=1.1, rotate=-90] (xo) at (1.4,1.9) {};
+      \draw[thick] (xo.output) -- (1.4,0.9);
+      \draw[thick] (xo.input 2) -- ++(0,0.3) node[above, smallgraytext] {$\ttab{b}_{n-1}$};
+      \draw[thick] (xo.input 1) |- ++(0.5,0.4) node[right, smallgraytext] {\ttab{sub}};
+      \draw[thick] (0,0) -- ++(-1.3,0) node[left, smallgraytext] {\ttab{c$_{n-1}$}};
+      \draw[thick] (2,0) -- ++(1.3,0) node[right, smallgraytext] {\ttab{c$_n$}};
+      \draw[thick] (1,-0.9) -- ++(0,-0.4) node[below, smallgraytext] {\ttab{sign}};
+      \fill (-0.65,0) circle (1.3pt);
+      \fill (2.65,0) circle (1.3pt);
+      \node[xor gate US, draw, thick, scale=1.1, rotate=-90] (xo2) at (1,-2.7) {};
+      \draw[thick] (-0.65,0) |- ($(xo2.input 2)+(0,0.25)$) -- (xo2.input 2);
+      \draw[thick] (2.65,0) |- ($(xo2.input 1)+(0,0.25)$) -- (xo2.input 1);
+      \draw[thick] (xo2.output) -- ++(0,-0.4) node[below, smallgraytext] {\ttab{overflow}};
+    \end{tikzpicture}
+  \end{figure}
+\end{frame}
+
+\begin{frame}
+  A \highlight{\ttab{zero}} flag is set when every bit of the result is \ttab{0} — equivalently, when none of the bits are \ttab{1}. An \ttab{n}-input \ttab{NOR} of the result bits does exactly this.\\[3mm]
+  \begin{figure}
+    \centering
+    \begin{tikzpicture}[>=stealth]
+      \node[nor gate US, draw, thick, scale=1.6, logic gate inputs=nnn,
+            logic gate input sep=8pt] (z) at (0,0) {};
+      \draw[thick] (z.input 1) -- ++(-0.6,0) node[left, smallgraytext] {$\ttab{s}_{n-1}$};
+      \node[smallgraytext] at ($(z.input 2)+(-0.35,0.1)$) {$\vdots$};
+      \draw[thick] (z.input 3) -- ++(-0.6,0) node[left, smallgraytext] {$\ttab{s}_0$};
+      \draw[thick] (z.output) -- ++(0.6,0) node[right, smallgraytext] {\ttab{zero}};
+    \end{tikzpicture}
+  \end{figure}
+\end{frame}
+
+\begin{frame}
+Putting it all together gives us an adder with its flags.
+  \begin{figure}
+    \centering
+    \begin{tikzpicture}
+      \draw[thick, fill=gray!30!white!20] (0,-1.2) rectangle (3.2,1.2);
+      \node at (1.6,0) {\small adder};
+      \draw[thick] (0,0.6) -- ++(-0.8,0) node[left, smallgraytext] {\ttab{a}};
+      \draw[thick] ($(-0.4,0.6)+(-0.08,-0.15)$) -- ($(-0.4,0.6)+(0.08,0.15)$);
+      \node[smallgraytext] at ($(-0.4,0.6)+(0,0.32)$) {\ttab{n}};
+      \draw[thick] (0,-0.6) -- ++(-0.8,0) node[left, smallgraytext] {\ttab{b}};
+      \draw[thick] ($(-0.4,-0.6)+(-0.08,-0.15)$) -- ($(-0.4,-0.6)+(0.08,0.15)$);
+      \node[smallgraytext] at ($(-0.4,-0.6)+(0,0.32)$) {\ttab{n}};
+      \draw[thick] (1.6,-1.2) -- ++(0,-0.5) node[below, smallgraytext] {\ttab{sub}};
+      \draw[thick] (3.2,0) -- ++(0.8,0) node[right, smallgraytext] {\ttab{res}};
+      \draw[thick] ($(3.6,0)+(-0.08,-0.15)$) -- ($(3.6,0)+(0.08,0.15)$);
+      \node[smallgraytext] at ($(3.6,0)+(0,0.32)$) {\ttab{n}};
+      \draw[thick] (0.4,1.2) -- ++(0,0.5) node[above, smallgraytext] {\ttab{sign}};
+      \draw[thick] (1.2,1.2) -- ++(0,0.9) node[above, smallgraytext] {\ttab{zero}};
+      \draw[thick] (2.0,1.2) -- ++(0,0.5) node[above, smallgraytext] {\ttab{overflow}};
+      \draw[thick] (2.8,1.2) -- ++(0,0.9) node[above, smallgraytext] {\ttab{carry}};
+    \end{tikzpicture}
+  \end{figure}
+\end{frame}
+
+\begin{frame}
+A few operations come up often enough that they're worth building directly into the circuit: \highlight{\textbf{increment}}, \highlight{\textbf{decrement}}, and \highlight{\textbf{transfer}}.
+  \begin{figure}
+    \centering
+    \begin{tikzpicture}[>=stealth]
+      \draw[thick, fill=gray!30!white!20] (0,-1.2) rectangle (3.2,1.2);
+      \node at (1.6,0) {\small adder};
+      \draw[thick] (0,0.6) -- ++(-0.8,0) node[left, smallgraytext] {\ttab{a}};
+      \draw[thick] ($(-0.4,0.6)+(-0.08,-0.15)$) -- ($(-0.4,0.6)+(0.08,0.15)$);
+      \node[smallgraytext] at ($(-0.4,0.6)+(0,0.32)$) {\ttab{n}};
+      \draw[thick] (1.6,-1.2) -- ++(0,-0.5) node[below, smallgraytext] {\ttab{cin}};
+      \draw[thick] (3.2,0) -- ++(0.8,0) node[right, smallgraytext] {\ttab{res}};
+      \draw[thick] ($(3.6,0)+(-0.08,-0.15)$) -- ($(3.6,0)+(0.08,0.15)$);
+      \node[smallgraytext] at ($(3.6,0)+(0,0.32)$) {\ttab{n}};
+      \draw[thick] (0.4,1.2) -- ++(0,0.5) node[above, smallgraytext] {\ttab{sign}};
+      \draw[thick] (1.2,1.2) -- ++(0,0.9) node[above, smallgraytext] {\ttab{zero}};
+      \draw[thick] (2.0,1.2) -- ++(0,0.5) node[above, smallgraytext] {\ttab{overflow}};
+      \draw[thick] (2.8,1.2) -- ++(0,0.9) node[above, smallgraytext] {\ttab{carry}};
+      \draw[thick] (0,-0.6) -- (-2.6,-0.6) -- (-2.6,1.7);
+      \draw[thick] ($(-1.3,-0.6)+(-0.08,-0.15)$) -- ($(-1.3,-0.6)+(0.08,0.15)$);
+      \node[smallgraytext] at ($(-1.3,-0.6)+(0,0.32)$) {\ttab{n}};
+      \draw[thick, fill=gray!30!white!20] (-3.6,3.3) -- (-1.6,3.3) -- (-2.0,1.7) -- (-3.2,1.7) -- cycle;
+      \draw[thick] (-3.4,3.3) -- ++(0,0.6) node[above, smallgraytext] {\ttab{0}};
+      \draw[thick] ($(-3.4,3.65)+(-0.08,-0.15)$) -- ($(-3.4,3.65)+(0.08,0.15)$);
+      \draw[thick] (-3.0,3.3) -- ++(0,0.6) node[above, smallgraytext] {\ttab{b}};
+      \draw[thick] ($(-3.0,3.65)+(-0.08,-0.15)$) -- ($(-3.0,3.65)+(0.08,0.15)$);
+      \fill (-3.0,3.85) circle (1.3pt);
+      \draw[thick] (-3.0,3.85) -- (-2.6,3.85) -- (-2.6,3.46);
+      \draw[thick] (-2.6,3.38) circle (0.08);
+      \draw[thick] (-2.2,3.3) -- ++(0,0.6) node[above, smallgraytext] {\ttab{1}};
+      \draw[thick] ($(-2.2,3.65)+(-0.08,-0.15)$) -- ($(-2.2,3.65)+(0.08,0.15)$);
+      \draw[thick] (-1.8,2.5) -- ++(0.6,0) node[right, smallgraytext] {\ttab{select}};
+      \draw[thick] ($(-1.5,2.5)+(-0.08,-0.15)$) -- ($(-1.5,2.5)+(0.08,0.15)$);
+      \node[smallgraytext] at ($(-1.5,2.5)+(0,0.32)$) {\ttab{2}};
+
+      \draw[thick, dashed] (-3.75,-1.35) rectangle (3.35,3.45);
+      \node[smallgraytext] at (-1.8,3.75) {\ttab{n}};
+    \end{tikzpicture}
+  \end{figure}
+\vspace{-3mm}
+A \highlight{\ttab{select}} input picks which one happens, by choosing what gets fed as \ttab{b}.
+\end{frame}
+
+\begin{frame}
+  We also want a circuit that can perform \highlight{\textbf{logical}} operations, alongside the arithmetic ones.
+  \begin{figure}
+    \centering
+    \begin{tikzpicture}[>=stealth]
+  % gates
+  \node[and gate US, draw, thick, scale=1.0] (g1) at (-5.4,5.0) {};
+  \node[or gate US, draw, thick, scale=1.0] (g2) at (-3.6,5.0) {};
+  \node[xor gate US, draw, thick, scale=1.0] (g3) at (-1.8,5.0) {};
+  \node[not gate US, draw, thick, scale=1.0] (g4) at (0.0,5.0) {};
+
+  % ---- a bus: routed ABOVE the gates, drops straight down into each input 1 ----
+  \node[left, smallgraytext] at (-7.4,5.098) {\ttab{a}};
+  \draw[thick] ($(-7.0,5.098)+(-0.06,-0.07)$) -- ($(-7.0,5.098)+(0.06,0.07)$);
+  \draw[thick] (-7.4,5.098) -- (-5.909,5.098);
+  \fill (-5.909,5.098) circle (1.3pt);
+  \draw[thick] (-5.909,5.098) -- (g1.input 1);
+  \draw[thick] (-5.909,5.098) -- (-5.909,5.5) -- (-4.038,5.5);
+  \fill (-4.038,5.5) circle (1.3pt);
+  \draw[thick] (-4.038,5.5) -- (-4.038,5.098) -- (g2.input 1);
+  \draw[thick] (-4.038,5.5) -- (-2.336,5.5);
+  \fill (-2.336,5.5) circle (1.3pt);
+  \draw[thick] (-2.336,5.5) -- (-2.336,5.098) -- (g3.input 1);
+  \draw[thick] (-2.336,5.5) -- (-0.328,5.5) -- (-0.328,5.0) -- (g4.input);
+
+  % ---- b bus: routed ABOVE the gates (below the a bus), drops down into each input 2 ----
+  \node[left, smallgraytext] at (-7.4,4.902) {\ttab{b}};
+  \draw[thick] ($(-7.0,4.902)+(-0.06,-0.07)$) -- ($(-7.0,4.902)+(0.06,0.07)$);
+  \draw[thick] (-7.4,4.902) -- (-6.109,4.902);
+  \fill (-6.109,4.902) circle (1.3pt);
+  \draw[thick] (-6.109,4.902) -- (g1.input 2);
+  \draw[thick] (-6.109,4.902) -- (-6.109,5.35) -- (-4.238,5.35);
+  \fill (-4.238,5.35) circle (1.3pt);
+  \draw[thick] (-4.238,5.35) -- (-4.238,4.902) -- (g2.input 2);
+  \draw[thick] (-4.238,5.35) -- (-2.536,5.35) -- (-2.536,4.902) -- (g3.input 2);
+
+  % gate outputs down into mux
+  \draw[thick] (g1.output) -- (-4.992,3.3);
+  \draw[thick] (g2.output) -- (-3.122,3.3);
+  \draw[thick] (g3.output) -- (-1.321,3.3);
+  \draw[thick] (g4.output) -- (0.477,3.3);
+  % n-bit ticks on gate outputs
+  \draw[thick] ($(-4.992,4.15)+(-0.08,-0.15)$) -- ($(-4.992,4.15)+(0.08,0.15)$);
+  \draw[thick] ($(-3.122,4.15)+(-0.08,-0.15)$) -- ($(-3.122,4.15)+(0.08,0.15)$);
+  \draw[thick] ($(-1.321,4.15)+(-0.08,-0.15)$) -- ($(-1.321,4.15)+(0.08,0.15)$);
+  \draw[thick] ($(0.477,4.15)+(-0.08,-0.15)$) -- ($(0.477,4.15)+(0.08,0.15)$);
+  % mux
+  \draw[thick, fill=gray!30!white!20] (-5.4,3.3) -- (0.9,3.3) -- (-0.75,1.7) -- (-3.75,1.7) -- cycle;
+  \draw[thick] (0.075,2.5) -- ++(0.6,0) node[right, smallgraytext] {\ttab{select}};
+  \draw[thick] ($(0.375,2.5)+(-0.08,-0.15)$) -- ($(0.375,2.5)+(0.08,0.15)$);
+  \node[smallgraytext] at ($(0.375,2.5)+(0,-0.32)$) {\ttab{2}};
+  \draw[thick] (-2.25,1.7) -- ++(0,-0.5) node[below, smallgraytext] {\ttab{res}};
+  \draw[thick] ($(-2.25,1.45)+(-0.08,-0.15)$) -- ($(-2.25,1.45)+(0.08,0.15)$);
+  \draw[thick, dashed] (-6.3,1.55) rectangle (0.65,5.6);
+  \node[smallgraytext] at (-2.4,5.9) {\ttab{logical circuit}};
+\end{tikzpicture}
+  \end{figure}
+The same \ttab{select} bits choose which one appears at the output.
+\end{frame}
+
+\begin{frame}
+  An \highlight{\textbf{arithmetic logic unit (ALU)}} gathers these operations into one block. An operation select input chooses what it computes.\\[4mm]
+  \begin{figure}
+    \centering
+    \begin{tikzpicture}
+      \draw[thick, fill=gray!30!white!20]
+        (0,1.4) -- (2.4,0.6) -- (2.4,-0.6) -- (0,-1.4) -- (0,-0.4) -- (0.5,0) -- (0,0.4) -- cycle;
+      \node at (1.2,0) {\small ALU};
+      \draw[thick] (0,1.05) -- ++(-1.28,0) node[left, smallgraytext] {\ttab{a}};
+      \draw[thick] (0,-1.05) -- ++(-1.28,0) node[left, smallgraytext] {\ttab{b}};
+      \draw[thick] (1.2,-1.0) -- ++(0,-0.5) node[below, smallgraytext] {\ttab{op}};
+      \draw[thick] (2.4,0) -- ++(0.8,0) node[right, smallgraytext] {\ttab{res}};
+    \end{tikzpicture}
+  \end{figure}
+  \begin{center}
+    \graytext{the same hardware adds, subtracts, and computes logic operations}
+  \end{center}
+\end{frame}
+
+% ------------------------------------------------------------
+% comparator
+% ------------------------------------------------------------
+\begin{frame}{Comparator}
+  \begin{center}
+    \Large \highlight{\textbf{comparators}}
+  \end{center}
+\end{frame}
+
+\begin{frame}
+  A \highlight{\textbf{comparator}} tells us whether two numbers (each pair of their bits) are equal or not.
+  \\~\\
+  We can compute \ttab{a - b} and read the \ttab{sign} and \ttab{zero} flags.\\[4mm]
+  \begin{minipage}{0.33\textwidth}
+  \centering
+  \highlight{\textbf{\ttab{a = b}}} \\
+  \graytext{\ttab{zero = 1}}
+  \end{minipage}%
+    \begin{minipage}{0.33\textwidth}
+  \centering
+  \highlight{\textbf{\ttab{a < b}}} \\
+  \graytext{\ttab{zero = 0}, \ttab{sign = 1}}
+  \end{minipage}%
+    \begin{minipage}{0.33\textwidth}
+  \centering
+  \highlight{\textbf{\ttab{a > b}}} \\
+  \graytext{\ttab{zero = 0}, \ttab{sign = 0}}
+  \end{minipage}
+  \vspace{2mm}
+  \begin{center}
+    \graytext{this assumes no overflow occurred in the subtraction}
+  \end{center}
+\end{frame}
+
+
+\begin{frame}{Shifters}
+  \begin{center}
+    \Large \highlight{\textbf{shifters}}
+  \end{center}
+\end{frame}
+
+
+\begin{frame}
+  A \highlight{\textbf{shifter}} moves every bit one place to the left. A fixed shift needs no gates at all, only wiring.\\[6mm]
+  \begin{minipage}{0.58\textwidth}
+    \centering
+    \begin{tikzpicture}
+      % inputs a3..a0 along the top, outputs s4..s0 along the bottom
+      \foreach \i in {0,...,3}
+        \draw[thick] ({-\i*0.8}, 1.9) node[above, smallgraytext] {$\ttab{a}_{\ttab{\i}}$}
+                  -- ({-\i*0.8}, 1.5) -- ({-(\i+1)*0.8}, 0.3) -- ({-(\i+1)*0.8}, -0.1);
+      \foreach \j in {1,...,4}
+        \node[below, smallgraytext] at ({-\j*0.8}, -0.1) {$\ttab{s}_{\ttab{\j}}$};
+      % a zero enters on the right
+      \draw[thick] (0, 0.75) node[above, smallgraytext] {\ttab{0}} -- (0, -0.1)
+        node[below, smallgraytext] {$\ttab{s}_{\ttab{0}}$};
+      \draw[thick, dashed] (-3.55, 0.1) rectangle (0.35, 1.7);
+    \end{tikzpicture}
+  \end{minipage}%
+  \begin{minipage}{0.42\textwidth}
+    \centering
+    \begin{tikzpicture}
+      \draw[thick, fill=gray!30!white!20] (-0.7, 0) rectangle (0.7, 0.8);
+      \node at (0, 0.4) {\small \ttab{<< 1}};
+      \draw[thick] (0, 0.8) -- ++(0, 0.7) node[above, smallgraytext] {\ttab{a}};
+      \mvbus{0}{1.15}{n}
+      \draw[thick] (0, 0) -- ++(0, -0.7) node[below, smallgraytext] {\ttab{s}};
+      \mvbus{0}{-0.35}{n+1}
+    \end{tikzpicture}
+  \end{minipage}
+  \vspace{6mm}
+  \begin{center}
+    \graytext{a shift by $k$ places is the same wiring, moved over $k$ places}
+  \end{center}
+\end{frame}
+
+
+\begin{frame}{Multipliers}
+  \begin{center}
+    \Large \highlight{\textbf{multipliers}}
+  \end{center}
+\end{frame}
+
+
+\begin{frame}
+  In hardware, each row is \ttab{a} passed through a shifter and \ttab{AND}ed with one bit of \ttab{b}. A chain of adders sums the rows.\\[2mm]
+  \begin{figure}
+    \centering
+    \begin{tikzpicture}[scale=0.82, transform shape]
+      % a feeds every row
+      \draw[thick] (-1.0, 4.0) node[left, smallgraytext] {\ttab{a}} -- (6.9, 4.0);
+      \mhbus{-0.55}{4.0}{4}
+      \foreach \x in {0, 2.3, 4.6} \fill (\x, 4.0) circle (1.5pt);
+
+      % one row per bit of b: shift, then AND with that bit
+      \foreach \i/\x in {0/0, 1/2.3, 2/4.6, 3/6.9} {
+        \draw[thick] (\x, 4.0) -- (\x, 3.55);
+        \draw[thick, fill=gray!30!white!20] (\x-0.55, 2.95) rectangle (\x+0.55, 3.55);
+        \node at (\x, 3.25) {\scriptsize \ttab{<< \i}};
+        % hang the gate from its first input, so the shifter drops straight in
+        \node[and gate US, draw, thick, rotate=-90, scale=1.25, anchor=input 1] (g\i) at (\x, 2.55) {};
+        \draw[thick] (\x, 2.95) -- (g\i.input 1);
+        \draw[thick] (g\i.input 2) -- ++(0, 0.22) -- ++(-0.45, 0)
+          node[left, smallgraytext] {$\ttab{b}_{\ttab{\i}}$};
+        \draw[thick] ($(g\i.output)+(-0.15,-0.33)$) -- ($(g\i.output)+(0.15,-0.25)$);
+        \node[smallgraytext, anchor=west] at ($(g\i.output)+(0.15,-0.29)$) {\ttab{8}};
+      }
+
+      % the adder chain: each is the adder from before, with its cin tied to 0
+      \foreach \n/\x/\y in {1/1.15/0.5, 2/3.45/-0.55, 3/5.75/-1.6} {
+        \draw[thick, fill=gray!30!white!20] (\x-0.75, \y-0.33) rectangle (\x+0.75, \y+0.33);
+        \node at (\x, \y) {\scriptsize adder};
+        \draw[thick] (\x-0.75, \y) -- ++(-0.35, 0) node[left, smallgraytext] {\ttab{0}};
+      }
+      \draw[thick] (g0.output) |- (0.75, 1.05) -- (0.75, 0.83);
+      \draw[thick] (g1.output) |- (1.55, 1.05) -- (1.55, 0.83);
+      \draw[thick] (1.15, 0.17) |- (3.05, 0.0) -- (3.05, -0.22);
+      \draw[thick] (g2.output) |- (3.85, 0.0) -- (3.85, -0.22);
+      \draw[thick] (3.45, -0.88) |- (5.35, -1.05) -- (5.35, -1.27);
+      \draw[thick] (g3.output) |- (6.15, -1.05) -- (6.15, -1.27);
+      \draw[thick] (5.75, -1.93) -- (5.75, -2.6) node[below, smallgraytext] {\ttab{product}};
+      \mvbus{5.75}{-2.25}{8}
+    \end{tikzpicture}
+  \end{figure}
+  \vspace{-2mm}
+  \begin{center}
+    \graytext{every \ttab{cin} is \ttab{0}; the sum always fits in $2n$ bits, so no flags}
+  \end{center}
+\end{frame}
+
+\begin{frame}
+  The multiplier usually sits \highlight{\textbf{beside}} the ALU rather than inside it: it is much larger, much slower, and its result is $2n$ bits wide.\\[4mm]
+  \begin{figure}
+    \centering
+    \begin{tikzpicture}
+      % shared inputs
+      \draw[thick] (-2.2, 1.6) node[left, smallgraytext] {\ttab{a}} -- (-0.6, 1.6);
+      \draw[thick] (-2.2, 0.8) node[left, smallgraytext] {\ttab{b}} -- (-0.9, 0.8);
+      \mhbus{-1.8}{1.6}{n}
+      \mhbus{-1.8}{0.8}{n}
+      \fill (-0.6, 1.6) circle (1.3pt);
+      \fill (-0.9, 0.8) circle (1.3pt);
+
+      % ALU (same outline as before)
+      \begin{scope}[shift={(0.4, 1.2)}, scale=0.7]
+        \draw[thick, fill=gray!30!white!20]
+          (0,1.4) -- (2.4,0.6) -- (2.4,-0.6) -- (0,-1.4) -- (0,-0.4) -- (0.5,0) -- (0,0.4) -- cycle;
+        \node at (1.2,0) {\small ALU};
+        \draw[thick] (2.4,0) -- ++(1.2,0) node[right, smallgraytext] {\ttab{res}};
+        \draw[thick] (1.2,-1.0) -- ++(0,-0.5) node[below, smallgraytext] {\ttab{op}};
+      \end{scope}
+      \draw[thick] (-0.6, 1.6) -- (0.4, 1.6);
+      \draw[thick] (-0.9, 0.8) -- (0.4, 0.8);
+      \mhbus{2.5}{1.2}{n}
+
+      % multiplier
+      \draw[thick, fill=gray!30!white!20] (0.4, -2.0) rectangle (2.1, -0.8);
+      \node at (1.25, -1.4) {\small multiplier};
+      \draw[thick] (-0.6, 1.6) |- (0.4, -1.1);
+      \draw[thick] (-0.9, 0.8) |- (0.4, -1.7);
+      \draw[thick] (2.1, -1.4) -- ++(1.35, 0) node[right, smallgraytext] {\ttab{product}};
+      \mhbus{2.8}{-1.4}{2n}
+    \end{tikzpicture}
+  \end{figure}
+  \begin{center}
+    \graytext{a shifter is cheap, so it often becomes one more ALU operation}
+  \end{center}
+\end{frame}
+
+\end{document}

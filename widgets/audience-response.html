@@ -1,0 +1,1249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script id="widget-schema" type="application/json">
+{
+  "label": "Audience Response",
+  "category": "Audience Response",
+  "fields": [
+    { "key": "responseType", "label": "Question type", "type": "select",
+      "options": [ { "v": "choice", "l": "Multiple choice" }, { "v": "open", "l": "Open-ended" } ],
+      "default": "choice" },
+    { "key": "question", "label": "Question", "type": "textarea", "rows": 3,
+      "placeholder": "Enter the question…" },
+    { "key": "options", "label": "Answer options (one per line)", "type": "textarea-lines", "rows": 4,
+      "placeholder": "Option A\nOption B\nOption C", "showIf": { "responseType": "choice" } },
+    { "key": "correctAnswer", "label": "Correct option (1-based, blank = none)", "type": "number-nullable",
+      "min": 1, "step": 1, "showIf": { "responseType": "choice" } },
+    { "key": "autoStart", "label": "Start collecting when the slide opens", "type": "checkbox", "default": true },
+    { "key": "showLiveResults", "label": "Show results while collecting", "type": "checkbox", "default": false },
+    { "key": "minResponses", "label": "Min. responses before closing", "type": "number",
+      "min": 1, "step": 1, "default": 1, "showIf": { "responseType": "open" } },
+    { "key": "model", "label": "AI model for summaries", "type": "ai-model", "showIf": { "responseType": "open" } },
+    { "key": "numSummaries", "label": "AI summary count", "type": "number",
+      "min": 1, "step": 1, "default": 3, "showIf": { "responseType": "open" } },
+    { "key": "apiKey", "label": "API key", "type": "password", "placeholder": "Paste API key…",
+      "showIf": { "responseType": "open" } },
+    { "key": "scale", "label": "Text size", "type": "select", "options": ["1", "1.4", "1.8", "2.2"], "default": "1.4" }
+  ]
+}
+</script>
+<!-- Standalone fallback. Inside Beamer+ the host injects the shared widget
+     base (tokens, fonts, toolbar, buttons) ahead of everything else. Opened
+     directly (a file in Edge, a plain web server) nothing does, so load the
+     same stylesheet from the repo, relative to this file, at the same point in
+     the cascade. Beamer+ is unaffected: its link is already present. -->
+<script id="bw-standalone">
+(function () {
+  if (document.querySelector('link[href*="widget-base.css"]')) return;
+  var head = document.head || document.getElementsByTagName('head')[0];
+  [['preconnect', 'https://fonts.googleapis.com'],
+   ['stylesheet', 'https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@400;500;600&display=swap'],
+   ['stylesheet', '../static/css/widget-base.css']].forEach(function (l) {
+    var el = document.createElement('link');
+    el.rel = l[0]; el.href = l[1];
+    head.appendChild(el);
+  });
+  document.documentElement.setAttribute('data-bw-standalone', '');
+})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audience Response — Beamer+</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
+<script src="/static/vendor/qrcode.min.js"></script>
+<!-- Vendored by the Beamer+ server. Never load socket.io from a CDN, and never
+     call io() bare — inside the srcdoc iframe that resolves to
+     http://about/socket.io/, which an HTTPS deck blocks as mixed content. -->
+<script src="/static/vendor/socket.io.min.js"></script>
+<style>
+/* Tokens, reset, toolbar, buttons, cards, banners and the spinner come from
+   the shared widget base (static/css/widget-base.css). What's left here is the
+   poll itself: the question, the answer rows that double as result bars, the
+   join panel, the response wall, the spotlight and the AI summary card.
+
+   Everything the room reads is sized off --u, so the host's text-size control
+   grows the results without inflating the toolbar. */
+
+/* ── Toolbar extras ──────────────────────────────────── */
+#primary-btn, #live-btn, #view-seg, #viewer-badge { display: none; }
+.ar-seg { display: inline-flex; }
+.ar-seg .bw-btn { border-radius: 0; margin-left: -1px; }
+.ar-seg .bw-btn:first-child { border-radius: var(--radius) 0 0 var(--radius); margin-left: 0; }
+.ar-seg .bw-btn:last-child  { border-radius: 0 var(--radius) var(--radius) 0; }
+
+/* ── Stage: prompt on the left, join panel on the right ─ */
+#stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: calc(28px * var(--u));
+  padding: calc(18px * var(--u)) calc(28px * var(--u));
+}
+#stage.no-join { grid-template-columns: minmax(0, 1fr); }
+
+#prompt {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: calc(14px * var(--u));
+  padding-bottom: 6%;           /* bias slightly above true centre */
+}
+/* The wall and a long answer list want the top edge, not the middle. */
+#stage.is-wall #prompt { justify-content: flex-start; padding-bottom: 0; }
+
+#kicker { display: flex; align-items: center; gap: 10px; }
+#kicker-meta:not(:empty)::before { content: '·'; margin-right: 10px; }
+#question {
+  font-size: var(--fs-head);
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  flex-shrink: 0;
+  overflow-wrap: anywhere;
+}
+/* Once there is data to look at, the question steps back a size. */
+#stage.is-results #question,
+#stage.is-wall #question { font-size: var(--fs-lead); }
+
+#banner { display: none; }
+#notice { display: none; }
+
+/* ── Answer rows (and result bars) ──────────────────── */
+#choices {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: calc(8px * var(--u));
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: calc(12px * var(--u));
+  padding: calc(9px * var(--u)) calc(14px * var(--u)) calc(9px * var(--u)) calc(10px * var(--u));
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  transition: border-color 0.2s, background 0.2s, opacity 0.3s;
+}
+.badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: calc(26px * var(--u)); height: calc(26px * var(--u));
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1px solid var(--border-med);
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  font-weight: 600;
+  flex-shrink: 0;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.badge svg { width: 58%; height: 58%; }
+.choice-body { min-width: 0; }
+.choice-label { font-size: var(--fs-body); line-height: 1.35; color: var(--text); overflow-wrap: anywhere; }
+
+.track {
+  height: calc(9px * var(--u));
+  margin-top: calc(7px * var(--u));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+  overflow: hidden;
+  display: none;
+}
+.fill {
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: var(--text-3);
+  transition: width 0.7s cubic-bezier(.22, 1, .36, 1), background 0.2s;
+}
+.figure {
+  display: none;
+  flex-direction: column;
+  align-items: flex-end;
+  /* Fixed, not auto: each row is its own grid, so a content-sized column
+     would give "1 vote" a longer track than "12 votes" and the bars would
+     stop sharing a scale. */
+  width: calc(58px * var(--u));
+}
+.pct {
+  font-family: var(--font-mono);
+  font-size: var(--fs-lead);
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.votes {
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-chrome-sm);
+  color: var(--text-3);
+  white-space: nowrap;
+}
+#choices.show-results .track  { display: block; }
+#choices.show-results .figure { display: flex; }
+
+/* Leader(s): full ink. Ties all lead. */
+.choice.is-lead { border-color: var(--border-med); background: var(--bg); }
+.choice.is-lead .fill  { background: var(--text); }
+.choice.is-lead .badge { background: var(--text); border-color: var(--text); color: var(--bg); }
+
+/* Revealed answer: green carries the one piece of meaning on the slide. */
+.choice.is-correct {
+  border-color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 8%, var(--bg));
+}
+.choice.is-correct .fill  { background: var(--ok); }
+.choice.is-correct .badge { background: var(--ok); border-color: var(--ok); color: #fff; }
+.choice.is-correct .pct   { color: var(--ok); }
+.choice.is-dim { opacity: 0.45; }
+
+/* ── Join panel ─────────────────────────────────────── */
+#join {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(10px * var(--u));
+  padding-bottom: 6%;
+  min-height: 0;
+}
+#qr-wrap {
+  /* Stays white in dark mode too — a QR code has to keep its contrast to scan. */
+  width: min(38vh, 30vw, 300px);
+  padding: 10px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  line-height: 0;
+}
+#qr img, #qr canvas { width: 100% !important; height: auto !important; }
+#join-url {
+  font-family: var(--font-mono);
+  font-size: var(--fs-chrome-sm);
+  color: var(--text-3);
+  text-align: center;
+  max-width: min(38vh, 30vw, 300px);
+  word-break: break-all;
+  cursor: pointer;
+  padding: 3px 8px;
+  border-radius: 4px;
+  transition: color var(--dur), background var(--dur);
+}
+#join-url:hover { background: var(--bg-subtle); color: var(--text-2); }
+#tally { display: flex; align-items: baseline; gap: 8px; margin-top: 4px; }
+#tally-n {
+  font-family: var(--font-mono);
+  font-size: var(--fs-head);
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  display: inline-block;
+}
+#tally-n.bump { animation: ar-bump 0.35s ease-out; }
+
+/* ── Response wall (open-ended) ─────────────────────── */
+#wall {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: none;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  justify-content: center;
+  gap: calc(10px * var(--u));
+  overflow-y: auto;
+  padding: 2px 2px calc(12px * var(--u));
+  scrollbar-width: thin;
+}
+.resp {
+  max-width: min(100%, calc(340px * var(--u)));
+  padding: calc(10px * var(--u)) calc(14px * var(--u));
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  font-size: var(--fs-body);
+  line-height: 1.4;
+  color: var(--text);
+  overflow-wrap: anywhere;
+  transition: border-color var(--dur), background var(--dur);
+}
+.resp.is-many { border-color: var(--border-med); background: var(--bg); }
+.resp .times {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--text);
+  color: var(--bg);
+  font-family: var(--font-mono);
+  font-size: var(--fs-chrome-sm);
+  font-weight: 600;
+  vertical-align: 0.15em;
+}
+.resp.is-new { animation: ar-in 0.45s cubic-bezier(.22, 1, .36, 1); }
+body.is-presenter .resp { cursor: pointer; }
+body.is-presenter .resp:hover { border-color: var(--text-3); }
+#wall-empty { display: none; margin: auto; }
+
+/* ── Spotlight: one response, big, for discussion ───── */
+#spot {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 5% 8% 9%;
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  backdrop-filter: blur(2px);
+}
+#spot.is-open { display: flex; animation: ar-fade 0.2s ease-out; }
+#spot-card {
+  width: 100%;
+  max-width: calc(640px * var(--u));
+  max-height: 100%;
+  overflow-y: auto;
+  padding: calc(26px * var(--u)) calc(30px * var(--u)) calc(18px * var(--u));
+  background: var(--bg);
+  border: 1px solid var(--border-med);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.14);
+}
+#spot-text {
+  font-size: var(--fs-head);
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+#spot-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: calc(18px * var(--u));
+  font-family: var(--font-mono);
+  font-size: var(--fs-chrome-sm);
+  color: var(--text-3);
+}
+#spot-foot .bw-spacer { flex: 1; }
+
+/* ── AI summary ─────────────────────────────────────── */
+#summary {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(16px * var(--u));
+  padding-bottom: 6%;
+}
+#sum-card { width: 100%; max-width: calc(620px * var(--u)); }
+#sum-text { font-size: var(--fs-lead); line-height: 1.5; color: var(--text); }
+.meter {
+  height: calc(6px * var(--u));
+  margin-top: calc(18px * var(--u));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+  overflow: hidden;
+}
+.meter-fill {
+  height: 100%;
+  width: 0;
+  background: var(--text);
+  border-radius: 999px;
+  transition: width 0.6s cubic-bezier(.22, 1, .36, 1);
+}
+#sum-nav { display: flex; align-items: center; gap: 12px; }
+#sum-dots { display: flex; gap: 6px; }
+#sum-dots span {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--border-med);
+  transition: background var(--dur), transform var(--dur);
+}
+#sum-dots span.is-on { background: var(--text); transform: scale(1.2); }
+#sum-busy { display: none; }
+
+/* ── Motion ─────────────────────────────────────────── */
+@keyframes ar-in   { from { opacity: 0; transform: translateY(8px) scale(0.97); } }
+@keyframes ar-fade { from { opacity: 0; } }
+@keyframes ar-bump { 40% { transform: scale(1.18); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .fill, .meter-fill, .choice { transition: none; }
+  .resp.is-new, #spot.is-open, #tally-n.bump { animation: none; }
+}
+
+/* ── Narrow or tall regions: stack, join panel becomes a strip ─ */
+@media (max-width: 620px), (max-aspect-ratio: 1/1) {
+  #stage { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; gap: 14px; }
+  #join {
+    flex-direction: row;
+    flex-wrap: wrap;
+    padding-bottom: 0;
+    gap: 12px;
+  }
+  #qr-wrap { width: min(22vh, 40vw, 180px); padding: 6px; }
+  /* No room for the caption and link beside a small QR; the code is enough. */
+  #join > .bw-hint:first-child, #join-url { display: none; }
+}
+
+/* Scrollbars: hairline, never louder than the content. */
+#choices::-webkit-scrollbar, #wall::-webkit-scrollbar, #spot-card::-webkit-scrollbar { width: 6px; }
+#choices::-webkit-scrollbar-thumb, #wall::-webkit-scrollbar-thumb, #spot-card::-webkit-scrollbar-thumb {
+  background: var(--border); border-radius: 3px;
+}
+#choices::-webkit-scrollbar-thumb:hover, #wall::-webkit-scrollbar-thumb:hover { background: var(--border-med); }
+</style>
+</head>
+<body>
+<div id="shell" class="bw-shell">
+
+  <div id="toolbar" class="bw-toolbar" data-bw-topbar>
+    <span class="bw-toolbar-title" id="wtitle">Audience Response</span>
+    <div class="bw-sep"></div>
+    <span class="bw-status"><span class="bw-dot" id="dot"></span><span id="status-text">Not started</span></span>
+    <div class="bw-spacer"></div>
+    <span class="bw-status" id="viewer-badge">View only · synced with presenter</span>
+    <button class="bw-btn" id="live-btn" title="Show or hide results on the slide while collecting">Show results</button>
+    <div class="ar-seg" id="view-seg">
+      <button class="bw-btn" id="view-wall">Responses</button>
+      <button class="bw-btn" id="view-summary">AI summary</button>
+    </div>
+    <button class="bw-btn bw-btn--primary" id="primary-btn">Start</button>
+  </div>
+
+  <div id="stage">
+    <section id="prompt">
+      <div id="banner" class="bw-banner bw-banner--error"></div>
+      <div id="kicker"><span class="bw-hint" id="kicker-text">Multiple choice</span><span class="bw-hint" id="kicker-meta"></span></div>
+      <div id="question" class="bw-md"></div>
+      <div id="notice" class="bw-empty"></div>
+      <ol id="choices"></ol>
+      <div id="wall"><div id="wall-empty" class="bw-empty">Responses will appear here.</div></div>
+      <div id="summary">
+        <div id="sum-busy" class="bw-center"><div class="bw-spinner"></div><div class="bw-boot-sub">Summarising responses…</div></div>
+        <div id="sum-card" class="bw-card bw-card--lg">
+          <div id="sum-text"></div>
+          <div class="meter"><div class="meter-fill" id="sum-meter"></div></div>
+          <div id="sum-meta" class="bw-card-meta"></div>
+        </div>
+        <div id="sum-nav">
+          <button class="bw-btn bw-btn--icon" id="sum-prev" title="Previous summary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg></button>
+          <div id="sum-dots"></div>
+          <button class="bw-btn bw-btn--icon" id="sum-next" title="Next summary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg></button>
+        </div>
+      </div>
+    </section>
+
+    <aside id="join">
+      <div class="bw-hint">Scan to respond</div>
+      <div id="qr-wrap"><div id="qr"></div></div>
+      <div id="join-url" title="Click to copy"></div>
+      <div id="tally"><span id="tally-n">0</span><span class="bw-hint" id="tally-label">responses</span></div>
+    </aside>
+
+    <div id="spot">
+      <div id="spot-card">
+        <div id="spot-text"></div>
+        <div id="spot-foot">
+          <span id="spot-count"></span>
+          <span class="bw-spacer"></span>
+          <button class="bw-btn bw-btn--icon" id="spot-prev" title="Previous (←)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg></button>
+          <span id="spot-pos"></span>
+          <button class="bw-btn bw-btn--icon" id="spot-next" title="Next (→)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg></button>
+          <button class="bw-btn bw-btn--icon" id="spot-close" title="Close (Esc)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ── Config ──────────────────────────────────────────────────────────────────
+  const _qs       = new URLSearchParams(location.search);
+  const CFG0      = window.WIDGET_CONFIG || {};
+  let   cfg       = { ...CFG0 };
+  let   WIDGET_ID = CFG0.id || CFG0.widgetId || 'audience-response';
+  let   IS_VIEWER = CFG0.role === 'viewer' || _qs.get('viewer') === '1';
+
+  const LETTERS  = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const letter   = i => LETTERS[i] || String(i + 1);
+  const MAX_SYNC = 400;     // response groups carried to viewers / saved with the deck
+  const POLL_MS  = 3000;
+
+  const CHECK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>';
+
+  // ── DOM ─────────────────────────────────────────────────────────────────────
+  const $ = id => document.getElementById(id);
+  const stage      = $('stage');
+  const titleEl    = $('wtitle');
+  const dotEl      = $('dot');
+  const statusText = $('status-text');
+  const viewerBadge= $('viewer-badge');
+  const liveBtn    = $('live-btn');
+  const viewSeg    = $('view-seg');
+  const viewWall   = $('view-wall');
+  const viewSum    = $('view-summary');
+  const primaryBtn = $('primary-btn');
+  const bannerEl   = $('banner');
+  const kickerText = $('kicker-text');
+  const kickerMeta = $('kicker-meta');
+  const questionEl = $('question');
+  const noticeEl   = $('notice');
+  const choicesEl  = $('choices');
+  const wallEl     = $('wall');
+  const wallEmpty  = $('wall-empty');
+  const joinEl     = $('join');
+  const qrEl       = $('qr');
+  const joinUrlEl  = $('join-url');
+  const tallyN     = $('tally-n');
+  const tallyLabel = $('tally-label');
+  const spotEl     = $('spot');
+  const spotText   = $('spot-text');
+  const spotCount  = $('spot-count');
+  const spotPos    = $('spot-pos');
+  const summaryEl  = $('summary');
+  const sumBusy    = $('sum-busy');
+  const sumCard    = $('sum-card');
+  const sumText    = $('sum-text');
+  const sumMeter   = $('sum-meter');
+  const sumMeta    = $('sum-meta');
+  const sumDots    = $('sum-dots');
+  const sumNav     = $('sum-nav');
+
+  // ── State ───────────────────────────────────────────────────────────────────
+  // Everything a viewer needs to draw the same picture lives in S; the DOM is a
+  // projection of it. `responses` is presenter-only raw data — viewers get the
+  // derived `votes` / `groups` instead, which are far smaller.
+  const S = {
+    type:      'choice',     // 'choice' | 'open'
+    question:  '',
+    options:   [],
+    correct:   null,         // 0-based index, or null
+    phase:     'idle',       // 'idle' | 'collect' | 'results'
+    surveyId:  null,
+    joinUrl:   '',
+    responses: [],
+    total:     0,
+    votes:     {},           // choice: { A: 3, B: 1 }
+    groups:    [],           // open: [{ text, n }] in order of first appearance
+    showLive:  false,
+    revealed:  false,
+    view:      'wall',       // open results: 'wall' | 'summary'
+    summaries: null,         // { summaries: [{summary, num_respondents}], num_responses }
+    sIdx:      0,
+    sumBusy:   false,
+    sumError:  '',
+    spotlight: -1,
+    error:     '',
+  };
+
+  let pollKey    = null;     // [type, question, options] of the running poll
+  let lastLive   = undefined;// last showLiveResults seen in config, so a toggle survives re-config
+  let startToken = 0;        // bumped to discard a create() that lost a race
+  let pollTimer  = null;
+  let inflight   = null;
+
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function parentOrigin() {
+    // location.origin is "null" inside a srcdoc iframe, hence the parent first.
+    try { return window.parent.location.origin; } catch (_) { return window.location.origin; }
+  }
+  function serverUrl() {
+    return (cfg.serverUrl || cfg.socketUrl || parentOrigin()).replace(/\/+$/, '');
+  }
+  function publicOrigin() {
+    try { return new URL(cfg.publicBaseUrl || cfg.serverUrl || cfg.socketUrl).origin; }
+    catch (_) { return parentOrigin(); }
+  }
+
+  // Markdown + KaTeX for the question and answer options. Falls back to plain
+  // text when the CDN is unreachable, rather than showing nothing.
+  function setMd(el, src) {
+    src = src == null ? '' : String(src);
+    if (el._md === src && el._mdKatex === !!window.renderMathInElement) return;
+    el._md = src; el._mdKatex = !!window.renderMathInElement;
+    if (!src) { el.textContent = ''; return; }
+    if (!window.marked) { el.textContent = src; return; }
+    // Presenter-authored config, not audience input — responses never come
+    // through here; they're set with textContent.
+    el.innerHTML = marked.parse(src, { breaks: false });
+    if (window.renderMathInElement) {
+      renderMathInElement(el, {
+        delimiters: [
+          { left: '$$',  right: '$$',  display: true  },
+          { left: '$',   right: '$',   display: false },
+          { left: '\\(', right: '\\)', display: false },
+          { left: '\\[', right: '\\]', display: true  },
+        ], throwOnError: false,
+      });
+    }
+  }
+
+  // Count a number up (or down) to its new value instead of snapping — reads
+  // as "the results are coming in" from the back of a room.
+  const REDUCED = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  function countTo(el, to, suffix) {
+    const from = el._v ?? 0;
+    el._v = to;
+    cancelAnimationFrame(el._raf);
+    if (REDUCED || from === to) { el.textContent = to + suffix; return; }
+    const t0 = performance.now(), dur = 650;
+    const step = t => {
+      const k = Math.min(1, (t - t0) / dur);
+      const e = 1 - Math.pow(1 - k, 3);
+      el.textContent = Math.round(from + (to - from) * e) + suffix;
+      if (k < 1) el._raf = requestAnimationFrame(step);
+    };
+    el._raf = requestAnimationFrame(step);
+  }
+
+  function normaliseOptions(o) {
+    const arr = Array.isArray(o) ? o : String(o || '').split('\n');
+    return arr.map(s => String(s).trim()).filter(Boolean).slice(0, LETTERS.length);
+  }
+
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+  // ── Derived data ────────────────────────────────────────────────────────────
+  function recompute() {
+    S.total = S.responses.length;
+    if (S.type === 'choice') {
+      const v = {};
+      for (const r of S.responses) {
+        const k = String(r.text || '').trim().toUpperCase();
+        if (k) v[k] = (v[k] || 0) + 1;
+      }
+      S.votes = v;
+    } else {
+      // Identical answers ("yes", "Yes ") collapse into one card with a count,
+      // so a room that agrees shows as agreement rather than as repetition.
+      const m = new Map();
+      for (const r of S.responses) {
+        const t = String(r.text || '').trim();
+        if (!t) continue;
+        const k = t.toLowerCase().replace(/\s+/g, ' ');
+        const g = m.get(k);
+        if (g) g.n++; else m.set(k, { text: t, n: 1 });
+      }
+      S.groups = [...m.values()];
+    }
+  }
+
+  function ready() {
+    return !!S.question && (S.type === 'open' || S.options.length >= 2);
+  }
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+  function render() {
+    document.body.classList.toggle('is-presenter', !IS_VIEWER);
+    const open    = S.type === 'open';
+    const results = S.phase === 'results';
+    const collect = S.phase === 'collect';
+    const showData = results || (collect && S.showLive);
+
+    titleEl.textContent    = open ? 'Open Response' : 'Multiple Choice';
+    kickerText.textContent = open ? 'Open question' : 'Multiple choice';
+    kickerMeta.textContent = showData ? plural(S.total, 'response', 'responses') : '';
+
+    // Status pill
+    dotEl.className = 'bw-dot ' + (collect ? 'is-ready' : 'is-idle');
+    statusText.textContent =
+      collect ? `Live · ${plural(S.total, 'response', 'responses')}` :
+      results ? `Closed · ${plural(S.total, 'response', 'responses')}` : 'Not started';
+
+    // Layout
+    stage.classList.toggle('no-join',    !collect);
+    stage.classList.toggle('is-results', results);
+    stage.classList.toggle('is-wall',    open && showData);
+    joinEl.style.display = collect ? 'flex' : 'none';
+
+    // Banner / setup notice
+    bannerEl.style.display = S.error ? 'flex' : 'none';
+    bannerEl.textContent   = S.error;
+    let notice = '';
+    if (!IS_VIEWER && !S.question) notice = 'Add a question in the widget settings.';
+    else if (!IS_VIEWER && !open && S.options.length < 2) notice = 'Add at least two answer options.';
+    noticeEl.style.display = notice ? 'block' : 'none';
+    noticeEl.textContent   = notice;
+
+    setMd(questionEl, S.question);
+
+    choicesEl.style.display = open ? 'none' : 'flex';
+    if (!open) renderChoices(showData);
+
+    const showWall = open && showData && !(results && S.view === 'summary');
+    wallEl.style.display = showWall ? 'flex' : 'none';
+    if (open) renderWall();
+
+    summaryEl.style.display = open && results && S.view === 'summary' ? 'flex' : 'none';
+    if (open && results && S.view === 'summary') renderSummary();
+
+    renderJoin();
+    renderSpotlight();
+    renderToolbar();
+  }
+
+  function renderToolbar() {
+    const open = S.type === 'open', p = S.phase;
+    viewerBadge.style.display = IS_VIEWER ? 'inline-flex' : 'none';
+    if (IS_VIEWER) {
+      [liveBtn, viewSeg, primaryBtn].forEach(b => { b.style.display = 'none'; });
+      return;
+    }
+
+    liveBtn.style.display = p === 'collect' ? 'inline-flex' : 'none';
+    liveBtn.classList.toggle('is-active', S.showLive);
+    liveBtn.textContent = (S.showLive ? 'Hide ' : 'Show ') + (open ? 'responses' : 'results');
+
+    const hasModel = !!cfg.model;
+    viewSeg.style.display = open && p === 'results' && hasModel ? 'inline-flex' : 'none';
+    viewWall.classList.toggle('is-active', S.view === 'wall');
+    viewSum .classList.toggle('is-active', S.view === 'summary');
+
+    let label = '', show = true, disabled = false;
+    if (p === 'idle') {
+      label = 'Start collecting'; disabled = !ready();
+    } else if (p === 'collect') {
+      label = 'Close & show results';
+      const min = parseInt(cfg.minResponses, 10) || 1;
+      if (open && S.total < min) { disabled = true; primaryBtn.title = `Needs ${plural(min, 'response', 'responses')}`; }
+      else primaryBtn.title = '';
+    } else if (!open && S.correct != null) {
+      label = S.revealed ? 'Hide answer' : 'Reveal answer';
+    } else {
+      show = false;
+    }
+    primaryBtn.style.display = show ? 'inline-flex' : 'none';
+    primaryBtn.textContent   = label;
+    primaryBtn.disabled      = disabled;
+  }
+
+  // Answer rows are built once per option list and then only updated, so the
+  // bars animate from their last width instead of redrawing from zero.
+  let choicesKey = null, choiceRows = [];
+  function renderChoices(showData) {
+    const key = JSON.stringify(S.options);
+    let fresh = false;
+    if (key !== choicesKey) {
+      choicesKey = key; fresh = true;
+      choicesEl.textContent = '';
+      choiceRows = S.options.map((opt, i) => {
+        const li    = document.createElement('li');   li.className = 'choice';
+        const badge = document.createElement('span'); badge.className = 'badge';
+        const body  = document.createElement('div');  body.className = 'choice-body';
+        const label = document.createElement('div'); label.className = 'choice-label bw-md';
+        const track = document.createElement('div');  track.className = 'track';
+        const fill  = document.createElement('div');  fill.className = 'fill';
+        const fig   = document.createElement('div');  fig.className = 'figure';
+        const pct   = document.createElement('span'); pct.className = 'pct';
+        const votes = document.createElement('span'); votes.className = 'votes';
+        track.appendChild(fill); body.appendChild(label); body.appendChild(track);
+        fig.appendChild(pct); fig.appendChild(votes);
+        li.appendChild(badge); li.appendChild(body); li.appendChild(fig);
+        choicesEl.appendChild(li);
+        pct.textContent = '0%'; pct._v = 0;
+        return { li, badge, label, fill, pct, votes, i };
+      });
+    }
+    choiceRows.forEach(r => setMd(r.label, S.options[r.i]));   // cached; KaTeX may arrive late
+
+    choicesEl.classList.toggle('show-results', showData);
+    const counts = S.options.map((_, i) => S.votes[letter(i)] || 0);
+    const total  = counts.reduce((a, b) => a + b, 0);
+    const max    = Math.max(0, ...counts);
+    const reveal = S.revealed && S.correct != null;
+
+    choiceRows.forEach(r => {
+      const n   = counts[r.i];
+      const pct = total ? Math.round(n / total * 100) : 0;
+      const ok  = reveal && S.correct === r.i;
+      r.li.classList.toggle('is-lead',    showData && !reveal && total > 0 && n === max);
+      r.li.classList.toggle('is-correct', ok);
+      r.li.classList.toggle('is-dim',     reveal && !ok);
+      if (ok) r.badge.innerHTML = CHECK_SVG; else r.badge.textContent = letter(r.i);
+      r.votes.textContent = plural(n, 'vote', 'votes');
+      const w = showData ? pct + '%' : '0%';
+      // A just-built bar needs one frame at 0 before it can transition out.
+      if (fresh) requestAnimationFrame(() => requestAnimationFrame(() => { r.fill.style.width = w; }));
+      else r.fill.style.width = w;
+      countTo(r.pct, showData ? pct : 0, '%');
+    });
+  }
+
+  // Cards are appended as responses arrive and never rebuilt, so only the new
+  // ones animate in and a card being read doesn't jump.
+  let wallCards = [];
+  function renderWall() {
+    const g = S.groups;
+    if (g.length < wallCards.length ||
+        (wallCards.length && wallCards[0].text !== g[0]?.text)) {
+      wallCards.forEach(c => c.el.remove());
+      wallCards = [];
+    }
+    const animate = wallCards.length > 0 || S.phase === 'collect';
+    for (let i = 0; i < g.length; i++) {
+      let c = wallCards[i];
+      if (!c) {
+        const el = document.createElement('div');
+        el.className = 'resp' + (animate ? ' is-new' : '');
+        const t  = document.createElement('span');
+        const x  = document.createElement('span'); x.className = 'times';
+        t.textContent = g[i].text;
+        el.appendChild(t); el.appendChild(x);
+        el.addEventListener('click', () => openSpotlight(i));
+        el.addEventListener('animationend', () => el.classList.remove('is-new'), { once: true });
+        wallEl.appendChild(el);
+        c = wallCards[i] = { el, times: x, text: g[i].text, n: -1 };
+      }
+      if (c.n !== g[i].n) {
+        c.n = g[i].n;
+        c.times.textContent = '×' + c.n;
+        c.times.style.display = c.n > 1 ? 'inline-block' : 'none';
+        c.el.classList.toggle('is-many', c.n > 1);
+      }
+    }
+    wallEmpty.style.display = g.length ? 'none' : 'block';
+  }
+
+  let lastTally = 0;
+  function renderJoin() {
+    if (S.phase !== 'collect') return;
+    if (qrEl.dataset.url !== S.joinUrl) {
+      qrEl.textContent = '';
+      qrEl.dataset.url = S.joinUrl;
+      joinUrlEl.textContent = S.joinUrl;
+      if (S.joinUrl && typeof QRCode !== 'undefined') {
+        new QRCode(qrEl, { text: S.joinUrl, width: 320, height: 320,
+                           colorDark: '#1a1a18', colorLight: '#ffffff' });
+      }
+    }
+    if (S.total !== lastTally) {
+      if (S.total > lastTally) {
+        tallyN.classList.remove('bump'); void tallyN.offsetWidth; tallyN.classList.add('bump');
+      }
+      lastTally = S.total;
+    }
+    tallyN.textContent     = S.total;
+    tallyLabel.textContent = S.total === 1 ? 'response' : 'responses';
+  }
+
+  function renderSpotlight() {
+    const g = S.groups[S.spotlight];
+    const on = S.type === 'open' && !!g;
+    spotEl.classList.toggle('is-open', on);
+    if (!on) return;
+    spotText.textContent  = g.text;
+    spotCount.textContent = g.n > 1 ? `${g.n} people said this` : '';
+    spotPos.textContent   = `${S.spotlight + 1} / ${S.groups.length}`;
+    ['spot-prev', 'spot-next', 'spot-close'].forEach(id => { $(id).style.display = IS_VIEWER ? 'none' : ''; });
+    $('spot-prev').disabled = S.spotlight === 0;
+    $('spot-next').disabled = S.spotlight >= S.groups.length - 1;
+  }
+
+  function renderSummary() {
+    const list = S.summaries?.summaries || [];
+    sumBusy.style.display = S.sumBusy ? 'flex' : 'none';
+    const show = !S.sumBusy && (list.length || S.sumError);
+    sumCard.style.display = show ? 'block' : 'none';
+    sumNav.style.display  = !S.sumBusy && list.length > 1 ? 'flex' : 'none';
+    if (!show) return;
+
+    if (S.sumError) {
+      sumText.textContent = S.sumError;
+      sumMeter.style.width = '0%';
+      sumMeta.textContent = '';
+      return;
+    }
+    const i   = Math.min(S.sIdx, list.length - 1);
+    const s   = list[i];
+    const tot = S.summaries.num_responses || S.total || 1;
+    sumText.textContent  = s.summary;
+    sumMeter.style.width = Math.round(Math.min(1, s.num_respondents / tot) * 100) + '%';
+    sumMeta.textContent  = `${plural(s.num_respondents, 'respondent', 'respondents')} of ${tot}`;
+    sumDots.textContent  = '';
+    list.forEach((_, k) => {
+      const d = document.createElement('span');
+      if (k === i) d.className = 'is-on';
+      sumDots.appendChild(d);
+    });
+    $('sum-prev').disabled = i === 0;
+    $('sum-next').disabled = i === list.length - 1;
+    $('sum-prev').style.visibility = $('sum-next').style.visibility = IS_VIEWER ? 'hidden' : '';
+  }
+
+  // ── Server ──────────────────────────────────────────────────────────────────
+  function resetPoll() {
+    stopPolling();
+    Object.assign(S, {
+      phase: 'idle', surveyId: null, joinUrl: '', responses: [], total: 0,
+      votes: {}, groups: [], revealed: false, view: 'wall', summaries: null,
+      sIdx: 0, sumBusy: false, sumError: '', spotlight: -1, error: '',
+    });
+    lastTally = 0;
+  }
+
+  function closeOnServer(sid) {
+    if (sid) fetch(`${serverUrl()}/api/survey/${sid}/close`, { method: 'POST' }).catch(() => {});
+  }
+
+  async function startPoll() {
+    if (IS_VIEWER || !ready()) return;
+    const token = ++startToken;
+    stopPolling();
+    const open = S.type === 'open';
+    const body = { question: S.question };
+    if (open) {
+      body.model         = cfg.model || null;
+      body.num_summaries = parseInt(cfg.numSummaries, 10) || 3;
+      if (cfg.apiKey) body.api_key = cfg.apiKey;
+    } else {
+      body.options = S.options;
+      body.model   = null;
+    }
+    try {
+      const res  = await fetch(`${serverUrl()}/api/survey/create`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      if (token !== startToken) { closeOnServer(data.survey_id); return; }   // superseded
+      resetPoll();
+      S.surveyId = data.survey_id;
+      // data.url is root-relative (/s/<id>/mcq/<sid>); the audience needs the
+      // public origin in front of it.
+      S.joinUrl  = publicOrigin() + data.url;
+      S.phase    = 'collect';
+      pollTimer  = setInterval(fetchResponses, POLL_MS);
+      render(); emitState();
+    } catch (e) {
+      if (token !== startToken) return;
+      S.error = `Couldn't open the poll — ${e.message || 'server unreachable'}.`;
+      render();
+    }
+  }
+
+  function fetchResponses() {
+    if (inflight) return inflight;
+    const sid = S.surveyId;
+    if (!sid) return Promise.resolve();
+    inflight = (async () => {
+      try {
+        const res = await fetch(`${serverUrl()}/api/survey/${sid}/responses?after=${S.responses.length}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (sid !== S.surveyId) return;
+        // The server restarted under us: its list is shorter than ours. Start over.
+        if (typeof data.total === 'number' && data.total < S.responses.length) {
+          S.responses = []; recompute(); render(); emitState();
+          return;
+        }
+        if (data.responses?.length) {
+          S.responses.push(...data.responses);
+          recompute(); render(); emitState();
+        }
+      } catch (_) { /* transient — the next tick retries */ }
+      finally { inflight = null; }
+    })();
+    return inflight;
+  }
+
+  function stopPolling() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  }
+
+  async function closePoll() {
+    if (IS_VIEWER || S.phase !== 'collect') return;
+    stopPolling();
+    await fetchResponses();
+    await fetchResponses();   // the first may have been one already in flight
+    closeOnServer(S.surveyId);
+    S.phase = 'results'; S.view = 'wall'; S.spotlight = -1;
+    render(); emitState();
+  }
+
+  async function loadSummary() {
+    if (IS_VIEWER || S.sumBusy || S.summaries || !S.surveyId) return;
+    S.sumBusy = true; S.sumError = ''; render();
+    try {
+      const res  = await fetch(`${serverUrl()}/api/survey/${S.surveyId}/analyze`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      S.summaries = data; S.sIdx = 0;
+    } catch (e) {
+      S.sumError = `Couldn't summarise: ${e.message}`;
+    } finally {
+      S.sumBusy = false; render(); emitState();
+    }
+  }
+
+  // ── Actions ─────────────────────────────────────────────────────────────────
+  function onPrimary() {
+    if (IS_VIEWER) return;
+    if (S.phase === 'idle')         startPoll();
+    else if (S.phase === 'collect') closePoll();
+    else if (S.correct != null)     { S.revealed = !S.revealed; render(); emitState(); }
+  }
+
+  function toggleLive() {
+    if (IS_VIEWER) return;
+    S.showLive = !S.showLive;
+    render(); emitState();
+  }
+
+  function setView(v) {
+    if (IS_VIEWER || S.view === v) return;
+    S.view = v; S.spotlight = -1;
+    render(); emitState();
+    if (v === 'summary') loadSummary();
+  }
+
+  function openSpotlight(i) {
+    if (IS_VIEWER) return;
+    S.spotlight = i; render(); emitState();
+  }
+  function stepSpotlight(d) {
+    if (IS_VIEWER || S.spotlight < 0) return;
+    const n = Math.max(0, Math.min(S.groups.length - 1, S.spotlight + d));
+    if (n !== S.spotlight) { S.spotlight = n; render(); emitState(); }
+  }
+  function closeSpotlight() {
+    if (IS_VIEWER || S.spotlight < 0) return;
+    S.spotlight = -1; render(); emitState();
+  }
+
+  function stepSummary(d) {
+    const n = S.summaries?.summaries?.length || 0;
+    if (IS_VIEWER || !n) return;
+    const i = Math.max(0, Math.min(n - 1, S.sIdx + d));
+    if (i !== S.sIdx) { S.sIdx = i; render(); emitState(); }
+  }
+
+  // Host reset: close the current poll and open a fresh one with a new QR code,
+  // so old responses don't carry over.
+  function restartPoll() {
+    if (IS_VIEWER) return;
+    closeOnServer(S.phase === 'collect' ? S.surveyId : null);
+    resetPoll(); render(); emitState();
+    startPoll();
+  }
+
+  function copyUrl() {
+    navigator.clipboard?.writeText(S.joinUrl).catch(() => {});
+  }
+
+  // ── Socket.IO sync ──────────────────────────────────────────────────────────
+  // Presenter emits, viewers apply. The presenter also joins the session room
+  // to hear `survey_response` pushes, which make new answers land in well under
+  // the 3s poll; the poll stays as the fallback.
+  let socket = null, socketUrlInUse = null, syncTimer = null;
+
+  function initSocket(url) {
+    url = url || (window.BeamerWidget ? BeamerWidget.serverOrigin() : '');
+    if (!url || url === socketUrlInUse) return;
+    socketUrlInUse = url;
+    if (typeof io === 'undefined') { socket = { emit() {}, on() {} }; return; }
+    try {
+      const prev = socket;
+      socket = io(url, { transports: ['websocket', 'polling'] });
+      if (prev && prev.disconnect) prev.disconnect();
+      socket.on('connect', () => {
+        if (!IS_VIEWER) socket.emit('join_presenter', { session_id: cfg.sessionId });
+      });
+      socket.on('widget_state', data => {
+        if (!IS_VIEWER || data?.widgetId !== WIDGET_ID) return;
+        applyState(data.state || {});
+      });
+      socket.on('survey_response', data => {
+        if (IS_VIEWER || !S.surveyId || data?.survey_id !== S.surveyId) return;
+        fetchResponses();
+      });
+    } catch (_) {
+      socket = { emit() {}, on() {} };
+    }
+  }
+
+  function emitState() {
+    if (!socket || IS_VIEWER) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => {
+      socket.emit('widget_state', { widgetId: WIDGET_ID, session_id: cfg.sessionId, state: getState() });
+    }, 150);
+  }
+
+  // ── State serialisation ─────────────────────────────────────────────────────
+  // One shape for live sync and for the host's park/restore, so a restored
+  // slide looks exactly like a synced viewer.
+  function getState() {
+    return {
+      type: S.type, question: S.question, options: S.options, correct: S.correct,
+      phase: S.phase, surveyId: S.surveyId, joinUrl: S.joinUrl, total: S.total,
+      votes: S.votes, groups: S.groups.slice(0, MAX_SYNC),
+      showLive: S.showLive, revealed: S.revealed, view: S.view,
+      summaries: S.summaries, sIdx: S.sIdx, spotlight: S.spotlight,
+    };
+  }
+
+  function applyState(s) {
+    if (!s || typeof s !== 'object') return;
+
+    if (!IS_VIEWER) {
+      // Presenter restore (the host re-sends saved state after a reload). Only
+      // adopt a poll for the same question; a changed question means a new one.
+      if (!s.surveyId || s.surveyId === S.surveyId) return;
+      const key = JSON.stringify([s.type, s.question, s.options || []]);
+      if (key !== pollKey) return;
+      startToken++;            // drop the auto-start that's racing this restore
+      stopPolling();
+    }
+
+    S.type      = s.type === 'open' ? 'open' : 'choice';
+    S.question  = s.question || '';
+    S.options   = Array.isArray(s.options) ? s.options : [];
+    S.correct   = s.correct ?? null;
+    S.phase     = ['idle', 'collect', 'results'].includes(s.phase) ? s.phase : 'idle';
+    S.surveyId  = s.surveyId || null;
+    S.joinUrl   = s.joinUrl || '';
+    S.total     = s.total || 0;
+    S.votes     = s.votes || {};
+    S.groups    = Array.isArray(s.groups) ? s.groups : [];
+    S.showLive  = !!s.showLive;
+    S.revealed  = !!s.revealed;
+    S.view      = s.view === 'summary' ? 'summary' : 'wall';
+    S.summaries = s.summaries || null;
+    S.sIdx      = s.sIdx || 0;
+    S.spotlight = Number.isInteger(s.spotlight) ? s.spotlight : -1;
+
+    if (!IS_VIEWER && S.phase === 'collect') {
+      // Resume the live poll: refetch everything, then keep polling.
+      S.responses = [];
+      fetchResponses();
+      pollTimer = setInterval(fetchResponses, POLL_MS);
+    }
+    render();
+  }
+
+  // ── Config ──────────────────────────────────────────────────────────────────
+  function applyConfig(c) {
+    if (!c) return;
+    cfg       = { ...cfg, ...c };
+    WIDGET_ID = cfg.id || cfg.widgetId || WIDGET_ID;
+    IS_VIEWER = cfg.role === 'viewer' || IS_VIEWER;
+
+    initSocket(cfg.socketUrl);
+    if (IS_VIEWER) { render(); return; }
+
+    S.type     = cfg.responseType === 'open' ? 'open' : 'choice';
+    S.question = String(cfg.question || '').trim();
+    S.options  = S.type === 'choice' ? normaliseOptions(cfg.options) : [];
+    const ca   = parseInt(cfg.correctAnswer, 10);
+    S.correct  = S.type === 'choice' && ca >= 1 && ca <= S.options.length ? ca - 1 : null;
+    if (S.correct == null) S.revealed = false;
+
+    // Take the config's live-results setting only when it changes, so the
+    // presenter's toolbar toggle isn't undone by an unrelated edit.
+    const live = !!cfg.showLiveResults;
+    if (live !== lastLive) { lastLive = live; S.showLive = live; }
+
+    const key = JSON.stringify([S.type, S.question, S.options]);
+    if (key !== pollKey) {
+      pollKey = key;
+      startToken++;
+      closeOnServer(S.phase === 'collect' ? S.surveyId : null);
+      resetPoll();
+      if (ready() && cfg.autoStart !== false) startPoll();
+    }
+    render(); emitState();
+  }
+
+  function destroy() {
+    stopPolling();
+    startToken++;
+    clearTimeout(syncTimer);
+    if (socket && socket.disconnect) socket.disconnect();
+    socket = null; socketUrlInUse = null;
+  }
+
+  // ── Beamer+ message bridge ──────────────────────────────────────────────────
+  window.addEventListener('message', e => {
+    const d = e.data || {};
+    if (d.type === 'widget-config')  applyConfig(d.config);
+    if (d.type === 'widget-cleanup') destroy();
+    if (d.type === 'widget-get-state') {
+      window.parent.postMessage({ type: 'widget-state', widgetId: WIDGET_ID, state: getState() }, '*');
+    }
+    if (d.type === 'widget-set-state' && d.state) applyState(d.state);
+  });
+
+  // ── Event wiring ────────────────────────────────────────────────────────────
+  primaryBtn.addEventListener('click', onPrimary);
+  liveBtn   .addEventListener('click', toggleLive);
+  viewWall  .addEventListener('click', () => setView('wall'));
+  viewSum   .addEventListener('click', () => setView('summary'));
+  joinUrlEl .addEventListener('click', copyUrl);
+  $('spot-prev') .addEventListener('click', () => stepSpotlight(-1));
+  $('spot-next') .addEventListener('click', () => stepSpotlight(1));
+  $('spot-close').addEventListener('click', closeSpotlight);
+  $('sum-prev')  .addEventListener('click', () => stepSummary(-1));
+  $('sum-next')  .addEventListener('click', () => stepSummary(1));
+  spotEl.addEventListener('click', e => { if (e.target === spotEl) closeSpotlight(); });
+
+  document.addEventListener('keydown', e => {
+    if (IS_VIEWER) return;
+    if (S.spotlight >= 0) {
+      if (e.key === 'ArrowLeft')  { e.preventDefault(); stepSpotlight(-1); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); stepSpotlight(1); }
+      if (e.key === 'Escape')     { e.preventDefault(); closeSpotlight(); }
+    } else if (S.view === 'summary' && S.phase === 'results') {
+      if (e.key === 'ArrowLeft')  { e.preventDefault(); stepSummary(-1); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); stepSummary(1); }
+    }
+  });
+
+  // KaTeX is deferred; re-render the maths once it has actually arrived.
+  window.addEventListener('load', () => render());
+
+  // Without this the host's Reset reloads the iframe, and a reloaded page only
+  // restarts if the host happens to re-send its config.
+  (function hookReset(tries) {
+    const tb = window.BeamerWidget?.topbar;
+    if (tb?.onReset) { tb.onReset(restartPoll); return; }
+    if (tries > 0) setTimeout(() => hookReset(tries - 1), 200);
+  })(15);
+
+  // ── Boot ────────────────────────────────────────────────────────────────────
+  applyConfig(CFG0);
+  render();
+})();
+</script>
+</body>
+</html>

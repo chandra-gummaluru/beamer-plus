@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script id="widget-schema" type="application/json">
+{
+  "label": "Binary Arithmetic",
+  "category": "Computer Science",
+  "fields": [
+    { "key": "op", "label": "Operation", "type": "select",
+      "options": [{ "v": "add", "l": "Addition  A + B" }, { "v": "sub", "l": "Subtraction  A − B" },
+                  { "v": "mul", "l": "Multiplication  A × B" }],
+      "default": "add" },
+    { "key": "bits", "label": "Number of bits", "type": "number", "min": 2, "max": 16, "step": 1, "default": 4 },
+    { "key": "repr", "label": "Read the bits as", "type": "select",
+      "options": [{ "v": "unsigned", "l": "Unsigned" }, { "v": "signed", "l": "Signed (two's complement)" }],
+      "default": "unsigned" },
+    { "key": "a", "label": "A (decimal)", "type": "number", "default": 5 },
+    { "key": "b", "label": "B (decimal)", "type": "number", "default": 3 },
+    { "key": "controls", "label": "Show operation and format switches", "type": "checkbox", "default": true },
+    { "key": "weights",  "label": "Show place values", "type": "checkbox", "default": true },
+    { "key": "reveal",   "label": "Open with the answer shown", "type": "checkbox", "default": false },
+    { "key": "scale", "label": "Text size", "type": "select", "options": ["1", "1.4", "1.8", "2.2"], "default": "1.4" }
+  ]
+}
+</script>
+<!-- Standalone fallback. Inside Beamer+ the host injects the shared widget
+     base (tokens, fonts, toolbar, buttons) ahead of everything else. Opened
+     directly nothing does, so load the same stylesheet from the repo,
+     relative to this file, at the same point in the cascade. -->
+<script id="bw-standalone">
+(function () {
+  if (document.querySelector('link[href*="widget-base.css"]')) return;
+  var head = document.head || document.getElementsByTagName('head')[0];
+  [['preconnect', 'https://fonts.googleapis.com'],
+   ['stylesheet', 'https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@400;500;600&display=swap'],
+   ['stylesheet', '../static/css/widget-base.css']].forEach(function (l) {
+    var el = document.createElement('link');
+    el.rel = l[0]; el.href = l[1];
+    head.appendChild(el);
+  });
+  document.documentElement.setAttribute('data-bw-standalone', '');
+})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Binary Arithmetic — Beamer+</title>
+
+<!-- Vendored by the Beamer+ server. Never load socket.io from a CDN, and never
+     call io() bare — inside the srcdoc iframe that resolves to
+     http://about/socket.io/, which an HTTPS deck blocks as mixed content. -->
+<script src="/static/vendor/socket.io.min.js"></script>
+
+<style>
+/* Tokens, reset, toolbar, buttons and status pills come from the shared
+   widget base (static/css/widget-base.css). What's left here is the working
+   itself: a column-arithmetic sheet of bit boxes, drawn the way the lecture
+   slides draw them. */
+
+/* ── Sizing ───────────────────────────────────────────────────────────────
+   One unit drives the whole sheet. The JS picks --cell so the widest and
+   tallest working (a 16×16 multiply: thirty-two columns, twenty rows) still
+   fits the slide region, and never lets it grow past what --u asks for —
+   so a 4-bit addition is big enough for the back row, and nothing scrolls.
+   ====================================================================== */
+#shell { --cell: 48px; --cols: 5; --lw: 4; --rw: 4; }
+
+/* ── Toolbar extras ───────────────────────────────────────────────────── */
+.op-btn { font-family: var(--font-mono); min-width: 52px; }
+/* Width: a number you can type, with − / + either side. */
+.w-step { display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0; }
+.w-step input {
+  width: 3.4ch;
+  height: var(--ctl-h);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--fs-chrome);
+  text-align: center;
+}
+.w-step input:focus { outline: none; border-color: var(--accent); }
+.w-step input[readonly] { cursor: default; }
+.w-unit { font-size: var(--fs-chrome); color: var(--text-2); margin: 0 3px 0 1px; }
+
+/* Unsigned / Signed: the same two-position switch the Karnaugh widget uses
+   for SOP / POS, so a deck's switches all look alike. */
+.mode-switch {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  height: var(--ctl-h);
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--ctl-h) / 2);
+  background: var(--bg-subtle);
+  font: inherit;
+  cursor: pointer;
+}
+.mode-switch:disabled { cursor: default; }
+.ms-opt {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  padding: 0 8px;
+  font-size: var(--fs-chrome);
+  font-weight: 600;
+  color: var(--text-3);
+  transition: color 0.2s ease;
+}
+.ms-thumb {
+  position: absolute;
+  top: 2px; bottom: 2px; left: 2px;
+  width: calc(50% - 2px);
+  border-radius: calc(var(--ctl-h) / 2 - 2px);
+  background: var(--text);
+  transition: transform 0.22s cubic-bezier(.3,.7,.3,1);
+}
+.mode-switch[aria-checked="true"] .ms-thumb { transform: translateX(100%); }
+.mode-switch[aria-checked="false"] .ms-opt:first-of-type,
+.mode-switch[aria-checked="true"]  .ms-opt:last-of-type { color: var(--bg); }
+
+/* Narrow slide regions: the title goes first, then the less-used switches,
+   so the step controls are always reachable. */
+@media (max-width: 860px) { #wtitle, #sep-title { display: none !important; } }
+@media (max-width: 720px) { #status, .w-unit { display: none; } }
+@media (max-width: 680px) { #all-btn { display: none !important; } .op-btn { min-width: 0; } .ms-opt { min-width: 50px; } #sep-steps, #sep-width { display: none; } }
+
+/* ── Stage ────────────────────────────────────────────────────────────── */
+#stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--cell) * 0.45);
+  padding: 14px 20px;
+  overflow: hidden;
+  position: relative;
+}
+#stage > * { flex-shrink: 0; }
+
+/* ── The sheet ────────────────────────────────────────────────────────────
+   One grid for the whole working: a label column (the operator and the
+   row's name), one column per bit position, and an annotation column (the
+   row's value in decimal). Every item is placed explicitly, so a
+   column highlight can sit under a whole column of bits.
+   ====================================================================== */
+#sheet {
+  display: grid;
+  grid-template-columns:
+    calc(var(--cell) * var(--lw))
+    repeat(var(--cols), var(--cell))
+    calc(var(--cell) * var(--rw));
+  column-gap: calc(var(--cell) * 0.14);
+  row-gap: calc(var(--cell) * 0.16);
+  align-items: center;
+  position: relative;
+  user-select: none;
+}
+
+.lab {
+  position: relative;
+  align-self: stretch;          /* span the whole row, so its top is the row's top */
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: calc(var(--cell) * 0.22);
+  white-space: nowrap;
+}
+/* The name's own box, as tall as the row, so the operator can be centred on
+   the name horizontally and hung from the row's top edge. */
+.lab .lc {
+  position: relative;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  /* Every name box in a sheet is the width of its longest name, so the
+     operator — centred on the box — stays put when a name changes length
+     (B becoming −B in subtraction). */
+  justify-content: center;
+  min-width: calc(var(--nmw, 1) * 1ch);
+  font-family: var(--font-mono);
+  font-size: calc(var(--cell) * 0.3);
+}
+/* The operator sits on the line between the two rows it joins, the way it
+   is written between the numbers — not beside the second one — and on the
+   same vertical axis as the names above and below it. Half the row gap above
+   the row's top is that line. */
+.lab .op {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--cell) * -0.08);
+  transform: translate(-50%, -50%);
+  width: calc(var(--cell) * 0.4);
+  height: calc(var(--cell) * 0.4);
+  color: var(--text);
+}
+/* Drawn, not typed: a font's + and × sit on its maths axis, below the middle
+   of the line box and off-centre in their advance width, which read as low
+   and to the left next to the names. A drawn mark is centred exactly. */
+.lab .op svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.lab .nm { color: var(--text-3); }
+
+.bit {
+  width: var(--cell);
+  height: var(--cell);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--border-med);
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: calc(var(--cell) * 0.5);
+  font-weight: 500;
+  line-height: 1;
+  position: relative;
+  z-index: 1;
+  transition: background var(--dur), border-color var(--dur), color var(--dur);
+}
+/* Operand bits are the input: click one to flip it. Presenter only. */
+#shell:not(.is-viewer) .bit.is-op { cursor: pointer; }
+#shell:not(.is-viewer) .bit.is-op:hover { border-color: var(--text-2); background: var(--bg-subtle); }
+
+.bit.is-res     { border-color: var(--text); }
+.bit.is-pending { border-style: dashed; border-color: var(--border); color: transparent; }
+.bit.is-faint   { color: var(--text-3); border-color: var(--border); }
+/* Sign extension in a signed multiply: real bits, but copies of the sign. */
+.bit.is-ext     { border-style: dashed; color: var(--text-2); }
+/* A carry out of the top that the n-bit result cannot keep. */
+.bit.is-dropped { border-style: dashed; border-color: var(--border-med); color: var(--text-3); text-decoration: line-through; text-decoration-thickness: 1.5px; }
+/* The bit of B that picks the current partial product. */
+.bit.is-focus   { border-color: var(--text); background: var(--accent-bg); }
+
+/* Small rows: place values above the sheet, carries above the addends. */
+.w, .cy {
+  height: calc(var(--cell) * 0.5);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  font-family: var(--font-mono);
+  line-height: 1;
+  position: relative;
+  z-index: 1;
+}
+.w  { font-size: calc(var(--cell) * 0.28); color: var(--text-3); padding-bottom: 2px; }
+/* The top bit of a two's-complement number weighs a negative amount — the
+   one fact the whole representation turns on, so it's the one coloured. */
+.w.is-neg { color: var(--err); }
+.cy { font-size: calc(var(--cell) * 0.34); color: var(--text-2); align-items: center; }
+.cy.is-cin {
+  color: var(--text);
+  background: var(--accent-bg);
+  border-radius: 4px;
+  margin: 0 calc(var(--cell) * 0.12);
+}
+
+.rule {
+  height: 0;
+  border-top: 1.5px solid var(--text);
+  align-self: center;
+  /* Reach back over the operator, not across the whole label column. */
+  margin-left: calc(var(--cell) * -1.1);
+}
+.gap { height: calc(var(--cell) * 0.1); }
+
+/* The column being worked on, drawn under its bits. */
+.col-hl {
+  align-self: stretch;
+  justify-self: stretch;
+  margin: calc(var(--cell) * -0.07) calc(var(--cell) * -0.06);
+  background: var(--accent-bg);
+  border-radius: 6px;
+  z-index: 0;
+}
+
+.row-hidden { visibility: hidden; }
+
+/* ── Annotations ──────────────────────────────────────────────────────── */
+.ann {
+  display: flex;
+  align-items: baseline;
+  gap: calc(var(--cell) * 0.2);
+  padding-left: calc(var(--cell) * 0.3);
+  font-family: var(--font-mono);
+  font-size: calc(var(--cell) * 0.4);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.ann .eq  { color: var(--text-3); }
+.ann .dec { color: var(--text); }
+/* A typed value and a computed one take the same width, so notes after
+   them line up in one column. */
+.ann .dec,
+.ann input { box-sizing: content-box; min-width: 4.6ch; padding: 0.05em 0.2em; border: 1px solid transparent; }
+.ann input { width: 4.6ch; }
+.ann .note { font-size: 0.7em; color: var(--text-3); }
+.ann input {
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  transition: border-color var(--dur), background var(--dur);
+}
+#shell:not(.is-viewer) .ann input:hover { border-color: var(--border); }
+.ann input:focus { outline: none; border-color: var(--accent); background: var(--bg-subtle); }
+.ann input[readonly] { cursor: default; }
+
+/* The sheet is centred on its own. */
+#work { position: relative; }
+
+/* ── Motion ───────────────────────────────────────────────────────────── */
+@keyframes pop  { from { transform: scale(0.4); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes flip { 0% { transform: rotateX(0); } 50% { transform: rotateX(90deg); } 100% { transform: rotateX(0); } }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.is-fresh { animation: pop 0.28s cubic-bezier(.3,.7,.3,1.3) both; }
+.is-flip  { animation: flip 0.4s ease-in-out both; }
+.is-rise  { animation: rise 0.3s ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .is-fresh, .is-flip, .is-rise { animation: none; }
+  .ms-thumb, .ms-opt { transition: none; }
+}
+</style>
+</head>
+<body>
+<div id="shell" class="bw-shell">
+
+  <div id="toolbar" class="bw-toolbar" data-bw-topbar>
+    <span class="bw-toolbar-title" id="wtitle">Binary Arithmetic</span>
+    <div class="bw-sep" id="sep-title"></div>
+    <div id="setup" style="display:contents">
+      <button class="bw-btn op-btn" data-op="add" title="Addition">A + B</button>
+      <button class="bw-btn op-btn" data-op="sub" title="Subtraction, as adding the two's complement">A − B</button>
+      <button class="bw-btn op-btn" data-op="mul" title="Multiplication, by shift and add">A × B</button>
+      <div class="bw-sep" id="sep-width"></div>
+      <div class="w-step" id="w-step" title="Number of bits (2–16)">
+        <button class="bw-btn bw-btn--icon" id="w-dec" aria-label="Fewer bits">−</button>
+        <input id="w-in" type="text" inputmode="numeric" spellcheck="false" aria-label="Number of bits">
+        <button class="bw-btn bw-btn--icon" id="w-inc" aria-label="More bits">+</button>
+        <span class="w-unit">bits</span>
+      </div>
+      <button class="mode-switch" id="repr-sel" role="switch" aria-checked="false"
+              title="Read the same bits as unsigned or as two's complement">
+        <span class="ms-thumb"></span>
+        <span class="ms-opt">Unsigned</span><span class="ms-opt">Signed</span>
+      </button>
+    </div>
+    <div class="bw-spacer"></div>
+    <span id="status" class="bw-status">view only</span>
+    <div class="bw-sep" id="sep-steps"></div>
+    <button class="bw-btn" id="back-btn" title="Previous step">Back</button>
+    <button class="bw-btn bw-btn--primary" id="step-btn" title="Next step">Step</button>
+    <button class="bw-btn" id="all-btn" title="Show the whole working">Show all</button>
+    <button class="bw-btn bw-btn--icon" id="replay-btn" title="Back to the start">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.8 8a5.2 5.2 0 1 0 1.7-3.9"/><path d="M2.6 2.2v3h3"/></svg>
+    </button>
+  </div>
+
+  <div id="stage">
+    <div id="work">
+      <div id="sheet"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ── Config ──────────────────────────────────────────────────────────────────
+  const _qs       = new URLSearchParams(location.search);
+  const CFG0      = window.WIDGET_CONFIG || {};
+  let   cfg       = CFG0;
+  let   WIDGET_ID = CFG0.id || CFG0.widgetId || 'binary-arithmetic';
+  let   role      = CFG0.role || 'presenter';
+  let   IS_VIEWER = role === 'viewer' || _qs.get('viewer') === '1';
+
+  // ── DOM ─────────────────────────────────────────────────────────────────────
+  const shell     = document.getElementById('shell');
+  const titleEl   = document.getElementById('wtitle');
+  const stageEl   = document.getElementById('stage');
+  const sheetEl   = document.getElementById('sheet');
+  const statusEl  = document.getElementById('status');
+  const setupEl   = document.getElementById('setup');
+  const reprSel   = document.getElementById('repr-sel');
+  const backBtn   = document.getElementById('back-btn');
+  const stepBtn   = document.getElementById('step-btn');
+  const allBtn    = document.getElementById('all-btn');
+  const replayBtn = document.getElementById('replay-btn');
+  const opBtns    = Array.from(document.querySelectorAll('.op-btn'));
+  const wDec      = document.getElementById('w-dec');
+  const wInc      = document.getElementById('w-inc');
+  const wIn       = document.getElementById('w-in');
+
+  // ── State ───────────────────────────────────────────────────────────────────
+  // a and b are stored as raw n-bit patterns, never as signed numbers: the
+  // point of the Unsigned/Signed switch is that the bits don't change, only
+  // how they are read.
+  const S   = { op: 'add', n: 4, signed: false, a: 5, b: 3, step: 0 };
+  let   OPT = { controls: true, weights: true };
+
+  const MIN_N = 2, MAX_N = 16;
+  const SIDE  = 4;   // label and value columns, in cells
+
+  // Operator marks, drawn on a 10×10 square so each is centred on its point.
+  const opSvg = d => '<svg viewBox="0 0 10 10" fill="none" stroke="currentColor" ' +
+    'stroke-width="1.1" stroke-linecap="round" aria-hidden="true"><path d="' + d + '"/></svg>';
+  const OP_MARK = {
+    '+':      opSvg('M5 0.5V9.5M0.5 5H9.5'),
+    '\u2212': opSvg('M0.5 5H9.5'),
+    '\u00d7': opSvg('M1.5 1.5L8.5 8.5M8.5 1.5L1.5 8.5'),
+  };
+  const OPS   = ['add', 'sub', 'mul'];
+
+  // ── Number helpers ──────────────────────────────────────────────────────────
+  const pow2  = p => 2 ** p;
+  const norm  = (v, n) => ((v % pow2(n)) + pow2(n)) % pow2(n);
+  const sval  = (v, n) => (v >= pow2(n - 1) ? v - pow2(n) : v);
+  const read  = (v, n) => (S.signed ? sval(v, n) : v);
+  const bitAt = (v, p) => Math.floor(v / pow2(p)) % 2;
+  const bin   = (v, n) => v.toString(2).padStart(n, '0');
+  const dec   = x => (x < 0 ? '−' + (-x) : String(x));        // typographic minus
+  const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+
+  function bitsArr(v, n) {
+    const out = [];
+    for (let p = 0; p < n; p++) out[p] = bitAt(v, p);
+    return out;
+  }
+
+  /** Column-by-column addition of any number of rows, LSB first.
+   *  carry[p] is the carry INTO column p; it can exceed 1 when more than two
+   *  rows are added (a multiply's partial products). */
+  function addColumns(addends, carry0, cols) {
+    const carry = [carry0], sum = [], tot = [];
+    for (let p = 0; p < cols; p++) {
+      let t = carry[p];
+      addends.forEach(r => { t += r[p] || 0; });
+      tot[p] = t; sum[p] = t % 2; carry[p + 1] = Math.floor(t / 2);
+    }
+    return { sum, carry, tot };
+  }
+
+  function parseNum(s) {
+    s = String(s).trim().replace(/−/g, '-').replace(/[_\s]/g, '').toLowerCase();
+    let neg = false;
+    if (s.startsWith('-')) { neg = true; s = s.slice(1); }
+    let v;
+    if      (/^0b[01]+$/.test(s))        v = parseInt(s.slice(2), 2);
+    else if (/^0x[0-9a-f]+$/.test(s))    v = parseInt(s.slice(2), 16);
+    else if (/^[01]+b$/.test(s))         v = parseInt(s.slice(0, -1), 2);
+    else if (/^\d+$/.test(s))            v = parseInt(s, 10);
+    else return null;
+    return neg ? -v : v;
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     Model — each operation turns (A, B, width, step) into the rows to draw,
+     and the column to highlight.
+     Rows that appear later are built from the start and only hidden, so the
+     layout never jumps as the presenter steps through.
+     ══════════════════════════════════════════════════════════════════════ */
+
+  // Animate only when the step moved forward by exactly one on the same
+  // problem — a resize, a sync or a restore must not replay the pop.
+  let prevKey = '', prevStep = -1, fresh = false;
+
+  function weightsRow(nw) {
+    const cells = {};
+    for (let p = 0; p < nw; p++) {
+      const neg = S.signed && p === nw - 1;
+      // Past four digits a place value stops fitting its column; 2^p always does.
+      const html = p >= 10 ? `<span>${neg ? '\u2212' : ''}2<sup>${p}</sup></span>` : null;
+      cells[p] = { v: html || dec(neg ? -pow2(p) : pow2(p)), html: !!html, cls: neg ? ['is-neg'] : [] };
+    }
+    return { t: 'w', cells };
+  }
+
+  function carryRow(carry, upto, freshP, cin) {
+    const cells = {};
+    if (cin) cells[0] = { v: cin.v, cls: ['is-cin'].concat(cin.fresh ? ['is-fresh'] : []) };
+    for (let p = 1; p <= upto; p++) {
+      if (!carry[p]) continue;
+      cells[p] = { v: carry[p], cls: p === freshP ? ['is-fresh'] : [] };
+    }
+    return { t: 'c', cells };
+  }
+
+  function operandRow(key, v, n, op, nm, extra) {
+    const cells = {};
+    for (let p = 0; p < n; p++) cells[p] = { v: bitAt(v, p), cls: ['is-op'], data: { op: key, p } };
+    return Object.assign({ t: 'b', op, nm, cells,
+      ann: { input: key, value: read(v, n) } }, extra || {});
+  }
+
+  function resultRow(sum, n, shown, freshP, dropped, ann, nm) {
+    const cells = {};
+    for (let p = 0; p < n; p++) {
+      cells[p] = p < shown
+        ? { v: sum[p], cls: ['is-res'].concat(p === freshP ? ['is-fresh'] : []) }
+        : { v: '', cls: ['is-pending'] };
+    }
+    if (dropped) cells[n] = { v: 1, cls: ['is-dropped', 'is-fresh'] };
+    return { t: 'b', op: '', nm, cells, ann };
+  }
+
+  // Column phase of an add-like working: `pre` steps of setup first, then
+  // one step per column, then one closing step for the verdict.
+  function phase(pre, cols) {
+    const max = pre + cols + 1;
+    const st  = clamp(S.step, 0, max);
+    const done   = st === max;
+    const shown  = done ? cols : Math.max(0, st - pre);
+    const active = (!done && st > pre) ? st - pre - 1 : null;
+    return { max, st, done, shown, active };
+  }
+
+  // ── Addition ───────────────────────────────────────────────────────────────
+  function buildAdd() {
+    const n = S.n, A = S.a, B = S.b;
+    const r  = addColumns([bitsArr(A, n), bitsArr(B, n)], 0, n);
+    const R  = norm(A + B, n);
+    const ph = phase(0, n);
+    const cout = r.carry[n];
+
+    const rows = [];
+    if (OPT.weights) rows.push(weightsRow(n));
+    rows.push(carryRow(r.carry, ph.shown, fresh && ph.active != null ? ph.active + 1 : -1));
+    rows.push(operandRow('a', A, n, '', 'A'));
+    rows.push(operandRow('b', B, n, '+', 'B'));
+    rows.push({ t: 'r' });
+    rows.push(resultRow(r.sum, n, ph.shown, fresh ? ph.active : -1, ph.done && cout,
+      ph.done ? { value: read(R, n) } : null, 'A+B'));
+
+    return { cols: n + 1, rows, active: ph.active, max: ph.max, st: ph.st };
+  }
+
+  // ── Subtraction: A − B = A + (−B) ───────────────────────────────────────────
+  // B becomes −B in place, in the two steps the slides teach: invert every
+  // bit, then add one. The sum that follows is a plain A + (−B).
+  function buildSub() {
+    const n = S.n, A = S.a, B = S.b;
+    const nb = pow2(n) - 1 - B;          // ~B
+    const mb = norm(-B, n);              // −B = ~B + 1
+    const r  = addColumns([bitsArr(A, n), bitsArr(mb, n)], 0, n);
+    const R  = norm(A - B, n);
+    const ph = phase(2, n);
+    const st = ph.st;
+
+    const rows = [];
+    if (OPT.weights) rows.push(weightsRow(n));
+    rows.push(carryRow(r.carry, ph.shown, fresh && ph.active != null ? ph.active + 1 : -1));
+    rows.push(operandRow('a', A, n, '', 'A'));
+    if (st === 0) {
+      rows.push(operandRow('b', B, n, '−', 'B'));
+    } else {
+      // The row stays clickable: flipping a shown bit flips B underneath.
+      const shownV = st === 1 ? nb : mb;
+      const row = operandRow('b', B, n, st === 1 ? '' : '+', st === 1 ? '~B' : '−B');
+      for (let p = 0; p < n; p++) {
+        row.cells[p].v = bitAt(shownV, p);
+        if (fresh && st === 1) row.cells[p].cls.push('is-flip');
+        // Adding one only changes the trailing 1s and the 0 above them.
+        if (fresh && st === 2 && bitAt(nb, p) !== bitAt(mb, p)) row.cells[p].cls.push('is-fresh');
+      }
+      row.ann = { value: read(shownV, n), note: '(B = ' + dec(read(B, n)) + ')' };
+      rows.push(row);
+    }
+    rows.push({ t: 'r' });
+    rows.push(resultRow(r.sum, n, ph.shown, fresh ? ph.active : -1, ph.done && r.carry[n],
+      ph.done ? { value: read(R, n) } : null, 'A−B'));
+
+    return { cols: n + 1, rows, active: ph.active, max: ph.max, st };
+  }
+
+  // ── Multiplication: shift and add ──────────────────────────────────────────
+  // Signed: B = −b₃·8 + b₂·4 + b₁·2 + b₀ (for four bits), so every partial
+  // product is A sign-extended and shifted, except the last, whose weight is
+  // negative — that row adds −A instead. Summed modulo 2^(2n), that is A·B.
+  function buildMul() {
+    const n = S.n, W = 2 * n, A = S.a, B = S.b;
+    const sA = read(A, n), sB = read(B, n);
+    const max = n + W + 1;
+    const st  = clamp(S.step, 0, max);
+    const done   = st === max;
+    const shown  = done ? W : Math.max(0, st - n);
+    const active = (!done && st > n) ? st - n - 1 : null;
+    const focusI = (st >= 1 && st <= n) ? st - 1 : null;
+
+    const parts = [];
+    for (let i = 0; i < n; i++) {
+      const bi = bitAt(B, i);
+      let contrib, to;
+      if (!S.signed) {
+        contrib = bi ? A * pow2(i) : 0;
+        to = i + n;
+      } else {
+        const base = bi ? (i === n - 1 ? -sA : sA) : 0;
+        contrib = base * pow2(i);
+        to = bi ? W : i + n;
+      }
+      const v = norm(contrib, W);
+      const cells = {};
+      for (let p = i; p < to; p++) {
+        const cls = [];
+        if (!bi) cls.push('is-faint');
+        else if (S.signed && p >= i + n) cls.push('is-ext');
+        if (fresh && st === i + 1) cls.push('is-fresh');
+        cells[p] = { v: bitAt(v, p), cls };
+      }
+      parts.push({ i, bi, v, contrib, cells });
+    }
+
+    const addends = parts.map(pp => bitsArr(pp.v, W).map((b, p) => (pp.cells[p] ? b : 0)));
+    const r = addColumns(addends, 0, W);
+    const P = norm(sA * sB, W);
+
+    const rows = [];
+    // Signed, the operands' top bits weigh −2^(n−1) but the product's weighs
+    // −2^(2n−1): one row of place values can't be right for both, so none.
+    if (OPT.weights && !S.signed) rows.push(weightsRow(W));
+    const aRow = operandRow('a', A, n, '', 'A');
+    const bRow = operandRow('b', B, n, '×', 'B');
+    if (focusI != null) bRow.cells[focusI].cls.push('is-focus');
+    rows.push(aRow, bRow, { t: 'r' });
+    rows.push(carryRow(r.carry, Math.min(shown, W - 1), fresh && active != null ? active + 1 : -1));
+    parts.forEach(pp => {
+      rows.push({ t: 'b', op: pp.i ? '+' : '', nm: `b${pp.i}=${pp.bi}`, cells: pp.cells,
+                  ann: { value: pp.contrib }, hidden: st < pp.i + 1 });
+    });
+    rows.push({ t: 'r', hidden: st < n });
+    rows.push(resultRow(r.sum, W, shown, fresh ? active : -1, false,
+      done ? { value: read(P, W) } : null, 'A×B'));
+
+    return { cols: W, rows, active, max, st };
+  }
+
+  function build() {
+    if (S.op === 'sub') return buildSub();
+    if (S.op === 'mul') return buildMul();
+    return buildAdd();
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     Render
+     ══════════════════════════════════════════════════════════════════════ */
+
+  let M = null;   // last built model, for fitting
+
+  function render() {
+    const key = [S.op, S.n, S.signed].join('|');
+    fresh = key === prevKey && S.step === prevStep + 1;
+
+    M = build();
+    S.step = M.st;
+    prevKey = key; prevStep = S.step;
+
+    shell.classList.toggle('is-viewer', IS_VIEWER);
+    shell.style.setProperty('--cols', M.cols);
+    // Side columns of equal width, so the operand bits sit on the centre line.
+    // Addition and subtraction carry one extra column on the left for the
+    // carry out, so the right side gets that much more to balance it.
+    shell.style.setProperty('--rw', (SIDE + (M.cols > S.n && S.op !== 'mul' ? 1.14 : 0)).toFixed(2));
+
+    renderSheet(M);
+
+    // Toolbar
+    setupEl.style.display = OPT.controls ? 'contents' : 'none';
+    document.getElementById('sep-title').style.display = OPT.controls ? '' : 'none';
+    opBtns.forEach(b => { b.classList.toggle('is-active', b.dataset.op === S.op); b.disabled = IS_VIEWER; });
+    if (document.activeElement !== wIn) wIn.value = String(S.n);
+    wIn.readOnly  = IS_VIEWER;
+    wDec.disabled = IS_VIEWER || S.n <= MIN_N;
+    wInc.disabled = IS_VIEWER || S.n >= MAX_N;
+    reprSel.setAttribute('aria-checked', String(S.signed));
+    reprSel.disabled = IS_VIEWER;
+
+    [backBtn, stepBtn, allBtn, replayBtn].forEach(b => { b.style.display = IS_VIEWER ? 'none' : ''; });
+    backBtn.disabled   = M.st === 0;
+    replayBtn.disabled = M.st === 0;
+    stepBtn.disabled   = M.st === M.max;
+    allBtn.disabled    = M.st === M.max;
+
+    // The step count is noise on a projected slide; a viewer still gets told
+    // why the controls don't respond.
+    statusEl.style.display = IS_VIEWER ? '' : 'none';
+    document.getElementById('sep-steps').style.display = IS_VIEWER ? 'none' : '';
+
+    fitTwice();
+
+  }
+
+  function renderSheet(model) {
+    const C   = model.cols;
+    // Longest row name, counting the ones subtraction steps through (~B, −B)
+    // so the name column doesn't change width between steps.
+    const nmw = Math.max(S.op === 'sub' ? 2 : 1,
+      ...model.rows.filter(r => r.t === 'b').map(r => (r.nm || '').length));
+    sheetEl.style.setProperty('--nmw', nmw);
+    const col = p => 2 + (C - 1 - p);
+    const frag = document.createDocumentFragment();
+    const add = (cls, r, c, html, extra) => {
+      const el = document.createElement('div');
+      el.className = cls;
+      el.style.gridRow = String(r);
+      el.style.gridColumn = String(c);
+      if (html != null) el.innerHTML = html;
+      if (extra) extra(el);
+      frag.appendChild(el);
+      return el;
+    };
+
+    let r = 0;
+    model.rows.forEach(row => {
+      r++;
+      const hid = row.hidden ? ' row-hidden' : '';
+      if (row.t === 'r') { add('rule' + hid, r, `2 / ${C + 2}`); return; }
+      if (row.t === 'g') { add('gap', r, 1); return; }
+      if (row.t === 'w' || row.t === 'c') {
+        const base = row.t === 'w' ? 'w' : 'cy';
+        Object.keys(row.cells).forEach(p => {
+          const c = row.cells[p];
+          add([base].concat(c.cls).join(' '), r, col(Number(p)), c.html ? c.v : escHtml(c.v));
+        });
+        if (row.t === 'c' && !Object.keys(row.cells).length) add('cy', r, col(0), '');
+        return;
+      }
+      // Bits row
+      add('lab' + hid, r, 1,
+        `<span class="lc"><span class="nm">${escHtml(row.nm || '')}</span>` +
+        (OP_MARK[row.op] ? `<span class="op">${OP_MARK[row.op]}</span>` : '') + `</span>`);
+      Object.keys(row.cells).forEach(p => {
+        const c = row.cells[p];
+        add(['bit'].concat(c.cls).join(' ') + hid, r, col(Number(p)), escHtml(c.v), el => {
+          if (c.data) { el.dataset.op = c.data.op; el.dataset.p = c.data.p; }
+        });
+      });
+      add('ann' + hid, r, C + 2, null, el => fillAnn(el, row.ann));
+    });
+
+    if (model.active != null) add('col-hl', `1 / ${r + 1}`, col(model.active));
+
+    // Keep a focused value box across the rebuild, so typing isn't cut off
+    // by a sync or a resize.
+    const focused = document.activeElement && document.activeElement.dataset
+      ? document.activeElement.dataset.in : null;
+    sheetEl.replaceChildren(frag);
+    if (focused) {
+      const again = sheetEl.querySelector(`input[data-in="${focused}"]`);
+      if (again) { again.focus(); again.select(); }
+    }
+  }
+
+  function fillAnn(el, ann) {
+    if (!ann) return;
+    if (ann.input) {
+      el.innerHTML = '<span class="eq">=</span>';
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.inputMode = 'numeric';
+      inp.spellcheck = false;
+      inp.dataset.in = ann.input;
+      inp.value = inp.defaultValue = dec(ann.value);
+      // Wide enough for the value it holds: a 16-bit operand runs to six characters.
+      inp.style.width = Math.max(4.6, inp.value.length + 0.6) + 'ch';
+      inp.readOnly = IS_VIEWER;
+      inp.title = 'Type a value: 13, −3, 0b1101 or 0xD';
+      el.appendChild(inp);
+      if (ann.note) el.insertAdjacentHTML('beforeend', `<span class="note">${escHtml(ann.note)}</span>`);
+      return;
+    }
+    el.innerHTML = `<span class="eq">=</span><span class="dec">${escHtml(dec(ann.value))}</span>` +
+      (ann.note ? `<span class="note">${escHtml(ann.note)}</span>` : '');
+  }
+
+  // ── Fit ─────────────────────────────────────────────────────────────────────
+  // Size the cell from the room first (--u), then shrink until the whole
+  // working fits the region. Heights are counted in cell units per row type.
+  function fit() {
+    if (!M) return;
+    const u  = parseFloat(getComputedStyle(shell).getPropertyValue('--u')) || 1.4;
+    const cs = getComputedStyle(stageEl);
+    const availW = stageEl.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const availH = stageEl.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+
+    let hUnits = 0;
+    M.rows.forEach(row => {
+      hUnits += row.t === 'b' ? 1 : row.t === 'r' ? 0.05 : row.t === 'g' ? 0.1 : 0.5;
+      hUnits += 0.16;
+    });
+    const rw = parseFloat(getComputedStyle(shell).getPropertyValue('--rw')) || SIDE;
+    const wUnits = SIDE + rw + M.cols * 1.14 + 0.14;
+
+    const cell = Math.max(14, Math.min(46 * u, 96, availW / wUnits, availH / hUnits));
+    shell.style.setProperty('--cell', cell.toFixed(1) + 'px');
+  }
+  function fitTwice() { fit(); fit(); }
+
+  let fitObs = null;
+  try { fitObs = new ResizeObserver(() => fitTwice()); fitObs.observe(stageEl); }
+  catch (_) { /* no ResizeObserver: window resize below still refits */ }
+  window.addEventListener('resize', fit);
+
+  /* ══════════════════════════════════════════════════════════════════════
+     Actions
+     ══════════════════════════════════════════════════════════════════════ */
+
+  function changed(persist) {
+    render(); emitState();
+    if (persist) pushSetting(persist);
+  }
+
+  function goStep(k) {
+    if (IS_VIEWER) return;
+    S.step = clamp(k, 0, M ? M.max : 0);
+    changed();
+  }
+
+  function setOp(op) {
+    if (IS_VIEWER || S.op === op) return;
+    S.op = op; S.step = 0;
+    changed({ op });
+  }
+
+  function setWidth(n) {
+    if (IS_VIEWER) return;
+    n = clamp(Math.round(Number(n)) || S.n, MIN_N, MAX_N);
+    if (S.n === n) { render(); return; }
+    // Keep the numbers, not the bit patterns: 1011 read as −5 becomes
+    // 11111011 (sign-extended), read as 11 becomes 00001011.
+    const conv = v => norm(read(v, S.n), n);
+    S.a = conv(S.a); S.b = conv(S.b);
+    S.n = n;
+    changed({ bits: n, a: read(S.a, n), b: read(S.b, n) });
+  }
+
+  function setSigned(on) {
+    if (IS_VIEWER || S.signed === on) return;
+    S.signed = on;   // same bits, new reading
+    changed({ repr: on ? 'signed' : 'unsigned' });
+  }
+
+  function flipBit(key, p) {
+    if (IS_VIEWER) return;
+    const v = S[key];
+    S[key] = bitAt(v, p) ? v - pow2(p) : v + pow2(p);
+    changed({ [key]: read(S[key], S.n) });
+  }
+
+  function setValue(key, text) {
+    if (IS_VIEWER) return;
+    const v = parseNum(text);
+    if (v == null) { render(); return; }   // not a number: put the old value back
+    S[key] = norm(v, S.n);
+    changed({ [key]: read(S[key], S.n) });
+  }
+
+  function restart() { goStep(0); }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     Socket.IO sync — presenter emits, viewers apply
+     ══════════════════════════════════════════════════════════════════════ */
+
+  let socket = null, syncTimer = null;
+
+  function initSocket(url) {
+    if (typeof io === 'undefined') { socket = { emit() {}, on() {} }; return; }
+    try {
+      const prev = socket;
+      socket = io(url || (window.BeamerWidget ? BeamerWidget.serverOrigin() : ''),
+                  { transports: ['websocket', 'polling'] });
+      if (prev && prev.disconnect) prev.disconnect();
+      socket.on('widget_state', data => {
+        if (!IS_VIEWER || data?.widgetId !== WIDGET_ID) return;
+        applyState(data.state || {});
+      });
+    } catch (_) {
+      socket = { emit() {}, on() {} };
+    }
+  }
+
+  function emitState() {
+    if (!socket || IS_VIEWER) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => {
+      socket.emit('widget_state', { widgetId: WIDGET_ID, state: getState() });
+    }, 120);
+  }
+
+  // The operands and the operation are part of the slide, not just this run
+  // of it — hand them back to the host so the deck opens on them next time.
+  let settingTimer = null, pendingPatch = null;
+  function pushSetting(patch) {
+    if (IS_VIEWER) return;
+    pendingPatch = { ...(pendingPatch || {}), ...patch };
+    clearTimeout(settingTimer);
+    settingTimer = setTimeout(() => {
+      // Record what we sent, so the config echo coming back isn't mistaken
+      // for a fresh edit in the settings panel.
+      Object.assign(lastCfg, pendingPatch);
+      try {
+        window.parent.postMessage(
+          { type: 'widget-settings', widgetId: WIDGET_ID, patch: pendingPatch, remove: [] }, '*');
+      } catch (_) { /* no parent to tell — standalone */ }
+      pendingPatch = null;
+    }, 600);
+  }
+
+  // ── State serialisation ─────────────────────────────────────────────────────
+  function getState() {
+    return { op: S.op, n: S.n, signed: S.signed, a: S.a, b: S.b, step: S.step };
+  }
+
+  function applyState(s) {
+    if (!s) return;
+    if (OPS.indexOf(s.op) >= 0) S.op = s.op;
+    else if (s.op) S.op = 'add';   // a deck saved while −A still existed
+    if (Number.isInteger(s.n) && s.n >= MIN_N && s.n <= MAX_N) S.n = s.n;
+    if (s.signed != null) S.signed = !!s.signed;
+    if (Number.isFinite(s.a)) S.a = norm(s.a, S.n);
+    if (Number.isFinite(s.b)) S.b = norm(s.b, S.n);
+    if (Number.isFinite(s.step)) S.step = Math.max(0, s.step);
+    render();
+  }
+
+  // ── Config ──────────────────────────────────────────────────────────────────
+  // Only adopt a config value when it actually changed, so re-applying the
+  // config doesn't undo what the presenter did in the widget.
+  const lastCfg = {};
+  let booted = false;
+
+  function applyConfig(c) {
+    if (!c) return;
+    cfg       = { ...cfg, ...c };
+    WIDGET_ID = cfg.id || cfg.widgetId || WIDGET_ID;
+    role      = cfg.role || role;
+    IS_VIEWER = role === 'viewer' || IS_VIEWER;
+
+    const on = (v, d) => (v == null ? d : v === true || v === 'true');
+    OPT = { controls: on(cfg.controls, true), weights: on(cfg.weights, true) };
+
+    const isNew = k => cfg[k] != null && cfg[k] !== '' && String(cfg[k]) !== String(lastCfg[k]);
+    let reset = false;
+    if (isNew('op'))   { lastCfg.op = cfg.op; if (OPS.indexOf(cfg.op) >= 0) { S.op = cfg.op; reset = true; } }
+    if (isNew('repr')) { lastCfg.repr = cfg.repr; S.signed = cfg.repr === 'signed'; }
+    if (isNew('bits')) { lastCfg.bits = cfg.bits; const n = Math.round(Number(cfg.bits)); if (n >= MIN_N && n <= MAX_N) S.n = n; }
+    if (isNew('a'))    { lastCfg.a = cfg.a; const v = parseNum(cfg.a); if (v != null) S.a = norm(v, S.n); }
+    if (isNew('b'))    { lastCfg.b = cfg.b; const v = parseNum(cfg.b); if (v != null) S.b = norm(v, S.n); }
+    if (reset) S.step = 0;
+
+    // "Open with the answer shown" is about the first view of the slide only.
+    if (!booted && on(cfg.reveal, false)) S.step = 1e6;
+    booted = true;
+
+    if (cfg.title) titleEl.textContent = cfg.title;
+    if (cfg.socketUrl) initSocket(cfg.socketUrl);
+    render();
+  }
+
+  function destroy() {
+    clearTimeout(syncTimer);
+    clearTimeout(settingTimer);
+    if (fitObs) fitObs.disconnect();
+    window.removeEventListener('resize', fit);
+    if (socket && socket.disconnect) socket.disconnect();
+    socket = null;
+  }
+
+  // ── Beamer+ message bridge ──────────────────────────────────────────────────
+  window.addEventListener('message', e => {
+    const d = e.data || {};
+    if (d.type === 'widget-config')  applyConfig(d.config);
+    if (d.type === 'widget-cleanup') destroy();
+    if (d.type === 'widget-get-state') {
+      try {
+        window.parent.postMessage(
+          { type: 'widget-state', widgetId: WIDGET_ID, state: getState() }, '*');
+      } catch (_) { /* standalone */ }
+    }
+    if (d.type === 'widget-set-state' && d.state) applyState(d.state);
+  });
+
+  /* ══════════════════════════════════════════════════════════════════════
+     Events
+     ══════════════════════════════════════════════════════════════════════ */
+
+  stepBtn  .addEventListener('click', () => goStep((M ? M.st : 0) + 1));
+  backBtn  .addEventListener('click', () => goStep((M ? M.st : 0) - 1));
+  allBtn   .addEventListener('click', () => goStep(M ? M.max : 0));
+  replayBtn.addEventListener('click', restart);
+  reprSel  .addEventListener('click', () => setSigned(!S.signed));
+  opBtns.forEach(b => b.addEventListener('click', () => setOp(b.dataset.op)));
+  wDec.addEventListener('click', () => setWidth(S.n - 1));
+  wInc.addEventListener('click', () => setWidth(S.n + 1));
+  wIn .addEventListener('change', () => setWidth(wIn.value));
+  wIn .addEventListener('keydown', e => {
+    if (e.key === 'Enter')     { e.preventDefault(); wIn.blur(); }   // change commits
+    if (e.key === 'ArrowUp')   { e.preventDefault(); setWidth(S.n + 1); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); setWidth(S.n - 1); }
+  });
+
+  // Stepping is the buttons' job only — a stray click on the slide while
+  // pointing at something must never move the working on. The sheet takes
+  // one kind of click: flipping an operand bit.
+  sheetEl.addEventListener('click', e => {
+    const cell = e.target.closest('.bit.is-op');
+    if (cell) flipBit(cell.dataset.op, Number(cell.dataset.p));
+  });
+
+  sheetEl.addEventListener('keydown', e => {
+    const inp = e.target.closest('input[data-in]');
+    if (!inp) return;
+    if (e.key === 'Enter')  { e.preventDefault(); inp.blur(); }   // focusout commits
+    if (e.key === 'Escape') { e.preventDefault(); inp.value = inp.defaultValue; inp.blur(); }
+  });
+  sheetEl.addEventListener('focusout', e => {
+    const inp = e.target.closest && e.target.closest('input[data-in]');
+    if (inp && !inp.readOnly) setValue(inp.dataset.in, inp.value);
+  });
+
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // ── Boot ────────────────────────────────────────────────────────────────────
+  initSocket(CFG0.socketUrl);
+  applyConfig(CFG0);
+  render();
+
+  // "Reset widget" in the shared bar means back to the first step, not a
+  // reload that would lose the numbers the presenter set up.
+  (function wireReset(tries) {
+    if (window.BeamerWidget && BeamerWidget.topbar) { BeamerWidget.topbar.onReset(restart); return; }
+    if (tries > 0) setTimeout(() => wireReset(tries - 1), 120);
+  })(20);
+
+  // Exposed for a test harness.
+  window.__binarith = { S, build, addColumns, parseNum, render };
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,245 @@
+% ============================================================
+% PART 1 - paste into the preamble, after \newcommand{\ttab}
+% ============================================================
+
+% ------------------------------------------------------------
+% seven-segment figures
+% ------------------------------------------------------------
+% A digit is drawn in a 1 x 2 box with its lower-left corner at the origin of
+% the current scope. Segments are named the standard way:
+%       a
+%     f   b
+%       g
+%     e   c
+%       d
+% Drawn like a real LED module: a black face, dark red segments that are
+% off, and bright red segments that are on. Each segment is a pointed bar, so
+% neighbouring segments meet at a mitre with a small gap between them.
+\definecolor{seglit}{RGB}{255,48,36}     % on
+\definecolor{seghot}{RGB}{255,196,40}    % on, and the segment being discussed
+\definecolor{segoff}{RGB}{48,14,12}      % off
+\definecolor{segface}{RGB}{16,16,16}     % the module's face
+\newcommand{\segt}{0.18}                 % bar thickness, in digit units
+% name / orientation / start / end, in a 1 x 2 box
+\newcommand{\segcoords}{%
+  a/h/0.09/2/0.91/2,     b/v/1/1.91/1/1.09,     c/v/1/0.91/1/0.09,
+  d/h/0.09/0/0.91/0,     e/v/0/0.91/0/0.09,     f/v/0/1.91/0/1.09,
+  g/h/0.09/1/0.91/1}
+\newcommand{\segbar}[6]{% colour, h|v, x1, y1, x2, y2
+  \if#2h
+    \fill[#1] (#3,#4) -- ++(\segt/2,\segt/2) -- (#5-\segt/2,#6+\segt/2) -- (#5,#6)
+              -- (#5-\segt/2,#6-\segt/2) -- (#3+\segt/2,#4-\segt/2) -- cycle;
+  \else
+    \fill[#1] (#3,#4) -- ++(\segt/2,-\segt/2) -- (#5+\segt/2,#6+\segt/2) -- (#5,#6)
+              -- (#5-\segt/2,#6+\segt/2) -- (#3-\segt/2,#4-\segt/2) -- cycle;
+  \fi}
+
+% \sevenseg{position}{scale}{lit segments}{emphasised segments}
+% Lit segments are always full red, so every digit reads correctly. An
+% emphasised segment is drawn amber instead, but only where it is lit; listed
+% on its own (no lit segments) it is drawn amber to point it out.
+\newcommand{\sevenseg}[4]{%
+  % The lists may arrive as macros (\segFive), so expand them before looping.
+  \edef\seglit{#3}\edef\seghot{#4}%
+  \begin{scope}[shift={#1}, scale=#2]
+    \fill[segface, rounded corners=0.12cm*#2] (-0.36,-0.34) rectangle (1.36,2.34);
+    \foreach \s/\o/\x/\y/\u/\v in \segcoords {
+      \segbar{segoff}{\o}{\x}{\y}{\u}{\v}
+      \foreach \t in \seglit {%
+        \edef\sega{\s}\edef\segb{\t}%
+        \ifx\sega\segb \segbar{seglit}{\o}{\x}{\y}{\u}{\v}\fi}%
+      \foreach \t in \seghot {%
+        \edef\sega{\s}\edef\segb{\t}%
+        \ifx\sega\segb
+          % amber if this digit lights it, or if no digit is given at all
+          \def\segshow{0}%
+          \ifx\seglit\empty \def\segshow{1}\fi
+          \foreach \w in \seglit {\edef\segc{\w}\ifx\segc\segb \xdef\segshow{1}\fi}%
+          \if1\segshow \segbar{seghot}{\o}{\x}{\y}{\u}{\v}\fi
+        \fi}%
+    }
+  \end{scope}}
+
+% The segments lit for each hex digit.
+\newcommand{\segZero}{a,b,c,d,e,f}
+\newcommand{\segOne}{b,c}
+\newcommand{\segTwo}{a,b,d,e,g}
+\newcommand{\segThree}{a,b,c,d,g}
+\newcommand{\segFour}{b,c,f,g}
+\newcommand{\segFive}{a,c,d,f,g}
+\newcommand{\segSix}{a,c,d,e,f,g}
+\newcommand{\segSeven}{a,b,c}
+\newcommand{\segEight}{a,b,c,d,e,f,g}
+\newcommand{\segNine}{a,b,c,d,f,g}
+\newcommand{\segA}{a,b,c,e,f,g}
+\newcommand{\segB}{c,d,e,f,g}
+\newcommand{\segC}{a,d,e,f}
+\newcommand{\segD}{b,c,d,e,g}
+\newcommand{\segE}{a,d,e,f,g}
+\newcommand{\segF}{a,e,f,g}
+
+% A small inline digit for tables: \segglyph{lit}{highlighted}
+\newcommand{\segglyph}[2]{%
+  \tikz[baseline=-0.1ex]{\sevenseg{(0,0)}{0.19}{#1}{#2}}}
+
+% a row of the segment table: \segrow{input bits}{glyph}{output}
+\newcommand{\segrow}[3]{\ttab{#1} & #2 & \ttab{#3} \\}
+
+
+% ============================================================
+% PART 2 - paste as frames, e.g. after the don't-care slides
+% ============================================================
+
+% ------------------------------------------------------------
+% seven-segment decoder
+% ------------------------------------------------------------
+\begin{frame}{Seven-Segment Decoders}
+  \begin{center}
+    \Large \highlight{\textbf{seven-segment decoders}}
+  \end{center}
+\end{frame}
+
+\begin{frame}
+  A \highlight{\textbf{seven-segment display}} draws a digit by lighting some of seven LEDs, numbered \ttab{0} to \ttab{6}. Different patterns give all sixteen hex digits.\\[4mm]
+  \begin{minipage}{0.36\textwidth}
+    \centering
+    \begin{tikzpicture}
+      % scale 1.2: the face runs from (-0.43,-0.41) to (1.63,2.81)
+      \sevenseg{(0,0)}{1.2}{\segEight}{}
+      \node[smallgraytext] at (0.6, 3.05)  {\ttab{0}};
+      \node[smallgraytext] at (1.9, 1.8)   {\ttab{1}};
+      \node[smallgraytext] at (1.9, 0.6)   {\ttab{2}};
+      \node[smallgraytext] at (0.6, -0.65) {\ttab{3}};
+      \node[smallgraytext] at (-0.7, 0.6)  {\ttab{4}};
+      \node[smallgraytext] at (-0.7, 1.8)  {\ttab{5}};
+      % 6 is the middle bar: label it outside, with a leader through the gap
+      \draw[gray!70, thin] (-0.55, 1.2) -- (0.2, 1.2);
+      \node[smallgraytext, anchor=east] at (-0.55, 1.2) {\ttab{6}};
+    \end{tikzpicture}
+  \end{minipage}%
+  \begin{minipage}{0.64\textwidth}
+    \centering
+    \begin{tikzpicture}
+      \foreach \d/\l [count=\i from 0] in
+          {\segZero/0, \segOne/1, \segTwo/2, \segThree/3,
+           \segFour/4, \segFive/5, \segSix/6, \segSeven/7,
+           \segEight/8, \segNine/9, \segA/A, \segB/b,
+           \segC/C, \segD/d, \segE/E, \segF/F} {
+        \pgfmathtruncatemacro{\cx}{mod(\i,4)}
+        \pgfmathtruncatemacro{\cy}{\i/4}
+        \sevenseg{({\cx*1.15}, {-\cy*1.35})}{0.32}{\d}{}
+        \node[smallgraytext] at ({\cx*1.15 + 0.16}, {-\cy*1.35 - 0.3}) {\ttab{\l}};
+      }
+    \end{tikzpicture}
+  \end{minipage}\\[4mm]
+  \graytext{\ttab{b} and \ttab{d} are lower case, so they aren't mistaken for \ttab{8} and \ttab{0}}
+\end{frame}
+
+\begin{frame}
+  A \highlight{\textbf{seven-segment decoder}} reads a 4-bit number and outputs the seven segment signals, $\ttab{s}_{\ttab{0}}$ to $\ttab{s}_{\ttab{6}}$, that draw it.\\[4mm]
+  \begin{center}
+    \begin{tikzpicture}
+      % the decoder
+      \draw[thick, fill=gray!30!white!20] (0,-1.9) rectangle (2.2,1.9);
+      \node[align=center] at (1.1,0) {\small decoder};
+      % inputs, showing 0101
+      \foreach \y/\i/\v in {1.2/3/0, 0.4/2/1, -0.4/1/0, -1.2/0/1} {
+        \draw[thick] (0,\y) -- ++(-0.8,0) node[left, smallgraytext] {$\ttab{x}_{\ttab{\i}}$};
+        \node[font=\ttfamily\small] at (-0.4,\y+0.2) {\v};
+      }
+      % outputs a..g, with the values for 5
+      \foreach \v [count=\k from 0] in {1, 0, 1, 1, 0, 1, 1} {
+        \pgfmathsetmacro{\yy}{1.5 - \k*0.5}
+        \draw[thick] (2.2,\yy) -- ++(1.2,0) node[right, smallgraytext] {$\ttab{s}_{\ttab{\k}}$};
+        \node[font=\ttfamily\small] at (2.8,\yy+0.18) {\v};
+      }
+      % the display it drives
+      \sevenseg{(4.9,-1.2)}{1.2}{\segFive}{}
+    \end{tikzpicture}
+  \end{center}
+  \begin{center}
+    \graytext{input \ttab{0101} lights segments \ttab{0}, \ttab{2}, \ttab{3}, \ttab{5} and \ttab{6}, drawing a \ttab{5}}
+  \end{center}
+\end{frame}
+
+\begin{frame}
+  Each segment is its own function of the four inputs. Segment \ttab{0} is lit for every digit except \ttab{1}, \ttab{4}, \ttab{b} and \ttab{d}.\\[3mm]
+  \begin{minipage}{0.22\textwidth}
+    \centering
+    \begin{tikzpicture}
+      \sevenseg{(0,0)}{0.95}{}{a}
+      \node[smallgraytext] at (0.475, 2.55) {segment \ttab{0}};
+    \end{tikzpicture}
+  \end{minipage}%
+  \begin{minipage}{0.78\textwidth}
+    \centering
+    \small
+    \renewcommand{\arraystretch}{1.3}
+    \begin{tabular}{c@{\hspace{3mm}}c@{\hspace{3mm}}c}
+      \graytext{\ttab{x}} & & $\ttab{s}_{\ttab{0}}$ \\ \hline
+      \segrow{0000}{\segglyph{\segZero}{a}}{1}
+      \segrow{0001}{\segglyph{\segOne}{}}{0}
+      \segrow{0010}{\segglyph{\segTwo}{a}}{1}
+      \segrow{0011}{\segglyph{\segThree}{a}}{1}
+      \segrow{0100}{\segglyph{\segFour}{}}{0}
+      \segrow{0101}{\segglyph{\segFive}{a}}{1}
+      \segrow{0110}{\segglyph{\segSix}{a}}{1}
+      \segrow{0111}{\segglyph{\segSeven}{a}}{1}
+    \end{tabular}%
+    \hspace{8mm}%
+    \begin{tabular}{c@{\hspace{3mm}}c@{\hspace{3mm}}c}
+      \graytext{\ttab{x}} & & $\ttab{s}_{\ttab{0}}$ \\ \hline
+      \segrow{1000}{\segglyph{\segEight}{a}}{1}
+      \segrow{1001}{\segglyph{\segNine}{a}}{1}
+      \segrow{1010}{\segglyph{\segA}{a}}{1}
+      \segrow{1011}{\segglyph{\segB}{}}{0}
+      \segrow{1100}{\segglyph{\segC}{a}}{1}
+      \segrow{1101}{\segglyph{\segD}{}}{0}
+      \segrow{1110}{\segglyph{\segE}{a}}{1}
+      \segrow{1111}{\segglyph{\segF}{a}}{1}
+    \end{tabular}
+  \end{minipage}\\[3mm]
+  \graytext{the other six segments each get a table like this one}
+\end{frame}
+
+\begin{frame}
+  Segment \ttab{0} is off in only four rows, so a \highlight{\textbf{decoder}} builds it directly: we \ttab{NOR} the outputs for \ttab{1}, \ttab{4}, \ttab{11} and \ttab{13}.\\[3mm]
+  \begin{center}
+    \begin{tikzpicture}
+      % a 4-to-16 decoder
+      \draw[thick, fill=gray!30!white!20] (0,-2.2) rectangle (1.6,2.2);
+      \node[align=center] at (0.8,0) {\small 4-to-16 \\[-1mm] \small decoder};
+      \draw[thick] (0,0) -- ++(-0.8,0) node[left, smallgraytext] {\ttab{x}};
+      \draw[thick] ($(-0.4,0)+(-0.08,-0.15)$) -- ($(-0.4,0)+(0.08,0.15)$);
+      \node[smallgraytext] at ($(-0.4,0)+(0,0.32)$) {\ttab{4}};
+
+      % sixteen outputs, y0 at the top; the four that feed the gate are dark
+      \foreach \k in {0,...,15} {
+        \pgfmathsetmacro{\yy}{2.0 - \k*0.2667}
+        \ifnum\k=1 \coordinate (o\k) at (1.6,\yy);
+        \else\ifnum\k=4 \coordinate (o\k) at (1.6,\yy);
+        \else\ifnum\k=11 \coordinate (o\k) at (1.6,\yy);
+        \else\ifnum\k=13 \coordinate (o\k) at (1.6,\yy);
+        \else \draw[gray!50] (1.6,\yy) -- ++(0.35,0);
+        \fi\fi\fi\fi
+      }
+      \foreach \k in {0,1,4,11,13,15} {
+        \pgfmathsetmacro{\yy}{2.0 - \k*0.2667}
+        \node[smallgraytext, anchor=east, font=\tiny] at (1.55,\yy) {\k};
+      }
+
+      % the NOR gate
+      \node[nor gate US, draw, thick, logic gate inputs=nnnn, scale=1.3] (n) at (4.4,0) {};
+      % outer pair turns furthest right, inner pair nearer, so no wires cross
+      \foreach \k/\i/\x/\y in {1/1/3.3/1.733, 4/2/3.0/0.933, 11/3/3.0/-0.933, 13/4/3.3/-1.467} {
+        \draw[thick] (o\k) -- (\x,\y) |- (n.input \i);
+        \fill[black] (o\k) circle (1.2pt);
+      }
+      \draw[thick] (n.output) -- ++(0.7,0) node[right, smallgraytext] {$\ttab{s}_{\ttab{0}}$};
+      \sevenseg{(7.55,-0.9)}{0.9}{}{a}
+    \end{tikzpicture}
+  \end{center}
+  \begin{center}
+    \graytext{a digit display for \ttab{0}--\ttab{9} only would make rows \ttab{1010}--\ttab{1111} don't-cares}
+  \end{center}
+\end{frame}

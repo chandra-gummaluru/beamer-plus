@@ -1,0 +1,479 @@
+\documentclass[mathserif, handout]{beamer}
+
+\usepackage{url}
+\input{includes}
+\input{tikz_figures}
+
+\usetikzlibrary{shapes.gates.logic.US}
+
+\newcommand{\ttab}[1]{\texttt{#1}}
+
+% ------------------------------------------------------------
+% seven-segment figures
+% ------------------------------------------------------------
+% A digit is drawn in a 1 x 2 box with its lower-left corner at the origin of
+% the current scope. Segments are named the standard way:
+%       a
+%     f   b
+%       g
+%     e   c
+%       d
+% Drawn like a real LED module: a black face, dark red segments that are
+% off, and bright red segments that are on. Each segment is a pointed bar, so
+% neighbouring segments meet at a mitre with a small gap between them.
+\definecolor{seglit}{RGB}{255,48,36}     % on
+\definecolor{segdim}{RGB}{120,26,20}     % on, but not the one being discussed
+\definecolor{segoff}{RGB}{48,14,12}      % off
+\definecolor{segface}{RGB}{16,16,16}     % the module's face
+\newcommand{\segt}{0.18}                 % bar thickness, in digit units
+% name / orientation / start / end, in a 1 x 2 box
+\newcommand{\segcoords}{%
+  a/h/0.09/2/0.91/2,     b/v/1/1.91/1/1.09,     c/v/1/0.91/1/0.09,
+  d/h/0.09/0/0.91/0,     e/v/0/0.91/0/0.09,     f/v/0/1.91/0/1.09,
+  g/h/0.09/1/0.91/1}
+\newcommand{\segbar}[6]{% colour, h|v, x1, y1, x2, y2
+  \if#2h
+    \fill[#1] (#3,#4) -- ++(\segt/2,\segt/2) -- (#5-\segt/2,#6+\segt/2) -- (#5,#6)
+              -- (#5-\segt/2,#6-\segt/2) -- (#3+\segt/2,#4-\segt/2) -- cycle;
+  \else
+    \fill[#1] (#3,#4) -- ++(\segt/2,-\segt/2) -- (#5+\segt/2,#6+\segt/2) -- (#5,#6)
+              -- (#5-\segt/2,#6+\segt/2) -- (#3-\segt/2,#4-\segt/2) -- cycle;
+  \fi}
+
+% \sevenseg{position}{scale}{lit segments}{emphasised segments}
+% When some segments are emphasised, the other lit ones are drawn dimmer, so
+% the eye goes to the segment being discussed.
+\newcommand{\sevenseg}[4]{%
+  % The lists may arrive as macros (\segFive), so expand them before looping.
+  \edef\seglit{#3}\edef\seghot{#4}%
+  \ifx\seghot\empty \def\segon{seglit}\else \def\segon{segdim}\fi
+  \begin{scope}[shift={#1}, scale=#2]
+    \fill[segface, rounded corners=0.12cm*#2] (-0.36,-0.34) rectangle (1.36,2.34);
+    \foreach \s/\o/\x/\y/\u/\v in \segcoords {
+      \segbar{segoff}{\o}{\x}{\y}{\u}{\v}
+      \foreach \t in \seglit {%
+        \edef\sega{\s}\edef\segb{\t}%
+        \ifx\sega\segb \segbar{\segon}{\o}{\x}{\y}{\u}{\v}\fi}%
+      \foreach \t in \seghot {%
+        \edef\sega{\s}\edef\segb{\t}%
+        \ifx\sega\segb \segbar{seglit}{\o}{\x}{\y}{\u}{\v}\fi}%
+    }
+  \end{scope}}
+
+% The segments lit for each hex digit.
+\newcommand{\segZero}{a,b,c,d,e,f}
+\newcommand{\segOne}{b,c}
+\newcommand{\segTwo}{a,b,d,e,g}
+\newcommand{\segThree}{a,b,c,d,g}
+\newcommand{\segFour}{b,c,f,g}
+\newcommand{\segFive}{a,c,d,f,g}
+\newcommand{\segSix}{a,c,d,e,f,g}
+\newcommand{\segSeven}{a,b,c}
+\newcommand{\segEight}{a,b,c,d,e,f,g}
+\newcommand{\segNine}{a,b,c,d,f,g}
+\newcommand{\segA}{a,b,c,e,f,g}
+\newcommand{\segB}{c,d,e,f,g}
+\newcommand{\segC}{a,d,e,f}
+\newcommand{\segD}{b,c,d,e,g}
+\newcommand{\segE}{a,d,e,f,g}
+\newcommand{\segF}{a,e,f,g}
+
+% A small inline digit for tables: \segglyph{lit}{highlighted}
+\newcommand{\segglyph}[2]{%
+  \tikz[baseline=-0.1ex]{\sevenseg{(0,0)}{0.19}{#1}{#2}}}
+
+% a row of the segment table: \segrow{input bits}{glyph}{output}
+\newcommand{\segrow}[3]{\ttab{#1} & #2 & \ttab{#3} \\}
+
+% title
+\title{Logic Devices}
+\subtitle{Computer Organization}
+\author[C. Gummaluru]{Chandra Gummaluru}
+\titlegraphic{\includegraphics[width=0.15\linewidth]{images/signature.pdf}}
+\institute[]{\url{chandra-gummaluru.github.io} }
+\date[Computer Organization]{}
+
+\begin{document}
+
+\begin{frame}
+  \maketitle
+\end{frame}
+
+\begin{frame}
+  \begin{center}
+    \highlight{\textbf{logic device}} \\[2mm]
+    \graytext{a reusable block, built from gates, \\ that performs one common task}
+  \end{center}
+\end{frame}
+
+\begin{frame}
+  We treat each device as a single symbol and reason about what it does, not how its gates are wired.\\[3mm]
+  \begin{itemize}
+    \item \highlight{\textbf{multiplexer}}\\
+    \graytext{selects one input to pass through} \\[2mm]
+    \item \highlight{\textbf{demultiplexer}}\\
+    \graytext{selects one output to pass the input through} \\[2mm]
+    \item \highlight{\textbf{decoder}}\\
+    \graytext{turns a number into a one-hot signal} \\[2mm]
+    \item \highlight{\textbf{encoder}}\\
+    \graytext{turns a one-hot signal back into a number}
+  \end{itemize}
+  \vspace{3mm}
+These devices give us the vocabulary to describe larger circuits without drawing every gate.
+\end{frame}
+
+% ------------------------------------------------------------
+% multiplexer
+% ------------------------------------------------------------
+\begin{frame}{Multiplexers}
+  \begin{center}
+    \Large \highlight{\textbf{multiplexers}}
+  \end{center}
+\end{frame}
+
+\begin{frame}
+  A \highlight{\textbf{multiplexer}} passes one of its data inputs to the output. A select input chooses which one.\\[3mm]
+  \begin{minipage}{0.55\textwidth}
+    \centering
+    \begin{tikzpicture}
+      \draw[thick, fill=gray!30!white!20] (0,1.3) -- (0,-1.3) -- (1.5,-0.7) -- (1.5,0.7) -- cycle;
+      \draw[thick] (0,0.6) -- ++(-0.7,0) node[left, smallgraytext] {$\ttab{d}_{\ttab{0}}$};
+      \draw[thick] (0,-0.6) -- ++(-0.7,0) node[left, smallgraytext] {$\ttab{d}_{\ttab{1}}$};
+      \draw[thick] (1.5,0) -- ++(0.7,0) node[right, smallgraytext] {\ttab{y}};
+      \draw[thick] (0.75,-1) -- ++(0,-0.6) node[below, smallgraytext] {\ttab{s}};
+    \end{tikzpicture}
+  \end{minipage}%
+  \begin{minipage}{0.45\textwidth}
+    \centering
+    \renewcommand{\arraystretch}{1.3}
+    \begin{tabular}{c|c}
+      \ttab{s} & \ttab{y} \\ \hline
+      \ttab{0} & $\ttab{d}_{\ttab{0}}$ \\
+      \ttab{1} & $\ttab{d}_{\ttab{1}}$ \\
+    \end{tabular}
+  \end{minipage}
+\end{frame}
+
+\begin{frame}
+  Inside, the select line either enables one \texttt{AND} gate or the other. Their outputs are combined by an \texttt{OR}.\\[1mm]
+  \begin{figure}
+    \centering
+    % needs: \usetikzlibrary{shapes.gates.logic.US, calc, positioning}
+    \begin{tikzpicture}[scale=0.95, transform shape]
+      \node[and gate US, draw, thick, scale=1.2] (g0) at (0,1.6)  {};
+      \node[and gate US, draw, thick, scale=1.2] (g1) at (0,-1.6) {};
+      \node[or  gate US, draw, thick, scale=1.2] (o)  at (2.6,0)  {};
+      \node[not gate US, draw, thick, scale=0.9] (n)  at (-3.0,0) {};
+
+      % data inputs
+      \draw[thick] (g0.input 1) -- ++(-0.6,0) node[left, smallgraytext] {$\ttab{d}_{\ttab{0}}$};
+      \draw[thick] (g1.input 1) -- ++(-0.6,0) node[left, smallgraytext] {$\ttab{d}_{\ttab{1}}$};
+
+      % NOT output feeds g0's second input
+      \draw[thick] (n.output) |- (g0.input 2);
+
+      % s: one horizontal run into the NOT gate, tapped down to g1's second input
+      \coordinate (sj) at (-4.2,0);
+      \draw[thick] (sj) -- (n.input);
+      \draw[thick] (sj) -- ++(-0.6,0) node[left, smallgraytext] {\ttab{s}};
+      \draw[thick] (sj) |- (g1.input 2);
+      \fill (sj) circle (1.4pt);
+
+      % AND outputs into the OR: drop/rise just before the gate, then enter from the left
+      \draw[thick] (g0.output) -| ([xshift=-4mm]o.input 1) -- (o.input 1);
+      \draw[thick] (g1.output) -| ([xshift=-4mm]o.input 2) -- (o.input 2);
+
+      \draw[thick] (o.output) -- ++(0.5,0) node[right, smallgraytext] {\ttab{y}};
+    \end{tikzpicture}
+  \end{figure}
+  \begin{center}
+    \graytext{$\ttab{y} = \overline{\ttab{s}}\cdot\ttab{d}_{\ttab{0}} + \ttab{s}\cdot\ttab{d}_{\ttab{1}}$}
+  \end{center}
+\end{frame}
+
+\begin{frame}
+  With more select inputs, a multiplexer chooses among more data inputs.\\[3mm]
+  \begin{center}
+    \begin{tikzpicture}
+      \draw[thick, fill=gray!30!white!20] (0,1.8) -- (0,-1.8) -- (1.6,-1.0) -- (1.6,1.0) -- cycle;
+      \foreach \y/\l in {1.2/$\ttab{d}_{\ttab{0}}$, 0.4/$\ttab{d}_{\ttab{1}}$, -0.4/$\ttab{d}_{\ttab{2}}$, -1.2/$\ttab{d}_{\ttab{3}}$}
+        \draw[thick] (0,\y) -- ++(-0.7,0) node[left, smallgraytext] {\ttab{\l}};
+      \draw[thick] (1.6,0) -- ++(0.7,0) node[right, smallgraytext] {\ttab{y}};
+      \draw[thick] (0.55,-1.525) -- (0.55,-2.0) node[below, smallgraytext] {$\ttab{s}_{\ttab{0}}$};
+      \draw[thick] (1.0,-1.3) -- (1.0,-2.0) node[below, smallgraytext] {$\ttab{s}_{\ttab{1}}$};
+    \end{tikzpicture}
+  \end{center}
+  \begin{center}
+    \graytext{the select inputs read as a number that picks the data input}
+  \end{center}
+\end{frame}
+\begin{frame}{De-Multiplexers}
+  \begin{center}
+    \Large \highlight{\textbf{de-multiplexers}}
+  \end{center}
+\end{frame}
+
+\begin{frame}
+  A \highlight{\textbf{de-multiplexer}} does the reverse. It sends one data input to the one output chosen by the select line.\\[3mm]
+  \begin{center}
+    \begin{tikzpicture}
+      % mirror-image trapezoid (narrow on the left)
+      \draw[thick, fill=gray!30!white!20] (1.5,1.3) -- (1.5,-1.3) -- (0,-0.7) -- (0,0.7) -- cycle;
+      \draw[thick] (0,0) -- ++(-0.7,0) node[left, smallgraytext] {\ttab{d}};
+      \draw[thick] (1.5,0.6) -- ++(0.7,0) node[right, smallgraytext] {$\ttab{y}_{\ttab{0}}$};
+      \draw[thick] (1.5,-0.6) -- ++(0.7,0) node[right, smallgraytext] {$\ttab{y}_{\ttab{1}}$};
+      \draw[thick] (0.75,-1) -- ++(0,-0.6) node[below, smallgraytext] {\ttab{s}};
+    \end{tikzpicture}
+  \end{center}
+  \begin{center}
+    \graytext{a multiplexer merges many lines into one, a demultiplexer splits one into many}
+  \end{center}
+\end{frame}
+
+\begin{frame}{Decoder}
+  \begin{center}
+    \Large \highlight{\textbf{decoders}}
+  \end{center}
+\end{frame}
+
+\begin{frame}
+  A \highlight{\textbf{decoder}} reads its inputs as a number and sets exactly one output to \ttab{1}.\\[3mm]
+  \begin{minipage}{0.45\textwidth}
+    \centering
+    \begin{tikzpicture}
+      \draw[thick, fill=gray!30!white!20] (0,-1.6) rectangle (1.6,1.6);
+      \draw[thick] (0,0.6) -- ++(-0.7,0) node[left, smallgraytext] {$\ttab{a}_{\ttab{1}}$};
+      \draw[thick] (0,-0.6) -- ++(-0.7,0) node[left, smallgraytext] {$\ttab{a}_{\ttab{0}}$};
+      \foreach \y/\l in {1.2/$\ttab{y}_{\ttab{3}}$, 0.4/$\ttab{y}_{\ttab{2}}$, -0.4/$\ttab{y}_{\ttab{1}}$, -1.2/$\ttab{y}_{\ttab{0}}$}
+        \draw[thick] (1.6,\y) -- ++(0.7,0) node[right, smallgraytext] {\ttab{\l}};
+    \end{tikzpicture}
+  \end{minipage}%
+  \begin{minipage}{0.55\textwidth}
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabular}{cc|cccc}
+      $\ttab{a}_{\ttab{1}}$ & $\ttab{a}_{\ttab{0}}$ & $\ttab{y}_{\ttab{3}}$ & $\ttab{y}_{\ttab{2}}$ & $\ttab{y}_{\ttab{1}}$ & $\ttab{y}_{\ttab{0}}$ \\ \hline
+      \ttab{0} & \ttab{0} & \ttab{0} & \ttab{0} & \ttab{0} & \ttab{1} \\
+      \ttab{0} & \ttab{1} & \ttab{0} & \ttab{0} & \ttab{1} & \ttab{0} \\
+      \ttab{1} & \ttab{0} & \ttab{0} & \ttab{1} & \ttab{0} & \ttab{0} \\
+      \ttab{1} & \ttab{1} & \ttab{1} & \ttab{0} & \ttab{0} & \ttab{0} \\
+    \end{tabular}
+  \end{minipage}
+\\[3mm]
+This is called a one-hot output.
+\end{frame}
+
+
+% ------------------------------------------------------------
+% encoder
+% ------------------------------------------------------------
+\begin{frame}{Encoders}
+  \begin{center}
+    \Large \highlight{\textbf{encoders}}
+  \end{center}
+\end{frame}
+
+\begin{frame}
+  An \highlight{\textbf{encoder}} does the reverse of a decoder. Given a one-hot input, it outputs the number of the input that is \ttab{1}.\\[3mm]
+  \begin{minipage}{0.45\textwidth}
+    \centering
+    \begin{tikzpicture}
+      \draw[thick, fill=gray!30!white!20] (0,-1.6) rectangle (1.6,1.6);
+      \foreach \y/\l in {1.2/$\ttab{d}_{\ttab{3}}$, 0.4/$\ttab{d}_{\ttab{2}}$, -0.4/$\ttab{d}_{\ttab{1}}$, -1.2/$\ttab{d}_{\ttab{0}}$}
+        \draw[thick] (0,\y) -- ++(-0.7,0) node[left, smallgraytext] {\ttab{\l}};
+      \draw[thick] (1.6,0.6) -- ++(0.7,0) node[right, smallgraytext] {$\ttab{a}_{\ttab{1}}$};
+      \draw[thick] (1.6,-0.6) -- ++(0.7,0) node[right, smallgraytext] {$\ttab{a}_{\ttab{0}}$};
+    \end{tikzpicture}
+  \end{minipage}%
+  \begin{minipage}{0.55\textwidth}
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabular}{cccc|cc}
+      $\ttab{d}_{\ttab{3}}$ & $\ttab{d}_{\ttab{2}}$ & $\ttab{d}_{\ttab{1}}$ & $\ttab{d}_{\ttab{0}}$ & $\ttab{a}_{\ttab{1}}$ & $\ttab{a}_{\ttab{0}}$ \\ \hline
+      \ttab{0} & \ttab{0} & \ttab{0} & \ttab{1} & \ttab{0} & \ttab{0} \\
+      \ttab{0} & \ttab{0} & \ttab{1} & \ttab{0} & \ttab{0} & \ttab{1} \\
+      \ttab{0} & \ttab{1} & \ttab{0} & \ttab{0} & \ttab{1} & \ttab{0} \\
+      \ttab{1} & \ttab{0} & \ttab{0} & \ttab{0} & \ttab{1} & \ttab{1} \\
+    \end{tabular}
+  \end{minipage}
+\end{frame}
+
+% ------------------------------------------------------------
+% don't-care values
+% ------------------------------------------------------------
+\begin{frame}{Don't-Care Values}
+  \begin{center}
+    \Large \highlight{\textbf{don't-care values}}
+  \end{center}
+\end{frame}
+
+\begin{frame}
+  Real devices, like a decoder for a digit display, have inputs that never occur. We mark their output as a \highlight{\textbf{don't-care}}, written \ttab{X}.\\[4mm]
+  \begin{center}
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabular}{cc|c}
+      $\ttab{a}_{\ttab{1}}$ & $\ttab{a}_{\ttab{0}}$ & \ttab{y} \\ \hline
+      \ttab{0} & \ttab{0} & \ttab{1} \\
+      \ttab{0} & \ttab{1} & \ttab{0} \\
+      \ttab{1} & \ttab{0} & \ttab{X} \\
+      \ttab{1} & \ttab{1} & \ttab{X} \\
+    \end{tabular}
+  \end{center}
+    When we simplify, we may read each \ttab{X} as whichever value makes the groups larger. A don't-care is a free choice, used only when it helps.
+\end{frame}
+
+% ------------------------------------------------------------
+% seven-segment decoder
+% ------------------------------------------------------------
+\begin{frame}{Seven-Segment Decoders}
+  \begin{center}
+    \Large \highlight{\textbf{seven-segment decoders}}
+  \end{center}
+\end{frame}
+
+\begin{frame}
+  A \highlight{\textbf{seven-segment display}} draws a digit by lighting some of seven LEDs, numbered \ttab{0} to \ttab{6}. Different patterns give all sixteen hex digits.\\[4mm]
+  \begin{minipage}{0.36\textwidth}
+    \centering
+    \begin{tikzpicture}
+      % scale 1.2: the face runs from (-0.43,-0.41) to (1.63,2.81)
+      \sevenseg{(0,0)}{1.2}{\segEight}{}
+      \node[smallgraytext] at (0.6, 3.05)  {\ttab{0}};
+      \node[smallgraytext] at (1.9, 1.8)   {\ttab{1}};
+      \node[smallgraytext] at (1.9, 0.6)   {\ttab{2}};
+      \node[smallgraytext] at (0.6, -0.65) {\ttab{3}};
+      \node[smallgraytext] at (-0.7, 0.6)  {\ttab{4}};
+      \node[smallgraytext] at (-0.7, 1.8)  {\ttab{5}};
+      % 6 is the middle bar: label it outside, with a leader through the gap
+      \draw[gray!70, thin] (-0.55, 1.2) -- (0.2, 1.2);
+      \node[smallgraytext, anchor=east] at (-0.55, 1.2) {\ttab{6}};
+    \end{tikzpicture}
+  \end{minipage}%
+  \begin{minipage}{0.64\textwidth}
+    \centering
+    \begin{tikzpicture}
+      \foreach \d/\l [count=\i from 0] in
+          {\segZero/0, \segOne/1, \segTwo/2, \segThree/3,
+           \segFour/4, \segFive/5, \segSix/6, \segSeven/7,
+           \segEight/8, \segNine/9, \segA/A, \segB/b,
+           \segC/C, \segD/d, \segE/E, \segF/F} {
+        \pgfmathtruncatemacro{\cx}{mod(\i,4)}
+        \pgfmathtruncatemacro{\cy}{\i/4}
+        \sevenseg{({\cx*1.15}, {-\cy*1.35})}{0.32}{\d}{}
+        \node[smallgraytext] at ({\cx*1.15 + 0.16}, {-\cy*1.35 - 0.3}) {\ttab{\l}};
+      }
+    \end{tikzpicture}
+  \end{minipage}\\[4mm]
+  \graytext{\ttab{b} and \ttab{d} are lower case, so they aren't mistaken for \ttab{8} and \ttab{0}}
+\end{frame}
+
+\begin{frame}
+  A \highlight{\textbf{seven-segment decoder}} reads a 4-bit number and outputs the seven segment signals, $\ttab{s}_{\ttab{0}}$ to $\ttab{s}_{\ttab{6}}$, that draw it.\\[4mm]
+  \begin{center}
+    \begin{tikzpicture}
+      % the decoder
+      \draw[thick, fill=gray!30!white!20] (0,-1.9) rectangle (2.2,1.9);
+      \node[align=center] at (1.1,0) {\small decoder};
+      % inputs, showing 0101
+      \foreach \y/\i/\v in {1.2/3/0, 0.4/2/1, -0.4/1/0, -1.2/0/1} {
+        \draw[thick] (0,\y) -- ++(-0.8,0) node[left, smallgraytext] {$\ttab{x}_{\ttab{\i}}$};
+        \node[font=\ttfamily\small] at (-0.4,\y+0.2) {\v};
+      }
+      % outputs a..g, with the values for 5
+      \foreach \v [count=\k from 0] in {1, 0, 1, 1, 0, 1, 1} {
+        \pgfmathsetmacro{\yy}{1.5 - \k*0.5}
+        \draw[thick] (2.2,\yy) -- ++(1.2,0) node[right, smallgraytext] {$\ttab{s}_{\ttab{\k}}$};
+        \node[font=\ttfamily\small] at (2.8,\yy+0.18) {\v};
+      }
+      % the display it drives
+      \sevenseg{(4.9,-1.2)}{1.2}{\segFive}{}
+    \end{tikzpicture}
+  \end{center}
+  \begin{center}
+    \graytext{input \ttab{0101} lights segments \ttab{0}, \ttab{2}, \ttab{3}, \ttab{5} and \ttab{6}, drawing a \ttab{5}}
+  \end{center}
+\end{frame}
+
+\begin{frame}
+  Each segment is its own function of the four inputs. Segment \ttab{0} is lit for every digit except \ttab{1}, \ttab{4}, \ttab{b} and \ttab{d}.\\[3mm]
+  \begin{minipage}{0.22\textwidth}
+    \centering
+    \begin{tikzpicture}
+      \sevenseg{(0,0)}{0.95}{}{a}
+      \node[smallgraytext] at (0.475, 2.55) {segment \ttab{0}};
+    \end{tikzpicture}
+  \end{minipage}%
+  \begin{minipage}{0.78\textwidth}
+    \centering
+    \small
+    \renewcommand{\arraystretch}{1.3}
+    \begin{tabular}{c@{\hspace{3mm}}c@{\hspace{3mm}}c}
+      \graytext{\ttab{x}} & & $\ttab{s}_{\ttab{0}}$ \\ \hline
+      \segrow{0000}{\segglyph{\segZero}{a}}{1}
+      \segrow{0001}{\segglyph{\segOne}{}}{0}
+      \segrow{0010}{\segglyph{\segTwo}{a}}{1}
+      \segrow{0011}{\segglyph{\segThree}{a}}{1}
+      \segrow{0100}{\segglyph{\segFour}{}}{0}
+      \segrow{0101}{\segglyph{\segFive}{a}}{1}
+      \segrow{0110}{\segglyph{\segSix}{a}}{1}
+      \segrow{0111}{\segglyph{\segSeven}{a}}{1}
+    \end{tabular}%
+    \hspace{8mm}%
+    \begin{tabular}{c@{\hspace{3mm}}c@{\hspace{3mm}}c}
+      \graytext{\ttab{x}} & & $\ttab{s}_{\ttab{0}}$ \\ \hline
+      \segrow{1000}{\segglyph{\segEight}{a}}{1}
+      \segrow{1001}{\segglyph{\segNine}{a}}{1}
+      \segrow{1010}{\segglyph{\segA}{a}}{1}
+      \segrow{1011}{\segglyph{\segB}{}}{0}
+      \segrow{1100}{\segglyph{\segC}{a}}{1}
+      \segrow{1101}{\segglyph{\segD}{}}{0}
+      \segrow{1110}{\segglyph{\segE}{a}}{1}
+      \segrow{1111}{\segglyph{\segF}{a}}{1}
+    \end{tabular}
+  \end{minipage}\\[3mm]
+  \graytext{the other six segments each get a table like this one}
+\end{frame}
+
+\begin{frame}
+  Segment \ttab{0} is off in only four rows, so a \highlight{\textbf{decoder}} builds it directly: we \ttab{NOR} the outputs for \ttab{1}, \ttab{4}, \ttab{11} and \ttab{13}.\\[3mm]
+  \begin{center}
+    \begin{tikzpicture}
+      % a 4-to-16 decoder
+      \draw[thick, fill=gray!30!white!20] (0,-2.2) rectangle (1.6,2.2);
+      \node[align=center] at (0.8,0) {\small 4-to-16 \\[-1mm] \small decoder};
+      \draw[thick] (0,0) -- ++(-0.8,0) node[left, smallgraytext] {\ttab{x}};
+      \draw[thick] ($(-0.4,0)+(-0.08,-0.15)$) -- ($(-0.4,0)+(0.08,0.15)$);
+      \node[smallgraytext] at ($(-0.4,0)+(0,0.32)$) {\ttab{4}};
+
+      % sixteen outputs, y0 at the top; the four that feed the gate are dark
+      \foreach \k in {0,...,15} {
+        \pgfmathsetmacro{\yy}{2.0 - \k*0.2667}
+        \ifnum\k=1 \coordinate (o\k) at (1.6,\yy);
+        \else\ifnum\k=4 \coordinate (o\k) at (1.6,\yy);
+        \else\ifnum\k=11 \coordinate (o\k) at (1.6,\yy);
+        \else\ifnum\k=13 \coordinate (o\k) at (1.6,\yy);
+        \else \draw[gray!50] (1.6,\yy) -- ++(0.35,0);
+        \fi\fi\fi\fi
+      }
+      \foreach \k in {0,1,4,11,13,15} {
+        \pgfmathsetmacro{\yy}{2.0 - \k*0.2667}
+        \node[smallgraytext, anchor=east, font=\tiny] at (1.55,\yy) {\k};
+      }
+
+      % the NOR gate
+      \node[nor gate US, draw, thick, logic gate inputs=nnnn, scale=1.3] (n) at (4.4,0) {};
+      % outer pair turns furthest right, inner pair nearer, so no wires cross
+      \foreach \k/\i/\x/\y in {1/1/3.3/1.733, 4/2/3.0/0.933, 11/3/3.0/-0.933, 13/4/3.3/-1.467} {
+        \draw[thick] (o\k) -- (\x,\y) |- (n.input \i);
+        \fill[black] (o\k) circle (1.2pt);
+      }
+      \draw[thick] (n.output) -- ++(0.7,0) node[right, smallgraytext] {$\ttab{s}_{\ttab{0}}$};
+      \sevenseg{(7.55,-0.9)}{0.9}{}{a}
+    \end{tikzpicture}
+  \end{center}
+  \begin{center}
+    \graytext{a digit display for \ttab{0}--\ttab{9} only would make rows \ttab{1010}--\ttab{1111} don't-cares}
+  \end{center}
+\end{frame}
+
+\end{document}

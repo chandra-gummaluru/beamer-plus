@@ -64,8 +64,8 @@ export function updatePropertiesPanel() {
     // Auto-apply every change immediately. Property assignment (not
     // addEventListener) because #editor-properties-body persists across panel
     // refreshes — addEventListener here would stack a new listener per refresh.
-    body.oninput  = () => applyPropertiesQuiet();
-    body.onchange = () => applyPropertiesQuiet();
+    body.oninput  = () => { applyPropertiesQuiet(); syncFieldVisibility(); };
+    body.onchange = () => { applyPropertiesQuiet(); syncFieldVisibility(); };
 }
 
 function buildPropsHTML(arrKey, item) {
@@ -263,9 +263,35 @@ async function fillWidgetFields(item, token) {
 
     for (const field of schema.fields) {
         const row = buildFieldRow(field, item);
+        row.field = field;
         _widgetRows.push(row);
         host.appendChild(row.node);
     }
+    syncFieldVisibility();
+}
+
+// A field may declare `showIf: { otherKey: value | [values] }` — it only
+// applies while another field holds one of those values (an answer list means
+// nothing to an open-ended poll). Hidden rather than removed, so its value is
+// kept and switching back restores what the presenter typed.
+function syncFieldVisibility() {
+    const values = {};
+    for (const r of _widgetRows) {
+        const res = r.read();
+        values[r.key] = res.remove ? r.field?.default : res.value;
+    }
+    for (const r of _widgetRows) {
+        r.node.style.display = fieldVisible(r.field, values) ? '' : 'none';
+    }
+}
+
+function fieldVisible(field, values) {
+    const cond = field?.showIf;
+    if (!cond || typeof cond !== 'object') return true;
+    return Object.keys(cond).every(k => {
+        const want = Array.isArray(cond[k]) ? cond[k] : [cond[k]];
+        return want.some(w => String(w) === String(values[k]));
+    });
 }
 
 function hintRow(text) {
