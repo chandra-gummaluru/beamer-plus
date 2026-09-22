@@ -55,6 +55,12 @@
         fields = (schema && Array.isArray(schema.fields))
             ? schema.fields.filter(function (f) { return f && f.key && RESERVED.indexOf(f.key) === -1; })
             : [];
+        // Every widget with a schema gets a Name (see name() below). Keep in
+        // step with nameField() in editor/widget-schema.js.
+        if (schema && !fields.some(function (f) { return f.key === 'title'; })) {
+            fields.unshift({ key: 'title', label: 'Name', type: 'text',
+                             placeholder: schema.label || 'Title and download file name' });
+        }
         customSettings = !!(schema && schema.customSettings);
         hasSettings = !customSettings && fields.length > 0;
         return true;
@@ -541,11 +547,40 @@
 
     var barEl = null, actionsEl = null, titleEl = null, resetHandler = null;
 
-    function barTitle() {
-        // A presenter-set title wins over the widget's generic name.
+    /* ─── name ──────────────────────────────────────────────────── */
+    // One Name per widget, used everywhere it shows up: the bar title, the
+    // heading inside an exported PDF, and every file the widget downloads.
+    // Blank means the widget's own default. `downloadName` is read as a
+    // fallback for decks saved while that was a separate setting.
+
+    function customName() {
         var c = cfg();
         if (typeof c.title === 'string' && c.title.trim()) return c.title.trim();
-        return (schema && schema.label) || '';
+        if (typeof c.downloadName === 'string' && c.downloadName.trim()) return c.downloadName.trim();
+        return '';
+    }
+
+    /** The widget's Name, or `fallback` (else its schema label) when none is set. */
+    function name(fallback) {
+        return customName() || (fallback != null ? String(fallback) : ((schema && schema.label) || ''));
+    }
+
+    /**
+     * A safe download file name: the Name if set, else `fallback`, plus `ext`.
+     * Only `ext` itself is stripped from a typed name, so "Lecture 3.2" keeps
+     * its ".2" and "Notes.pdf" doesn't become "Notes.pdf.pdf".
+     */
+    function fileName(fallback, ext) {
+        ext = ext ? '.' + String(ext).replace(/^\./, '') : '';
+        var n = (customName() || String(fallback || 'download'))
+            .replace(/[\\/:*?"<>|\x00-\x1f]+/g, '_').trim();
+        if (ext && n.toLowerCase().slice(-ext.length) === ext.toLowerCase()) n = n.slice(0, -ext.length).trim();
+        return (n || 'download') + ext;
+    }
+
+    function barTitle() {
+        // A presenter-set title wins over the widget's generic name.
+        return name();
     }
 
     function makeBtn(opts) {
@@ -728,6 +763,7 @@
         var ownTitle = own.querySelector('.bw-toolbar-title, [data-bw-title], .toolbar-title, #toolbar-title');
         if (ownTitle) {
             ownTitle.classList.add('bw-topbar-title');
+            if (customName()) ownTitle.textContent = customName();
             if (titleEl && titleEl.parentNode) titleEl.parentNode.removeChild(titleEl);
             titleEl = ownTitle;
         }
@@ -798,6 +834,8 @@
         closeSettings: function () { closePanel(); },
         hasSettings:   function () { readSchema(); return hasSettings; },
         topbar:        topbarApi,
+        name:          function (fallback) { readSchema(); return name(fallback); },
+        fileName:      function (fallback, ext) { readSchema(); return fileName(fallback, ext); },
     };
 
     function init() { applyScale(); announce(); buildTopbar(); syncScaleButtons(); }

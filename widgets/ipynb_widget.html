@@ -8,8 +8,7 @@
   "fields": [
     { "key": "notebook", "label": "Notebook file", "type": "file", "accept": ".ipynb", "folder": "assets" },
     { "key": "packages", "label": "Extra packages (one per line)", "type": "textarea-lines", "rows": 4, "placeholder": "pandas\nsympy\nrequests==2.31.0" },
-    { "key": "autoImport", "label": "Auto-load packages from imports", "type": "checkbox", "default": true },
-    { "key": "downloadName", "label": "Download file name", "type": "text", "placeholder": "Defaults to the notebook name" }
+    { "key": "autoImport", "label": "Auto-load packages from imports", "type": "checkbox", "default": true }
   ]
 }
 </script>
@@ -1140,7 +1139,7 @@ function renderNotebook(nb, filename, withOutputs = true) {
   try {
     if (filename) {
       notebookName = filename.split('/').pop();
-      document.getElementById('notebook-title').textContent = notebookName;
+      document.getElementById('notebook-title').textContent = wName(notebookName);
       notebookTitleSet = true;
     }
     if (nb.metadata) originalMetadata = nb.metadata;
@@ -1766,20 +1765,19 @@ function enablePresenterToolbar() {
 // block for the document it prints.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/* The presenter's "Download file name" setting as a safe file stem, or ''.
-   Read from WIDGET_CONFIG at download time, so an edit made after the widget
-   loaded still applies. Only a known extension is stripped: "Lecture 3.2"
-   must stay "Lecture 3.2". */
-function downloadStem(){
-  var raw = String((window.WIDGET_CONFIG || {}).downloadName || '').trim();
-  return raw.replace(/\.(pdf|ipynb|py|json)$/i, '').replace(/[\\/:*?"<>|\x00-\x1f]+/g, '_').trim();
+/* The widget's Name setting (every widget has one — the settings kit adds it)
+   is its title everywhere: the bar, the heading inside an exported PDF, and
+   the downloaded file's name. Blank falls back to the widget's own default. */
+function wName(fallback){
+  return (window.BeamerWidget && BeamerWidget.name) ? BeamerWidget.name(fallback) : fallback;
+}
+function wFile(fallback, ext){
+  return (window.BeamerWidget && BeamerWidget.fileName) ? BeamerWidget.fileName(fallback, ext) : fallback + ext;
 }
 
 function notebookFilename() {
-  const custom = downloadStem();
-  if (custom) return custom + '.ipynb';
-  const raw = (notebookName || 'Untitled.ipynb').trim();
-  return raw.replace(/[\\/:*?"<>|]/g, '_') || 'Untitled.ipynb';
+  const raw = (notebookName || 'Untitled.ipynb').trim().replace(/\.ipynb$/i, '');
+  return wFile(raw.replace(/[\\/:*?"<>|]/g, '_') || 'Untitled', '.ipynb');
 }
 
 // nbformat wants source as a list of lines, each keeping its newline except
@@ -1966,7 +1964,7 @@ function printHighlight(src) {
 }
 
 function fillPrintHeader() {
-  const name  = (document.getElementById('notebook-title')?.textContent || 'Untitled.ipynb').trim();
+  const name  = wName(notebookName || 'Untitled.ipynb');
   let date;
   try { date = new Date().toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' }); }
   catch (_) { date = new Date().toDateString(); }
@@ -2063,7 +2061,7 @@ async function downloadPdf() {
     const INK = [26, 26, 24], DIM = [133, 133, 125], RULE = [218, 217, 212];
 
     // Title block, as text.
-    const name = (document.getElementById('notebook-title')?.textContent || 'Untitled.ipynb').trim();
+    const name = wName(notebookName || 'Untitled.ipynb');
     let date;
     try { date = new Date().toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' }); }
     catch (_) { date = new Date().toDateString(); }
@@ -2118,8 +2116,7 @@ async function downloadPdf() {
       doc.text(`Page ${i} of ${pages}`, ML + CW, PH - 26, { align: 'right' });
     }
 
-    const stem = downloadStem() || name.replace(/\.ipynb$/i, '').replace(/[^\w.-]+/g, '-') || 'notebook';
-    doc.save(stem + '.pdf');
+    doc.save(wFile(notebookName.replace(/\.ipynb$/i, '').replace(/[^\w.-]+/g, '-') || 'notebook', '.pdf'));
     if (label) label.textContent = 'PDF';
   } catch (err) {
     console.error('[notebook] PDF export failed', err);
@@ -2275,7 +2272,7 @@ window.addEventListener('message', function(e) {
     // its listener first (it is injected into <head>), so this runs after.
     if (notebookTitleSet) {
       const title = document.getElementById('notebook-title');
-      if (title) title.textContent = notebookName;
+      if (title) title.textContent = wName(notebookName);
     }
   }
 });

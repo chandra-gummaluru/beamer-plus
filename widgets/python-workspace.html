@@ -19,7 +19,6 @@
     { "key": "secondary", "label": "Second pane", "type": "select", "default": "memory",
       "options": [ { "v": "editor", "l": "Editor" }, { "v": "shell", "l": "Shell" }, { "v": "memory", "l": "Memory model" } ] },
     { "key": "filename", "label": "File name", "type": "text", "placeholder": "main.py" },
-    { "key": "downloadName", "label": "Download file name", "type": "text", "placeholder": "Defaults to the file name" },
     { "key": "code", "label": "Starting code", "type": "textarea", "rows": 8,
       "placeholder": "a = [1, 2]\nb = a\na.append(3)\nprint(b)" },
     { "key": "scale", "label": "Text size", "type": "select", "default": "1.4",
@@ -4072,19 +4071,20 @@ function pdfSection(page, x, y, text){
   return y + 13;
 }
 
-/* The presenter's "Download file name" setting as a safe file stem, or ''.
-   Read from WIDGET_CONFIG at download time, so an edit made after the widget
-   loaded still applies. Only a known extension is stripped: "Lecture 3.2"
-   must stay "Lecture 3.2". */
-function downloadStem(){
-  var raw = String((window.WIDGET_CONFIG || {}).downloadName || '').trim();
-  return raw.replace(/\.(pdf|ipynb|py|json)$/i, '').replace(/[\\/:*?"<>|\x00-\x1f]+/g, '_').trim();
+/* The widget's Name setting (every widget has one — the settings kit adds it)
+   is its title everywhere: the bar, the heading inside an exported PDF, and
+   the downloaded file's name. Blank falls back to the widget's own default. */
+function wName(fallback){
+  return (window.BeamerWidget && BeamerWidget.name) ? BeamerWidget.name(fallback) : fallback;
+}
+function wFile(fallback, ext){
+  return (window.BeamerWidget && BeamerWidget.fileName) ? BeamerWidget.fileName(fallback, ext) : fallback + ext;
 }
 
 function pdfTitle(){
   var f = document.getElementById('filename');
   var name = f && f.value.trim();
-  return name || 'main.py';
+  return wName(name || 'main.py');
 }
 
 function pdfDate(){
@@ -4096,7 +4096,7 @@ function pdfDate(){
 function pdfHeader(page, x, y, w){
   var drawing = app.mode === 'draw';
   page.label(x, y, 'MEMORY MODEL', 6.8, PDF_COL.dim, 'F5', { tracking: 0.9 });
-  page.label(x, y + 12, drawing ? 'Drawing' : pdfTitle(), 17, PDF_COL.ink, drawing ? 'F5' : 'F2');
+  page.label(x, y + 12, drawing ? wName('Drawing') : pdfTitle(), 17, PDF_COL.ink, drawing ? 'F5' : 'F2');
   page.label(x + w, y + 18, pdfDate(), 8.5, PDF_COL.dim, 'F4', { align: 'right' });
   page.rule(x, y + 40, x + w, y + 40, PDF_COL.ink, 0.8);
   return y + 56;
@@ -4260,12 +4260,11 @@ function buildPdf(){
 
     pdfFooter(page, M, footY, W);
 
-    var custom = downloadStem();
-    var stem = pdfTitle().replace(/\.[^.]+$/, '').replace(/[^\w.-]+/g, '-') || 'memory-model';
+    var f = document.getElementById('filename');
+    var stem = ((f && f.value.trim()) || 'main.py').replace(/\.[^.]+$/, '').replace(/[^\w.-]+/g, '-') || 'memory-model';
     return {
       blob: pdfFile(PDF.pw, PDF.ph, page.ops.join('\n'), img),
-      name: custom ? custom + '.pdf'
-          : drawing ? stem + '-drawing.pdf' : stem + '-step-' + app.idx + '.pdf'
+      name: wFile(drawing ? stem + '-drawing' : stem + '-step-' + app.idx, '.pdf')
     };
   });
 }

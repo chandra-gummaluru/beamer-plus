@@ -7,9 +7,8 @@
   "category": "Tools",
   "fields": [
     { "key": "pdf", "label": "PDF file", "type": "file", "accept": ".pdf", "folder": "assets" },
-    { "key": "title", "label": "Display title",   "type": "text",   "placeholder": "Optional" },
-    { "key": "page",  "label": "Start page",      "type": "number", "min": 1, "step": 1, "default": 1 },
-    { "key": "downloadName", "label": "Download file name", "type": "text", "placeholder": "Defaults to the uploaded file name" }
+    { "key": "title", "label": "Name",            "type": "text",   "placeholder": "Title bar and downloaded file" },
+    { "key": "page",  "label": "Start page",      "type": "number", "min": 1, "step": 1, "default": 1 }
   ]
 }
 </script>
@@ -259,11 +258,14 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
 
   // The PDF this widget is showing, kept for the download button.
   let sourceUrl   = '';
-  // The presenter's "Download file name" setting as a safe file stem, or ''.
-  // Only a known extension is stripped: "Lecture 3.2" must stay as it is.
-  function downloadStem() {
-    const raw = String((window.WIDGET_CONFIG || {}).downloadName || '').trim();
-    return raw.replace(/\.pdf$/i, '').replace(/[\\/:*?"<>|\x00-\x1f]+/g, '_').trim();
+  /* The widget's Name setting (every widget has one — the settings kit adds it)
+     is its title everywhere: the bar, the heading inside an exported PDF, and
+     the downloaded file's name. Blank falls back to the widget's own default. */
+  function wName(fallback){
+    return (window.BeamerWidget && BeamerWidget.name) ? BeamerWidget.name(fallback) : fallback;
+  }
+  function wFile(fallback, ext){
+    return (window.BeamerWidget && BeamerWidget.fileName) ? BeamerWidget.fileName(fallback, ext) : fallback + ext;
   }
   let sourceName  = 'document.pdf';
 
@@ -563,7 +565,7 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       const blob = await resp.blob();
       const href = URL.createObjectURL(blob);
-      const a = Object.assign(document.createElement('a'), { href, download: downloadStem() ? downloadStem() + '.pdf' : sourceName });
+      const a = Object.assign(document.createElement('a'), { href, download: wFile(sourceName.replace(/\.pdf$/i, ''), '.pdf') });
       document.body.appendChild(a);
       a.click();
       a.remove();

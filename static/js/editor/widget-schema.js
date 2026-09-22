@@ -70,10 +70,26 @@ async function loadSchema(item) {
         ? schema.fields.filter(f => f && typeof f.key === 'string' && !WIDGET_RESERVED.has(f.key))
         : [];
 
+    // Every widget has a Name: its title in the bar, inside any PDF it
+    // exports, and on any file it downloads. Added here (and in the settings
+    // kit) rather than declared per widget, so no widget can forget it. A
+    // widget that declares its own `title` field keeps that one.
+    if (!fields.some(f => f.key === 'title')) fields.unshift(nameField(schema?.label));
+
     return {
         label: typeof schema?.label === 'string' ? schema.label : null,
         customSettings: !!schema?.customSettings,
         fields,
+    };
+}
+
+/** The universal Name field. Keep in step with nameField() in widget-settings-kit.js. */
+export function nameField(label) {
+    return {
+        key: 'title',
+        label: 'Name',
+        type: 'text',
+        placeholder: (typeof label === 'string' && label) ? label : 'Title and download file name',
     };
 }
 

@@ -95,8 +95,12 @@ appear only while another field holds that value — e.g. the answer list in
 `audience-response.html` shows only when `responseType` is `"choice"`. Hidden
 fields keep their values.
 
-Widgets that download a file declare a `downloadName` text field
-(`"Download file name"`) and use it as the file stem when set.
+Every widget with a schema also gets a **Name** field (key `title`), added by
+the settings kit and the editor — don't declare it. It is the widget's title
+everywhere: the bar, the heading of any exported PDF, and every downloaded
+file. Read it with `BeamerWidget.name(fallback)` and name downloads with
+`BeamerWidget.fileName(fallbackStem, '.pdf')`; both fall back to the widget's
+own default when the Name is blank.
 
 Conventional field keys reused across widgets: `autoStart`, `autoplay`, `readOnly`,
 `scale` (text size, `select` of `"1" | "1.4" | "1.8" | "2.2"`, default `"1.4"`).

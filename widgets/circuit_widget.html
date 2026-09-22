@@ -16,8 +16,7 @@
       "note": "this deck only" },
     { "key": "hop",     "label": "Seconds per hop", "type": "select", "default": 1,
       "options": [ {"v": 0.25, "l": "¼s"}, {"v": 0.5, "l": "½s"}, {"v": 1, "l": "1s"}, {"v": 2, "l": "2s"} ] },
-    { "key": "running", "label": "Start running", "type": "checkbox", "default": true },
-    { "key": "downloadName", "label": "Download file name", "type": "text", "placeholder": "circuit" }
+    { "key": "running", "label": "Start running", "type": "checkbox", "default": true }
   ]
 }
 </script>
@@ -3555,20 +3554,21 @@ function App() {
   };
 
 
-  /* The presenter's "Download file name" setting as a safe file stem, or ''.
-     Read from WIDGET_CONFIG at download time, so an edit made after the widget
-     loaded still applies. Only a known extension is stripped: "Lecture 3.2"
-     must stay "Lecture 3.2". */
-  function downloadStem(){
-    var raw = String((window.WIDGET_CONFIG || {}).downloadName || '').trim();
-    return raw.replace(/\.(pdf|ipynb|py|json)$/i, '').replace(/[\\/:*?"<>|\x00-\x1f]+/g, '_').trim();
+  /* The widget's Name setting (every widget has one — the settings kit adds it)
+     is its title everywhere: the bar, the heading inside an exported PDF, and
+     the downloaded file's name. Blank falls back to the widget's own default. */
+  function wName(fallback){
+    return (window.BeamerWidget && BeamerWidget.name) ? BeamerWidget.name(fallback) : fallback;
+  }
+  function wFile(fallback, ext){
+    return (window.BeamerWidget && BeamerWidget.fileName) ? BeamerWidget.fileName(fallback, ext) : fallback + ext;
   }
 
   const exportJson = ()=>{
     const blob = new Blob([JSON.stringify(circuit.serialize(), null, 2)], { type:'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = (downloadStem() || 'circuit') + '.json';
+    a.download = wFile('circuit', '.json');
     a.click();
     setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
   };
@@ -3579,8 +3579,7 @@ function App() {
     if (!svg || pdfBusy) return;
     setPdfBusy(true);
     try {
-      const stem = downloadStem();
-      await window.CircuitPdf.download(svg, { title: stem || 'Circuit' }, (stem || 'circuit') + '.pdf');
+      await window.CircuitPdf.download(svg, { title: wName('Circuit') }, wFile('circuit', '.pdf'));
     } catch (err) {
       console.error('[circuit] PDF export failed', err);
       alert('The PDF could not be made: ' + err.message);

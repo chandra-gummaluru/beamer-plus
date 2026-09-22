@@ -669,7 +669,9 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     const collect = S.phase === 'collect';
     const showData = results || (collect && S.showLive);
 
-    titleEl.textContent    = open ? 'Open Response' : 'Multiple Choice';
+    // A presenter-set Name wins over the type label (see the settings kit).
+    const fallbackTitle = open ? 'Open Response' : 'Multiple Choice';
+    titleEl.textContent = window.BeamerWidget?.name ? BeamerWidget.name(fallbackTitle) : fallbackTitle;
     kickerText.textContent = open ? 'Open question' : 'Multiple choice';
     kickerMeta.textContent = showData ? plural(S.total, 'response', 'responses') : '';
 

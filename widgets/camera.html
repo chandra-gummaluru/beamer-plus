@@ -288,6 +288,16 @@ html, body { width: 100%; height: 100%; overflow: hidden; }
   </div>
 
   <script>
+/* The widget's Name setting (every widget has one — the settings kit adds it)
+   is its title everywhere: the bar, the heading inside an exported PDF, and
+   the downloaded file's name. Blank falls back to the widget's own default. */
+function wName(fallback){
+  return (window.BeamerWidget && BeamerWidget.name) ? BeamerWidget.name(fallback) : fallback;
+}
+function wFile(fallback, ext){
+  return (window.BeamerWidget && BeamerWidget.fileName) ? BeamerWidget.fileName(fallback, ext) : fallback + ext;
+}
+
   (function () {
     const root        = document.getElementById('root');
     const idleScreen  = document.getElementById('idle-screen');
@@ -443,7 +453,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; }
         if (!blob) return;
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = `snapshot-${Date.now()}.jpg`; a.click();
+        a.href = url; a.download = wFile(`snapshot-${Date.now()}`, '.jpg'); a.click();
         setTimeout(() => URL.revokeObjectURL(url), 5000);
       }, 'image/jpeg', 0.92);
     }
