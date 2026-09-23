@@ -13,8 +13,8 @@
                    { "v": "numeric",   "l": "Numeric estimate" },
                    { "v": "wordcloud", "l": "Word cloud" },
                    { "v": "open",      "l": "Open-ended" } ] },
-    { "key": "question", "label": "Question", "type": "textarea", "rows": 3,
-      "placeholder": "Enter the question…" },
+    { "key": "question", "label": "Question (Markdown, $LaTeX$, ```code``` blocks)", "type": "textarea", "rows": 5,
+      "placeholder": "Consider the following code:\n\n```python\nx = 5\nif x > 2:\n    x = -3\n```\n\nWhat is `x`?" },
 
     { "key": "options", "label": "Answer options (one per line)", "type": "textarea-lines", "rows": 4,
       "placeholder": "Option A\nOption B\nOption C", "showIf": { "responseType": "choice" } },
@@ -136,9 +136,103 @@
   line-height: 1.3;
   letter-spacing: -0.01em;
   color: var(--text);
-  flex-shrink: 0;
   overflow-wrap: anywhere;
+  /* A question carrying a code listing can be tall; it gets the space it
+     needs and scrolls rather than pushing the answers off the slide. */
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
+
+/* ── Code and maths inside the question ─────────────── */
+/* Listings are the point of the question, not decoration: a quiet panel,
+   mono type sized off --u so it's readable from the back, and its own
+   scrollbar when a long line refuses to wrap. */
+#question pre {
+  margin: calc(10px * var(--u)) 0;
+  padding: calc(10px * var(--u)) calc(14px * var(--u));
+  background: var(--bg-output);
+  border: 1px solid var(--border);
+  border-left: calc(3px * var(--u)) solid var(--border-med);
+  border-radius: var(--radius);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+#question pre code {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--fs-code);
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: 0;
+  color: var(--text);
+  white-space: pre;
+  tab-size: 4;
+}
+/* Inline `code`, in a question or an answer option. */
+#question :not(pre) > code,
+.choice-label code,
+#spot-text code {
+  padding: 0.1em 0.35em;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  white-space: pre-wrap;
+}
+#question blockquote {
+  margin: calc(8px * var(--u)) 0;
+  padding-left: calc(12px * var(--u));
+  border-left: 2px solid var(--border-med);
+  color: var(--text-2);
+}
+#question ul, #question ol { margin: calc(6px * var(--u)) 0 calc(6px * var(--u)) 1.2em; }
+#question li { margin: 0.15em 0; }
+#question .katex-display { margin: calc(10px * var(--u)) 0; }
+#question h1, #question h2, #question h3 { font-size: 1em; font-weight: 600; }
+#question img { max-width: 100%; }
+
+/* A listing makes the question the main event, so the prose around it steps
+   down and the block itself carries the size. */
+#question.has-code { font-size: var(--fs-body); font-weight: 400; line-height: 1.45; }
+#question.has-code > p:first-child { font-weight: 500; }
+
+/* Code on the left, answers on the right — but only once there's something to
+   show and there's room for two columns. Stacked, a listing plus four answer
+   rows doesn't fit a slide. */
+@media (min-width: 820px) {
+  #stage.is-code #prompt {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    column-gap: calc(24px * var(--u));
+    align-content: start;
+  }
+  #stage.is-code #banner,
+  #stage.is-code #kicker { grid-column: 1 / -1; }
+  #stage.is-code #question { grid-column: 1; grid-row: 2; align-self: start; max-height: 100%; }
+  #stage.is-code #choices  { grid-column: 2; grid-row: 2; align-self: center; max-height: 100%; }
+}
+
+/* While the room is still answering, the listing is what they're reading and
+   the options are already on their phones — so the options shrink to a row of
+   pills and the code keeps the slide. */
+#stage.is-code-collect #choices {
+  flex: 0 0 auto;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: calc(8px * var(--u));
+  overflow: visible;
+}
+#stage.is-code-collect .choice {
+  flex: 0 1 auto;
+  padding: calc(5px * var(--u)) calc(13px * var(--u)) calc(5px * var(--u)) calc(6px * var(--u));
+  border-radius: 999px;
+  column-gap: calc(8px * var(--u));
+}
+#stage.is-code-collect .badge { width: calc(21px * var(--u)); height: calc(21px * var(--u)); }
+#stage.is-code-collect .choice-label { font-size: var(--fs-small); }
 /* Once there is data to look at, the question steps back a size. */
 #stage.is-data #question { font-size: var(--fs-lead); }
 #banner { display: none; }
@@ -179,6 +273,7 @@
 /* ── Answer rows (choice, true/false) ───────────────── */
 #choices {
   list-style: none;
+  flex: 0 1 auto;
   flex-direction: column;
   gap: calc(8px * var(--u));
   min-height: 0;
@@ -836,11 +931,12 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     src = src == null ? '' : String(src);
     if (el._md === src && el._mdKatex === !!window.renderMathInElement) return;
     el._md = src; el._mdKatex = !!window.renderMathInElement;
-    if (!src) { el.textContent = ''; return; }
+    if (!src) { el.textContent = ''; el.classList.remove('has-code'); return; }
     if (!window.marked) { el.textContent = src; return; }
     // Presenter-authored config, not audience input — responses never come
     // through here; they're set with textContent.
     el.innerHTML = marked.parse(src, { breaks: false });
+    el.classList.toggle('has-code', !!el.querySelector('pre'));
     if (window.renderMathInElement) {
       renderMathInElement(el, {
         delimiters: [
@@ -999,6 +1095,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     const D = preview ? sample(S.type) : S;
     const t = D.type;
 
+    setMd(questionEl, D.question);
     const results  = D.phase === 'results';
     const collect  = D.phase === 'collect';
     const showData = results || (collect && D.showLive);
@@ -1021,6 +1118,10 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     stage.classList.toggle('no-join',    !withJoin);
     stage.classList.toggle('is-data',    showData);
     stage.classList.toggle('is-fill',    showData && !isChoiceLike(t));
+    // A code listing beside its answers, rather than above them (see the CSS).
+    const codeQ = isChoiceLike(t) && questionEl.classList.contains('has-code');
+    stage.classList.toggle('is-code',         codeQ && showData);
+    stage.classList.toggle('is-code-collect', codeQ && collect && !showData);
     joinEl.style.display = withJoin ? 'flex' : 'none';
     previewMsg.textContent = IS_VIEWER ? 'Waiting for the presenter to set up this question.'
                                        : 'Sample data — ' + missing().replace(/^A/, 'a');
@@ -1028,8 +1129,6 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
 
     bannerEl.style.display = S.error && !preview ? 'flex' : 'none';
     bannerEl.textContent   = S.error;
-
-    setMd(questionEl, D.question);
 
     const show = (el, on, how) => { el.style.display = on ? (how || 'flex') : 'none'; };
     show(choicesEl, isChoiceLike(t));

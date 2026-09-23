@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Respond — Beamer+</title>
 <script src="/static/vendor/socket.io.min.js"></script>
+<!-- The presenter can write Markdown, $LaTeX$ and ```code``` blocks in a
+     question; the phone has to show the same thing the slide does. Both are
+     pinned to the versions the widgets use, so a deck fetches them once. -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap');
 
@@ -142,6 +149,45 @@ textarea::placeholder { color: var(--text-3); }
 }
 .status-card.ok .status-title { color: var(--green); }
 .status-card.err .status-title { color: var(--red); }
+
+/* ── Rich question text ──────────────────────────────── */
+.question-text p { margin: 0; }
+.question-text p + p { margin-top: 0.6em; }
+.question-text pre {
+  margin: 14px 0;
+  padding: 12px 14px;
+  text-align: left;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border-med);
+  border-radius: var(--radius);
+  overflow-x: auto;
+}
+.question-text pre code {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+  white-space: pre;
+  tab-size: 4;
+  color: var(--text);
+}
+.question-text :not(pre) > code {
+  padding: 0.1em 0.35em;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+}
+.question-text ul, .question-text ol { margin: 8px 0 8px 1.2em; text-align: left; }
+.question-text blockquote {
+  margin: 8px 0; padding-left: 12px;
+  border-left: 2px solid var(--border-med); color: var(--text-2); text-align: left;
+}
+.question-text img { max-width: 100%; }
+.question-text.has-block { font-size: 1.1rem; text-align: left; }
 </style>
 </head>
 <body>
@@ -315,6 +361,32 @@ async function submit() {
   }
 }
 
+// The question as the presenter wrote it: Markdown, $LaTeX$ and code blocks.
+// Falls back to plain text when the CDN can't be reached, so a phone on a
+// captive network still sees the question.
+function setQuestion(src) {
+  const el = document.getElementById('question-text');
+  el._src = src = src || '';
+  if (!window.marked) { el.textContent = src; return; }
+  el.innerHTML = marked.parse(src, { breaks: false });
+  el.classList.toggle('has-block', !!el.querySelector('pre, ul, ol, blockquote'));
+  if (window.renderMathInElement) {
+    renderMathInElement(el, {
+      delimiters: [
+        { left: '$$',  right: '$$',  display: true  },
+        { left: '$',   right: '$',   display: false },
+        { left: '\\(', right: '\\)', display: false },
+        { left: '\\[', right: '\\]', display: true  },
+      ], throwOnError: false,
+    });
+  }
+}
+// KaTeX is deferred, so the maths may only be ready after the first paint.
+window.addEventListener('load', () => {
+  const el = document.getElementById('question-text');
+  if (el && el._src) setQuestion(el._src);
+});
+
 async function load() {
   if (sessionStorage.getItem(SESSION_KEY)) { showCard('already-card'); return; }
   try {
@@ -322,7 +394,7 @@ async function load() {
     if (!res.ok) { showCard('error-card'); return; }
     const data = await res.json();
     if (!data.active) { showCard('closed-card'); return; }
-    document.getElementById('question-text').textContent = data.question || 'Share your thoughts';
+    setQuestion(data.question || 'Share your thoughts');
     buildInput(data);
     document.getElementById('loading-area').style.display = 'none';
     document.getElementById('main-area').style.display = 'flex';
