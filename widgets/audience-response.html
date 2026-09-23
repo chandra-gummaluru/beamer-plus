@@ -1335,7 +1335,10 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     show(statsEl,   showData && (t === 'rating' || t === 'numeric'));
     show(chartEl,   showData && (t === 'rating' || t === 'numeric'));
     show(cloudEl,   showData && t === 'wordcloud');
-    show(fillEl,    t === 'fill' && !!D.template);
+    // The template is the answer sheet: it goes up when the poll closes, not
+    // while the room is still filling it in on their phones.
+    const showFill = t === 'fill' && !!D.template && (D.phase === 'closed' || results);
+    show(fillEl,    showFill);
     const summary = t === 'open' && results && D.view === 'summary';
     show(wallEl,    showData && t === 'open' && !summary);
     show(summaryEl, summary);
@@ -1344,7 +1347,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     if (showData && t === 'rating')    renderRating(D);
     if (showData && t === 'numeric')   renderNumeric(D);
     if (showData && t === 'wordcloud') renderCloud(D);
-    if (t === 'fill') renderFill(D, showData);
+    if (showFill) renderFill(D, showData);
     if (t === 'open')     renderWall(D);
     if (summary)          renderSummary(D);
 
