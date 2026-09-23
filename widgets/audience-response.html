@@ -43,7 +43,6 @@
       "showIf": { "responseType": "wordcloud" } },
 
     { "key": "autoStart", "label": "Start collecting when the slide opens", "type": "checkbox", "default": true },
-    { "key": "showLiveResults", "label": "Show results while collecting", "type": "checkbox", "default": false },
 
     { "key": "minResponses", "label": "Min. responses before closing", "type": "number",
       "min": 1, "step": 1, "default": 1, "showIf": { "responseType": "open" } },
@@ -99,7 +98,7 @@
    grows the results without inflating the toolbar. */
 
 /* ── Toolbar extras ──────────────────────────────────── */
-#primary-btn, #live-btn, #view-seg, #viewer-badge { display: none; }
+#start-btn, #close-btn, #show-btn, #reveal-btn, #view-seg, #viewer-badge { display: none; }
 .ar-seg { display: inline-flex; }
 .ar-seg .bw-btn { border-radius: 0; margin-left: -1px; }
 .ar-seg .bw-btn:first-child { border-radius: var(--radius) 0 0 var(--radius); margin-left: 0; }
@@ -128,8 +127,7 @@
 /* Views that fill the space want the top edge, not the middle. */
 #stage.is-fill #prompt { justify-content: flex-start; padding-bottom: calc(6px * var(--u)); }
 
-#kicker { display: flex; align-items: center; gap: 10px; }
-#kicker-meta:not(:empty)::before { content: '·'; margin-right: 10px; }
+#kicker:empty { display: none; }
 #question {
   font-size: var(--fs-head);
   font-weight: 500;
@@ -149,12 +147,10 @@
    mono type sized off --u so it's readable from the back, and its own
    scrollbar when a long line refuses to wrap. */
 #question pre {
-  margin: calc(10px * var(--u)) 0;
-  padding: calc(10px * var(--u)) calc(14px * var(--u));
-  background: var(--bg-output);
-  border: 1px solid var(--border);
-  border-left: calc(3px * var(--u)) solid var(--border-med);
-  border-radius: var(--radius);
+  margin: calc(12px * var(--u)) 0;
+  padding: calc(12px * var(--u)) calc(16px * var(--u)) calc(12px * var(--u)) 0;
+  background: var(--bg-subtle);
+  border-radius: var(--radius-lg);
   overflow-x: auto;
   scrollbar-width: thin;
 }
@@ -163,12 +159,52 @@
   font-family: var(--font-mono);
   font-size: var(--fs-code);
   font-weight: 400;
-  line-height: 1.5;
+  line-height: 1.55;
   letter-spacing: 0;
   color: var(--text);
   white-space: pre;
   tab-size: 4;
 }
+/* One line, one row, numbered in the gutter — so a question can say
+   "look at line 3" and the room knows which line that is. */
+.cl {
+  display: block;
+  position: relative;
+  padding-left: calc(46px * var(--u));
+}
+.cl::before {
+  content: attr(data-n);
+  position: absolute;
+  left: 0;
+  width: calc(32px * var(--u));
+  text-align: right;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+.cl::after { content: '\200b'; }   /* keeps a blank line's height */
+
+/* Token colours. Two sets, because the deck can be light or dark and the
+   host's theme isn't a media query — syncCodeTheme() reads --bg and picks. */
+:root {
+  --pk-kw:  #8250df;
+  --pk-str: #0a7a68;
+  --pk-num: #1257c9;
+  --pk-bi:  #9a3d84;
+  --pk-com: #8a938e;
+}
+html.ar-dark {
+  --pk-kw:  #c9a6ff;
+  --pk-str: #54c8a8;
+  --pk-num: #8bb9ff;
+  --pk-bi:  #eda6d8;
+  --pk-com: #8a938e;
+}
+.pk-kw  { color: var(--pk-kw); font-weight: 600; }
+.pk-str { color: var(--pk-str); }
+.pk-num { color: var(--pk-num); }
+.pk-bi  { color: var(--pk-bi); }
+.pk-com { color: var(--pk-com); font-style: italic; }
 /* Inline `code`, in a question or an answer option. */
 #question :not(pre) > code,
 .choice-label code,
@@ -651,19 +687,6 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     repeating-linear-gradient(0deg,  #1a1a18 0 8%, transparent 8% 17%);
   opacity: 0.55;
 }
-#join-url {
-  font-family: var(--font-mono);
-  font-size: var(--fs-chrome-sm);
-  color: var(--text-3);
-  text-align: center;
-  max-width: min(38vh, 30vw, 300px);
-  word-break: break-all;
-  cursor: pointer;
-  padding: 3px 8px;
-  border-radius: 4px;
-  transition: color var(--dur), background var(--dur);
-}
-#join-url:hover { background: var(--bg-subtle); color: var(--text-2); }
 #tally { display: flex; align-items: baseline; gap: 8px; margin-top: 4px; }
 #tally-n {
   font-family: var(--font-mono);
@@ -692,8 +715,8 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   #stage { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; gap: 14px; }
   #join { flex-direction: row; flex-wrap: wrap; padding-bottom: 0; gap: 12px; }
   #qr-wrap { width: min(22vh, 40vw, 180px); padding: 6px; }
-  /* No room for the caption and link beside a small QR; the code is enough. */
-  #join > .bw-hint:first-child, #join-url { display: none; }
+  /* No room for the caption beside a small QR; the code is enough. */
+  #join > .bw-hint:first-child { display: none; }
   #choices.is-tf { flex-direction: column; }
 }
 
@@ -710,22 +733,22 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
 
   <div id="toolbar" class="bw-toolbar" data-bw-topbar>
     <span class="bw-toolbar-title" id="wtitle">Audience Response</span>
-    <div class="bw-sep"></div>
-    <span class="bw-status"><span class="bw-dot" id="dot"></span><span id="status-text">Not started</span></span>
     <div class="bw-spacer"></div>
     <span class="bw-status" id="viewer-badge">View only · synced with presenter</span>
-    <button class="bw-btn" id="live-btn" title="Show or hide results on the slide while collecting">Show results</button>
     <div class="ar-seg" id="view-seg">
       <button class="bw-btn" id="view-wall">Responses</button>
       <button class="bw-btn" id="view-summary">AI summary</button>
     </div>
-    <button class="bw-btn bw-btn--primary" id="primary-btn">Start</button>
+    <button class="bw-btn" id="start-btn">Start</button>
+    <button class="bw-btn" id="close-btn">Close</button>
+    <button class="bw-btn" id="show-btn">Show results</button>
+    <button class="bw-btn" id="reveal-btn">Reveal answer</button>
   </div>
 
   <div id="stage">
     <section id="prompt">
       <div id="banner" class="bw-banner bw-banner--error"></div>
-      <div id="kicker"><span class="bw-hint" id="kicker-text">Multiple choice</span><span class="bw-hint" id="kicker-meta"></span></div>
+      <div class="bw-hint" id="kicker"></div>
       <div id="question" class="bw-md"></div>
       <div id="stats"></div>
       <ol id="choices"></ol>
@@ -754,7 +777,6 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     <aside id="join">
       <div class="bw-hint">Scan to respond</div>
       <div id="qr-wrap"><div id="qr"></div><div id="qr-fake"></div></div>
-      <div id="join-url" title="Click to copy"></div>
       <div id="tally"><span id="tally-n">0</span><span class="bw-hint" id="tally-label">responses</span></div>
     </aside>
 
@@ -818,17 +840,16 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   const $ = id => document.getElementById(id);
   const stage       = $('stage');
   const titleEl     = $('wtitle');
-  const dotEl       = $('dot');
-  const statusText  = $('status-text');
   const viewerBadge = $('viewer-badge');
-  const liveBtn     = $('live-btn');
+  const startBtn    = $('start-btn');
+  const closeBtn    = $('close-btn');
+  const showBtn     = $('show-btn');
+  const revealBtn   = $('reveal-btn');
   const viewSeg     = $('view-seg');
   const viewWall    = $('view-wall');
   const viewSum     = $('view-summary');
-  const primaryBtn  = $('primary-btn');
   const bannerEl    = $('banner');
-  const kickerText  = $('kicker-text');
-  const kickerMeta  = $('kicker-meta');
+  const kickerEl    = $('kicker');
   const questionEl  = $('question');
   const statsEl     = $('stats');
   const choicesEl   = $('choices');
@@ -846,7 +867,6 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   const joinEl      = $('join');
   const qrEl        = $('qr');
   const qrFake      = $('qr-fake');
-  const joinUrlEl   = $('join-url');
   const tallyN      = $('tally-n');
   const tallyLabel  = $('tally-label');
   const previewMsg  = $('preview-msg');
@@ -877,7 +897,8 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     unit:      '',           // numeric
     answer:    null,         // numeric: the actual value, or null
     words:     1,            // wordcloud: words kept per response
-    phase:     'idle',       // 'idle' | 'collect' | 'results'
+    // idle → collect (QR up) → closed (no more answers) → results (on screen)
+    phase:     'idle',
     surveyId:  null,
     joinUrl:   '',
     responses: [],
@@ -887,7 +908,6 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     nums:      [],           // numeric: every valid estimate
     cloud:     [],           // wordcloud: [{ text, n }]
     groups:    [],           // open: [{ text, n }] in order of first appearance
-    showLive:  false,
     revealed:  false,
     view:      'wall',       // open results: 'wall' | 'summary'
     summaries: null,
@@ -899,7 +919,6 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   };
 
   let pollKey    = null;     // identity of the running poll; a change starts a new one
-  let lastLive   = undefined;// last showLiveResults seen in config, so a toggle survives re-config
   let startToken = 0;        // bumped to discard a create() that lost a race
   let pollTimer  = null;
   let inflight   = null;
@@ -936,6 +955,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     // Presenter-authored config, not audience input — responses never come
     // through here; they're set with textContent.
     el.innerHTML = marked.parse(src, { breaks: false });
+    decorateCode(el);
     el.classList.toggle('has-code', !!el.querySelector('pre'));
     if (window.renderMathInElement) {
       renderMathInElement(el, {
@@ -1004,6 +1024,84 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     return tokens.slice(0, k).join(' ');
   }
 
+  // ── Code blocks ─────────────────────────────────────────────────────────────
+  // A listing in a question is read from the back of a room, so it gets what a
+  // listing needs and nothing more: line numbers and colour for the three
+  // things that carry meaning — keywords, literals and comments. Highlighting
+  // is per line (a string can't span lines here), which is all a slide needs.
+  const KW_PY = 'def class lambda if elif else for while break continue return yield pass import from as with ' +
+    'try except finally raise assert del global nonlocal in is not and or None True False async await';
+  const KW_C  = 'function var let const class new delete return if else for while do switch case default break ' +
+    'continue try catch finally throw typeof instanceof struct enum union typedef public private protected static ' +
+    'void int long short float double char bool string true false null nullptr this super import export from ' +
+    'extends implements interface package async await sizeof';
+  const BI_PY = 'print len range str int float bool list dict set tuple sum min max abs sorted enumerate zip map ' +
+    'filter type input open round isinstance append';
+
+  const CLIKE = new Set(['js', 'javascript', 'ts', 'typescript', 'java', 'c', 'cpp', 'c++', 'cs', 'csharp',
+                         'go', 'rust', 'php', 'swift', 'kotlin', 'scala', 'dart']);
+
+  // Written with String.raw so the regex reads as a regex, not as a wall of
+  // doubled backslashes. Back-tick strings are left out on purpose: they'd
+  // need escaping here, and slide code rarely uses them.
+  const RE_COM = String.raw`#[^\n]*|//[^\n]*|/\*.*?\*/`;
+  const RE_STR = String.raw`"(?:\\.|[^"\\])*"?|'(?:\\.|[^'\\])*'?`;
+  const RE_NUM = String.raw`0[xXbBoO][0-9a-fA-F_]+|\d[\d_]*\.?\d*(?:[eE][+-]?\d+)?`;
+
+  function tokenRe(lang) {
+    const kw = CLIKE.has(lang) ? KW_C
+             : (lang === 'python' || lang === 'py' || !lang) ? KW_PY
+             : KW_PY + ' ' + KW_C;
+    const alt = list => list.trim().split(/\s+/).join('|');
+    return new RegExp(
+      '(' + RE_COM + ')' +
+      '|(' + RE_STR + ')' +
+      '|\\b(' + alt(kw) + ')\\b' +
+      '|\\b(' + alt(BI_PY) + ')\\b' +
+      '|\\b(' + RE_NUM + ')\\b', 'g');
+  }
+
+  function highlightLine(line, re) {
+    const sp = (c, t) => `<span class="pk-${c}">${escHtml(t)}</span>`;
+    let out = '', last = 0, m;
+    re.lastIndex = 0;
+    while ((m = re.exec(line))) {
+      out += escHtml(line.slice(last, m.index));
+      out += m[1] ? sp('com', m[1]) : m[2] ? sp('str', m[2]) : m[3] ? sp('kw', m[3])
+           : m[4] ? sp('bi', m[4]) : sp('num', m[5]);
+      last = re.lastIndex;
+      if (m[0] === '') re.lastIndex++;
+    }
+    return out + escHtml(line.slice(last));
+  }
+
+  function decorateCode(root) {
+    root.querySelectorAll('pre > code').forEach(code => {
+      const lang = (code.className.match(/language-([\w+#]+)/) || ['', ''])[1].toLowerCase();
+      const re   = tokenRe(lang);
+      const src  = code.textContent.replace(/\n+$/, '');
+      code.innerHTML = src.split('\n')
+        .map((line, i) => `<span class="cl" data-n="${i + 1}">${highlightLine(line, re)}</span>`)
+        .join('');
+    });
+  }
+
+  // The token palette can't come from the host's tokens (they carry no hues),
+  // so pick the light or dark set from how dark --bg actually is.
+  function syncCodeTheme() {
+    const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+    let r = 255, g = 255, b = 255;
+    if (bg.startsWith('#')) {
+      const h = bg.slice(1);
+      const p = h.length === 3 ? [...h].map(c => c + c) : [h.slice(0, 2), h.slice(2, 4), h.slice(4, 6)];
+      [r, g, b] = p.map(x => parseInt(x, 16) || 0);
+    } else {
+      const n = bg.match(/[\d.]+/g);
+      if (n && n.length >= 3) [r, g, b] = n.slice(0, 3).map(Number);
+    }
+    document.documentElement.classList.toggle('ar-dark', (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.45);
+  }
+
   // ── Derived data ────────────────────────────────────────────────────────────
   function recompute() {
     S.total = S.responses.length;
@@ -1055,7 +1153,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   // unconfigured slide shows what it will become instead of a bare instruction.
   function sample(type) {
     const base = {
-      type, phase: 'results', total: 24, revealed: false, showLive: false, view: 'wall',
+      type, phase: 'results', total: 24, revealed: false, view: 'wall',
       options: [], correct: null, votes: {}, ratings: {}, nums: [], cloud: [], groups: [],
       scale: S.scale, unit: '', answer: null, spotlight: -1, summaries: null,
       joinUrl: '',
@@ -1088,6 +1186,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   // ── Render ──────────────────────────────────────────────────────────────────
   function render() {
     document.body.classList.toggle('is-presenter', !IS_VIEWER);
+    syncCodeTheme();
 
     // A viewer only knows what the presenter sent; with no question yet it
     // shows the preview of whatever type that is.
@@ -1098,19 +1197,13 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     setMd(questionEl, D.question);
     const results  = D.phase === 'results';
     const collect  = D.phase === 'collect';
-    const showData = results || (collect && D.showLive);
+    const showData = results;
 
     const fallbackTitle = TYPES[t]?.title || 'Audience Response';
     titleEl.textContent = window.BeamerWidget?.name ? BeamerWidget.name(fallbackTitle) : fallbackTitle;
-    kickerText.textContent = TYPES[t]?.kicker || '';
-    kickerMeta.textContent = showData ? plural(D.total, 'response', 'responses') : '';
-
-    // Status pill
-    dotEl.className = 'bw-dot ' + (S.phase === 'collect' ? 'is-ready' : 'is-idle');
-    statusText.textContent =
-      S.phase === 'collect' ? `Live · ${plural(S.total, 'response', 'responses')}` :
-      S.phase === 'results' ? `Closed · ${plural(S.total, 'response', 'responses')}` :
-      preview ? 'Not set up' : 'Not started';
+    // The only thing above the question is the count, and only once the room
+    // has answered — the type is obvious from what's on the slide.
+    kickerEl.textContent = D.phase === 'closed' || results ? plural(D.total, 'response', 'responses') : '';
 
     // Layout. The preview shows the join panel too, so the slide reads right.
     const withJoin = collect || preview;
@@ -1121,7 +1214,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     // A code listing beside its answers, rather than above them (see the CSS).
     const codeQ = isChoiceLike(t) && questionEl.classList.contains('has-code');
     stage.classList.toggle('is-code',         codeQ && showData);
-    stage.classList.toggle('is-code-collect', codeQ && collect && !showData);
+    stage.classList.toggle('is-code-collect', codeQ && !showData);
     joinEl.style.display = withJoin ? 'flex' : 'none';
     previewMsg.textContent = IS_VIEWER ? 'Waiting for the presenter to set up this question.'
                                        : 'Sample data — ' + missing().replace(/^A/, 'a');
@@ -1151,41 +1244,47 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     renderToolbar(preview);
   }
 
+  // Three plain steps, always in the same order: close the poll, put the
+  // results on the slide, reveal the answer. A button that isn't its turn yet
+  // is visible but disabled, so the sequence is legible from the bar.
   function renderToolbar(preview) {
     const t = S.type, p = S.phase;
     viewerBadge.style.display = IS_VIEWER ? 'inline-flex' : 'none';
-    if (IS_VIEWER) {
-      [liveBtn, viewSeg, primaryBtn].forEach(b => { b.style.display = 'none'; });
+    const btns = [startBtn, closeBtn, showBtn, revealBtn];
+    if (IS_VIEWER || preview) {
+      [...btns, viewSeg].forEach(b => { b.style.display = 'none'; });
       return;
     }
-
-    liveBtn.style.display = p === 'collect' ? 'inline-flex' : 'none';
-    liveBtn.classList.toggle('is-active', S.showLive);
-    liveBtn.textContent = (S.showLive ? 'Hide ' : 'Show ') + (t === 'open' ? 'responses' : 'results');
 
     viewSeg.style.display = t === 'open' && p === 'results' && cfg.model ? 'inline-flex' : 'none';
     viewWall.classList.toggle('is-active', S.view === 'wall');
     viewSum .classList.toggle('is-active', S.view === 'summary');
 
     const canReveal = (isChoiceLike(t) && S.correct != null) || (t === 'numeric' && S.answer != null);
-    let label = '', show = true, disabled = false;
-    primaryBtn.title = '';
-    if (preview) {
-      show = false;
-    } else if (p === 'idle') {
-      label = 'Start collecting';
-    } else if (p === 'collect') {
-      label = 'Close & show results';
-      const min = parseInt(cfg.minResponses, 10) || 1;
-      if (t === 'open' && S.total < min) { disabled = true; primaryBtn.title = `Needs ${plural(min, 'response', 'responses')}`; }
-    } else if (canReveal) {
-      label = S.revealed ? 'Hide answer' : 'Reveal answer';
-    } else {
-      show = false;
-    }
-    primaryBtn.style.display = show ? 'inline-flex' : 'none';
-    primaryBtn.textContent   = label;
-    primaryBtn.disabled      = disabled;
+    const min       = parseInt(cfg.minResponses, 10) || 1;
+    const tooFew    = t === 'open' && S.total < min;
+
+    startBtn.style.display  = p === 'idle' ? 'inline-flex' : 'none';
+    closeBtn.style.display  = p === 'idle' ? 'none' : 'inline-flex';
+    showBtn.style.display   = p === 'idle' ? 'none' : 'inline-flex';
+    revealBtn.style.display = canReveal ? 'inline-flex' : 'none';
+
+    closeBtn.disabled = p !== 'collect' || tooFew;
+    closeBtn.title    = tooFew ? `Needs ${plural(min, 'response', 'responses')}` : '';
+    closeBtn.textContent = p === 'collect' ? 'Close' : 'Closed';
+
+    showBtn.disabled    = p === 'collect';
+    showBtn.textContent = p === 'results' ? 'Hide results' : 'Show results';
+
+    revealBtn.disabled    = p !== 'results';
+    revealBtn.textContent = S.revealed ? 'Hide answer' : 'Reveal answer';
+
+    // Exactly one filled button: whatever comes next.
+    const next = p === 'idle' ? startBtn
+               : p === 'collect' ? closeBtn
+               : p === 'closed' ? showBtn
+               : canReveal && !S.revealed ? revealBtn : null;
+    btns.forEach(b => b.classList.toggle('bw-btn--primary', b === next && !b.disabled));
   }
 
   // ── Choice / true-false rows ────────────────────────────────────────────────
@@ -1466,7 +1565,6 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     qrFake.style.display = preview ? 'block' : 'none';
     qrEl.style.display   = preview ? 'none' : 'block';
     if (preview) {
-      joinUrlEl.textContent = 'Join link appears here';
       tallyN.textContent = '0'; tallyLabel.textContent = 'responses';
       return;
     }
@@ -1479,7 +1577,6 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
                            colorDark: '#1a1a18', colorLight: '#ffffff' });
       }
     }
-    joinUrlEl.textContent = S.joinUrl;
     if (S.total > lastTally) {
       tallyN.classList.remove('bump'); void tallyN.offsetWidth; tallyN.classList.add('bump');
     }
@@ -1624,7 +1721,9 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     await fetchResponses();
     await fetchResponses();   // the first may have been one already in flight
     closeOnServer(S.surveyId);
-    S.phase = 'results'; S.view = 'wall'; S.spotlight = -1;
+    // Closing only stops the answers coming in; the results go up when the
+    // presenter asks for them.
+    S.phase = 'closed'; S.view = 'wall'; S.spotlight = -1;
     render(); emitState();
   }
 
@@ -1646,16 +1745,16 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   }
 
   // ── Actions ─────────────────────────────────────────────────────────────────
-  function onPrimary() {
-    if (IS_VIEWER) return;
-    if (S.phase === 'idle')         startPoll();
-    else if (S.phase === 'collect') closePoll();
-    else { S.revealed = !S.revealed; render(); emitState(); }
+  function toggleResults() {
+    if (IS_VIEWER || S.phase === 'idle' || S.phase === 'collect') return;
+    S.phase = S.phase === 'results' ? 'closed' : 'results';
+    S.spotlight = -1;
+    render(); emitState();
   }
 
-  function toggleLive() {
-    if (IS_VIEWER) return;
-    S.showLive = !S.showLive;
+  function toggleReveal() {
+    if (IS_VIEWER || S.phase !== 'results') return;
+    S.revealed = !S.revealed;
     render(); emitState();
   }
 
@@ -1667,7 +1766,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   }
 
   function openSpotlight(i) {
-    if (IS_VIEWER || !ready()) return;
+    if (IS_VIEWER || !ready() || S.phase !== 'results') return;
     S.spotlight = i; render(); emitState();
   }
   function stepSpotlight(d) {
@@ -1694,10 +1793,6 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     closeOnServer(S.phase === 'collect' ? S.surveyId : null);
     resetPoll(); render(); emitState();
     startPoll();
-  }
-
-  function copyUrl() {
-    if (S.joinUrl) navigator.clipboard?.writeText(S.joinUrl).catch(() => {});
   }
 
   // ── Socket.IO sync ──────────────────────────────────────────────────────────
@@ -1751,7 +1846,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
       nums: S.nums.slice(-CAP.nums),
       cloud: S.cloud.slice().sort((a, b) => b.n - a.n).slice(0, CAP.words),
       groups: S.groups.slice(0, CAP.groups),
-      showLive: S.showLive, revealed: S.revealed, view: S.view,
+      revealed: S.revealed, view: S.view,
       summaries: S.summaries, sIdx: S.sIdx, spotlight: S.spotlight,
     };
   }
@@ -1781,7 +1876,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     S.unit      = s.unit || '';
     S.answer    = Number.isFinite(s.answer) ? s.answer : null;
     S.words     = s.words || 1;
-    S.phase     = ['idle', 'collect', 'results'].includes(s.phase) ? s.phase : 'idle';
+    S.phase     = ['idle', 'collect', 'closed', 'results'].includes(s.phase) ? s.phase : 'idle';
     S.surveyId  = s.surveyId || null;
     S.joinUrl   = s.joinUrl || '';
     S.total     = s.total || 0;
@@ -1790,7 +1885,6 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     S.nums      = Array.isArray(s.nums) ? s.nums : [];
     S.cloud     = Array.isArray(s.cloud) ? s.cloud : [];
     S.groups    = Array.isArray(s.groups) ? s.groups : [];
-    S.showLive  = !!s.showLive;
     S.revealed  = !!s.revealed;
     S.view      = s.view === 'summary' ? 'summary' : 'wall';
     S.summaries = s.summaries || null;
@@ -1840,11 +1934,6 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     const canReveal = S.correct != null || (S.type === 'numeric' && S.answer != null);
     if (!canReveal) S.revealed = false;
 
-    // Take the config's live-results setting only when it changes, so the
-    // presenter's toolbar toggle isn't undone by an unrelated edit.
-    const live = !!cfg.showLiveResults;
-    if (live !== lastLive) { lastLive = live; S.showLive = live; }
-
     const key = pollIdentity(S.type, S.question, S.options, S.scale, S.unit, S.words);
     if (key !== pollKey) {
       pollKey = key;
@@ -1878,11 +1967,12 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   });
 
   // ── Event wiring ────────────────────────────────────────────────────────────
-  primaryBtn.addEventListener('click', onPrimary);
-  liveBtn   .addEventListener('click', toggleLive);
+  startBtn  .addEventListener('click', () => startPoll());
+  closeBtn  .addEventListener('click', closePoll);
+  showBtn   .addEventListener('click', toggleResults);
+  revealBtn .addEventListener('click', toggleReveal);
   viewWall  .addEventListener('click', () => setView('wall'));
   viewSum   .addEventListener('click', () => setView('summary'));
-  joinUrlEl .addEventListener('click', copyUrl);
   previewBtn.addEventListener('click', () => window.BeamerWidget?.openSettings?.());
   $('spot-prev') .addEventListener('click', () => stepSpotlight(-1));
   $('spot-next') .addEventListener('click', () => stepSpotlight(1));
