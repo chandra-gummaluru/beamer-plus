@@ -104,17 +104,38 @@
 .ar-seg .bw-btn:first-child { border-radius: var(--radius) 0 0 var(--radius); margin-left: 0; }
 .ar-seg .bw-btn:last-child  { border-radius: 0 var(--radius) var(--radius) 0; }
 
-/* ── Stage: prompt on the left, join panel on the right ─ */
+/* ── Stage ───────────────────────────────────────────
+   One column by default: the question, and whatever the question produced,
+   down the middle. A multiple-choice question splits instead — question and
+   options on the left, and on the right the one thing that changes as the
+   poll moves along: the QR code, then "poll closed", then the pie. */
 #stage {
   position: relative;
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: calc(28px * var(--u));
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: calc(20px * var(--u)) calc(28px * var(--u));
   padding: calc(18px * var(--u)) calc(28px * var(--u));
 }
-#stage.no-join { grid-template-columns: minmax(0, 1fr); }
+#stage.is-split {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.72fr);
+  grid-template-rows: minmax(0, 1fr);
+  align-items: center;
+}
+#stage.is-split #side { grid-column: 2; grid-row: 1; }
+
+/* The right-hand column: exactly one of these at a time. */
+#side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(12px * var(--u));
+  min-height: 0;
+}
+#side:empty, #side.is-empty { display: none; }
 
 #prompt {
   min-height: 0;
@@ -126,6 +147,24 @@
 }
 /* Views that fill the space want the top edge, not the middle. */
 #stage.is-fill #prompt { justify-content: flex-start; padding-bottom: calc(6px * var(--u)); }
+/* Split view: the whole left column scrolls as one, rather than the question
+   and the answers each keeping their own scrollbar. */
+#stage.is-split #prompt {
+  padding-bottom: 0;
+  /* Stretch to the row and scroll inside it: centred, a column taller than
+     the slide overflows upwards and loses its own first line. */
+  align-self: stretch;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  /* Top-aligned, not centred: a question with a listing is taller than the
+     slide, and a centred column clips its own first line when it overflows. */
+  justify-content: flex-start;
+}
+/* Natural height, no shrinking: inside a scrolling column a flex child that
+   shrinks squeezes its own listing instead of letting the column scroll. */
+#stage.is-split #question,
+#stage.is-split #choices { flex: 0 0 auto; overflow: visible; max-height: none; }
 
 #kicker:empty { display: none; }
 #question {
@@ -241,7 +280,7 @@ html.ar-dark {
 /* Sample data, faded, so the presenter sees the finished layout before
    typing anything — rather than a bare instruction on an empty slide. */
 #stage.is-preview #prompt,
-#stage.is-preview #join { opacity: 0.38; filter: grayscale(1); pointer-events: none; user-select: none; }
+#stage.is-preview #side { opacity: 0.38; filter: grayscale(1); pointer-events: none; user-select: none; }
 #preview-tag {
   position: absolute;
   left: 50%;
@@ -304,21 +343,6 @@ html.ar-dark {
 .badge svg { width: 58%; height: 58%; }
 .choice-body { min-width: 0; }
 .choice-label { font-size: var(--fs-body); line-height: 1.35; color: var(--text); overflow-wrap: anywhere; }
-.track {
-  height: calc(9px * var(--u));
-  margin-top: calc(7px * var(--u));
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--text) 7%, transparent);
-  overflow: hidden;
-  display: none;
-}
-.fill {
-  height: 100%;
-  width: 0;
-  border-radius: 999px;
-  background: var(--text-3);
-  transition: width 0.7s cubic-bezier(.22, 1, .36, 1), background 0.2s;
-}
 .figure {
   display: none;
   flex-direction: column;
@@ -343,7 +367,6 @@ html.ar-dark {
   color: var(--text-3);
   white-space: nowrap;
 }
-#choices.show-results .track  { display: block; }
 #choices.show-results .figure { display: flex; }
 
 /* True / False: two big tiles side by side instead of a list. */
@@ -353,46 +376,75 @@ html.ar-dark {
 
 /* Leader(s): full ink. Ties all lead. */
 .choice.is-lead { border-color: var(--border-med); background: var(--bg); }
-.choice.is-lead .fill  { background: var(--text); }
-.choice.is-lead .badge { background: var(--text); border-color: var(--text); color: var(--bg); }
 
 /* Revealed answer: green carries the one piece of meaning on the slide. */
 .choice.is-correct {
   border-color: var(--ok);
   background: color-mix(in srgb, var(--ok) 8%, var(--bg));
 }
-.choice.is-correct .fill  { background: var(--ok); }
-.choice.is-correct .badge { background: var(--ok); border-color: var(--ok); color: #fff; }
+.choice.is-correct .badge { background: var(--ok) !important; border-color: var(--ok) !important; color: #fff !important; }
 .choice.is-correct .pct   { color: var(--ok); }
 .choice.is-dim { opacity: 0.45; }
 
-/* ── Code questions: one frame, all the way through ──
-   A listing plus four answer rows doesn't fit stacked on a slide, so a code
-   question runs in two columns: the listing on the left, and on the right the
-   QR code with the answers under it. Closing the poll drops the QR and adding
-   the results fills the bars — the columns themselves never move, so the
-   slide doesn't reshuffle between steps. */
-@media (min-width: 780px) {
-  #stage.is-code {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr);
-    grid-template-rows: auto minmax(0, auto) minmax(0, 1fr);
-    column-gap: calc(24px * var(--u));
-    align-items: start;
-  }
-  /* The prompt's children become items of the stage grid, so the answers can
-     sit in the other column while staying inside the widget's one flow. */
-  #stage.is-code #prompt { display: contents; }
-  #stage.is-code #banner,
-  #stage.is-code #kicker   { grid-column: 1 / -1; grid-row: 1; }
-  #stage.is-code #question { grid-column: 1; grid-row: 2 / span 2; max-height: 100%; }
-  #stage.is-code #join     { grid-column: 2; grid-row: 2; padding-bottom: 0; }
-  #stage.is-code #choices  { grid-column: 2; grid-row: 3; max-height: 100%; padding-top: calc(10px * var(--u)); }
-  #stage.is-code #qr-wrap  { width: min(22vh, 100%, 190px); }
-  #stage.is-code .choice { padding: calc(7px * var(--u)) calc(12px * var(--u)) calc(7px * var(--u)) calc(8px * var(--u)); }
-  #stage.is-code .badge  { width: calc(22px * var(--u)); height: calc(22px * var(--u)); }
-  #stage.is-code .choice-label { font-size: var(--fs-small); }
-  #stage.is-code .pct { font-size: var(--fs-body); }
+/* ── Share shades ────────────────────────────────────
+   A ramp mixed from the deck's own ink, so the pie and the letter badges say
+   the same thing in any theme: the more votes, the more ink. */
+.s0 { --share: color-mix(in srgb, var(--text) 92%, var(--bg)); }
+.s1 { --share: color-mix(in srgb, var(--text) 74%, var(--bg)); }
+.s2 { --share: color-mix(in srgb, var(--text) 56%, var(--bg)); }
+.s3 { --share: color-mix(in srgb, var(--text) 40%, var(--bg)); }
+.s4 { --share: color-mix(in srgb, var(--text) 27%, var(--bg)); }
+.s5 { --share: color-mix(in srgb, var(--text) 17%, var(--bg)); }
+.badge.s0, .badge.s1, .badge.s2, .badge.s3, .badge.s4, .badge.s5 {
+  background: var(--share); border-color: var(--share);
 }
+.badge.s0, .badge.s1, .badge.s2 { color: var(--bg); }
+.badge.s3, .badge.s4, .badge.s5 { color: var(--text); }
+
+/* ── Pie ─────────────────────────────────────────────
+   A donut, because the question is "how did the room split", not "how many
+   voted for D" — and the hole gives the headline somewhere to live. */
+#pie { display: none; flex-direction: column; align-items: center; gap: calc(8px * var(--u)); width: 100%; }
+#pie svg { width: min(100%, calc(260px * var(--u))); height: auto; overflow: visible; }
+.seg {
+  fill: none;
+  stroke: var(--share);
+  stroke-width: 26;
+  transition: stroke-dasharray 0.7s cubic-bezier(.22, 1, .36, 1), opacity 0.3s;
+}
+.seg.is-correct { stroke: var(--ok); }
+.seg.is-dim { opacity: 0.3; }
+.seg-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+.pie-mid {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  text-anchor: middle;
+  fill: var(--text);
+}
+.pie-mid.is-correct { fill: var(--ok); }
+.pie-sub { font-family: var(--font-ui); font-size: 8px; fill: var(--text-3); text-anchor: middle; }
+#pie-empty { font-size: var(--fs-body); color: var(--text-3); }
+
+/* ── "Poll closed" ───────────────────────────────────
+   The right-hand column has to say something between closing the poll and
+   putting the results up, or the slide reads as broken. */
+#closed-note {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(8px * var(--u));
+  color: var(--text-3);
+  text-align: center;
+}
+#closed-note svg { width: calc(34px * var(--u)); height: calc(34px * var(--u)); stroke-width: 1.4; }
+#closed-note .cn-title { font-size: var(--fs-body); color: var(--text-2); }
+#closed-note .cn-sub { font-size: var(--fs-small); }
 
 /* ── Headline numbers (rating, numeric) ─────────────── */
 #stats {
@@ -649,17 +701,14 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
 
 /* ── Join panel ─────────────────────────────────────── */
 #join {
-  display: flex;
+  display: none;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: calc(10px * var(--u));
-  padding-bottom: 6%;
-  min-height: 0;
 }
 #qr-wrap {
   /* Stays white in dark mode too — a QR code has to keep its contrast to scan. */
-  width: min(38vh, 30vw, 300px);
+  width: min(34vh, 26vw, 260px);
   padding: 10px;
   background: #fff;
   border: 1px solid var(--border);
@@ -667,15 +716,6 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   line-height: 0;
 }
 #qr img, #qr canvas { width: 100% !important; height: auto !important; }
-/* The preview draws a stand-in code, so the panel keeps its real proportions. */
-#qr-fake {
-  display: none;
-  aspect-ratio: 1;
-  background:
-    repeating-linear-gradient(90deg, #1a1a18 0 8%, transparent 8% 14%),
-    repeating-linear-gradient(0deg,  #1a1a18 0 8%, transparent 8% 17%);
-  opacity: 0.55;
-}
 /* The count reads as one phrase — "12 responses" — in the deck's own type,
    both here and above the question once the poll is closed. */
 #tally, #kicker {
@@ -699,9 +739,15 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
 
 /* ── Narrow or tall regions: stack, join panel becomes a strip ─ */
 @media (max-width: 620px), (max-aspect-ratio: 1/1) {
-  #stage { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; gap: 14px; }
-  #join { flex-direction: row; flex-wrap: wrap; padding-bottom: 0; gap: 12px; }
+  #stage, #stage.is-split {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: 14px;
+  }
+  #stage.is-split #side { grid-column: 1; grid-row: 2; }
+  #join { flex-direction: row; flex-wrap: wrap; gap: 12px; }
   #qr-wrap { width: min(22vh, 40vw, 180px); padding: 6px; }
+  #pie svg { width: min(100%, 200px); }
   #choices.is-tf { flex-direction: column; }
 }
 
@@ -759,9 +805,22 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
       </div>
     </section>
 
-    <aside id="join">
-      <div id="qr-wrap"><div id="qr"></div><div id="qr-fake"></div></div>
-      <div id="tally">0 responses</div>
+    <aside id="side">
+      <div id="join">
+        <div id="qr-wrap"><div id="qr"></div></div>
+        <div id="tally">0 responses</div>
+      </div>
+
+      <div id="closed-note">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10.5" width="16" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>
+        <div class="cn-title">Poll closed</div>
+        <div class="cn-sub">Awaiting results</div>
+      </div>
+
+      <div id="pie">
+        <svg id="pie-svg" viewBox="0 0 120 120"></svg>
+        <div id="pie-empty">No responses</div>
+      </div>
     </aside>
 
     <div id="preview-tag">
@@ -848,9 +907,13 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   const cloudInner  = $('cloud-inner');
   const wallEl      = $('wall');
   const wallEmpty   = $('wall-empty');
+  const sideEl      = $('side');
   const joinEl      = $('join');
+  const closedNote  = $('closed-note');
+  const pieEl       = $('pie');
+  const pieSvg      = $('pie-svg');
+  const pieEmpty    = $('pie-empty');
   const qrEl        = $('qr');
-  const qrFake      = $('qr-fake');
   const tallyEl     = $('tally');
   const previewMsg  = $('preview-msg');
   const previewBtn  = $('preview-open');
@@ -1188,17 +1251,28 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     // has answered — the type is obvious from what's on the slide.
     kickerEl.textContent = D.phase === 'closed' || results ? plural(D.total, 'response', 'responses') : '';
 
-    // Layout. The preview shows the join panel too, so the slide reads right.
-    const withJoin = collect || preview;
-    // A code question keeps its two columns whether or not the QR is up.
-    stage.classList.toggle('is-code',
-      isChoiceLike(t) && questionEl.classList.contains('has-code'));
+    // Layout. A multiple-choice question always splits — question and options
+    // on the left, the right column carrying the poll's one moving part.
+    // Everything else runs down the middle. The preview shows the QR too, so
+    // the slide reads the way it will when it's live.
+    const split    = isChoiceLike(t);
+    // The preview shows the finished slide — sample results — so it doesn't
+    // draw a stand-in QR code next to them.
+    const withJoin = collect;
+    stage.classList.toggle('is-split',   split);
     stage.classList.toggle('is-preview', preview);
-    stage.classList.toggle('no-join',    !withJoin && !stage.classList.contains('is-code'));
     stage.classList.toggle('is-data',    showData);
-    stage.classList.toggle('is-fill',    showData && !isChoiceLike(t));
-    // A code listing beside its answers, rather than above them (see the CSS).
-    joinEl.style.display = withJoin ? 'flex' : 'none';
+    stage.classList.toggle('is-fill',    showData && !split);
+
+    // The right column: the QR while answering, a closed sign once it shuts,
+    // the pie once the results are up. For every other question type the
+    // results are the view itself, so the column goes away.
+    const showPie = split && showData;
+    joinEl.style.display     = withJoin ? 'flex' : 'none';
+    closedNote.style.display = D.phase === 'closed' ? 'flex' : 'none';
+    pieEl.style.display      = showPie ? 'flex' : 'none';
+    sideEl.classList.toggle('is-empty', !withJoin && D.phase !== 'closed' && !showPie);
+    if (showPie) renderPie(D);
     previewMsg.textContent = IS_VIEWER ? 'Waiting for the presenter to set up this question.'
                                        : 'Sample data — ' + missing().replace(/^A/, 'a');
     previewBtn.style.display = IS_VIEWER || !window.BeamerWidget?.openSettings ? 'none' : '';
@@ -1286,42 +1360,105 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
         const badge = document.createElement('span'); badge.className = 'badge';
         const body  = document.createElement('div');  body.className = 'choice-body';
         const label = document.createElement('div');  label.className = 'choice-label bw-md';
-        const track = document.createElement('div');  track.className = 'track';
-        const fill  = document.createElement('div');  fill.className = 'fill';
         const fig   = document.createElement('div');  fig.className = 'figure';
         const pct   = document.createElement('span'); pct.className = 'pct';
         const votes = document.createElement('span'); votes.className = 'votes';
-        track.appendChild(fill); body.appendChild(label); body.appendChild(track);
+        body.appendChild(label);
         fig.appendChild(pct); fig.appendChild(votes);
         li.appendChild(badge); li.appendChild(body); li.appendChild(fig);
         choicesEl.appendChild(li);
         pct.textContent = '0%'; pct._v = 0;
-        return { li, badge, label, fill, pct, votes, i };
+        return { li, badge, label, pct, votes, i };
       });
     }
     choiceRows.forEach(r => setMd(r.label, D.options[r.i]));   // cached; KaTeX may arrive late
 
     choicesEl.classList.toggle('show-results', showData);
-    const counts = D.options.map((_, i) => D.votes[letter(i)] || 0);
-    const total  = counts.reduce((a, b) => a + b, 0);
-    const max    = Math.max(0, ...counts);
+    const share  = shares(D);
     const reveal = D.revealed && D.correct != null;
 
     choiceRows.forEach(r => {
-      const n   = counts[r.i];
-      const pct = total ? Math.round(n / total * 100) : 0;
-      const ok  = reveal && D.correct === r.i;
-      r.li.classList.toggle('is-lead',    showData && !reveal && total > 0 && n === max);
+      const n  = share.counts[r.i];
+      const ok = reveal && D.correct === r.i;
+      r.li.classList.toggle('is-lead',    showData && !reveal && share.total > 0 && n === share.max);
       r.li.classList.toggle('is-correct', ok);
       r.li.classList.toggle('is-dim',     reveal && !ok);
       if (ok) r.badge.innerHTML = CHECK_SVG; else r.badge.textContent = letter(r.i);
+      // The badge doubles as the pie's key: same letter, same ink.
+      r.badge.className = 'badge' + (showData ? ' s' + share.shade[r.i] : '');
       r.votes.textContent = plural(n, 'vote', 'votes');
-      const w = showData ? pct + '%' : '0%';
-      // A just-built bar needs one frame at 0 before it can transition out.
-      if (fresh) requestAnimationFrame(() => requestAnimationFrame(() => { r.fill.style.width = w; }));
-      else r.fill.style.width = w;
-      countTo(r.pct, showData ? pct : 0, '%');
+      countTo(r.pct, showData ? share.pct[r.i] : 0, '%');
     });
+  }
+
+  // Counts, percentages and the shade each option draws — the pie and the
+  // answer rows both read from this, so they can't disagree.
+  function shares(D) {
+    const counts = D.options.map((_, i) => D.votes[letter(i)] || 0);
+    const total  = counts.reduce((a, b) => a + b, 0);
+    const max    = Math.max(0, ...counts);
+    const pct    = counts.map(n => (total ? Math.round(n / total * 100) : 0));
+    // Darkest ink to the most popular answer, ties broken by order.
+    const rank   = counts.map((_, i) => i).sort((a, b) => counts[b] - counts[a] || a - b);
+    const shade  = [];
+    rank.forEach((i, k) => { shade[i] = Math.min(5, k); });
+    return { counts, total, max, pct, shade };
+  }
+
+  // ── Pie ─────────────────────────────────────────────────────────────────────
+  // A donut drawn as one dashed circle per slice: no library, no geometry
+  // beyond the angles, and each slice animates from its last size. The hole
+  // carries the headline.
+  const PIE_R = 42, PIE_C = 2 * Math.PI * PIE_R;
+  function renderPie(D) {
+    const share  = shares(D);
+    const reveal = D.revealed && D.correct != null;
+    pieEmpty.style.display = share.total ? 'none' : 'block';
+    pieSvg.style.display   = share.total ? 'block' : 'none';
+    pieSvg.textContent = '';
+    if (!share.total) return;
+
+    const NS = 'http://www.w3.org/2000/svg';
+    const add = (tag, attrs, text) => {
+      const el = document.createElementNS(NS, tag);
+      for (const k in attrs) el.setAttribute(k, attrs[k]);
+      if (text != null) el.textContent = text;
+      pieSvg.appendChild(el);
+      return el;
+    };
+
+    let at = 0;   // fraction of the circle used so far
+    D.options.forEach((_, i) => {
+      const f = share.counts[i] / share.total;
+      if (!f) return;
+      const ok  = reveal && D.correct === i;
+      const len = Math.max(0, f * PIE_C - (f < 0.995 ? 1.5 : 0));   // hairline gap between slices
+      add('circle', {
+        class: `seg s${share.shade[i]}${ok ? ' is-correct' : ''}${reveal && !ok ? ' is-dim' : ''}`,
+        cx: 60, cy: 60, r: PIE_R,
+        'stroke-dasharray': `${len} ${PIE_C - len}`,
+        'stroke-dashoffset': -at * PIE_C,
+        transform: 'rotate(-90 60 60)',
+      });
+      if (f >= 0.07) {
+        const mid = (at + f / 2) * 2 * Math.PI - Math.PI / 2;
+        add('text', {
+          class: 'seg-label',
+          x: 60 + Math.cos(mid) * PIE_R,
+          y: 60 + Math.sin(mid) * PIE_R,
+          fill: share.shade[i] <= 2 ? 'var(--bg)' : 'var(--text)',
+        }, letter(i));
+      }
+      at += f;
+    });
+
+    // The hole says the number the room is waiting for: the winning share, or
+    // the correct answer's once it's revealed.
+    const lead = reveal ? D.correct : share.counts.indexOf(share.max);
+    add('text', { class: 'pie-mid' + (reveal ? ' is-correct' : ''), x: 60, y: 58, 'font-size': 20 },
+        share.pct[lead] + '%');
+    add('text', { class: 'pie-sub', x: 60, y: 72 },
+        (reveal ? 'correct · ' : '') + letter(lead));
   }
 
   // ── Headline numbers ────────────────────────────────────────────────────────
@@ -1545,10 +1682,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
 
   let lastTally = 0;
   function renderJoin(D, preview) {
-    qrFake.style.display = preview ? 'block' : 'none';
-    qrEl.style.display   = preview ? 'none' : 'block';
-    if (preview) { tallyEl.textContent = '0 responses'; return; }
-    if (S.phase !== 'collect') return;
+    if (preview || S.phase !== 'collect') return;
     if (qrEl.dataset.url !== S.joinUrl) {
       qrEl.textContent = '';
       qrEl.dataset.url = S.joinUrl;
