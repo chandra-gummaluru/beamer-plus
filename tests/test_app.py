@@ -253,6 +253,22 @@ def test_survey_kinds_route_to_the_right_page(client):
     assert client.get(f'{pre}/api/survey/{odd["survey_id"]}').get_json()['kind'] == 'open'
 
 
+def test_fill_in_the_blanks_survey_carries_its_template(client):
+    session_id = create_session(client)
+    tpl = '>>> f(BLANK, BLANK)\nTrue'
+    fill = create_survey(client, session_id, question='Fill in the blanks', kind='fill',
+                         meta={'template': tpl})
+    assert fill['url'] == f'/s/{session_id}/survey/{fill["survey_id"]}'
+    info = client.get(f'{session_prefix(session_id)}/api/survey/{fill["survey_id"]}').get_json()
+    assert info['kind'] == 'fill'
+    assert info['meta']['template'] == tpl
+    # A template longer than the display-hint cap is kept, not dropped.
+    long_tpl = 'x BLANK ' * 300
+    big = create_survey(client, session_id, question='Q', kind='fill', meta={'template': long_tpl})
+    meta = client.get(f'{session_prefix(session_id)}/api/survey/{big["survey_id"]}').get_json()['meta']
+    assert meta['template'] == long_tpl[:2000]
+
+
 def test_create_survey_with_unknown_model_rejected(client):
     session_id = create_session(client)
     resp = client.post(f'{session_prefix(session_id)}/api/survey/create', json={'question': 'Q', 'model': 'nope'})

@@ -12,7 +12,12 @@
                    { "v": "rating",    "l": "Rating scale" },
                    { "v": "numeric",   "l": "Numeric estimate" },
                    { "v": "wordcloud", "l": "Word cloud" },
+                   { "v": "fill",      "l": "Fill in the blanks" },
                    { "v": "open",      "l": "Open-ended" } ] },
+    { "key": "template", "label": "Template — write BLANK where students fill in", "type": "textarea", "rows": 7,
+      "placeholder": ">>> f(BLANK, BLANK)\nTrue\n>>> f(BLANK, BLANK)\nFalse",
+      "showIf": { "responseType": "fill" } },
+
     { "key": "question", "label": "Question (Markdown, $LaTeX$, ```code``` blocks)", "type": "textarea", "rows": 5,
       "placeholder": "Consider the following code:\n\n```python\nx = 5\nif x > 2:\n    x = -3\n```\n\nWhat is `x`?" },
 
@@ -147,6 +152,9 @@
 }
 /* Views that fill the space want the top edge, not the middle. */
 #stage.is-fill #prompt { justify-content: flex-start; padding-bottom: calc(6px * var(--u)); }
+/* A choice question sits at the top whatever phase it's in: centring it would
+   drop the question down the slide the moment the QR column goes away. */
+#stage.is-top #prompt { justify-content: flex-start; padding-bottom: 0; }
 /* Split view: the whole left column scrolls as one, rather than the question
    and the answers each keeping their own scrollbar. */
 #stage.is-split #prompt {
@@ -166,7 +174,9 @@
 #stage.is-split #question,
 #stage.is-split #choices { flex: 0 0 auto; overflow: visible; max-height: none; }
 
-#kicker:empty { display: none; }
+/* The count keeps its line whatever it says, so closing the poll can't nudge
+   the question down — it is the one thing on the slide that must not move. */
+#kicker { min-height: 1.5em; }
 #question {
   font-size: var(--fs-head);
   font-weight: 500;
@@ -274,7 +284,7 @@ html.ar-dark {
 #question.has-code > p:first-child { font-weight: 500; }
 
 /* Every results view starts hidden; render() shows the one that applies. */
-#choices, #chart, #stats, #cloud, #wall, #summary { display: none; }
+#choices, #chart, #stats, #cloud, #wall, #summary, #fill { display: none; }
 
 /* ── Preview (not configured yet) ───────────────────── */
 /* Sample data, faded, so the presenter sees the finished layout before
@@ -307,10 +317,15 @@ html.ar-dark {
 #preview-open { height: 26px; border-radius: 999px; }
 
 /* ── Answer rows (choice, true/false) ───────────────── */
+/* A grid, not a list: layoutChoices() picks the number of columns from how
+   many answers there are and how long they run, so four short answers sit in
+   one line, four long ones stack, and six middling ones make a block —
+   whatever keeps them all on the slide without a scrollbar. */
 #choices {
   list-style: none;
   flex: 0 1 auto;
-  flex-direction: column;
+  grid-auto-rows: min-content;
+  align-content: start;
   gap: calc(8px * var(--u));
   min-height: 0;
   overflow-y: auto;
@@ -369,9 +384,10 @@ html.ar-dark {
 }
 #choices.show-results .figure { display: flex; }
 
-/* True / False: two big tiles side by side instead of a list. */
-#choices.is-tf { flex-direction: row; gap: calc(12px * var(--u)); }
-#choices.is-tf .choice { flex: 1; padding: calc(16px * var(--u)) calc(18px * var(--u)); }
+/* True / False: two answers, so they land side by side, and they get the
+   room to be read as tiles rather than rows. */
+#choices.is-tf { gap: calc(12px * var(--u)); }
+#choices.is-tf .choice { padding: calc(16px * var(--u)) calc(18px * var(--u)); }
 #choices.is-tf .choice-label { font-size: var(--fs-lead); font-weight: 500; }
 
 /* Leader(s): full ink. Ties all lead. */
@@ -400,51 +416,6 @@ html.ar-dark {
 }
 .badge.s0, .badge.s1, .badge.s2 { color: var(--bg); }
 .badge.s3, .badge.s4, .badge.s5 { color: var(--text); }
-
-/* ── Pie ─────────────────────────────────────────────
-   A donut, because the question is "how did the room split", not "how many
-   voted for D" — and the hole gives the headline somewhere to live. */
-#pie { display: none; flex-direction: column; align-items: center; gap: calc(8px * var(--u)); width: 100%; }
-#pie svg { width: min(100%, calc(260px * var(--u))); height: auto; overflow: visible; }
-.seg {
-  fill: none;
-  stroke: var(--share);
-  stroke-width: 26;
-  transition: stroke-dasharray 0.7s cubic-bezier(.22, 1, .36, 1), opacity 0.3s;
-}
-.seg.is-correct { stroke: var(--ok); }
-.seg.is-dim { opacity: 0.3; }
-.seg-label {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 700;
-  text-anchor: middle;
-  dominant-baseline: central;
-}
-.pie-mid {
-  font-family: var(--font-mono);
-  font-weight: 600;
-  text-anchor: middle;
-  fill: var(--text);
-}
-.pie-mid.is-correct { fill: var(--ok); }
-.pie-sub { font-family: var(--font-ui); font-size: 8px; fill: var(--text-3); text-anchor: middle; }
-#pie-empty { font-size: var(--fs-body); color: var(--text-3); }
-
-/* ── "Poll closed" ───────────────────────────────────
-   The right-hand column has to say something between closing the poll and
-   putting the results up, or the slide reads as broken. */
-#closed-note {
-  display: none;
-  flex-direction: column;
-  align-items: center;
-  gap: calc(8px * var(--u));
-  color: var(--text-3);
-  text-align: center;
-}
-#closed-note svg { width: calc(34px * var(--u)); height: calc(34px * var(--u)); stroke-width: 1.4; }
-#closed-note .cn-title { font-size: var(--fs-body); color: var(--text-2); }
-#closed-note .cn-sub { font-size: var(--fs-small); }
 
 /* ── Headline numbers (rating, numeric) ─────────────── */
 #stats {
@@ -578,6 +549,55 @@ html.ar-dark {
 }
 .word.is-new { animation: ar-pop 0.45s cubic-bezier(.22, 1, .36, 1); }
 #cloud-empty { display: none; margin: auto; }
+
+/* ── Fill in the blanks ─────────────────────────────── */
+/* The presenter's template with a slot per BLANK: empty while the room is
+   answering, then one student's answers at a time as they step through. */
+#fill {
+  flex: 0 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  gap: calc(10px * var(--u));
+}
+#fill-tpl {
+  padding: calc(14px * var(--u)) calc(18px * var(--u));
+  background: var(--bg-subtle);
+  border-radius: var(--radius-lg);
+  font-family: var(--font-mono);
+  font-size: var(--fs-code);
+  line-height: 2.1;
+  white-space: pre-wrap;
+  overflow: auto;
+  scrollbar-width: thin;
+  color: var(--text);
+}
+.blank {
+  display: inline-block;
+  min-width: 5ch;
+  margin: 0 2px;
+  padding: 0 6px;
+  border-bottom: 2px solid var(--border-med);
+  text-align: center;
+  color: var(--text-3);
+}
+.blank.is-filled {
+  border-bottom-color: transparent;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  color: var(--text);
+  font-weight: 600;
+  animation: ar-pop 0.25s cubic-bezier(.22, 1, .36, 1);
+}
+#fill-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-chrome-sm);
+  color: var(--text-3);
+}
+#fill-stats { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#fill-foot .bw-spacer { flex: 1; }
 
 /* ── Response wall (open-ended) ─────────────────────── */
 #wall {
@@ -718,13 +738,12 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
 #qr img, #qr canvas { width: 100% !important; height: auto !important; }
 /* The count reads as one phrase — "12 responses" — in the deck's own type,
    both here and above the question once the poll is closed. */
-#tally, #kicker {
+#kicker {
   font-size: var(--fs-body);
   color: var(--text-2);
   font-variant-numeric: tabular-nums;
 }
-#tally { margin-top: calc(6px * var(--u)); }
-#tally.bump { animation: ar-bump 0.35s ease-out; }
+#kicker.bump { animation: ar-bump 0.35s ease-out; }
 
 /* ── Motion ─────────────────────────────────────────── */
 @keyframes ar-in   { from { opacity: 0; transform: translateY(8px) scale(0.97); } }
@@ -734,7 +753,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
 
 @media (prefers-reduced-motion: reduce) {
   .fill, .meter-fill, .choice, .hbar, .hn { transition: none; }
-  .resp.is-new, .word.is-new, #spot.is-open, #tally.bump { animation: none; }
+  .resp.is-new, .word.is-new, #spot.is-open, #kicker.bump { animation: none; }
 }
 
 /* ── Narrow or tall regions: stack, join panel becomes a strip ─ */
@@ -748,7 +767,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   #join { flex-direction: row; flex-wrap: wrap; gap: 12px; }
   #qr-wrap { width: min(22vh, 40vw, 180px); padding: 6px; }
   #pie svg { width: min(100%, 200px); }
-  #choices.is-tf { flex-direction: column; }
+
 }
 
 /* Scrollbars: hairline, never louder than the content. */
@@ -789,6 +808,17 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
         <div class="hist-ends" id="hist-ends"></div>
       </div>
       <div id="cloud"><div id="cloud-inner"></div><div id="cloud-empty" class="bw-empty">Words will appear here.</div></div>
+
+      <div id="fill">
+        <div id="fill-tpl"></div>
+        <div id="fill-foot">
+          <span id="fill-stats"></span>
+          <span class="bw-spacer"></span>
+          <button class="bw-btn bw-btn--icon" id="fill-prev" title="Previous response (←)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg></button>
+          <span id="fill-pos"></span>
+          <button class="bw-btn bw-btn--icon" id="fill-next" title="Next response (→)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg></button>
+        </div>
+      </div>
       <div id="wall"><div id="wall-empty" class="bw-empty">Responses will appear here.</div></div>
       <div id="summary">
         <div id="sum-busy" class="bw-center"><div class="bw-spinner"></div><div class="bw-boot-sub">Summarising responses…</div></div>
@@ -808,18 +838,6 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     <aside id="side">
       <div id="join">
         <div id="qr-wrap"><div id="qr"></div></div>
-        <div id="tally">0 responses</div>
-      </div>
-
-      <div id="closed-note">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10.5" width="16" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>
-        <div class="cn-title">Poll closed</div>
-        <div class="cn-sub">Awaiting results</div>
-      </div>
-
-      <div id="pie">
-        <svg id="pie-svg" viewBox="0 0 120 120"></svg>
-        <div id="pie-empty">No responses</div>
       </div>
     </aside>
 
@@ -862,12 +880,15 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   const POLL_MS  = 3000;
   const CAP      = { groups: 400, nums: 2000, words: 150 };   // what travels to viewers / the deck
 
+  const BLANK_RE = /\bBLANK\b|_{3,}/g;
+
   const TYPES = {
     choice:    { title: 'Multiple Choice',  kicker: 'Multiple choice' },
     truefalse: { title: 'True or False',    kicker: 'True or false' },
     rating:    { title: 'Rating Scale',     kicker: 'Rating' },
     numeric:   { title: 'Numeric Estimate', kicker: 'Estimate' },
     wordcloud: { title: 'Word Cloud',       kicker: 'Word cloud' },
+    fill:      { title: 'Fill in the Blanks', kicker: 'Fill in the blanks' },
     open:      { title: 'Open Response',    kicker: 'Open question' },
   };
   const isChoiceLike = t => t === 'choice' || t === 'truefalse';
@@ -893,6 +914,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   const viewSum     = $('view-summary');
   const bannerEl    = $('banner');
   const kickerEl    = $('kicker');
+  const promptEl    = $('prompt');
   const questionEl  = $('question');
   const statsEl     = $('stats');
   const choicesEl   = $('choices');
@@ -904,17 +926,16 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   const markerLabel = $('marker-label');
   const cloudEl     = $('cloud');
   const cloudEmpty  = $('cloud-empty');
+  const fillEl      = $('fill');
+  const fillTpl     = $('fill-tpl');
+  const fillStats   = $('fill-stats');
+  const fillPos     = $('fill-pos');
   const cloudInner  = $('cloud-inner');
   const wallEl      = $('wall');
   const wallEmpty   = $('wall-empty');
   const sideEl      = $('side');
   const joinEl      = $('join');
-  const closedNote  = $('closed-note');
-  const pieEl       = $('pie');
-  const pieSvg      = $('pie-svg');
-  const pieEmpty    = $('pie-empty');
   const qrEl        = $('qr');
-  const tallyEl     = $('tally');
   const previewMsg  = $('preview-msg');
   const previewBtn  = $('preview-open');
   const spotEl      = $('spot');
@@ -943,6 +964,9 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     unit:      '',           // numeric
     answer:    null,         // numeric: the actual value, or null
     words:     1,            // wordcloud: words kept per response
+    template:  '',           // fill: the text, with a BLANK per slot
+    fills:     [],           // fill: [[answer, answer, …], …] one per response
+    fillIdx:   0,            // fill: whose answers are on screen
     // idle → collect (QR up) → closed (no more answers) → results (on screen)
     phase:     'idle',
     surveyId:  null,
@@ -1165,6 +1189,16 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
       S.ratings = r;
     } else if (S.type === 'numeric') {
       S.nums = texts.map(t => Number(t.replace(/[\s,_]/g, ''))).filter(Number.isFinite);
+    } else if (S.type === 'fill') {
+      // Each response is one JSON array — an answer per blank, in order. An
+      // older or hand-typed response that isn't JSON counts as one answer.
+      S.fills = texts.map(t => {
+        try {
+          const a = JSON.parse(t);
+          return Array.isArray(a) ? a.map(x => String(x)) : [String(a)];
+        } catch (_) { return [t]; }
+      });
+      S.fillIdx = Math.min(S.fillIdx, Math.max(0, S.fills.length - 1));
     } else if (S.type === 'wordcloud') {
       const m = new Map();
       for (const t of texts) {
@@ -1188,9 +1222,18 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
 
   // What's missing before this poll can run, or '' when it's ready.
   function missing() {
+    if (S.type === 'fill') {
+      if (!S.template) return 'Add a template in the settings to start.';
+      if (!blankCount(S.template)) return 'Mark at least one blank in the template by writing BLANK.';
+      return '';
+    }
     if (!S.question) return 'Add a question in the settings to start.';
     if (S.type === 'choice' && S.options.length < 2) return 'Add at least two answer options in the settings.';
     return '';
+  }
+
+  function blankCount(tpl) {
+    return (String(tpl).match(BLANK_RE) || []).length;
   }
   const ready = () => !missing();
 
@@ -1202,6 +1245,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
       type, phase: 'results', total: 24, revealed: false, view: 'wall',
       options: [], correct: null, votes: {}, ratings: {}, nums: [], cloud: [], groups: [],
       scale: S.scale, unit: '', answer: null, spotlight: -1, summaries: null,
+      template: '', fills: [], fillIdx: 0,
       joinUrl: '',
     };
     const q = S.question;
@@ -1219,6 +1263,9 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
         cloud: [['interesting', 7], ['fast', 5], ['confusing', 4], ['useful', 4], ['fun', 3], ['dense', 3],
                 ['clear', 2], ['recursion', 2], ['challenging', 2], ['long', 1], ['engaging', 1], ['abstract', 1],
                 ['practical', 1], ['neat', 1]].map(([text, n]) => ({ text, n })) };
+      case 'fill': return { ...base, question: q,
+        template: S.template || '>>> is_sorted(BLANK)\nTrue\n>>> is_sorted(BLANK)\nFalse',
+        fills: [['[1, 2, 3]', '[3, 1, 2]'], ['[]', '[2, 1]'], ['[1, 2, 3]', '[5, 4]']], fillIdx: 0 };
       case 'open': return { ...base, question: q || 'What is one thing from today you\'re still unsure about?',
         groups: [['Hash collisions', 3], ['When to use a tree vs a hash table', 1], ['Big-O of amortised operations', 1],
                  ['Recursion', 2], ['Why resizing doubles the array', 1], ['Proof on slide 14', 1]]
@@ -1249,30 +1296,33 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     titleEl.textContent = window.BeamerWidget?.name ? BeamerWidget.name(fallbackTitle) : fallbackTitle;
     // The only thing above the question is the count, and only once the room
     // has answered — the type is obvious from what's on the slide.
-    kickerEl.textContent = D.phase === 'closed' || results ? plural(D.total, 'response', 'responses') : '';
+    // The count has one home, above the question, from the moment the poll
+    // opens — so closing it doesn't shift a thing.
+    const countText = D.phase === 'idle' ? '' : plural(D.total, 'response', 'responses');
+    if (countText !== kickerEl.textContent) {
+      kickerEl.textContent = countText;
+      if (D.total > lastTally && !preview) {
+        kickerEl.classList.remove('bump'); void kickerEl.offsetWidth; kickerEl.classList.add('bump');
+      }
+      lastTally = preview ? 0 : D.total;
+    }
 
-    // Layout. A multiple-choice question always splits — question and options
-    // on the left, the right column carrying the poll's one moving part.
-    // Everything else runs down the middle. The preview shows the QR too, so
-    // the slide reads the way it will when it's live.
-    const split    = isChoiceLike(t);
-    // The preview shows the finished slide — sample results — so it doesn't
-    // draw a stand-in QR code next to them.
+    // Layout. While a multiple-choice poll is open the slide splits — question
+    // and options on the left, the QR on the right. From the moment it closes
+    // the right column is gone for good and the slide is one column, so the
+    // results arrive without anything moving. The preview shows the finished
+    // slide (sample results), so it draws no stand-in QR.
     const withJoin = collect;
+    const split    = isChoiceLike(t) && withJoin;
     stage.classList.toggle('is-split',   split);
+    // A template (or a list of answers) is read from the top, not centred.
+    stage.classList.toggle('is-top',     isChoiceLike(t) || t === 'fill');
     stage.classList.toggle('is-preview', preview);
     stage.classList.toggle('is-data',    showData);
     stage.classList.toggle('is-fill',    showData && !split);
 
-    // The right column: the QR while answering, a closed sign once it shuts,
-    // the pie once the results are up. For every other question type the
-    // results are the view itself, so the column goes away.
-    const showPie = split && showData;
-    joinEl.style.display     = withJoin ? 'flex' : 'none';
-    closedNote.style.display = D.phase === 'closed' ? 'flex' : 'none';
-    pieEl.style.display      = showPie ? 'flex' : 'none';
-    sideEl.classList.toggle('is-empty', !withJoin && D.phase !== 'closed' && !showPie);
-    if (showPie) renderPie(D);
+    joinEl.style.display = withJoin ? 'flex' : 'none';
+    sideEl.classList.toggle('is-empty', !withJoin);
     previewMsg.textContent = IS_VIEWER ? 'Waiting for the presenter to set up this question.'
                                        : 'Sample data — ' + missing().replace(/^A/, 'a');
     previewBtn.style.display = IS_VIEWER || !window.BeamerWidget?.openSettings ? 'none' : '';
@@ -1281,10 +1331,11 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     bannerEl.textContent   = S.error;
 
     const show = (el, on, how) => { el.style.display = on ? (how || 'flex') : 'none'; };
-    show(choicesEl, isChoiceLike(t));
+    show(choicesEl, isChoiceLike(t), 'grid');
     show(statsEl,   showData && (t === 'rating' || t === 'numeric'));
     show(chartEl,   showData && (t === 'rating' || t === 'numeric'));
     show(cloudEl,   showData && t === 'wordcloud');
+    show(fillEl,    t === 'fill' && !!D.template);
     const summary = t === 'open' && results && D.view === 'summary';
     show(wallEl,    showData && t === 'open' && !summary);
     show(summaryEl, summary);
@@ -1293,6 +1344,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     if (showData && t === 'rating')    renderRating(D);
     if (showData && t === 'numeric')   renderNumeric(D);
     if (showData && t === 'wordcloud') renderCloud(D);
+    if (t === 'fill') renderFill(D, showData);
     if (t === 'open')     renderWall(D);
     if (summary)          renderSummary(D);
 
@@ -1377,6 +1429,8 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     const share  = shares(D);
     const reveal = D.revealed && D.correct != null;
 
+    layoutChoices(showData);
+
     choiceRows.forEach(r => {
       const n  = share.counts[r.i];
       const ok = reveal && D.correct === r.i;
@@ -1391,6 +1445,54 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     });
   }
 
+  // How many columns the answers should run in. Measured, not guessed: the
+  // widest answer that still fits on one line decides it, and if the block is
+  // then too tall for the space left under the question, it takes another
+  // column and tries again. Re-run on resize and when the percentages appear,
+  // since both change what fits.
+  let _measure = null;
+  function layoutChoices(showData) {
+    const n = choiceRows.length;
+    if (!n) return;
+    const set = c => { choicesEl.style.gridTemplateColumns = `repeat(${c}, minmax(0, 1fr))`; };
+    set(1);
+
+    const avail = choicesEl.clientWidth;
+    const gap   = parseFloat(getComputedStyle(choicesEl).columnGap) || 0;
+    if (!avail) return;
+
+    // What one answer needs beside its text: badge, padding, and the
+    // percentage column once the results are up.
+    const r0    = choiceRows[0];
+    const chrome = Math.max(0, r0.li.getBoundingClientRect().width - r0.label.getBoundingClientRect().width);
+
+    const cs   = getComputedStyle(r0.label);
+    _measure   = _measure || document.createElement('canvas').getContext('2d');
+    _measure.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const widest = Math.max(...choiceRows.map(r => _measure.measureText(r.label.textContent || '').width));
+
+    // The most columns whose share of the width still fits the longest answer
+    // on one line. `slack` above 1 accepts an answer that wraps, which is worth
+    // it when it turns a four-deep stack into two rows.
+    const fits = (c, slack) => (avail - gap * (c - 1)) / c >= widest / slack + chrome + 2;
+    let cols = 1;
+    for (let c = n; c >= 1; c--) if (fits(c, 1)) { cols = c; break; }
+    if (Math.ceil(n / cols) > 2) {
+      for (let c = n; c > cols; c--) {
+        if (Math.ceil(n / c) <= 2 && fits(c, 1.3)) { cols = c; break; }
+      }
+    }
+    // Even up the block: six answers that fit four across read better as 3 × 2
+    // than as a row of four and a row of two.
+    cols = Math.ceil(n / Math.ceil(n / cols));
+    set(cols);
+
+    // Still taller than the room left under the question? Trade line breaks
+    // for rows until it fits, or until every answer has its own column.
+    const room = promptEl.getBoundingClientRect().bottom - choicesEl.getBoundingClientRect().top;
+    while (cols < n && choicesEl.scrollHeight > room + 1) { set(++cols); }
+  }
+
   // Counts, percentages and the shade each option draws — the pie and the
   // answer rows both read from this, so they can't disagree.
   function shares(D) {
@@ -1403,62 +1505,6 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     const shade  = [];
     rank.forEach((i, k) => { shade[i] = Math.min(5, k); });
     return { counts, total, max, pct, shade };
-  }
-
-  // ── Pie ─────────────────────────────────────────────────────────────────────
-  // A donut drawn as one dashed circle per slice: no library, no geometry
-  // beyond the angles, and each slice animates from its last size. The hole
-  // carries the headline.
-  const PIE_R = 42, PIE_C = 2 * Math.PI * PIE_R;
-  function renderPie(D) {
-    const share  = shares(D);
-    const reveal = D.revealed && D.correct != null;
-    pieEmpty.style.display = share.total ? 'none' : 'block';
-    pieSvg.style.display   = share.total ? 'block' : 'none';
-    pieSvg.textContent = '';
-    if (!share.total) return;
-
-    const NS = 'http://www.w3.org/2000/svg';
-    const add = (tag, attrs, text) => {
-      const el = document.createElementNS(NS, tag);
-      for (const k in attrs) el.setAttribute(k, attrs[k]);
-      if (text != null) el.textContent = text;
-      pieSvg.appendChild(el);
-      return el;
-    };
-
-    let at = 0;   // fraction of the circle used so far
-    D.options.forEach((_, i) => {
-      const f = share.counts[i] / share.total;
-      if (!f) return;
-      const ok  = reveal && D.correct === i;
-      const len = Math.max(0, f * PIE_C - (f < 0.995 ? 1.5 : 0));   // hairline gap between slices
-      add('circle', {
-        class: `seg s${share.shade[i]}${ok ? ' is-correct' : ''}${reveal && !ok ? ' is-dim' : ''}`,
-        cx: 60, cy: 60, r: PIE_R,
-        'stroke-dasharray': `${len} ${PIE_C - len}`,
-        'stroke-dashoffset': -at * PIE_C,
-        transform: 'rotate(-90 60 60)',
-      });
-      if (f >= 0.07) {
-        const mid = (at + f / 2) * 2 * Math.PI - Math.PI / 2;
-        add('text', {
-          class: 'seg-label',
-          x: 60 + Math.cos(mid) * PIE_R,
-          y: 60 + Math.sin(mid) * PIE_R,
-          fill: share.shade[i] <= 2 ? 'var(--bg)' : 'var(--text)',
-        }, letter(i));
-      }
-      at += f;
-    });
-
-    // The hole says the number the room is waiting for: the winning share, or
-    // the correct answer's once it's revealed.
-    const lead = reveal ? D.correct : share.counts.indexOf(share.max);
-    add('text', { class: 'pie-mid' + (reveal ? ' is-correct' : ''), x: 60, y: 58, 'font-size': 20 },
-        share.pct[lead] + '%');
-    add('text', { class: 'pie-sub', x: 60, y: 72 },
-        (reveal ? 'correct · ' : '') + letter(lead));
   }
 
   // ── Headline numbers ────────────────────────────────────────────────────────
@@ -1644,6 +1690,55 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   }
   window.addEventListener('resize', () => { if (cloudEl.style.display !== 'none') fitCloud(); });
 
+  // ── Fill in the blanks ──────────────────────────────────────────────────────
+  // While the room is answering, the template stands on the slide with its
+  // blanks empty. Once the results are up, the same template replays one
+  // student's answers at a time — the arrows step through the class.
+  function renderFill(D, showData) {
+    const parts   = String(D.template || '').split(BLANK_RE);
+    const answers = showData ? (D.fills[D.fillIdx] || []) : [];
+    fillTpl.textContent = '';
+    parts.forEach((part, i) => {
+      fillTpl.appendChild(document.createTextNode(part));
+      if (i >= parts.length - 1) return;
+      const b = document.createElement('span');
+      const a = answers[i];
+      b.className = 'blank' + (a ? ' is-filled' : '');
+      b.textContent = a || '';
+      fillTpl.appendChild(b);
+    });
+
+    const n = D.fills.length;
+    $('fill-foot').style.display = showData ? 'flex' : 'none';
+    if (!showData) return;
+    fillPos.textContent = n ? `${D.fillIdx + 1} / ${n}` : '0 / 0';
+    $('fill-prev').disabled = D.fillIdx <= 0;
+    $('fill-next').disabled = D.fillIdx >= n - 1;
+    ['fill-prev', 'fill-next'].forEach(id => { $(id).style.display = IS_VIEWER ? 'none' : ''; });
+
+    // What the class settled on, blank by blank — the one thing a stepper
+    // can't show on its own.
+    const blanks = parts.length - 1;
+    const bits = [];
+    for (let k = 0; k < Math.min(blanks, 6); k++) {
+      const tally = new Map();
+      D.fills.forEach(f => {
+        const v = (f[k] || '').trim();
+        if (v) tally.set(v, (tally.get(v) || 0) + 1);
+      });
+      if (!tally.size) continue;
+      const [best, count] = [...tally].sort((a, b) => b[1] - a[1])[0];
+      bits.push(`${k + 1}: ${best} (${Math.round(count / n * 100)}%)`);
+    }
+    fillStats.textContent = bits.length ? 'most common — ' + bits.join('  ·  ') : '';
+  }
+
+  function stepFill(d) {
+    if (IS_VIEWER || S.phase !== 'results') return;
+    const i = Math.max(0, Math.min(S.fills.length - 1, S.fillIdx + d));
+    if (i !== S.fillIdx) { S.fillIdx = i; render(); emitState(); }
+  }
+
   // ── Response wall (open-ended) ──────────────────────────────────────────────
   // Cards are appended as responses arrive and never rebuilt, so only the new
   // ones animate in and a card being read doesn't jump.
@@ -1691,11 +1786,6 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
                            colorDark: '#1a1a18', colorLight: '#ffffff' });
       }
     }
-    if (S.total > lastTally) {
-      tallyEl.classList.remove('bump'); void tallyEl.offsetWidth; tallyEl.classList.add('bump');
-    }
-    lastTally = S.total;
-    tallyEl.textContent = plural(S.total, 'response', 'responses');
   }
 
   function renderSpotlight(D) {
@@ -1747,7 +1837,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     stopPolling();
     Object.assign(S, {
       phase: 'idle', surveyId: null, joinUrl: '', responses: [], total: 0,
-      votes: {}, ratings: {}, nums: [], cloud: [], groups: [],
+      votes: {}, ratings: {}, nums: [], cloud: [], groups: [], fills: [], fillIdx: 0,
       revealed: false, view: 'wall', summaries: null,
       sIdx: 0, sumBusy: false, sumError: '', spotlight: -1, error: '',
     });
@@ -1760,11 +1850,14 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
 
   // What the phone page needs to draw the right input for this type.
   function createBody() {
-    const body = { question: S.question, kind: S.type, model: null };
+    // A fill-in-the-blanks question often has no prose at all — the template
+    // is the question — so the phone gets something sensible to head it with.
+    const body = { question: S.question || (S.type === 'fill' ? 'Fill in the blanks' : ''), kind: S.type, model: null };
     if (isChoiceLike(S.type)) body.options = S.options;
     if (S.type === 'rating')    body.meta = { ...S.scale };
     if (S.type === 'numeric')   body.meta = { unit: S.unit };
     if (S.type === 'wordcloud') body.meta = { words: S.words };
+    if (S.type === 'fill')      body.meta = { template: S.template };
     if (S.type === 'open') {
       body.model         = cfg.model || null;
       body.num_summaries = parseInt(cfg.numSummaries, 10) || 3;
@@ -1954,6 +2047,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     return {
       type: S.type, question: S.question, options: S.options, correct: S.correct,
       scale: S.scale, unit: S.unit, answer: S.answer, words: S.words,
+      template: S.template, fills: S.fills.slice(0, CAP.groups), fillIdx: S.fillIdx,
       phase: S.phase, surveyId: S.surveyId, joinUrl: S.joinUrl, total: S.total,
       votes: S.votes, ratings: S.ratings,
       nums: S.nums.slice(-CAP.nums),
@@ -1964,9 +2058,10 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     };
   }
 
-  function pollIdentity(type, question, options, scale, unit, words) {
+  function pollIdentity(type, question, options, scale, unit, words, template) {
     return JSON.stringify([type, question, options || [], type === 'rating' ? scale : null,
-                           type === 'numeric' ? unit : null, type === 'wordcloud' ? words : null]);
+                           type === 'numeric' ? unit : null, type === 'wordcloud' ? words : null,
+                           type === 'fill' ? template || '' : null]);
   }
 
   function applyState(s) {
@@ -1976,7 +2071,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
       // Presenter restore (the host re-sends saved state after a reload). Only
       // adopt a poll for the same question; a changed question means a new one.
       if (!s.surveyId || s.surveyId === S.surveyId) return;
-      if (pollIdentity(s.type, s.question, s.options, s.scale, s.unit, s.words) !== pollKey) return;
+      if (pollIdentity(s.type, s.question, s.options, s.scale, s.unit, s.words, s.template) !== pollKey) return;
       startToken++;            // drop the auto-start that's racing this restore
       stopPolling();
     }
@@ -1989,6 +2084,9 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     S.unit      = s.unit || '';
     S.answer    = Number.isFinite(s.answer) ? s.answer : null;
     S.words     = s.words || 1;
+    S.template  = s.template || '';
+    S.fills     = Array.isArray(s.fills) ? s.fills : [];
+    S.fillIdx   = s.fillIdx || 0;
     S.phase     = ['idle', 'collect', 'closed', 'results'].includes(s.phase) ? s.phase : 'idle';
     S.surveyId  = s.surveyId || null;
     S.joinUrl   = s.joinUrl || '';
@@ -2043,11 +2141,12 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     S.answer = Number.isFinite(ans) ? ans : null;
     S.unit   = String(cfg.numericUnit || '').trim();
     S.words  = Math.min(3, Math.max(1, parseInt(cfg.wordsPerResponse, 10) || 1));
+    S.template = S.type === 'fill' ? String(cfg.template || '') : '';
 
     const canReveal = S.correct != null || (S.type === 'numeric' && S.answer != null);
     if (!canReveal) S.revealed = false;
 
-    const key = pollIdentity(S.type, S.question, S.options, S.scale, S.unit, S.words);
+    const key = pollIdentity(S.type, S.question, S.options, S.scale, S.unit, S.words, S.template);
     if (key !== pollKey) {
       pollKey = key;
       startToken++;
@@ -2087,6 +2186,8 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   viewWall  .addEventListener('click', () => setView('wall'));
   viewSum   .addEventListener('click', () => setView('summary'));
   previewBtn.addEventListener('click', () => window.BeamerWidget?.openSettings?.());
+  $('fill-prev') .addEventListener('click', () => stepFill(-1));
+  $('fill-next') .addEventListener('click', () => stepFill(1));
   $('spot-prev') .addEventListener('click', () => stepSpotlight(-1));
   $('spot-next') .addEventListener('click', () => stepSpotlight(1));
   $('spot-close').addEventListener('click', closeSpotlight);
@@ -2100,6 +2201,9 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
       if (e.key === 'ArrowLeft')  { e.preventDefault(); stepSpotlight(-1); }
       if (e.key === 'ArrowRight') { e.preventDefault(); stepSpotlight(1); }
       if (e.key === 'Escape')     { e.preventDefault(); closeSpotlight(); }
+    } else if (S.type === 'fill' && S.phase === 'results') {
+      if (e.key === 'ArrowLeft')  { e.preventDefault(); stepFill(-1); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); stepFill(1); }
     } else if (S.view === 'summary' && S.phase === 'results') {
       if (e.key === 'ArrowLeft')  { e.preventDefault(); stepSummary(-1); }
       if (e.key === 'ArrowRight') { e.preventDefault(); stepSummary(1); }
@@ -2108,6 +2212,10 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
 
   // KaTeX is deferred; re-render the maths once it has actually arrived.
   window.addEventListener('load', () => render());
+
+  // The slide region can change size (the host's font-size control, a resized
+  // widget); what fits in a row changes with it.
+  window.addEventListener('resize', () => { if (isChoiceLike(S.type)) render(); });
 
   // Without this the host's Reset reloads the iframe, and a reloaded page only
   // restarts if the host happens to re-send its config.

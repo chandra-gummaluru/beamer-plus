@@ -320,7 +320,7 @@ fenced code blocks (marked 9.1.6 + KaTeX 0.16.9, both pinned); the phone
 response templates render the same thing, so a listing on the slide is a
 listing in the student's hand.
 
-| `POST /api/survey/create` | `{ question, kind?, options?, meta?, model, num_summaries }` — `kind`: open · choice · truefalse · rating · numeric · wordcloud → `{ survey_id, url }` |
+| `POST /api/survey/create` | `{ question, kind?, options?, meta?, model, num_summaries }` — `kind`: open · choice · truefalse · rating · numeric · wordcloud · fill → `{ survey_id, url }` |
 | `GET  /api/survey/<id>/responses?after=<n>` | poll responses (3s interval is the convention) |
 | `POST /api/survey/<id>/close` | close the poll |
 | `POST /api/survey/<id>/analyze` | AI summaries |

@@ -110,6 +110,39 @@ textarea::placeholder { color: var(--text-3); }
 }
 .field-error { min-height: 16px; font-size: 13px; color: var(--red); text-align: center; }
 
+/* Fill in the blanks: the presenter's template, with an input where each
+   BLANK was. Monospace, because these are nearly always code. */
+.fill-template {
+  padding: 14px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 2.1;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-align: left;
+  color: var(--text);
+}
+.blank-input {
+  width: 7ch;
+  min-width: 7ch;
+  padding: 3px 6px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border-med);
+  border-radius: 5px;
+  outline: none;
+  text-align: center;
+  -webkit-appearance: none;
+  transition: border-color 0.15s;
+}
+.blank-input:focus { border-color: var(--text); }
+.blank-input:disabled { opacity: 0.55; }
+
 /* Rating scale: one button per point, the scale's end labels underneath. */
 .scale { display: grid; gap: 8px; }
 .scale-btn {
@@ -286,6 +319,39 @@ function buildInput(data) {
     return;
   }
 
+  if (kind === 'fill') {
+    // Every BLANK (or ___) in the template becomes an input, in order.
+    const tpl  = String(meta.template || '');
+    const parts = tpl.split(/\bBLANK\b|_{3,}/);
+    const box  = el('div', 'fill-template');
+    parts.forEach((part, i) => {
+      box.appendChild(document.createTextNode(part));
+      if (i < parts.length - 1) {
+        const inp = el('input', 'blank-input');
+        inp.type = 'text';
+        inp.autocomplete = 'off';
+        inp.autocapitalize = 'none';
+        inp.spellcheck = false;
+        inp.setAttribute('aria-label', `Blank ${i + 1}`);
+        inp.addEventListener('input', () => {
+          // Grow with what's typed, so a long answer stays readable.
+          inp.style.width = Math.max(7, Math.min(28, inp.value.length + 2)) + 'ch';
+        });
+        inp.addEventListener('keydown', e => {
+          if (e.key !== 'Enter') return;
+          const all = [...slot.querySelectorAll('.blank-input')];
+          const next = all[all.indexOf(inp) + 1];
+          if (next) next.focus(); else submit();
+        });
+        box.appendChild(inp);
+      }
+    });
+    slot.appendChild(box);
+    hint.textContent = 'Enter moves to the next blank';
+    setTimeout(() => slot.querySelector('.blank-input')?.focus(), 50);
+    return;
+  }
+
   if (kind === 'numeric' || kind === 'wordcloud') {
     const wrap = el('div', 'line-wrap');
     inputEl = el('input', 'line-input');
@@ -323,6 +389,19 @@ function readAnswer() {
   const err = document.getElementById('field-error');
   err.textContent = '';
   if (kind === 'rating') return rating == null ? null : String(rating);
+  if (kind === 'fill') {
+    const inputs = [...document.querySelectorAll('.blank-input')];
+    const vals   = inputs.map(i => i.value.trim());
+    const empty  = vals.findIndex(v => !v);
+    if (empty >= 0) {
+      err.textContent = `Fill in blank ${empty + 1}.`;
+      inputs[empty].focus();
+      return null;
+    }
+    // One answer per blank, in order — the slide replays them into the
+    // template as the presenter steps through the responses.
+    return JSON.stringify(vals);
+  }
   const text = (inputEl?.value || '').trim();
   if (!text) { inputEl?.focus(); return null; }
   if (kind === 'numeric') {
@@ -336,7 +415,7 @@ function readAnswer() {
 function setInputsDisabled(off) {
   document.getElementById('submit-btn').disabled = off;
   if (inputEl) inputEl.disabled = off;
-  document.querySelectorAll('.scale-btn').forEach(b => { b.disabled = off; });
+  document.querySelectorAll('.scale-btn, .blank-input').forEach(b => { b.disabled = off; });
 }
 
 async function submit() {

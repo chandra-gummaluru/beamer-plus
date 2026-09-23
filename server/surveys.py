@@ -14,17 +14,20 @@ surveys_bp = Blueprint('surveys', __name__)
 
 # What the audience is asked to give. Decides which response page they get
 # and what that page asks for; the server stores every answer as text either way.
-SURVEY_KINDS = {'open', 'choice', 'truefalse', 'rating', 'numeric', 'wordcloud'}
+SURVEY_KINDS = {'open', 'choice', 'truefalse', 'rating', 'numeric', 'wordcloud', 'fill'}
 
 
 def _clean_meta(meta):
-    """Small, flat, public display hints for the response page (scale ends, a unit)."""
+    """Small, flat, public display hints for the response page: scale ends, a
+    unit, or the template a fill-in-the-blanks question hands out."""
     if not isinstance(meta, dict):
         return {}
     out = {}
     for k, v in list(meta.items())[:12]:
         if isinstance(k, str) and isinstance(v, (str, int, float, bool)) or v is None:
-            out[str(k)[:40]] = v[:120] if isinstance(v, str) else v
+            # Long enough for a fill-in-the-blanks template, short enough that
+            # this stays a display hint rather than a content store.
+            out[str(k)[:40]] = v[:2000] if isinstance(v, str) else v
     return out
 
 
