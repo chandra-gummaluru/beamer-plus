@@ -2906,6 +2906,10 @@ function measureFrame(f){
    found by relaxation, capped so that a self-referencing structure still
    terminates. */
 var MAX_COL = 8;
+/* How many orphaned objects the diagram will carry before it stops adding
+   them — enough for a lecture example, not enough to swamp the slide. */
+var MAX_GHOSTS = 40;
+
 function heapDepths(state){
   var depth = {};
   state.order.forEach(function(id){ if (state.varRefs[id]) depth[id] = 0; });
@@ -2927,7 +2931,7 @@ function heapDepths(state){
   return depth;
 }
 
-function renderMemory(state, prev){
+function renderMemory(state, prev, history){
   var svg = $('diagram');
   var wrap = $('memoryWrap');
   /* Keep the viewport still across a redraw: stepping should not scroll the
@@ -2940,19 +2944,28 @@ function renderMemory(state, prev){
   var depth = heapDepths(state);
   var shown = state.order.filter(function(id){ return depth[id] !== undefined; });
 
-  /* Objects the last statement orphaned are drawn once, faded and with no
-     arrows, then dropped. Rebinding a name does not quietly erase what it was
-     pointing at: the room gets one step to see it become garbage. */
-  var ghosts = {};
-  if (prev){
-    var pdepth = heapDepths(prev);
-    prev.order.forEach(function(id){
-      if (!state.objects[id]){
-        ghosts[id] = prev.objects[id];
-        depth[id] = pdepth[id] === undefined ? 0 : pdepth[id];
-        shown.push(id);
-      }
-    });
+  /* Every object the program has orphaned so far stays on the diagram, faded
+     and with no arrows into it. Rebinding a name does not quietly erase what
+     it was pointing at, and it doesn't vanish on the next step either: the
+     room can still point at it three statements later.
+
+     Built from the steps before this one rather than from a running tally, so
+     stepping backwards takes the garbage back with it. The newest snapshot of
+     an object wins, and the pile is capped so a loop that allocates on every
+     iteration can't bury the live objects. */
+  var ghosts = {}, nghosts = 0;
+  var past = history || (prev ? [prev] : []);
+  for (var h = past.length - 1; h >= 0 && nghosts < MAX_GHOSTS; h--){
+    var st = past[h], hdepth = null;
+    for (var k = 0; k < st.order.length && nghosts < MAX_GHOSTS; k++){
+      var gid = st.order[k];
+      if (state.objects[gid] || ghosts[gid]) continue;
+      if (!hdepth) hdepth = heapDepths(st);
+      ghosts[gid] = st.objects[gid];
+      depth[gid] = hdepth[gid] === undefined ? 0 : hdepth[gid];
+      shown.push(gid);
+      nghosts++;
+    }
   }
 
   if (!frames.length && !shown.length){
@@ -3406,7 +3419,7 @@ function render(){
   var prev = app.idx > 0 ? states[app.idx - 1] : null;
 
   markLines(state);
-  renderMemory(state, prev);
+  renderMemory(state, prev, states.slice(0, app.idx));
   renderOutput(state, prev);
   renderStatus(state);
   renderError(state);

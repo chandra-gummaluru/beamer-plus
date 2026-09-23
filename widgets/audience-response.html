@@ -234,45 +234,6 @@ html.ar-dark {
 #question.has-code { font-size: var(--fs-body); font-weight: 400; line-height: 1.45; }
 #question.has-code > p:first-child { font-weight: 500; }
 
-/* Code on the left, answers on the right — but only once there's something to
-   show and there's room for two columns. Stacked, a listing plus four answer
-   rows doesn't fit a slide. */
-@media (min-width: 820px) {
-  #stage.is-code #prompt {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
-    grid-template-rows: auto minmax(0, 1fr);
-    column-gap: calc(24px * var(--u));
-    align-content: start;
-  }
-  #stage.is-code #banner,
-  #stage.is-code #kicker { grid-column: 1 / -1; }
-  #stage.is-code #question { grid-column: 1; grid-row: 2; align-self: start; max-height: 100%; }
-  #stage.is-code #choices  { grid-column: 2; grid-row: 2; align-self: center; max-height: 100%; }
-}
-
-/* While the room is still answering, the listing is what they're reading and
-   the options are already on their phones — so the options shrink to a row of
-   pills and the code keeps the slide. */
-#stage.is-code-collect #choices {
-  flex: 0 0 auto;
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: calc(8px * var(--u));
-  overflow: visible;
-}
-#stage.is-code-collect .choice {
-  flex: 0 1 auto;
-  padding: calc(5px * var(--u)) calc(13px * var(--u)) calc(5px * var(--u)) calc(6px * var(--u));
-  border-radius: 999px;
-  column-gap: calc(8px * var(--u));
-}
-#stage.is-code-collect .badge { width: calc(21px * var(--u)); height: calc(21px * var(--u)); }
-#stage.is-code-collect .choice-label { font-size: var(--fs-small); }
-/* Once there is data to look at, the question steps back a size. */
-#stage.is-data #question { font-size: var(--fs-lead); }
-#banner { display: none; }
-
 /* Every results view starts hidden; render() shows the one that applies. */
 #choices, #chart, #stats, #cloud, #wall, #summary { display: none; }
 
@@ -404,6 +365,34 @@ html.ar-dark {
 .choice.is-correct .badge { background: var(--ok); border-color: var(--ok); color: #fff; }
 .choice.is-correct .pct   { color: var(--ok); }
 .choice.is-dim { opacity: 0.45; }
+
+/* ── Code questions: one frame, all the way through ──
+   A listing plus four answer rows doesn't fit stacked on a slide, so a code
+   question runs in two columns: the listing on the left, and on the right the
+   QR code with the answers under it. Closing the poll drops the QR and adding
+   the results fills the bars — the columns themselves never move, so the
+   slide doesn't reshuffle between steps. */
+@media (min-width: 780px) {
+  #stage.is-code {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr);
+    grid-template-rows: auto minmax(0, auto) minmax(0, 1fr);
+    column-gap: calc(24px * var(--u));
+    align-items: start;
+  }
+  /* The prompt's children become items of the stage grid, so the answers can
+     sit in the other column while staying inside the widget's one flow. */
+  #stage.is-code #prompt { display: contents; }
+  #stage.is-code #banner,
+  #stage.is-code #kicker   { grid-column: 1 / -1; grid-row: 1; }
+  #stage.is-code #question { grid-column: 1; grid-row: 2 / span 2; max-height: 100%; }
+  #stage.is-code #join     { grid-column: 2; grid-row: 2; padding-bottom: 0; }
+  #stage.is-code #choices  { grid-column: 2; grid-row: 3; max-height: 100%; padding-top: calc(10px * var(--u)); }
+  #stage.is-code #qr-wrap  { width: min(22vh, 100%, 190px); }
+  #stage.is-code .choice { padding: calc(7px * var(--u)) calc(12px * var(--u)) calc(7px * var(--u)) calc(8px * var(--u)); }
+  #stage.is-code .badge  { width: calc(22px * var(--u)); height: calc(22px * var(--u)); }
+  #stage.is-code .choice-label { font-size: var(--fs-small); }
+  #stage.is-code .pct { font-size: var(--fs-body); }
+}
 
 /* ── Headline numbers (rating, numeric) ─────────────── */
 #stats {
@@ -687,17 +676,15 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     repeating-linear-gradient(0deg,  #1a1a18 0 8%, transparent 8% 17%);
   opacity: 0.55;
 }
-#tally { display: flex; align-items: baseline; gap: 8px; margin-top: 4px; }
-#tally-n {
-  font-family: var(--font-mono);
-  font-size: var(--fs-head);
-  font-weight: 600;
-  line-height: 1;
+/* The count reads as one phrase — "12 responses" — in the deck's own type,
+   both here and above the question once the poll is closed. */
+#tally, #kicker {
+  font-size: var(--fs-body);
+  color: var(--text-2);
   font-variant-numeric: tabular-nums;
-  color: var(--text);
-  display: inline-block;
 }
-#tally-n.bump { animation: ar-bump 0.35s ease-out; }
+#tally { margin-top: calc(6px * var(--u)); }
+#tally.bump { animation: ar-bump 0.35s ease-out; }
 
 /* ── Motion ─────────────────────────────────────────── */
 @keyframes ar-in   { from { opacity: 0; transform: translateY(8px) scale(0.97); } }
@@ -707,7 +694,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
 
 @media (prefers-reduced-motion: reduce) {
   .fill, .meter-fill, .choice, .hbar, .hn { transition: none; }
-  .resp.is-new, .word.is-new, #spot.is-open, #tally-n.bump { animation: none; }
+  .resp.is-new, .word.is-new, #spot.is-open, #tally.bump { animation: none; }
 }
 
 /* ── Narrow or tall regions: stack, join panel becomes a strip ─ */
@@ -715,8 +702,6 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   #stage { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; gap: 14px; }
   #join { flex-direction: row; flex-wrap: wrap; padding-bottom: 0; gap: 12px; }
   #qr-wrap { width: min(22vh, 40vw, 180px); padding: 6px; }
-  /* No room for the caption beside a small QR; the code is enough. */
-  #join > .bw-hint:first-child { display: none; }
   #choices.is-tf { flex-direction: column; }
 }
 
@@ -748,7 +733,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   <div id="stage">
     <section id="prompt">
       <div id="banner" class="bw-banner bw-banner--error"></div>
-      <div class="bw-hint" id="kicker"></div>
+      <div id="kicker"></div>
       <div id="question" class="bw-md"></div>
       <div id="stats"></div>
       <ol id="choices"></ol>
@@ -775,9 +760,8 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     </section>
 
     <aside id="join">
-      <div class="bw-hint">Scan to respond</div>
       <div id="qr-wrap"><div id="qr"></div><div id="qr-fake"></div></div>
-      <div id="tally"><span id="tally-n">0</span><span class="bw-hint" id="tally-label">responses</span></div>
+      <div id="tally">0 responses</div>
     </aside>
 
     <div id="preview-tag">
@@ -867,8 +851,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   const joinEl      = $('join');
   const qrEl        = $('qr');
   const qrFake      = $('qr-fake');
-  const tallyN      = $('tally-n');
-  const tallyLabel  = $('tally-label');
+  const tallyEl     = $('tally');
   const previewMsg  = $('preview-msg');
   const previewBtn  = $('preview-open');
   const spotEl      = $('spot');
@@ -1207,14 +1190,14 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
 
     // Layout. The preview shows the join panel too, so the slide reads right.
     const withJoin = collect || preview;
+    // A code question keeps its two columns whether or not the QR is up.
+    stage.classList.toggle('is-code',
+      isChoiceLike(t) && questionEl.classList.contains('has-code'));
     stage.classList.toggle('is-preview', preview);
-    stage.classList.toggle('no-join',    !withJoin);
+    stage.classList.toggle('no-join',    !withJoin && !stage.classList.contains('is-code'));
     stage.classList.toggle('is-data',    showData);
     stage.classList.toggle('is-fill',    showData && !isChoiceLike(t));
     // A code listing beside its answers, rather than above them (see the CSS).
-    const codeQ = isChoiceLike(t) && questionEl.classList.contains('has-code');
-    stage.classList.toggle('is-code',         codeQ && showData);
-    stage.classList.toggle('is-code-collect', codeQ && !showData);
     joinEl.style.display = withJoin ? 'flex' : 'none';
     previewMsg.textContent = IS_VIEWER ? 'Waiting for the presenter to set up this question.'
                                        : 'Sample data — ' + missing().replace(/^A/, 'a');
@@ -1564,10 +1547,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   function renderJoin(D, preview) {
     qrFake.style.display = preview ? 'block' : 'none';
     qrEl.style.display   = preview ? 'none' : 'block';
-    if (preview) {
-      tallyN.textContent = '0'; tallyLabel.textContent = 'responses';
-      return;
-    }
+    if (preview) { tallyEl.textContent = '0 responses'; return; }
     if (S.phase !== 'collect') return;
     if (qrEl.dataset.url !== S.joinUrl) {
       qrEl.textContent = '';
@@ -1578,11 +1558,10 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
       }
     }
     if (S.total > lastTally) {
-      tallyN.classList.remove('bump'); void tallyN.offsetWidth; tallyN.classList.add('bump');
+      tallyEl.classList.remove('bump'); void tallyEl.offsetWidth; tallyEl.classList.add('bump');
     }
     lastTally = S.total;
-    tallyN.textContent     = S.total;
-    tallyLabel.textContent = S.total === 1 ? 'response' : 'responses';
+    tallyEl.textContent = plural(S.total, 'response', 'responses');
   }
 
   function renderSpotlight(D) {
