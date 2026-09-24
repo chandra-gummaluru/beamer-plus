@@ -95,6 +95,22 @@ appear only while another field holds that value — e.g. the answer list in
 `audience-response.html` shows only when `responseType` is `"choice"`. Hidden
 fields keep their values.
 
+#### Editor hints
+
+Optional keys that make a widget with a lot to configure pleasant to set up.
+The editor (sidebar and its expanded dialog, `static/js/editor/widget-fields.js`)
+uses them; the in-widget settings kit ignores them and falls back to the plain
+control, so they are always safe to add. `audience-response.html` uses all of them.
+
+| Key | On | Effect |
+|-----|----|--------|
+| `section: "Answers"` | any field | Starts a titled group; later fields without one join it. A group whose fields are all hidden by `showIf` hides too. In the dialog, groups holding long fields go in the wide left column. |
+| `note: "Markdown & $LaTeX$"` | any field | Short aside next to the label. Keep labels short and put qualifiers here. |
+| `mono: true` | `textarea` | Monospace, for code or JSON. |
+| `editor: "list"` | `textarea-lines` | One input per line: add/remove, Enter for a new row, multi-line paste splits into rows. Still stored as an array of strings. `itemLabel` / `itemPlaceholder` name the rows ("Add option", "Option 1"). |
+| `correct: { "key": "correctAnswer", "base": 1 }` | with `editor: "list"` | Adds a "correct answer" toggle to each row, written as a base-indexed position to that key (kept in step as rows are added/removed). Keep declaring the target field too — the kit still edits it directly — the editor hides it. |
+| `blanks: { "pattern": "\\bBLANK\\b\|_{3,}", "insert": "BLANK" }` | `textarea` | Template editor: highlights every match of `pattern`, counts them, and has an "Insert blank" button that turns the selection into `insert`. Match `pattern` to how the widget itself finds its blanks. |
+
 Every widget with a schema also gets a **Name** field (key `title`), added by
 the settings kit and the editor — don't declare it. It is the widget's title
 everywhere: the bar, the heading of any exported PDF, and every downloaded

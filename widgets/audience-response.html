@@ -6,58 +6,24 @@
   "label": "Audience Response",
   "category": "Audience Response",
   "fields": [
-    { "key": "responseType", "label": "Question type", "type": "select", "default": "choice",
-      "options": [ { "v": "choice",    "l": "Multiple choice" },
-                   { "v": "truefalse", "l": "True / False" },
-                   { "v": "rating",    "l": "Rating scale" },
-                   { "v": "numeric",   "l": "Numeric estimate" },
-                   { "v": "wordcloud", "l": "Word cloud" },
-                   { "v": "fill",      "l": "Fill in the blanks" },
-                   { "v": "open",      "l": "Open-ended" } ] },
-    { "key": "template", "label": "Template — write BLANK where students fill in", "type": "textarea", "rows": 7,
-      "placeholder": ">>> f(BLANK, BLANK)\nTrue\n>>> f(BLANK, BLANK)\nFalse",
-      "showIf": { "responseType": "fill" } },
-
-    { "key": "question", "label": "Question (Markdown, $LaTeX$, ```code``` blocks)", "type": "textarea", "rows": 5,
-      "placeholder": "Consider the following code:\n\n```python\nx = 5\nif x > 2:\n    x = -3\n```\n\nWhat is `x`?" },
-
-    { "key": "options", "label": "Answer options (one per line)", "type": "textarea-lines", "rows": 4,
-      "placeholder": "Option A\nOption B\nOption C", "showIf": { "responseType": "choice" } },
-    { "key": "correctAnswer", "label": "Correct option (1-based, blank = none)", "type": "number-nullable",
-      "min": 1, "step": 1, "showIf": { "responseType": "choice" } },
-
-    { "key": "correctTF", "label": "Correct answer", "type": "select", "default": "",
-      "options": [ { "v": "", "l": "None" }, { "v": "true", "l": "True" }, { "v": "false", "l": "False" } ],
-      "showIf": { "responseType": "truefalse" } },
-
-    { "key": "ratingMax", "label": "Scale", "type": "select", "default": "5",
-      "options": [ { "v": "5", "l": "1 – 5" }, { "v": "7", "l": "1 – 7" }, { "v": "10", "l": "1 – 10" } ],
-      "showIf": { "responseType": "rating" } },
-    { "key": "ratingLow",  "label": "Label for the low end",  "type": "text", "placeholder": "Strongly disagree",
-      "showIf": { "responseType": "rating" } },
-    { "key": "ratingHigh", "label": "Label for the high end", "type": "text", "placeholder": "Strongly agree",
-      "showIf": { "responseType": "rating" } },
-
-    { "key": "numericAnswer", "label": "Actual value (revealed on click, optional)", "type": "number-nullable",
-      "showIf": { "responseType": "numeric" } },
-    { "key": "numericUnit", "label": "Unit (optional)", "type": "text", "placeholder": "ms",
-      "showIf": { "responseType": "numeric" } },
-
-    { "key": "wordsPerResponse", "label": "Each response counts as", "type": "select", "default": "1",
-      "options": [ { "v": "1", "l": "One word" }, { "v": "2", "l": "Up to two words" }, { "v": "3", "l": "Up to three words" } ],
-      "showIf": { "responseType": "wordcloud" } },
-
-    { "key": "autoStart", "label": "Start collecting when the slide opens", "type": "checkbox", "default": true },
-
-    { "key": "minResponses", "label": "Min. responses before closing", "type": "number",
-      "min": 1, "step": 1, "default": 1, "showIf": { "responseType": "open" } },
-    { "key": "model", "label": "AI model for summaries", "type": "ai-model", "showIf": { "responseType": "open" } },
-    { "key": "numSummaries", "label": "AI summary count", "type": "number",
-      "min": 1, "step": 1, "default": 3, "showIf": { "responseType": "open" } },
-    { "key": "apiKey", "label": "API key", "type": "password", "placeholder": "Paste API key…",
-      "showIf": { "responseType": "open" } },
-
-    { "key": "scale", "label": "Text size", "type": "select", "options": ["1", "1.4", "1.8", "2.2"], "default": "1.4" }
+    {"key": "responseType", "label": "Question type", "type": "select", "default": "choice", "options": [{"v": "choice", "l": "Multiple choice"}, {"v": "truefalse", "l": "True / False"}, {"v": "rating", "l": "Rating scale"}, {"v": "numeric", "l": "Numeric estimate"}, {"v": "wordcloud", "l": "Word cloud"}, {"v": "fill", "l": "Fill in the blanks"}, {"v": "open", "l": "Open-ended"}], "section": "Question"},
+    {"key": "question", "label": "Question text", "type": "textarea", "rows": 4, "placeholder": "Consider the following code:\n\n```python\nx = 5\nif x > 2:\n    x = -3\n```\n\nWhat is `x`?", "note": "Markdown & $LaTeX$"},
+    {"key": "template", "label": "Template", "type": "textarea", "rows": 6, "placeholder": ">>> f(BLANK, BLANK)\nTrue\n>>> f(BLANK, BLANK)\nFalse", "showIf": {"responseType": "fill"}, "note": "each blank is one answer", "mono": true, "blanks": {"pattern": "\\bBLANK\\b|_{3,}", "insert": "BLANK"}},
+    {"key": "options", "label": "Options", "type": "textarea-lines", "rows": 4, "placeholder": "Option A\nOption B\nOption C", "showIf": {"responseType": "choice"}, "section": "Answers", "editor": "list", "itemLabel": "option", "itemPlaceholder": "Option", "correct": {"key": "correctAnswer", "base": 1}},
+    {"key": "correctAnswer", "label": "Correct option (1-based, blank = none)", "type": "number-nullable", "min": 1, "step": 1, "showIf": {"responseType": "choice"}},
+    {"key": "correctTF", "label": "Correct answer", "type": "select", "default": "", "options": [{"v": "", "l": "None"}, {"v": "true", "l": "True"}, {"v": "false", "l": "False"}], "showIf": {"responseType": "truefalse"}},
+    {"key": "ratingMax", "label": "Scale", "type": "select", "default": "5", "options": [{"v": "5", "l": "1 – 5"}, {"v": "7", "l": "1 – 7"}, {"v": "10", "l": "1 – 10"}], "showIf": {"responseType": "rating"}},
+    {"key": "ratingLow", "label": "Low-end label", "type": "text", "placeholder": "Strongly disagree", "showIf": {"responseType": "rating"}},
+    {"key": "ratingHigh", "label": "High-end label", "type": "text", "placeholder": "Strongly agree", "showIf": {"responseType": "rating"}},
+    {"key": "numericAnswer", "label": "Actual value", "type": "number-nullable", "showIf": {"responseType": "numeric"}, "note": "revealed on click"},
+    {"key": "numericUnit", "label": "Unit", "type": "text", "placeholder": "ms", "showIf": {"responseType": "numeric"}, "note": "optional"},
+    {"key": "wordsPerResponse", "label": "Each response counts as", "type": "select", "default": "1", "options": [{"v": "1", "l": "One word"}, {"v": "2", "l": "Up to two words"}, {"v": "3", "l": "Up to three words"}], "showIf": {"responseType": "wordcloud"}},
+    {"key": "autoStart", "label": "Start collecting when the slide opens", "type": "checkbox", "default": true, "section": "Collecting"},
+    {"key": "minResponses", "label": "Responses needed to close", "type": "number", "min": 1, "step": 1, "default": 1, "showIf": {"responseType": "open"}},
+    {"key": "model", "label": "Model", "type": "ai-model", "showIf": {"responseType": "open"}, "section": "AI summaries"},
+    {"key": "numSummaries", "label": "Number of summaries", "type": "number", "min": 1, "step": 1, "default": 3, "showIf": {"responseType": "open"}},
+    {"key": "apiKey", "label": "API key", "type": "password", "placeholder": "Paste API key…", "showIf": {"responseType": "open"}},
+    {"key": "scale", "label": "Text size", "type": "select", "options": [{"v": "1", "l": "Small"}, {"v": "1.4", "l": "Medium"}, {"v": "1.8", "l": "Large"}, {"v": "2.2", "l": "Extra large"}], "default": "1.4", "section": "Display"}
   ]
 }
 </script>

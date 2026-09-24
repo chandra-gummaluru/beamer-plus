@@ -7,18 +7,27 @@
 // widget declares in its `widget-schema` block (see editor/widget-schema.js).
 // They are read straight out of the widget's HTML rather than from a live
 // iframe, so they are there the moment a widget is added — before it has ever
-// been rendered. This panel is the only place a widget is configured from.
+// been rendered. The form itself is built by widget-fields.js; the expand
+// button in the panel header opens the same form in a larger dialog
+// (widget-settings-modal.js) for widgets with a lot to configure.
+//
+// For a widget its settings come first and its geometry sits in a collapsed
+// "Layout" section: position and size are usually set by dragging the box on
+// the slide, and they used to push every actual setting below the fold.
 import { ctx, getSlideEl, getOrCreateConfig, escAttr, escHtml, setPanelMode, setPanelTitle,
-         resolvePanelMode, WIDGET_RESERVED } from './context.js';
+         resolvePanelMode } from './context.js';
 import { cleanupEditOverlays, renderEditOverlays, positionOverlay } from './overlays.js';
 import { WIDGET_LABELS } from './widget-picker.js';
-import { saveWidgetAsset } from './widget-settings.js';
 import { getWidgetSchema } from './widget-schema.js';
-import { sessionUrl } from '../app/session.js';
+import { buildWidgetForm } from './widget-fields.js';
+import { openWidgetSettings } from './widget-settings-modal.js';
 
-// Controls for the selected widget's declared fields, as { key, node, read() }.
+// The selected widget's settings form (see widget-fields.js), or null.
 // Rebuilt whenever the panel is, and read back by applyPropertiesQuiet().
-let _widgetRows = [];
+let _widgetForm = null;
+// Whether the widget "Layout" section was left open — kept across rebuilds.
+let _layoutOpen = false;
+let _expandWired = false;
 // Bumped on every panel build so a schema that resolves late can tell whether
 // it is still the selection the user is looking at.
 let _widgetFieldsToken = 0;
@@ -41,10 +50,13 @@ export function updatePropertiesPanel() {
     const body = document.getElementById('editor-properties-body');
     if (!body) return;
     body.innerHTML = buildPropsHTML(arrKey, item);
+    body.querySelector('#prop-layout')?.addEventListener('toggle', (e) => { _layoutOpen = e.target.open; });
 
     // A widget's own fields need its HTML, so they arrive a tick later and are
     // appended into the placeholder buildPropsHTML left for them.
-    _widgetRows = [];
+    _widgetForm = null;
+    wireExpandButton();
+    panel.closest('#editor-panel')?.removeAttribute('data-widget-settings');
     const fieldsToken = ++_widgetFieldsToken;
     if (arrKey === 'widgets') fillWidgetFields(item, fieldsToken);
 
@@ -64,8 +76,8 @@ export function updatePropertiesPanel() {
     // Auto-apply every change immediately. Property assignment (not
     // addEventListener) because #editor-properties-body persists across panel
     // refreshes — addEventListener here would stack a new listener per refresh.
-    body.oninput  = () => { applyPropertiesQuiet(); syncFieldVisibility(); };
-    body.onchange = () => { applyPropertiesQuiet(); syncFieldVisibility(); };
+    body.oninput  = () => { applyPropertiesQuiet(); _widgetForm?.syncVisibility(); };
+    body.onchange = () => { applyPropertiesQuiet(); _widgetForm?.syncVisibility(); };
 }
 
 function buildPropsHTML(arrKey, item) {
@@ -75,9 +87,7 @@ function buildPropsHTML(arrKey, item) {
 
     // ── Widget type badge (top of panel) ──────────────────────────────────
     if (arrKey === 'widgets') {
-        const typeLabel = WIDGET_LABELS[item.type]
-            || (item.type || '').replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-            || 'Custom Widget';
+        const typeLabel = widgetTypeLabel(item);
         html += `
             <div class="editor-prop-row editor-prop-row--type-header">
                 <div class="editor-prop-label">Widget type</div>
@@ -87,7 +97,7 @@ function buildPropsHTML(arrKey, item) {
         html += `<div class="editor-prop-divider"></div>`;
     }
 
-    html += `
+    const geometry = `
         <div class="editor-prop-row">
             <div class="editor-prop-label">Position</div>
             <div class="editor-prop-row-2col">
@@ -111,6 +121,20 @@ function buildPropsHTML(arrKey, item) {
             <input class="editor-prop-input" type="number" min="1" max="999" step="1" id="prop-z" value="${item.zIndex ?? 5}">
         </div>
     `;
+
+    if (arrKey === 'widgets') {
+        // Settings (filled in by fillWidgetFields once the schema is read),
+        // then the geometry, folded away.
+        html += `<div id="widget-fields"></div>`;
+        html += `
+            <details class="editor-prop-details" id="prop-layout"${_layoutOpen ? ' open' : ''}>
+                <summary class="editor-prop-details-summary">Layout</summary>
+                <div class="editor-prop-details-body">${geometry}</div>
+            </details>
+        `;
+    } else {
+        html += geometry;
+    }
 
     if (arrKey === 'videos') {
         html += `
@@ -161,9 +185,6 @@ function buildPropsHTML(arrKey, item) {
         `;
     }
 
-    // Filled by fillWidgetFields() once the widget's schema has been read.
-    if (arrKey === 'widgets') html += `<div id="widget-fields"></div>`;
-
     html += `
         <button class="btn editor-delete-btn" id="prop-delete" title="Remove this item">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
@@ -213,7 +234,7 @@ export function applyPropertiesQuiet() {
         item.animationName = get('prop-animName')?.value || undefined;
     } else if (arrKey === 'widgets') {
         // The widget's own declared fields, alongside its geometry.
-        applyWidgetFields(item);
+        _widgetForm?.apply(item);
     }
 
     const container = getSlideEl();
@@ -234,10 +255,10 @@ function deleteItem(arrKey, index) {
 
 /* ─── a widget's own declared fields ──────────────────────────────── */
 
-// Read the selected widget's schema and append a control per declared field.
-// Async because the schema comes from the widget's HTML (server or ZIP); the
-// token guards against a slow read landing in a panel the user has since
-// pointed at something else.
+// Read the selected widget's schema and build its settings form into the
+// placeholder. Async because the schema comes from the widget's HTML (server
+// or ZIP); the token guards against a slow read landing in a panel the user
+// has since pointed at something else.
 async function fillWidgetFields(item, token) {
     const schema = await getWidgetSchema(item);
     if (token !== _widgetFieldsToken) return;
@@ -252,46 +273,9 @@ async function fillWidgetFields(item, token) {
         return;
     }
 
-    const divider = document.createElement('div');
-    divider.className = 'editor-prop-divider';
-    host.appendChild(divider);
-
-    const heading = document.createElement('div');
-    heading.className = 'editor-prop-section';
-    heading.textContent = `${schema.label || 'Widget'} settings`;
-    host.appendChild(heading);
-
-    for (const field of schema.fields) {
-        const row = buildFieldRow(field, item);
-        row.field = field;
-        _widgetRows.push(row);
-        host.appendChild(row.node);
-    }
-    syncFieldVisibility();
-}
-
-// A field may declare `showIf: { otherKey: value | [values] }` — it only
-// applies while another field holds one of those values (an answer list means
-// nothing to an open-ended poll). Hidden rather than removed, so its value is
-// kept and switching back restores what the presenter typed.
-function syncFieldVisibility() {
-    const values = {};
-    for (const r of _widgetRows) {
-        const res = r.read();
-        values[r.key] = res.remove ? r.field?.default : res.value;
-    }
-    for (const r of _widgetRows) {
-        r.node.style.display = fieldVisible(r.field, values) ? '' : 'none';
-    }
-}
-
-function fieldVisible(field, values) {
-    const cond = field?.showIf;
-    if (!cond || typeof cond !== 'object') return true;
-    return Object.keys(cond).every(k => {
-        const want = Array.isArray(cond[k]) ? cond[k] : [cond[k]];
-        return want.some(w => String(w) === String(values[k]));
-    });
+    _widgetForm = buildWidgetForm(schema, item, 'panel');
+    host.appendChild(_widgetForm.node);
+    document.getElementById('editor-panel')?.setAttribute('data-widget-settings', '1');
 }
 
 function hintRow(text) {
@@ -301,222 +285,34 @@ function hintRow(text) {
     return el;
 }
 
-// What a control should show: what the presenter set, else the schema's default.
-function fieldValue(item, field) {
-    const v = item[field.key];
-    return v !== undefined ? v : field.default;
+function widgetTypeLabel(item) {
+    return WIDGET_LABELS[item.type]
+        || (item.type || '').replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+        || 'Custom Widget';
 }
 
-// Label only — a field says what it is and nothing more. Explanatory blurbs
-// under a control read as clutter in a panel this narrow; anything a presenter
-// genuinely needs to know belongs in the label or the placeholder.
-function fieldLabel(field) {
-    const lab = document.createElement('div');
-    lab.className = 'editor-prop-label';
-    lab.textContent = field.label || field.key;
-    return lab;
+/* ─── expanded settings dialog ────────────────────────────────────── */
+
+// The header's expand button (only shown while a widget with settings is
+// selected — see editor.css) opens the same form in a large dialog. It edits
+// the same config item live; closing it rebuilds this panel to match.
+function wireExpandButton() {
+    if (_expandWired) return;
+    const btn = document.getElementById('editor-props-expand');
+    if (!btn) return;
+    _expandWired = true;
+    btn.addEventListener('click', openExpandedSettings);
 }
 
-// One control per declared field. Deliberately mirrors the widget settings
-// kit's field types and its read() semantics — notably that clearing a field
-// drops the key so the widget's own default applies again — so a widget
-// behaves identically whichever surface configured it.
-function buildFieldRow(field, item) {
-    const eff = fieldValue(item, field);
-    const row = document.createElement('div');
-    row.className = 'editor-prop-row';
-    let input;
-
-    if (field.type === 'checkbox') {
-        const lab = document.createElement('label');
-        lab.className = 'editor-prop-checkbox-row';
-        input = document.createElement('input');
-        input.type = 'checkbox';
-        input.checked = eff === true;
-        lab.appendChild(input);
-        lab.appendChild(document.createTextNode(field.label || field.key));
-        row.appendChild(lab);
-
-    } else if (field.type === 'select') {
-        row.appendChild(fieldLabel(field));
-        input = document.createElement('select');
-        input.className = 'editor-prop-select';
-        for (const o of field.options || []) {
-            const isObj = o && typeof o === 'object';
-            const value = isObj ? o.v : o;
-            const label = isObj ? (o.l !== undefined ? o.l : o.v) : o;
-            const opt = document.createElement('option');
-            opt.value = value;
-            opt.textContent = label;
-            // Compared as strings: a deck may hold 1.4 where the schema
-            // declares "1.4", and a strict compare would lose the selection.
-            if (String(eff) === String(value)) opt.selected = true;
-            input.appendChild(opt);
-        }
-        row.appendChild(input);
-
-    } else if (field.type === 'ai-model') {
-        row.appendChild(fieldLabel(field));
-        input = document.createElement('select');
-        input.className = 'editor-prop-select';
-        fillModelOptions(input, eff);
-        row.appendChild(input);
-
-    } else if (field.type === 'textarea' || field.type === 'textarea-lines') {
-        row.appendChild(fieldLabel(field));
-        input = document.createElement('textarea');
-        input.className = 'editor-prop-input editor-prop-area';
-        input.rows = field.rows || (field.type === 'textarea-lines' ? 4 : 3);
-        input.spellcheck = false;
-        if (field.placeholder) input.placeholder = field.placeholder;
-        input.value = Array.isArray(eff) ? eff.join('\n') : (eff == null ? '' : String(eff));
-        row.appendChild(input);
-
-    } else if (field.type === 'file') {
-        row.appendChild(fieldLabel(field));
-        const fileRow = document.createElement('div');
-        fileRow.className = 'editor-prop-file';
-        input = document.createElement('input');
-        input.className = 'editor-prop-input';
-        input.type = 'text';
-        input.readOnly = true;
-        input.placeholder = 'No file selected';
-        input.value = eff == null ? '' : String(eff);
-        input.title = input.value;
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'btn editor-prop-file-btn';
-        btn.textContent = 'Upload';
-        btn.addEventListener('click', () => pickWidgetAsset(field, item, input, btn));
-        fileRow.appendChild(input);
-        fileRow.appendChild(btn);
-        row.appendChild(fileRow);
-
-    } else {
-        row.appendChild(fieldLabel(field));
-        input = document.createElement('input');
-        input.className = 'editor-prop-input';
-        input.type = field.type === 'password' ? 'password'
-                   : (field.type === 'number' || field.type === 'number-nullable') ? 'number'
-                   : 'text';
-        if (field.min  !== undefined) input.min  = field.min;
-        if (field.max  !== undefined) input.max  = field.max;
-        if (field.step !== undefined) input.step = field.step;
-        if (field.placeholder) input.placeholder = field.placeholder;
-        input.value = eff == null ? '' : String(eff);
-        row.appendChild(input);
-    }
-
-    // No per-control listener: #editor-properties-body already auto-applies on
-    // input/change, and these rows sit inside it.
-    return {
-        key: field.key,
-        node: row,
-        read() {
-            if (field.type === 'checkbox') return { value: input.checked };
-            if (field.type === 'number' || field.type === 'number-nullable') {
-                const raw = input.value.trim();
-                if (raw === '') return { remove: true };
-                const n = parseFloat(raw);
-                return isNaN(n) ? { remove: true } : { value: n };
-            }
-            if (field.type === 'textarea-lines') {
-                const lines = input.value.split('\n').map(s => s.trim()).filter(Boolean);
-                return lines.length ? { value: lines } : { remove: true };
-            }
-            return input.value === '' ? { remove: true } : { value: input.value };
-        },
-    };
-}
-
-// The AI models the server can actually reach. main.js loads them at start-up;
-// fall back to asking if that hasn't landed (or failed).
-async function fillModelOptions(select, current) {
-    const render = (models) => {
-        select.textContent = '';
-        const none = document.createElement('option');
-        none.value = '';
-        none.textContent = '— no model —';
-        select.appendChild(none);
-        for (const m of models) {
-            const opt = document.createElement('option');
-            opt.value = m;
-            opt.textContent = m;
-            if (current === m) opt.selected = true;
-            select.appendChild(opt);
-        }
-        // Keep a model the deck names but this server doesn't offer, so simply
-        // opening the panel doesn't silently clear the presenter's choice.
-        if (current && !models.includes(current)) {
-            const opt = document.createElement('option');
-            opt.value = current;
-            opt.textContent = `${current} (unavailable)`;
-            opt.selected = true;
-            select.appendChild(opt);
-        }
-    };
-
-    const known = ctx.state?.availableModels;
-    if (Array.isArray(known) && known.length) { render(known); return; }
-
-    const placeholder = document.createElement('option');
-    placeholder.value = current == null ? '' : String(current);
-    placeholder.textContent = current ? String(current) : '— loading… —';
-    select.appendChild(placeholder);
-    try {
-        const data = await (await fetch(sessionUrl('/api/models'))).json();
-        const models = data?.models || [];
-        if (ctx.state) ctx.state.availableModels = models;
-        render(models);
-    } catch (_) {
-        placeholder.textContent = '— unavailable —';
-    }
-}
-
-// A file field's bytes go into the deck (and up to the server so the widget can
-// read them before any save); the widget's config records only the path.
-function pickWidgetAsset(field, item, input, btn) {
-    const picker = document.createElement('input');
-    picker.type = 'file';
-    if (field.accept) picker.accept = field.accept;
-    picker.addEventListener('change', async () => {
-        const file = picker.files?.[0];
-        if (!file) return;
-        btn.disabled = true;
-        btn.textContent = 'Uploading…';
-        try {
-            const buffer = await file.arrayBuffer();
-            const path = await saveWidgetAsset(item, {
-                key: field.key, name: file.name, folder: field.folder || 'files', buffer,
-            });
-            if (path) { input.value = path; input.title = path; }
-        } catch (err) {
-            // The file is still recorded and will be written into the deck on
-            // save — it is only the live preview that can't be served. Say so,
-            // rather than leaving a silent failure to resurface later as a
-            // missing file inside the widget.
-            console.warn('[editor] widget file upload failed:', err);
-            window.BeamerModal?.show({
-                kind: 'error',
-                title: 'Upload failed',
-                message: `${err.message}\n\nThe file is still part of the presentation and will be included when you save, but the widget can't preview it until the upload succeeds.`,
-            });
-        } finally {
-            btn.disabled = false;
-            btn.textContent = 'Upload';
-        }
+export async function openExpandedSettings() {
+    const sel = ctx.selectedOverlay;
+    if (sel?.arrKey !== 'widgets') return;
+    const item = getOrCreateConfig()?.widgets?.[sel.index];
+    if (!item) return;
+    const schema = await getWidgetSchema(item);
+    if (!schema?.fields?.length) return;
+    openWidgetSettings(item, schema, {
+        title: item.title || schema.label || widgetTypeLabel(item),
+        onClose: () => { if (ctx.state?.editMode) updatePropertiesPanel(); },
     });
-    picker.click();
-}
-
-// Write every declared field back onto the widget's config item. A cleared
-// field is deleted rather than stored empty, so the widget falls back to its
-// own default exactly as it would through its in-widget panel.
-function applyWidgetFields(item) {
-    for (const row of _widgetRows) {
-        if (WIDGET_RESERVED.has(row.key)) continue;   // a widget can't move itself
-        const res = row.read();
-        if (res.remove) delete item[row.key];
-        else item[row.key] = res.value;
-    }
 }
