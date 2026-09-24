@@ -12,7 +12,7 @@
 import { bus } from '../core/events.js';
 import { ctx, setPanelMode } from './context.js';
 import { renderEditOverlays, cleanupEditOverlays, deselectOverlay, pickMediaFile, onMediaFileSelected } from './overlays.js';
-import { updatePropertiesPanel } from './properties.js';
+import { updatePropertiesPanel, refreshSlideItems } from './properties.js';
 import { addWidget } from './widget-picker.js';
 import { showViewConfig, hideViewConfig } from './view-config.js';
 import { applySlideReorder, removeSlideReorder } from './reorder.js';
@@ -200,6 +200,7 @@ function updateSlideSettingsPanel() {
     const obj    = ctx.state?.slideStructure?.[ctx.state?.currentSlide];
     const toggle = document.getElementById('slide-hidden-toggle');
     if (toggle) toggle.checked = !!obj?.hidden;
+    refreshSlideItems();
 }
 
 // Disable the add-media buttons when the current slide is a view slide

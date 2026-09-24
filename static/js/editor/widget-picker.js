@@ -9,6 +9,7 @@
 // only thing kept here is the icon, with a generic one for anything unlisted.
 import { ctx, getOrCreateConfig, escHtml } from './context.js';
 import { renderEditOverlays, cleanupEditOverlays, selectOverlayEl } from './overlays.js';
+import { openWidgetSettingsFor } from './properties.js';
 
 const WIDGET_ICONS = {
     'audience-response':`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`,
@@ -213,6 +214,9 @@ function _pickCustomWidget() {
         renderEditOverlays();
         const ov = document.querySelector(`.edit-overlay[data-arr-key="widgets"][data-item-index="${newIndex}"]`);
         if (ov) selectOverlayEl(ov, 'widgets', newIndex);
+        // A new widget always needs setting up — go straight to its settings
+        // (a widget without any just stays selected).
+        openWidgetSettingsFor(newIndex);
     });
     input.click();
 }
@@ -237,4 +241,5 @@ function _doAddWidget(type) {
     renderEditOverlays();
     const overlay = document.querySelector(`.edit-overlay[data-arr-key="widgets"][data-item-index="${newIndex}"]`);
     if (overlay) selectOverlayEl(overlay, 'widgets', newIndex);
+    openWidgetSettingsFor(newIndex);
 }

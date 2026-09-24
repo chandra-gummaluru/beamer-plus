@@ -483,27 +483,66 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
     --wf-correct: oklch(55% 0.13 150);
 }
 
-/* Opens the selected widget's settings in the larger dialog. */
-.editor-props-expand {
-    display: none;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    width: 28px;
-    height: 28px;
-    margin-left: auto;
-    /* Clear of the edit-mode close button, which floats over this corner. */
-    margin-right: 44px;
-    padding: 0;
-    background: none;
-    border: none;
-    border-radius: var(--r-sm);
-    color: var(--ink-3);
-    cursor: pointer;
-    transition: color var(--dur-fast), background var(--dur-fast);
+/* "On this slide" — everything on the slide, in the slide properties. */
+#editor-slide-items {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    padding-top: var(--sp-3);
+    border-top: var(--line-hairline);
 }
-#editor-panel[data-mode="item"][data-widget-settings="1"] .editor-props-expand { display: flex; }
-.editor-props-expand:hover { color: var(--ink-1); background: var(--surface-cream-2); }
+.slide-items { display: flex; flex-direction: column; gap: 6px; }
+.slide-item {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    width: 100%;
+    padding: 8px 10px;
+    text-align: left;
+    background: var(--surface-paper);
+    border: 1px solid oklch(88% 0.005 260);
+    border-radius: var(--r-md);
+    color: var(--ink-1);
+    font-family: var(--font-sans);
+    cursor: pointer;
+    transition: border-color var(--dur-fast), background var(--dur-fast), box-shadow var(--dur-fast);
+}
+.slide-item:hover { border-color: var(--accent); box-shadow: 0 1px 4px oklch(20% 0.01 260 / 0.08); }
+.slide-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.slide-item-icon { flex: 0 0 auto; color: var(--ink-3); }
+.slide-item-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.slide-item-name {
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.slide-item-kind { font-size: var(--fs-xs); color: var(--ink-3); }
+.slide-item-go { flex: 0 0 auto; color: var(--ink-4); transition: color var(--dur-fast), transform var(--dur-fast); }
+.slide-item:hover .slide-item-go { color: var(--ink-2); transform: translateX(2px); }
+
+/* The box a hovered list row refers to. */
+.edit-overlay.is-hinted {
+    border-style: solid;
+    background: oklch(45% 0.005 260 / 0.18);
+    box-shadow: 0 0 0 3px oklch(45% 0.005 260 / 0.25);
+}
+
+/* A selected widget's way into its settings dialog. */
+#widget-summary { display: flex; flex-direction: column; gap: var(--sp-2); }
+.editor-open-settings {
+    width: 100%;
+    justify-content: center;
+    gap: var(--sp-2);
+    min-height: 36px;
+    background: var(--ink-1);
+    border-color: var(--ink-1);
+    color: var(--ink-on-accent);
+    font-family: var(--font-sans);
+    font-size: var(--fs-sm);
+}
+.editor-open-settings:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
 
 /* A widget's geometry, folded below its settings. */
 .editor-prop-details { border-top: var(--line-hairline); padding-top: var(--sp-3); }
@@ -740,6 +779,42 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
     letter-spacing: -0.01em;
     line-height: 1.2;
 }
+.wsm-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: none;
+    border: none;
+    border-radius: var(--r-sm);
+    color: var(--ink-3);
+    cursor: pointer;
+}
+.wsm-close:hover { color: var(--ink-1); background: var(--surface-cream-2); }
+.wsm-footer {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-6);
+    border-top: var(--line-hairline);
+}
+.wsm-footer-note { margin-left: auto; font-size: var(--fs-xs); color: var(--ink-3); }
+.wsm-remove {
+    gap: 6px;
+    min-height: 34px;
+    background: none;
+    border-color: transparent;
+    color: oklch(45% 0.15 25);
+    font-family: var(--font-sans);
+    font-size: var(--fs-sm);
+}
+.wsm-remove:hover { background: oklch(from var(--danger) l c h / 0.08); }
+.wsm-remove.is-armed { background: var(--danger); border-color: var(--danger); color: #fff; }
+.wsm-remove[hidden] { display: none; }
+.wsm-layout-presets { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.wsm-empty { padding: 0 var(--sp-1); }
 .wsm-done {
     min-height: 34px;
     padding: 0 var(--sp-5);

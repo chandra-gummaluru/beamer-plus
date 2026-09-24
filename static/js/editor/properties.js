@@ -7,27 +7,25 @@
 // widget declares in its `widget-schema` block (see editor/widget-schema.js).
 // They are read straight out of the widget's HTML rather than from a live
 // iframe, so they are there the moment a widget is added — before it has ever
-// been rendered. The form itself is built by widget-fields.js; the expand
-// button in the panel header opens the same form in a larger dialog
-// (widget-settings-modal.js) for widgets with a lot to configure.
+// been rendered.
 //
-// For a widget its settings come first and its geometry sits in a collapsed
-// "Layout" section: position and size are usually set by dragging the box on
-// the slide, and they used to push every actual setting below the fold.
+// A widget is configured in its settings dialog (widget-settings-modal.js,
+// form built by widget-fields.js) — a narrow sidebar is no place for a
+// question, an answer list and a code template. The dialog opens from the
+// slide's "On this slide" list (refreshSlideItems), from the "Edit settings"
+// button shown here when a widget is selected on the slide, by
+// double-clicking the widget, and straight after a widget is added. The
+// sidebar keeps what goes with the box on the slide: its layout, and Remove.
 import { ctx, getSlideEl, getOrCreateConfig, escAttr, escHtml, setPanelMode, setPanelTitle,
          resolvePanelMode } from './context.js';
 import { cleanupEditOverlays, renderEditOverlays, positionOverlay } from './overlays.js';
 import { WIDGET_LABELS } from './widget-picker.js';
 import { getWidgetSchema } from './widget-schema.js';
-import { buildWidgetForm } from './widget-fields.js';
-import { openWidgetSettings } from './widget-settings-modal.js';
+import { openWidgetSettings, isWidgetSettingsOpen } from './widget-settings-modal.js';
+import { selectOverlayEl, deselectOverlay } from './overlays.js';
 
-// The selected widget's settings form (see widget-fields.js), or null.
-// Rebuilt whenever the panel is, and read back by applyPropertiesQuiet().
-let _widgetForm = null;
 // Whether the widget "Layout" section was left open — kept across rebuilds.
-let _layoutOpen = false;
-let _expandWired = false;
+let _layoutOpen = true;
 // Bumped on every panel build so a schema that resolves late can tell whether
 // it is still the selection the user is looking at.
 let _widgetFieldsToken = 0;
@@ -36,7 +34,7 @@ export function updatePropertiesPanel() {
     const panel = document.getElementById('editor-properties');
     if (!panel) return;
     // Nothing selected — hand the panel back to the slide (or view) section.
-    if (!ctx.selectedOverlay) { setPanelMode(resolvePanelMode()); return; }
+    if (!ctx.selectedOverlay) { setPanelMode(resolvePanelMode()); refreshSlideItems(); return; }
     setPanelMode('item');
 
     const { arrKey, index } = ctx.selectedOverlay;
@@ -52,13 +50,10 @@ export function updatePropertiesPanel() {
     body.innerHTML = buildPropsHTML(arrKey, item);
     body.querySelector('#prop-layout')?.addEventListener('toggle', (e) => { _layoutOpen = e.target.open; });
 
-    // A widget's own fields need its HTML, so they arrive a tick later and are
-    // appended into the placeholder buildPropsHTML left for them.
-    _widgetForm = null;
-    wireExpandButton();
-    panel.closest('#editor-panel')?.removeAttribute('data-widget-settings');
+    // Whether a widget has settings to edit needs its HTML, so the summary
+    // arrives a tick later, into the placeholder buildPropsHTML left for it.
     const fieldsToken = ++_widgetFieldsToken;
-    if (arrKey === 'widgets') fillWidgetFields(item, fieldsToken);
+    if (arrKey === 'widgets') fillWidgetSummary(item, index, fieldsToken);
 
     // Delete button
     body.querySelector('#prop-delete')?.addEventListener('click', () => deleteItem(arrKey, index));
@@ -76,8 +71,8 @@ export function updatePropertiesPanel() {
     // Auto-apply every change immediately. Property assignment (not
     // addEventListener) because #editor-properties-body persists across panel
     // refreshes — addEventListener here would stack a new listener per refresh.
-    body.oninput  = () => { applyPropertiesQuiet(); _widgetForm?.syncVisibility(); };
-    body.onchange = () => { applyPropertiesQuiet(); _widgetForm?.syncVisibility(); };
+    body.oninput  = () => applyPropertiesQuiet();
+    body.onchange = () => applyPropertiesQuiet();
 }
 
 function buildPropsHTML(arrKey, item) {
@@ -123,9 +118,9 @@ function buildPropsHTML(arrKey, item) {
     `;
 
     if (arrKey === 'widgets') {
-        // Settings (filled in by fillWidgetFields once the schema is read),
-        // then the geometry, folded away.
-        html += `<div id="widget-fields"></div>`;
+        // The way into its settings (filled in by fillWidgetSummary once the
+        // schema is read), then its geometry.
+        html += `<div id="widget-summary"></div>`;
         html += `
             <details class="editor-prop-details" id="prop-layout"${_layoutOpen ? ' open' : ''}>
                 <summary class="editor-prop-details-summary">Layout</summary>
@@ -232,9 +227,6 @@ export function applyPropertiesQuiet() {
         item.autoRotate    = get('prop-autoRotate')?.checked ?? false;
         item.animate       = get('prop-animate')?.checked ?? true;
         item.animationName = get('prop-animName')?.value || undefined;
-    } else if (arrKey === 'widgets') {
-        // The widget's own declared fields, alongside its geometry.
-        _widgetForm?.apply(item);
     }
 
     const container = getSlideEl();
@@ -242,7 +234,7 @@ export function applyPropertiesQuiet() {
     if (div && cr) positionOverlay(div, item, cr);
 }
 
-function deleteItem(arrKey, index) {
+export function deleteItem(arrKey, index) {
     const cfg = getOrCreateConfig();
     if (!cfg?.[arrKey]) return;
     cfg[arrKey].splice(index, 1);
@@ -253,29 +245,25 @@ function deleteItem(arrKey, index) {
     updatePropertiesPanel();
 }
 
-/* ─── a widget's own declared fields ──────────────────────────────── */
+/* ─── the selected widget: a way into its settings ────────────────── */
 
-// Read the selected widget's schema and build its settings form into the
-// placeholder. Async because the schema comes from the widget's HTML (server
-// or ZIP); the token guards against a slow read landing in a panel the user
-// has since pointed at something else.
-async function fillWidgetFields(item, token) {
+async function fillWidgetSummary(item, index, token) {
     const schema = await getWidgetSchema(item);
     if (token !== _widgetFieldsToken) return;
-    const host = document.getElementById('widget-fields');
+    const host = document.getElementById('widget-summary');
     if (!host) return;
     host.textContent = '';
-
-    // `customSettings` is not honoured here: whatever a widget declares as
-    // fields is edited in this panel, so every widget is configured the same way.
     if (!schema || !schema.fields.length) {
         host.appendChild(hintRow('This widget has no settings of its own.'));
         return;
     }
-
-    _widgetForm = buildWidgetForm(schema, item, 'panel');
-    host.appendChild(_widgetForm.node);
-    document.getElementById('editor-panel')?.setAttribute('data-widget-settings', '1');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn editor-open-settings';
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>Edit settings';
+    btn.addEventListener('click', () => openWidgetSettingsFor(index));
+    host.appendChild(btn);
+    host.appendChild(hintRow('Or double-click the widget on the slide.'));
 }
 
 function hintRow(text) {
@@ -285,34 +273,118 @@ function hintRow(text) {
     return el;
 }
 
-function widgetTypeLabel(item) {
+export function widgetTypeLabel(item) {
     return WIDGET_LABELS[item.type]
         || (item.type || '').replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
         || 'Custom Widget';
 }
 
-/* ─── expanded settings dialog ────────────────────────────────────── */
+/* ─── the widget settings dialog ──────────────────────────────────── */
 
-// The header's expand button (only shown while a widget with settings is
-// selected — see editor.css) opens the same form in a large dialog. It edits
-// the same config item live; closing it rebuilds this panel to match.
-function wireExpandButton() {
-    if (_expandWired) return;
-    const btn = document.getElementById('editor-props-expand');
-    if (!btn) return;
-    _expandWired = true;
-    btn.addEventListener('click', openExpandedSettings);
-}
-
-export async function openExpandedSettings() {
-    const sel = ctx.selectedOverlay;
-    if (sel?.arrKey !== 'widgets') return;
-    const item = getOrCreateConfig()?.widgets?.[sel.index];
+/**
+ * Open the settings dialog for widget #index on the current slide. The widget
+ * is selected on the slide too, so its box is highlighted while it's edited.
+ * `fromList`: opened from the slide's item list — closing returns there
+ * rather than to the widget's own sidebar view.
+ */
+export async function openWidgetSettingsFor(index, { fromList = false } = {}) {
+    if (isWidgetSettingsOpen()) return;
+    const item = getOrCreateConfig()?.widgets?.[index];
     if (!item) return;
     const schema = await getWidgetSchema(item);
-    if (!schema?.fields?.length) return;
-    openWidgetSettings(item, schema, {
-        title: item.title || schema.label || widgetTypeLabel(item),
-        onClose: () => { if (ctx.state?.editMode) updatePropertiesPanel(); },
+
+    const overlay = document.querySelector(`.edit-overlay[data-arr-key="widgets"][data-item-index="${index}"]`);
+    if (overlay && ctx.selectedOverlay?.div !== overlay) selectOverlayEl(overlay, 'widgets', index);
+
+    openWidgetSettings(item, schema || { label: null, fields: [] }, {
+        title: item.title || schema?.label || widgetTypeLabel(item),
+        // Keep the box on the slide in step with the dialog's Layout card.
+        onLayout: () => {
+            const div = document.querySelector(`.edit-overlay[data-arr-key="widgets"][data-item-index="${index}"]`);
+            const cr = getSlideEl()?.getBoundingClientRect();
+            if (div && cr) positionOverlay(div, item, cr);
+        },
+        onRemove: () => deleteItem('widgets', index),
+        onClose: (removed) => {
+            if (!ctx.state?.editMode || removed) return;
+            const label = document.querySelector(`.edit-overlay[data-arr-key="widgets"][data-item-index="${index}"] .edit-overlay-label`);
+            if (label) label.textContent = item.title || widgetTypeLabel(item);
+            if (fromList) deselectOverlay();      // back to the slide's list
+            else updatePropertiesPanel();
+            refreshSlideItems();                  // names may have changed
+        },
     });
+}
+
+/* ─── "On this slide" — the slide properties' item list ───────────── */
+
+const ITEM_ICONS = {
+    widgets: '<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/>',
+    videos:  '<polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/>',
+    audios:  '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+    models:  '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>',
+};
+const KIND_LABELS = { widgets: 'Widget', videos: 'Video', audios: 'Audio', models: '3D model' };
+
+/**
+ * Rebuild the list of everything on the current slide, in the slide
+ * properties section. A widget opens its settings dialog; media selects its
+ * box, whose properties then take over the panel as before.
+ */
+export function refreshSlideItems() {
+    const host = document.getElementById('editor-slide-items');
+    if (!host) return;
+    host.textContent = '';
+
+    const head = document.createElement('div');
+    head.className = 'editor-prop-label';
+    head.textContent = 'On this slide';
+    host.appendChild(head);
+
+    const cfg = getOrCreateConfig();
+    const entries = [];
+    for (const arrKey of ['widgets', 'videos', 'audios', 'models']) {
+        (cfg?.[arrKey] || []).forEach((item, index) => entries.push({ arrKey, item, index }));
+    }
+    if (!entries.length) {
+        host.appendChild(hintRow('Nothing yet — add a widget or media with the buttons below.'));
+        return;
+    }
+
+    const list = document.createElement('div');
+    list.className = 'slide-items';
+    for (const { arrKey, item, index } of entries) {
+        const isWidget = arrKey === 'widgets';
+        const name = isWidget
+            ? (item.title || widgetTypeLabel(item))
+            : (item.path ? item.path.split('/').pop() : `${KIND_LABELS[arrKey]} ${index + 1}`);
+        const kind = isWidget && item.title ? widgetTypeLabel(item) : KIND_LABELS[arrKey];
+
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'slide-item';
+        row.title = isWidget ? `Edit ${name}` : `Select ${name}`;
+        row.innerHTML = `
+            <svg class="slide-item-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ITEM_ICONS[arrKey]}</svg>
+            <span class="slide-item-text">
+                <span class="slide-item-name"></span>
+                <span class="slide-item-kind"></span>
+            </span>
+            <svg class="slide-item-go" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>`;
+        row.querySelector('.slide-item-name').textContent = name;
+        row.querySelector('.slide-item-kind').textContent = kind;
+
+        // Point out which box on the slide this row is.
+        const box = () => document.querySelector(`.edit-overlay[data-arr-key="${arrKey}"][data-item-index="${index}"]`);
+        row.addEventListener('mouseenter', () => box()?.classList.add('is-hinted'));
+        row.addEventListener('mouseleave', () => box()?.classList.remove('is-hinted'));
+        row.addEventListener('click', () => {
+            box()?.classList.remove('is-hinted');
+            if (isWidget) { openWidgetSettingsFor(index, { fromList: true }); return; }
+            const b = box();
+            if (b) selectOverlayEl(b, arrKey, index);
+        });
+        list.appendChild(row);
+    }
+    host.appendChild(list);
 }

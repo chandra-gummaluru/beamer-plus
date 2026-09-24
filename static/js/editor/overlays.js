@@ -4,7 +4,7 @@
 // (select → update panel; delete → re-render overlays). Both only export
 // functions called after load, so the cycle is harmless.
 import { ctx, getSlideEl, getOrCreateConfig, getConfigItems, arrKeyForType } from './context.js';
-import { updatePropertiesPanel, syncPropertiesPosition } from './properties.js';
+import { updatePropertiesPanel, syncPropertiesPosition, openWidgetSettingsFor, widgetTypeLabel } from './properties.js';
 
 let _pendingMediaType = null;
 
@@ -30,7 +30,10 @@ function buildOverlay(type, arrKey, item, index, container, rect) {
 
     const label = document.createElement('div');
     label.className = 'edit-overlay-label';
-    const name = item.path ? item.path.split('/').pop() : (item.type || `${type} ${index + 1}`);
+    // Same name the slide's item list uses: a widget's own Name, else its type.
+    const name = item.path ? item.path.split('/').pop()
+               : arrKey === 'widgets' ? (item.title || widgetTypeLabel(item))
+               : (item.type || `${type} ${index + 1}`);
     label.textContent = name;
     div.appendChild(label);
 
@@ -48,6 +51,14 @@ function buildOverlay(type, arrKey, item, index, container, rect) {
         selectOverlayEl(div, arrKey, index);
         startMove(e, div, arrKey, index, container);
     });
+    // A widget is configured in its settings dialog; a double-click is the
+    // shortest way there from the slide.
+    if (arrKey === 'widgets') {
+        div.addEventListener('dblclick', (e) => {
+            if (e.target === handle) return;
+            openWidgetSettingsFor(index);
+        });
+    }
     return div;
 }
 

@@ -1,9 +1,11 @@
-// Widget settings dialog — the roomy alternative to the properties sidebar.
+// Widget settings dialog — where a widget is configured.
 //
-// Opened from the expand button in the panel header. It builds the same form
-// as the sidebar (widget-fields.js) over the same config item, laid out as
-// cards across a wide dialog, and applies every change live — so closing it
-// just hands back to a sidebar that is rebuilt to match.
+// Opened from the slide's "On this slide" list, the "Edit settings" button,
+// a double-click on the widget, or right after adding one (see
+// openWidgetSettingsFor in properties.js). It holds everything about the
+// widget: its own settings (form from widget-fields.js, as cards in two
+// columns), a Layout card for its box on the slide, and Remove. Every change
+// is applied to the config item live, so there is nothing to save or cancel.
 import { buildWidgetForm } from './widget-fields.js';
 
 let _open = null;   // { overlay, onKey, restoreFocus, onClose }
@@ -15,10 +17,12 @@ export function isWidgetSettingsOpen() { return !!_open; }
  * @param {object} schema   from getWidgetSchema(item)
  * @param {object} opts
  * @param {string} opts.title       e.g. "Audience Response"
- * @param {() => void} opts.onChange  after each applied edit
- * @param {() => void} opts.onClose   after the dialog is gone
+ * @param {() => void} opts.onChange  after each applied settings edit
+ * @param {() => void} opts.onLayout  after a Layout edit (reposition the box)
+ * @param {() => void} opts.onRemove  Remove was chosen — delete the widget
+ * @param {(removed:boolean) => void} opts.onClose  after the dialog is gone
  */
-export function openWidgetSettings(item, schema, { title, onChange, onClose } = {}) {
+export function openWidgetSettings(item, schema, { title, onChange, onLayout, onRemove, onClose } = {}) {
     closeWidgetSettings();
 
     const overlay = document.createElement('div');
@@ -30,9 +34,19 @@ export function openWidgetSettings(item, schema, { title, onChange, onClose } = 
                     <div class="wsm-kicker">Widget settings</div>
                     <h2 class="wsm-title" id="wsm-title"></h2>
                 </div>
-                <button type="button" class="btn wsm-done">Done</button>
+                <button type="button" class="wsm-close" title="Close (Esc)" aria-label="Close">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
             </header>
             <div class="wsm-body"></div>
+            <footer class="wsm-footer">
+                <button type="button" class="btn wsm-remove">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                    Remove widget
+                </button>
+                <span class="wsm-footer-note">Changes apply as you type</span>
+                <button type="button" class="btn wsm-done">Done</button>
+            </footer>
         </div>`;
     overlay.querySelector('.wsm-title').textContent = title || schema.label || 'Widget';
 
@@ -40,11 +54,52 @@ export function openWidgetSettings(item, schema, { title, onChange, onClose } = 
     const body = overlay.querySelector('.wsm-body');
     body.appendChild(form.node);
 
-    const apply = () => { form.apply(item); form.syncVisibility(); onChange?.(); };
+    // The box on the slide, as a card under the short settings (or on its
+    // own, for a widget with nothing else to configure).
+    const layout = buildLayoutCard(item, () => onLayout?.());
+    let side = form.node.querySelector(':scope > .wf-col--side');
+    if (!side) {
+        side = document.createElement('div');
+        side.className = 'wf-col wf-col--side';
+        form.node.appendChild(side);
+    }
+    side.appendChild(layout);
+    if (!schema.fields.length) {
+        const none = document.createElement('div');
+        none.className = 'editor-prop-hint wsm-empty';
+        none.textContent = 'This widget has no settings of its own — only its place on the slide.';
+        side.prepend(none);
+    }
+    form.syncVisibility();
+
+    const apply = (e) => {
+        if (layout.contains(e.target)) return;   // handled by the card itself
+        form.apply(item); form.syncVisibility(); onChange?.();
+    };
     body.addEventListener('input', apply);
     body.addEventListener('change', apply);
 
-    overlay.querySelector('.wsm-done').addEventListener('click', closeWidgetSettings);
+    overlay.querySelector('.wsm-done').addEventListener('click', () => closeWidgetSettings());
+    overlay.querySelector('.wsm-close').addEventListener('click', () => closeWidgetSettings());
+    const removeBtn = overlay.querySelector('.wsm-remove');
+    if (onRemove) {
+        // Two clicks: the first arms it, so a stray click can't lose a
+        // configured widget (there is no undo for this).
+        removeBtn.addEventListener('click', () => {
+            if (!removeBtn.classList.contains('is-armed')) {
+                removeBtn.classList.add('is-armed');
+                removeBtn.lastChild.textContent = ' Click again to remove';
+                setTimeout(() => {
+                    if (!removeBtn.isConnected) return;
+                    removeBtn.classList.remove('is-armed');
+                    removeBtn.lastChild.textContent = ' Remove widget';
+                }, 3000);
+                return;
+            }
+            closeWidgetSettings(true);
+            onRemove();
+        });
+    } else removeBtn.hidden = true;
     // A click on the backdrop itself (not a drag that merely ends there).
     let downOnBackdrop = false;
     overlay.addEventListener('pointerdown', (e) => { downOnBackdrop = e.target === overlay; });
@@ -77,15 +132,70 @@ export function openWidgetSettings(item, schema, { title, onChange, onClose } = 
     });
 }
 
-export function closeWidgetSettings() {
+export function closeWidgetSettings(removed = false) {
     if (!_open) return;
     const { overlay, onKey, restoreFocus, onClose } = _open;
     _open = null;
     window.removeEventListener('keydown', onKey, true);
     overlay.remove();
     document.body.classList.remove('wsm-open');
-    try { restoreFocus?.focus?.(); } catch (_) {}
-    onClose?.();
+    try { restoreFocus?.isConnected && restoreFocus.focus?.(); } catch (_) {}
+    onClose?.(removed);
+}
+
+// Position, size and layer of the widget's box on the slide, in percent of
+// the slide (as the sidebar shows them). Written to the item as fractions.
+function buildLayoutCard(item, onLayout) {
+    const card = document.createElement('section');
+    card.className = 'wf-group wsm-layout';
+    const pct = (v, d) => Math.round((v ?? d) * 100);
+    card.innerHTML = `
+        <div class="wf-group-title">Layout</div>
+        <div class="wf-group-body">
+            <div class="editor-prop-row-2col">
+                <label class="editor-prop-row"><span class="editor-prop-label">X (%)</span>
+                    <input class="editor-prop-input" type="number" min="0" max="100" step="1" data-k="x"></label>
+                <label class="editor-prop-row"><span class="editor-prop-label">Y (%)</span>
+                    <input class="editor-prop-input" type="number" min="0" max="100" step="1" data-k="y"></label>
+                <label class="editor-prop-row"><span class="editor-prop-label">Width (%)</span>
+                    <input class="editor-prop-input" type="number" min="1" max="100" step="1" data-k="width"></label>
+                <label class="editor-prop-row"><span class="editor-prop-label">Height (%)</span>
+                    <input class="editor-prop-input" type="number" min="1" max="100" step="1" data-k="height"></label>
+            </div>
+            <label class="editor-prop-row"><span class="editor-prop-label">Layer<span class="editor-prop-label-note">higher is in front</span></span>
+                <input class="editor-prop-input" type="number" min="1" max="999" step="1" data-k="zIndex"></label>
+            <div class="wsm-layout-presets">
+                <button type="button" class="wf-chip-btn" data-preset="full">Fill the slide</button>
+                <button type="button" class="wf-chip-btn" data-preset="center">Centre it</button>
+            </div>
+        </div>`;
+    const inputs = Object.fromEntries(Array.from(card.querySelectorAll('input[data-k]')).map(i => [i.dataset.k, i]));
+    const show = () => {
+        inputs.x.value = pct(item.x, 0);          inputs.y.value = pct(item.y, 0);
+        inputs.width.value = pct(item.width, 0.4); inputs.height.value = pct(item.height, 0.3);
+        inputs.zIndex.value = item.zIndex ?? 10;
+    };
+    show();
+    card.addEventListener('input', (e) => {
+        const k = e.target.dataset?.k;
+        if (!k) return;
+        const n = parseFloat(e.target.value);
+        if (isNaN(n)) return;
+        if (k === 'zIndex') item.zIndex = Math.round(n);
+        else item[k] = Math.max(0, Math.min(100, n)) / 100;
+        onLayout();
+    });
+    card.addEventListener('click', (e) => {
+        const p = e.target.closest?.('[data-preset]')?.dataset.preset;
+        if (!p) return;
+        if (p === 'full') Object.assign(item, { x: 0, y: 0, width: 1, height: 1 });
+        else {
+            item.x = Math.max(0, (1 - (item.width ?? 0.4)) / 2);
+            item.y = Math.max(0, (1 - (item.height ?? 0.3)) / 2);
+        }
+        show(); onLayout();
+    });
+    return card;
 }
 
 // Keep Tab inside the dialog while it's open.
