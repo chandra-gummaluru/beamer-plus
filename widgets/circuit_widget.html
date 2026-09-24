@@ -934,6 +934,24 @@ defineModule('engine', ['state'], (state) => {
     }
     return best;
   }
+  // Where a branch should join a wire near (x, y): the nearest point on it,
+  // then slid along that segment to the closest grid line (never past the
+  // segment's ends). Wire corners and pins all sit on the grid, so the
+  // branch then leaves on a grid line too instead of a few pixels off one.
+  function snapOntoPoly(p, x, y) {
+    const pr = projectOnPoly(p, x, y);
+    const a = p[pr.index], b = p[pr.index+1];
+    if (!a || !b) return pr;
+    let q = pr.point;
+    if (a.y === b.y) {
+      const lo = Math.min(a.x,b.x), hi = Math.max(a.x,b.x);
+      q = { x: Math.min(hi, Math.max(lo, snapGridVal(q.x))), y: a.y };
+    } else if (a.x === b.x) {
+      const lo = Math.min(a.y,b.y), hi = Math.max(a.y,b.y);
+      q = { x: a.x, y: Math.min(hi, Math.max(lo, snapGridVal(q.y))) };
+    }
+    return { ...pr, point: q };
+  }
 
   /* ── Auto-routing ────────────────────────────────────────────────────────
      Wires with no manual bends route themselves: leave the source pin along
@@ -1027,12 +1045,23 @@ defineModule('engine', ['state'], (state) => {
     }
     // Full resolved polyline for a wire: manual bends if it has any,
     // otherwise a freshly auto-routed path.
+    // A tap leaves its wire at right angles, but on whichever side the far
+    // end actually is — always going down/right made a branch to something
+    // above a wire dip under it and double back through it.
+    function terminalDirToward(term, target, depth = 0) {
+      const d = terminalDir(term, depth);
+      if (!isTap(term) || !target) return d;
+      const a = terminalCoords(term, depth);
+      if (d.y && (target.y - a.y) * d.y < 0) return { x:0, y:-d.y };
+      if (d.x && (target.x - a.x) * d.x < 0) return { x:-d.x, y:0 };
+      return d;
+    }
     function wirePoints(wire, depth = 0) {
       const a = terminalCoords(wire.from, depth);
       const b = terminalCoords(wire.to, depth);
       const mids = (wire.points && wire.points.length)
         ? wire.points
-        : autoRoute(a, terminalDir(wire.from, depth), b, terminalDir(wire.to, depth));
+        : autoRoute(a, terminalDirToward(wire.from, b, depth), b, terminalDir(wire.to, depth));
       return resolveWire(a.x, a.y, b.x, b.y, mids);
     }
 
@@ -1170,12 +1199,31 @@ defineModule('engine', ['state'], (state) => {
       }
     }
 
-    // Deleting a wire takes its branches with it — a tap has no meaning
-    // without the wire it taps.
+    // Is this still something a wire can be driven from?
+    function sourceAlive(term) {
+      if (isPin(term)) {
+        const c = components.get(term.compId), def = c && GATE_DEFS[c.kind];
+        return !!def && term.pin >= 0 && term.pin < def.outputs;
+      }
+      return isTap(term) && wires.has(term.wireId);
+    }
+
+    // Removing a wire only disconnects the input *it* runs to. Branches that
+    // tapped it were fed by the same source, so they're re-attached to that
+    // source (the output pin, or the junction the wire itself started from)
+    // instead of vanishing along with it — which used to happen whenever an
+    // input was re-wired or the part at the far end was deleted. Only when
+    // the source itself is gone do the branches go too.
     function removeWire(id) {
-      if (!wires.has(id)) return;
+      const gone = wires.get(id);
+      if (!gone) return;
       wires.delete(id);
-      for (const [wid,w] of [...wires]) if (isTap(w.from) && w.from.wireId === id) removeWire(wid);
+      const keep = sourceAlive(gone.from);
+      for (const [wid,w] of [...wires]) {
+        if (!isTap(w.from) || w.from.wireId !== id) continue;
+        if (keep) w.from = { ...gone.from };
+        else removeWire(wid);
+      }
       // The signal table itself is reconciled against live topology on the
       // next step(), so there's nothing to clean up here.
     }
@@ -1448,17 +1496,62 @@ defineModule('engine', ['state'], (state) => {
         components.set(c.id, c);
         if (c.ioId) ioComponents.set(c.ioId, c);
       }
+      // Never mint an id that's already taken: a hand-edited or pasted
+      // circuit can carry a stale (or no) nextId.
+      const idNum = (k) => Number(String(k).replace(/^\D+/, '')) || 0;
+      const maxWireId = Math.max(0, ...(data.wires || []).map(w => idNum(w && w.id)));
+      nextId   = Math.max(data.nextId || 1, nextId, maxWireId + 1,
+                          ...[...components.keys()].map(k => idNum(k) + 1));
+      nextIoId = Math.max(data.nextIoId || 1, nextIoId,
+                          ...[...ioComponents.keys()].map(k => idNum(k) + 1));
       for (const wd of migrateWires(data)) {
         const from = wd.from && wd.from.compId ? { ...wd.from, type:'out' } : wd.from;
-        wires.set(wd.id, { id:wd.id, from, to:wd.to, points:wd.points||[], label:wd.label||'' });
+        const id = wd.id && !wires.has(wd.id) ? wd.id : 'w' + (nextId++);
+        wires.set(id, { id, from, to:wd.to, points:Array.isArray(wd.points) ? wd.points : [], label:wd.label||'' });
       }
-      nextId = Math.max(data.nextId || 1, nextId);
-      nextIoId = Math.max(data.nextIoId || 1, nextIoId);
+      sanitizeWires();
+    }
+
+    // Loaded circuits come from files, slide config and old versions, so
+    // don't trust their wiring: drop wires whose ends point at parts or pins
+    // that don't exist, branches off wires that don't exist, and branch
+    // loops (A taps B taps A — they have no source and would otherwise send
+    // the geometry code round in circles). Then enforce one driver per
+    // input, keeping the last one listed, as addWire would have.
+    function sanitizeWires() {
+      const pinOk = (t, side) => {
+        if (!isPin(t)) return false;
+        const c = components.get(t.compId), def = c && GATE_DEFS[c.kind];
+        return !!def && Number.isInteger(t.pin) && t.pin >= 0 && t.pin < (side === 'in' ? def.inputs : def.outputs);
+      };
+      const rooted = (w) => {
+        const seen = new Set([w.id]);
+        let t = w.from;
+        while (isTap(t)) {
+          if (seen.has(t.wireId) || !wires.has(t.wireId)) return false;
+          seen.add(t.wireId);
+          t = wires.get(t.wireId).from;
+        }
+        return pinOk(t, 'out');
+      };
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const [id, w] of [...wires]) {
+          if (!pinOk(w.to, 'in') || !rooted(w)) { wires.delete(id); changed = true; }
+        }
+      }
+      const driverOf = new Map();
+      for (const w of [...wires.values()]) {
+        const k = w.to.compId + ':' + w.to.pin;
+        if (driverOf.has(k)) removeWire(driverOf.get(k));
+        driverOf.set(k, w.id);
+      }
     }
 
     return {
       components, wires, ioComponents, signals,
-      isPin, isTap, sigKey,
+      isPin, isTap, sigKey, terminalDirToward,
       terminalCoords, terminalDir, wirePoints, rootSignalOf, topology, wireIntoInput,
       connectionProblem,
       addComponent, removeComponent, addWire, removeWire,
@@ -1518,7 +1611,7 @@ defineModule('engine', ['state'], (state) => {
 
   return {
     GATE_DEFS, GRID, snapGridVal, GLOBAL_TICK_MS, snapToGlobalTick,
-    pinAbs, pinOutDir, rotDir, FACE_ROT, flipAxis,
+    pinAbs, pinOutDir, rotDir, FACE_ROT, flipAxis, snapOntoPoly,
     resolveWire, pathD, polyLength, samplePoly, distToSeg, projectOnPoly, autoRoute,
     createCircuit,
     BIT_CAPABLE, MAX_BITS, clampBits, bitMask, formatBits, parseBits, busBaseOf,
@@ -1555,10 +1648,17 @@ defineModule('gates', ['state', 'engine'], (state, engine) => {
     const usable = h - PIN_MARGIN*2;
     return Array.from({length:n}, (_,i)=>snap20(PIN_MARGIN + usable*i/(n-1)));
   }
-  // How tall a box needs to be to fit n pins at that spacing, snapped to the
-  // 40px grid gates are normally sized on.
+  // How tall a box needs to be for n pins. Up to 8 pins get exactly two
+  // grid cells each (h = 40n), which makes pinYs space them a clean, even
+  // 40px apart — the old 30px target, snapped to the 20px grid, left an
+  // 8-input gate with a lumpy mix of 20px and 40px gaps. Past 8 (16-bit
+  // buses, a 16-way MUX) that would get unwieldy, so those keep the tighter
+  // packing.
+  const PIN_PITCH = 40;
   function boxHeightFor(n) {
-    return Math.ceil(Math.max(H, PIN_MARGIN*2 + (Math.max(n,1)-1)*PIN_GAP)/40)*40;
+    n = Math.max(n, 1);
+    if (n <= 8) return Math.max(H, n*PIN_PITCH);
+    return Math.ceil(Math.max(H, PIN_MARGIN*2 + (n-1)*PIN_GAP)/40)*40;
   }
 
   // Fills left-to-right while a pending output counts down a component's own
@@ -1605,6 +1705,13 @@ defineModule('gates', ['state', 'engine'], (state, engine) => {
   const MUX_DIAG = 18;
   const dMUX  = (h)=>`M ${BX} 8 L ${W-BX} ${8+MUX_DIAG} V ${h-8-MUX_DIAG} L ${BX} ${h-8} Z`;
   const bubble= (cx,cy,edge,f)=><circle cx={cx} cy={cy} r="5" fill={f} stroke={edge} strokeWidth={STROKE}/>;
+  // How far in from the box edge the curved back of an OR-family gate sits
+  // at height y. Both back curves above are quadratics whose control point
+  // is at mid-height, so y runs linearly with t and x = x0 + 30·t(1−t).
+  // Input stubs are run in to meet it: at a fixed 12px they stopped short
+  // of the curve on every pin but the outermost two, which is most of them
+  // on a 4- or 8-input gate.
+  const backX = (x0, y, h)=>{ const t = Math.min(1, Math.max(0, (y-8)/(h-16))); return x0 + 30*t*(1-t); };
 
   // Builds the VIS entry for one (base, inputCount) pair — n data inputs
   // for AND/OR/etc., n data lines (plus however many select bits they need)
@@ -1628,7 +1735,14 @@ defineModule('gates', ['state', 'engine'], (state, engine) => {
               {ys.map((y,i)=><text key={i} x={BX+7} y={y+4} fontFamily="var(--mono)" fontSize="8" fill="var(--ink)" opacity=".4">{i}</text>)}
             </g>,
     };
-    const inputs = base === 'MUX' ? [...ys.map(y=>({x:0,y})), {x:W*.5,y:0,dir:'up'}] : ys.map(y=>({x:0,y}));
+    // OR/NOR run in to the body's curved back (tucked 1px under its
+    // outline, which is drawn over the stub); XOR/XNOR stop on the separate
+    // input arc in front of it, as the symbol is conventionally drawn.
+    const reach = (y)=>
+      (base === 'OR' || base === 'NOR')    ? backX(BX, y, h) + 1 :
+      (base === 'XOR' || base === 'XNOR')  ? backX(BX-6, y, h) :
+      undefined;
+    const inputs = base === 'MUX' ? [...ys.map(y=>({x:0,y})), {x:W*.5,y:0,dir:'up'}] : ys.map(y=>({x:0,y,reach:reach(y)}));
     return { w:W, h, inputs, outputs:[{x:W,y:yo}], body: bodies[base] };
   }
 
@@ -1749,7 +1863,12 @@ defineModule('gates', ['state', 'engine'], (state, engine) => {
       </g>;
     } };
 
-  VIS.OUTPUT = { w:64, h:40, inputs:[{x:0,y:20}], outputs:[],
+  // 80 wide (was 64) purely so the box obeys the grid rule every part
+  // follows: w and h both multiples of 20 and differing by a multiple of 40,
+  // which is what keeps every pin on the grid once the part is turned about
+  // its centre. The artwork is unchanged; the extra width just takes in the
+  // label that already sat there.
+  VIS.OUTPUT = { w:80, h:40, inputs:[{x:0,y:20}], outputs:[],
     body:(f,comp)=>{
       const bits = comp.bits || 1;
       const on = comp.inputVals[0];
@@ -1789,23 +1908,32 @@ defineModule('gates', ['state', 'engine'], (state, engine) => {
      their historical segment mapping (0=g, 1=f, 2=a, 3=b, 4=e, 5=d, 6=c) and
      their slot positions, so circuits saved against the old artwork still
      light up the segments they used to. */
-  const S7 = { w:60, h:80 };
+  //
+  // 100×140 (was 60×80): at the old size the pins sat 12px apart, off the
+  // grid. At this width the same slots (20/40/60/80% across) land exactly
+  // on grid lines 20px apart, and the height keeps the box turnable on the
+  // grid (see VIS.OUTPUT). The digit is laid out from the box rather than
+  // hard-coded, in the same proportions as before.
+  const S7 = { w:100, h:140 };
   VIS.SEVEN = { w:S7.w, h:S7.h,
-    inputs:[{x:S7.w*0.2,y:0,dir:'up'},{x:S7.w*0.4,y:0,dir:'up'},{x:S7.w*0.6,y:0,dir:'up'},{x:S7.w*0.8,y:0,dir:'up'},
-            {x:S7.w*0.2,y:S7.h,dir:'down'},{x:S7.w*0.4,y:S7.h,dir:'down'},{x:S7.w*0.6,y:S7.h,dir:'down'}],
+    // Slot k of 5 across the top/bottom edge. Built as (w/5)·k, not w·0.2k:
+    // 100*0.6 is 60.00000000000001 in floating point, which would put the
+    // pin a hair off the grid and break exact-match wire routing.
+    inputs:[1,2,3,4].map(k=>({x:S7.w/5*k, y:0, dir:'up'}))
+      .concat([1,2,3].map(k=>({x:S7.w/5*k, y:S7.h, dir:'down'}))),
     outputs:[],
     body:(f,comp)=>{
       const lit = (i)=>!!comp.inputVals[i];
-      const T = 4.6, R = 2.3;                       // segment thickness, radius
-      const L = 18.4, Rt = 41.6, Mid = 40;          // left / right / middle
-      const Top = 19, Bot = 61;
+      const T = 7.5, R = T/2;                       // segment thickness, radius
+      const L = S7.w*0.307, Rt = S7.w*0.693;        // left / right
+      const Mid = S7.h/2, Top = S7.h*0.24, Bot = S7.h*0.76;
       const bar = (i, x, y, w, h)=><rect key={i} x={x} y={y} width={w} height={h} rx={R}
         fill={lit(i) ? 'var(--high)' : 'var(--border-md)'} opacity={lit(i) ? 1 : .5}/>;
       const hBar = (i, y)=>bar(i, L + T*0.6, y - T/2, (Rt - L) - T*1.2, T);
       const vBar = (i, y0, y1)=>bar(i, L - T/2, y0 + T*0.6, T, (y1 - y0) - T*1.2);
       const vBarR = (i, y0, y1)=>bar(i, Rt - T/2, y0 + T*0.6, T, (y1 - y0) - T*1.2);
       return <g>
-        <rect x="3" y="9" width={S7.w-6} height={S7.h-18} rx="8"
+        <rect x="3" y="9" width={S7.w-6} height={S7.h-18} rx="12"
               fill="var(--panel-2)" stroke="var(--border-hi)" strokeWidth="2"/>
         {hBar(2, Top)}{hBar(0, Mid)}{hBar(5, Bot)}
         {vBar(1, Top, Mid)}{vBar(4, Mid, Bot)}
@@ -1859,28 +1987,36 @@ defineModule('gates', ['state', 'engine'], (state, engine) => {
   // without crowding either — the whole reason someone reaches for a
   // register instead of a flip-flop is to watch a bus's worth of state, so
   // that value (and what it's measured in) belongs front and center.
+  //
+  // Heights are 140/180 (were 130/170): with a 100px width, w − h has to be
+  // a multiple of 40 for the pins to stay on the grid when the part is
+  // turned up or down (see VIS.OUTPUT). SHIFT's outputs move from y 25/65 —
+  // off the grid even unturned — to 20/60, level with SI and ▷.
   const REG_W = 100;
-  VIS.REG  = { w:REG_W,h:130, inputs:[{x:0,y:20},{x:0,y:60}], outputs:[{x:REG_W,y:40}],
-    body:(f,comp,e)=><g>{pendingBar(comp)}{ffRect(f,130,e,REG_W)}
+  VIS.REG  = { w:REG_W,h:140, inputs:[{x:0,y:20},{x:0,y:60}], outputs:[{x:REG_W,y:40}],
+    body:(f,comp,e)=><g>{pendingBar(comp)}{ffRect(f,140,e,REG_W)}
       {ffTxt(14,25,'D')}{ffTxt(14,65,'▷')}{ffTxtR(REG_W-14,45,'Q')}
-      {ffCap('REG',comp.bits||1,86,REG_W)}{ffVal(comp,106,REG_W)}</g> };
-  VIS.LOAD = { w:REG_W,h:170, inputs:[{x:0,y:20},{x:0,y:60},{x:0,y:100}], outputs:[{x:REG_W,y:40}],
-    body:(f,comp,e)=><g>{pendingBar(comp)}{ffRect(f,170,e,REG_W)}
+      {ffCap('REG',comp.bits||1,94,REG_W)}{ffVal(comp,114,REG_W)}</g> };
+  VIS.LOAD = { w:REG_W,h:180, inputs:[{x:0,y:20},{x:0,y:60},{x:0,y:100}], outputs:[{x:REG_W,y:40}],
+    body:(f,comp,e)=><g>{pendingBar(comp)}{ffRect(f,180,e,REG_W)}
       {ffTxt(14,25,'D')}{ffTxt(14,65,'LD')}{ffTxt(14,105,'▷')}{ffTxtR(REG_W-14,45,'Q')}
-      {ffCap('LOAD',comp.bits||1,124,REG_W)}{ffVal(comp,144,REG_W)}</g> };
-  VIS.SHIFT = { w:REG_W,h:130, inputs:[{x:0,y:20},{x:0,y:60}], outputs:[{x:REG_W,y:25},{x:REG_W,y:65}],
-    body:(f,comp,e)=><g>{pendingBar(comp)}{ffRect(f,130,e,REG_W)}
-      {ffTxt(14,25,'SI')}{ffTxt(14,65,'▷')}{ffTxtR(REG_W-14,29,'Q')}{ffTxtR(REG_W-14,69,'SO')}
-      {ffCap('SHIFT',comp.bits||1,86,REG_W)}{ffVal(comp,106,REG_W)}</g> };
+      {ffCap('LOAD',comp.bits||1,132,REG_W)}{ffVal(comp,152,REG_W)}</g> };
+  VIS.SHIFT = { w:REG_W,h:140, inputs:[{x:0,y:20},{x:0,y:60}], outputs:[{x:REG_W,y:20},{x:REG_W,y:60}],
+    body:(f,comp,e)=><g>{pendingBar(comp)}{ffRect(f,140,e,REG_W)}
+      {ffTxt(14,25,'SI')}{ffTxt(14,65,'▷')}{ffTxtR(REG_W-14,25,'Q')}{ffTxtR(REG_W-14,65,'SO')}
+      {ffCap('SHIFT',comp.bits||1,94,REG_W)}{ffVal(comp,114,REG_W)}</g> };
 
   /* ── pin stubs ─────────────────────────────────────────────────────────
      Each stub normally points 'left' (inputs) or 'right' (outputs) toward
      the body, but a pin can override with its own `dir` to poke out another
      side — e.g. a mux select facing 'up' — independent of gate facing. */
   const PIN_DIR_VEC = { left:[-1,0], right:[1,0], up:[0,-1], down:[0,1] };
+  // `reach` lets a pin run its stub further in than the usual 12px, to meet
+  // a body edge that isn't straight (see backX).
   function pinStub(p, defaultDir) {
     const [dx,dy] = PIN_DIR_VEC[p.dir || defaultDir];
-    return { x1:p.x-dx*12, y1:p.y-dy*12, x2:p.x, y2:p.y };
+    const len = p.reach || 12;
+    return { x1:p.x-dx*len, y1:p.y-dy*len, x2:p.x, y2:p.y };
   }
 
   /* ── orientation ───────────────────────────────────────────────────────
@@ -2105,7 +2241,10 @@ defineModule('gates', ['state', 'engine'], (state, engine) => {
      · Click / release on a pin     → connect
      · Backspace                    → undo the last corner
      · Esc or right-click           → cancel
-     · Drag off an existing wire    → branch from it (a junction tap)
+     · Drag off an existing wire    → branch from it (a junction tap);
+       or click it once to select it,   click it again to start the branch there
+     · Click a wire while drawing from an input pin
+                                    → connect that input to the wire
 
    Wires can't be left dangling in mid-air: every wire runs pin-to-pin, which
    is what makes "one net = one hop" a well-defined unit of delay. */
@@ -2115,7 +2254,7 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
 const { GATE_VIS, GateBody, orientT, toggleHit } = gates;
 const {
   GATE_DEFS, GRID, resolveWire, pathD, polyLength, samplePoly,
-  projectOnPoly, autoRoute, pinAbs, pinOutDir,
+  projectOnPoly, snapOntoPoly, autoRoute, pinAbs, pinOutDir,
 } = engine;
 
 const snap = (v, on=true) => on ? Math.round(v/GRID)*GRID : v;
@@ -2260,9 +2399,12 @@ function Canvas({
   const problemWith = useCallback((from, term) => {
     if (!from) return 'no wire in progress';
     if (circuit.isPin(from) && from.type === 'in') {
-      if (term.type !== 'out') return 'that end needs an output pin';
+      // Ending on a wire means "feed this input from whatever drives that".
+      if (circuit.isTap(term)) return circuit.connectionProblem(term, from);
+      if (term.type !== 'out') return 'that end needs an output pin or a wire';
       return circuit.connectionProblem(term, from);
     }
+    if (circuit.isTap(term)) return 'a wire has to end on an input pin';
     return circuit.connectionProblem(from, term);
   },[circuit]);
 
@@ -2373,8 +2515,14 @@ function Canvas({
         bendDragRef.current = null;
       }
       if (tapPendRef.current) {
-        cbRef.current.onSelect?.(tapPendRef.current.wireId);
-        tapPendRef.current = null;
+        const t = tapPendRef.current; tapPendRef.current = null;
+        // Same click-to-start rhythm as a pin, but the first click on a wire
+        // still just selects it (it has to — that's how you label or delete
+        // one); a second click on the selected wire starts the branch.
+        if (t.wasSelected && circuit.wires.has(t.wireId)) {
+          const wf = { from:{ wireId:t.wireId, x:t.x, y:t.y }, bends:[] };
+          wiringRef.current = wf; setWiring(wf);
+        } else cbRef.current.onSelect?.(t.wireId);
       }
       panRef.current = null;
       setIsPanning(false);
@@ -2426,21 +2574,25 @@ function Canvas({
     return ()=>el.removeEventListener('wheel', onWheel);
   },[]);
 
+  // Drop a corner on the in-progress wire and keep going.
+  const addBend = (w)=>{
+    const wf = wiringRef.current;
+    if (!wf) return;
+    const p = { x:snap(w.x), y:snap(w.y) };
+    const last = wf.bends[wf.bends.length-1];
+    if (!last || last.x !== p.x || last.y !== p.y) {
+      const next = { ...wf, bends:[...wf.bends, p] };
+      wiringRef.current = next; setWiring(next);
+    }
+  };
+  const drawingFromInput = (wf)=> !!wf && circuit.isPin(wf.from) && wf.from.type === 'in';
+
   const onBgMouseDown = (e)=>{
     if (e.button === 2) { if (wiringRef.current) cancelWiring(); return; }
     const isBg = e.target === svgRef.current || e.target.classList?.contains('canvas-bg');
     if (!isBg) return;
     const wf = wiringRef.current;
-    if (wf && e.button === 0) {
-      // Drop a corner and keep wiring.
-      const p = { x:snap(cursor.x), y:snap(cursor.y) };
-      const last = wf.bends[wf.bends.length-1];
-      if (!last || last.x !== p.x || last.y !== p.y) {
-        const next = { ...wf, bends:[...wf.bends, p] };
-        wiringRef.current = next; setWiring(next);
-      }
-      return;
-    }
+    if (wf && e.button === 0) { addBend(screenToWorld(e.clientX, e.clientY)); return; }
     if (e.button !== 0 && e.button !== 1) return;
     panRef.current = { sx:e.clientX, sy:e.clientY, vx:view.x, vy:view.y };
     setIsPanning(true);
@@ -2519,10 +2671,31 @@ function Canvas({
   const onWireMouseDown = (e, wire, path)=>{
     if (e.button === 2) return;
     e.stopPropagation();
-    if (wiringRef.current) { reject('a wire has to end on an input pin'); return; }
     const w = screenToWorld(e.clientX, e.clientY);
-    const pr = projectOnPoly(path, w.x, w.y);
-    tapPendRef.current = { wireId:wire.id, x:pr.point.x, y:pr.point.y, sx:e.clientX, sy:e.clientY };
+    const pt = snapOntoPoly(path, w.x, w.y).point;
+    const wf = wiringRef.current;
+    if (wf) {
+      // Drawing from an input: the wire is a legitimate place to finish —
+      // the input joins that wire's net. Drawing from an output (or off
+      // another wire) it can't be, since that would give the wire two
+      // drivers; a click there just drops a corner, like empty board would,
+      // rather than refusing — wires are often simply in the way.
+      if (drawingFromInput(wf)) finishWire({ wireId:wire.id, x:pt.x, y:pt.y });
+      else addBend(w);
+      return;
+    }
+    tapPendRef.current = { wireId:wire.id, x:pt.x, y:pt.y, sx:e.clientX, sy:e.clientY,
+                           wasSelected: selection === wire.id };
+  };
+  // Press on an input pin, drag, let go over a wire: same as clicking it.
+  const onWireMouseUp = (e, wire, path)=>{
+    const wf = wiringRef.current;
+    if (!drawingFromInput(wf) || !wf.startS) return;
+    if (Math.hypot(e.clientX-wf.startS.x, e.clientY-wf.startS.y) <= DRAG_SLOP) return;
+    e.stopPropagation();
+    const w = screenToWorld(e.clientX, e.clientY);
+    const pt = snapOntoPoly(path, w.x, w.y).point;
+    finishWire({ wireId:wire.id, x:pt.x, y:pt.y });
   };
   const onWireContext = (e, wireId)=>{
     e.preventDefault(); e.stopPropagation();
@@ -2569,13 +2742,18 @@ function Canvas({
         wiringTail = p;
         wiringTailValid = !problem;
       }
+    } else if (hover.wire && drawingFromInput(wiring) && paths.get(hover.wire)) {
+      // Show exactly where the input would join the wire under the cursor.
+      const pt = snapOntoPoly(paths.get(hover.wire), cursor.x, cursor.y).point;
+      wiringTail = pt;
+      wiringTailValid = !problemWith(wiring.from, { wireId:hover.wire, x:pt.x, y:pt.y });
     } else wiringTail = { x:snap(cursor.x), y:snap(cursor.y) };
   }
 
   const wiringPreview = (()=>{
     if (!wiring) return null;
     const a = circuit.terminalCoords(wiring.from);
-    const dir = circuit.terminalDir(wiring.from);
+    const dir = circuit.terminalDirToward(wiring.from, wiringTail);
     const mids = wiring.bends.length
       ? wiring.bends
       : [{ x:snap(a.x+dir.x*GRID), y:snap(a.y+dir.y*GRID) }];
@@ -2657,6 +2835,7 @@ function Canvas({
             <path data-x="1" d={d} fill="none" stroke="transparent" strokeWidth="14"
                   style={{ cursor: wiring ? 'crosshair' : 'cell' }}
                   onMouseDown={e=>onWireMouseDown(e,w,path)}
+                  onMouseUp={e=>onWireMouseUp(e,w,path)}
                   onMouseEnter={()=>setHover(h=>({...h, wire:w.id}))}
                   onMouseLeave={()=>setHover(h=>(h.wire===w.id?{...h, wire:null}:h))}
                   onContextMenu={e=>onWireContext(e,w.id)}/>
@@ -2814,7 +2993,7 @@ function Canvas({
 
     {wiring && <div className="wiring-badge">
       <span>{circuit.isTap(wiring.from) ? 'Branching from wire' : 'Drawing wire'}</span>
-      <kbd>click pin</kbd><span style={{opacity:.5}}>connect</span>
+      <kbd>{drawingFromInput(wiring) ? 'click pin or wire' : 'click pin'}</kbd><span style={{opacity:.5}}>connect</span>
       <kbd>Esc</kbd><span style={{opacity:.5}}>cancel</span>
     </div>}
 
@@ -3797,6 +3976,7 @@ function App() {
       <ul className="hint-list">
         <li><kbd className="key">knob</kbd><span>click a switch’s knob to flip it, a clock’s pad to run or halt it</span></li>
         <li><kbd className="key">body</kbd><span>click the rest of a part to select and configure it</span></li>
+        <li><kbd className="key">wire</kbd><span>drag off a wire, or click a selected wire, to branch from that point · draw from an input and click a wire to join it</span></li>
         <li><kbd className="key">scroll</kbd><span>zoom · drag empty space to pan</span></li>
         <li><kbd className="key">right-click</kbd><span>delete a part or a wire outright</span></li>
       </ul>
