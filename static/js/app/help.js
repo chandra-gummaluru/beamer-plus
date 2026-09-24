@@ -56,7 +56,7 @@ export function showHelpModal({ onStartTour = null } = {}) {
 <h4 class="help-h">Focus mode</h4>
 <p class="help-p">Click ${_hbtn('focus','Focus mode')} in the top-right to hide all UI and show only the slide. Press ${_hic('Esc')} to exit.</p>
 <h4 class="help-h">Annotation tools</h4>
-<p class="help-p">The floating toolbar on the left lets you draw directly on slides. Annotations are saved per slide.</p>
+<p class="help-p">The floating toolbar on the right lets you draw directly on slides. Annotations are saved per slide. Drag the dotted grip at its top to move it anywhere on screen; double-click the grip to put it back.</p>
 <ul class="help-ul">
   <li>${_hbtn('hand','Hand')} <strong>Hand</strong>: default mode, no drawing.</li>
   <li>${_hbtn('spotlight','Spotlight')} <strong>Spotlight</strong>: dims the slide and highlights your cursor position.</li>

@@ -408,3 +408,87 @@ body.text-tool-active #ann-canvas-2 {
 /* Ensure annotation panel toggle (legacy) stays hidden — we use the unified rail now */
 #annotation-panel-toggle,
 #floating-annotation-panel { display: none !important; }
+
+/* ============================================================
+   Draggable toolbar — grip + moved-state flyout placement
+   (see initToolbarDrag in annotations/toolbar.js)
+   ============================================================ */
+#annotation-toolbar-grip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    align-self: stretch;
+    height: 14px;
+    margin: calc(-1 * var(--sp-1)) 0 calc(-1 * var(--sp-1));
+    color: var(--ink-3);
+    border-radius: var(--r-md);
+    cursor: grab;
+    touch-action: none;          /* pointer events, not scroll, on touch */
+    user-select: none;
+    -webkit-user-select: none;
+    flex: none;
+}
+#annotation-toolbar-grip:hover,
+#annotation-toolbar-grip:focus-visible { color: var(--ink-1); background: var(--surface-cream-2); }
+#annotation-toolbar-grip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+#floating-annotation-toolbar.is-dragging { box-shadow: var(--shadow-3), 0 0 0 1px var(--accent); }
+#floating-annotation-toolbar.is-dragging,
+#floating-annotation-toolbar.is-dragging #annotation-toolbar-grip { cursor: grabbing; }
+
+/* Horizontal layouts: the grip becomes a vertical strip at the left end. */
+body.split-view-active #annotation-toolbar-grip {
+    height: auto;
+    width: 14px;
+    align-self: stretch;
+    margin: 0 calc(-1 * var(--sp-1)) 0 0;
+}
+body.split-view-active #annotation-toolbar-grip svg { transform: rotate(90deg); }
+@media (max-width: 1024px) {
+    #annotation-toolbar-grip {
+        height: auto;
+        width: 14px;
+        margin: 0 calc(-1 * var(--sp-1)) 0 0;
+    }
+    #annotation-toolbar-grip svg { transform: rotate(90deg); }
+}
+
+/* Once moved, the text-size flyout follows the toolbar instead of its fixed
+   default spot. Vertical rail: flyout to the left (right when flipped). */
+body.ann-toolbar-moved #text-size-sidebar,
+body.ann-toolbar-moved #shape-sidebar {
+    top: var(--ann-tb-cy);
+    left: var(--ann-tb-left);
+    right: auto;
+    bottom: auto;
+    transform: translate(calc(-100% - var(--sp-3)), -50%);
+}
+body.ann-toolbar-moved.ann-toolbar-flip #text-size-sidebar,
+body.ann-toolbar-moved.ann-toolbar-flip #shape-sidebar {
+    left: var(--ann-tb-right);
+    transform: translate(var(--sp-3), -50%);
+}
+/* Horizontal bar: flyout below (above when flipped). */
+body.ann-toolbar-moved.split-view-active #text-size-sidebar,
+body.ann-toolbar-moved.split-view-active #shape-sidebar {
+    top: var(--ann-tb-bottom);
+    left: var(--ann-tb-cx);
+    transform: translate(-50%, var(--sp-3));
+}
+body.ann-toolbar-moved.split-view-active.ann-toolbar-flip #text-size-sidebar,
+body.ann-toolbar-moved.split-view-active.ann-toolbar-flip #shape-sidebar {
+    top: var(--ann-tb-top);
+    transform: translate(-50%, calc(-100% - var(--sp-3)));
+}
+@media (max-width: 1024px) {
+    body.ann-toolbar-moved #text-size-sidebar,
+    body.ann-toolbar-moved #shape-sidebar {
+        top: var(--ann-tb-bottom);
+        left: var(--ann-tb-cx);
+        transform: translate(-50%, var(--sp-3));
+    }
+    body.ann-toolbar-moved.ann-toolbar-flip #text-size-sidebar,
+    body.ann-toolbar-moved.ann-toolbar-flip #shape-sidebar {
+        top: var(--ann-tb-top);
+        transform: translate(-50%, calc(-100% - var(--sp-3)));
+    }
+}
