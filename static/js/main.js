@@ -18,7 +18,7 @@ import { initTextAnnotations, wireTextCanvas, commitOpenTextEditor,
 
 import { initNavigator } from './slides/navigator.js';
 import { initThumbnails } from './slides/thumbnails.js';
-import { initSlideStructure, getSlideLabels } from './slides/structure.js';
+import { initSlideStructure, getSlideLabels, slideUid } from './slides/structure.js';
 import { initSpotlight, hideSpotlight, renderSpotlight,
          setWidgetInteractivityForSpotlight } from './slides/spotlight.js';
 import { initMedia, renderMedia, updateMediaPositions, resetMediaCache } from './slides/media.js';
@@ -903,7 +903,12 @@ async function renderLogicalSlide(logicalIndex, isRight = false, suppressOverlay
     if (!cvs || !annCvs) return;
 
     // ── Park widgets from the slide currently in this container ───────────
-    const newSlideKey = (isRight ? 'R' : 'L') + logicalIndex;
+    // Keyed by pane + the slide's own identity, never its position: a
+    // position-based key ("L3") went stale on every reorder or insert, which
+    // handed one slide's parked widgets to whichever slide moved into that
+    // position — where they were torn down as "not in this slide's config"
+    // and the real owner had to start its widgets from scratch.
+    const newSlideKey = (isRight ? 'R:' : 'L:') + slideUid(obj);
     const prevSlideKey = slideContainer?.dataset?.slideKey;
     if (slideContainer && prevSlideKey != null) {
         parkWidgets(slideContainer, prevSlideKey);
@@ -1037,9 +1042,13 @@ let annotationSyncTimer = null;
 function syncAnnotations() {
     clearTimeout(annotationSyncTimer);
     const cvs = activeAnnCvs();
-    const idx = activeAnnSlide();
+    // Remember the slide, not its position: if the deck is reordered (or a
+    // slide inserted) inside the debounce window, the old position belongs
+    // to a different slide by the time this fires.
+    const slide = state.slideStructure[activeAnnSlide()];
     annotationSyncTimer = setTimeout(() => {
-        state.annotations[idx] = cvs.canvas.toDataURL('image/png');
+        const idx = state.slideStructure.indexOf(slide);
+        if (idx >= 0) state.annotations[idx] = cvs.canvas.toDataURL('image/png');
     }, 100);
 }
 
@@ -1272,14 +1281,27 @@ bus.on('editor:exited', () => renderLogicalSlide(state.currentSlide, false, fals
 
 /* ─── editor: slide reorder ───────────────────────────────────── */
 bus.on('slides:reordered', async () => {
-    // Slide indices changed — parked widgets are keyed by old indices, so discard them
-    clearAllParked();
-    const leftCvs = document.getElementById('pdf-canvas');
-    const rightCvs = document.getElementById('pdf-canvas-2');
-    if (leftCvs)  delete leftCvs.dataset.slideKey;
-    if (rightCvs) delete rightCvs.dataset.slideKey;
+    // Every position-keyed map has already been remapped (remapSlideIndices),
+    // and widgets are keyed by slide identity, so there is nothing to throw
+    // away: each widget, visible or parked, keeps its live state. (This used
+    // to call clearAllParked(), which rebooted every widget in the deck and
+    // also dropped the widget states loaded from the ZIP.)
+    //
+    // The slide(s) on stage are the same slides as before, just at new
+    // positions. Re-render them quietly anyway — an in-flight render that
+    // started under the old numbering would otherwise bail out half-done —
+    // after first committing the canvas so the re-render reloads the latest
+    // strokes rather than an older snapshot.
+    saveCurrentAnnotations();
     populateSlideNavigator();
-    await renderLogicalSlide(state.currentSlide);
+    if (state.splitView) {
+        await Promise.all([
+            renderLogicalSlide(state.currentSlide,    false, true),
+            renderLogicalSlide(state.rightSlideIndex, true,  true),
+        ]);
+    } else {
+        await renderLogicalSlide(state.currentSlide, false, true);
+    }
     updateSlideNavigator();
     updateBlankSlideButtons();
 });
@@ -1392,6 +1414,15 @@ export async function loadPdfPresentation(file) {
 
         const zip = new JSZip();
         zip.file('slides.pdf', data);
+
+        // Same teardown as a ZIP load: the previous deck's widgets (visible
+        // or parked) belong to slides that no longer exist.
+        clearAllParked();
+        for (const id of ['pdf-canvas', 'pdf-canvas-2']) {
+            const el = document.getElementById(id);
+            if (el) delete el.dataset.slideKey;
+        }
+
         state.zipFile = zip;
         // Free the previous PDF's worker memory, then reuse the document we
         // just parsed instead of decoding it again on first render.
@@ -1404,6 +1435,7 @@ export async function loadPdfPresentation(file) {
         state.annotations    = {};
         resetAllTextBoxes(state);
         state.bookmarks      = {};
+        if (state.editorNewFiles) state.editorNewFiles = {};
 
         await renderLogicalSlide(0);
         await generateThumbnails();

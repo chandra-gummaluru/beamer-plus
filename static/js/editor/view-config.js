@@ -1,7 +1,7 @@
 // View-slide configuration panel — pick the two pane slides and the divider
 // ratio for a saved split view, or delete the view slide.
 import { bus } from '../core/events.js';
-import { getSlideLabels } from '../slides/structure.js';
+import { getSlideLabels, removeSlideAt } from '../slides/structure.js';
 import { ctx, escAttr, escHtml, setPanelMode, resolvePanelMode } from './context.js';
 
 export function showViewConfig(i) {
@@ -95,34 +95,15 @@ function wireViewConfigHandlers(i, obj) {
     get('view-delete')?.addEventListener('click', () => {
         if (ctx.selectedViewIdx === null) return;
         const delIdx = ctx.selectedViewIdx;
-        ctx.state.slideStructure.splice(delIdx, 1);
-        ctx.state.totalSlides = ctx.state.slideStructure.length;
-        // Adjust any remaining view slides whose pane indices shifted after the deletion
-        for (const obj of ctx.state.slideStructure) {
-            if (obj.type !== 'view') continue;
-            if (obj.left  !== undefined && obj.left  >= delIdx) obj.left  -= 1;
-            if (obj.right !== undefined && obj.right >= delIdx) obj.right -= 1;
-        }
-        // Annotations/bookmarks are keyed by structure index — shift them down too.
-        ctx.state.annotations = _shiftIndexedMapAfterDelete(ctx.state.annotations, delIdx);
-        ctx.state.bookmarks   = _shiftIndexedMapAfterDelete(ctx.state.bookmarks,   delIdx);
-        if (ctx.state.currentSlide > delIdx) ctx.state.currentSlide -= 1;
+        // Close the panel first, so it isn't still pointing at the view while
+        // the remap runs. removeSlideAt shifts everything position-keyed —
+        // including the right pane and text boxes, which the old hand-rolled
+        // shift here missed.
         hideViewConfig();
+        removeSlideAt(delIdx);
         if (ctx.state.splitView) document.getElementById('split-toggle')?.click();
         bus.emit('nav:refresh');
     });
-}
-
-// Shift a structure-index-keyed map ({index: value}) after a deletion at delIdx:
-// the deleted slot's entry is dropped, later entries move down by one.
-function _shiftIndexedMapAfterDelete(map, delIdx) {
-    const out = {};
-    for (const [key, val] of Object.entries(map)) {
-        const k = parseInt(key, 10);
-        if (k === delIdx) continue;
-        out[k > delIdx ? k - 1 : k] = val;
-    }
-    return out;
 }
 
 // Build <option> list from all slides (all types), using structure index as the value.

@@ -1,7 +1,7 @@
 // Save — rebuilds the presentation ZIP from the in-memory state (slide
 // configs, slide order, annotations, widget states, newly added files) and
 // downloads it.
-import { collectWidgetStates } from '../core/iframe-widget-renderer.js';
+import { collectWidgetStates, getLoadedWidgetStates } from '../core/iframe-widget-renderer.js';
 import { requestWidgetFileFlush } from './widget-settings.js';
 import { ctx } from './context.js';
 
@@ -43,21 +43,58 @@ export async function savePresentation() {
         if (ctx.state.annCvs?.canvas) {
             ctx.state.annotations[ctx.state.currentSlide] = ctx.state.annCvs.canvas.toDataURL('image/png');
         }
+        if (ctx.state.splitView && ctx.state.annCvs2?.canvas) {
+            ctx.state.annotations[ctx.state.rightSlideIndex] = ctx.state.annCvs2.canvas.toDataURL('image/png');
+        }
+
+        // Which slide configs belong in the deck: one per PDF page and blank
+        // actually in the structure. A slide deleted this session takes its
+        // config (and its widgets' saved state) with it.
+        const liveKeys = new Set();
+        for (const obj of ctx.state.slideStructure) {
+            if (obj?.type === 'pdf')                  liveKeys.add(String(obj.pdfIndex));
+            else if (obj?.type === 'blank' && obj.blankId) liveKeys.add(String(obj.blankId));
+        }
+        const cfgs = ctx.state.slideConfigs;
+        const inMemory = (key) => Object.prototype.hasOwnProperty.call(cfgs, key) && cfgs[key];
+        const widgetIds = new Set();
+        const noteWidgets = (cfg) => {
+            for (const w of (Array.isArray(cfg?.widgets) ? cfg.widgets : [])) {
+                if (w?.id != null) widgetIds.add(String(w.id));
+            }
+        };
 
         const newZip = new JSZip();
 
         for (const path of Object.keys(ctx.state.zipFile.files)) {
             const f = ctx.state.zipFile.file(path);
             if (!f || f.dir) continue;
-            if (path.startsWith('config/s') && path.endsWith('.json')) continue;
+            // Rewritten below from in-memory state. (Checked before the
+            // config/s*.json pattern — slide-order.json matches it too.)
             if (path === 'config/slide-order.json') continue;
             if (path === 'config/annotations.json') continue;
             if (path === 'config/widget-states.json') continue;
+            const m = /^config\/s(.+)\.json$/.exec(path);
+            if (m) {
+                const key = m[1];
+                if (!liveKeys.has(key)) continue;   // its slide is gone
+                if (inMemory(key)) continue;        // newer copy written below
+                // Configs load lazily, only when a slide is first shown, so
+                // any slide not opened this session has none in memory. Carry
+                // its file over as-is — this used to be skipped, which dropped
+                // every widget, video and model on those slides.
+                const text = await f.async('string');
+                newZip.file(path, text);
+                try { noteWidgets(JSON.parse(text)); } catch (_) { /* kept verbatim anyway */ }
+                continue;
+            }
             newZip.file(path, await f.async('uint8array'));
         }
 
-        for (const [pi, cfg] of Object.entries(ctx.state.slideConfigs)) {
-            if (cfg) newZip.file(`config/s${pi}.json`, JSON.stringify(normalizeWidgetSrcs(cfg), null, 2));
+        for (const [key, cfg] of Object.entries(cfgs)) {
+            if (!cfg || !liveKeys.has(String(key))) continue;
+            newZip.file(`config/s${key}.json`, JSON.stringify(normalizeWidgetSrcs(cfg), null, 2));
+            noteWidgets(cfg);
         }
 
         const isDefault = ctx.state.slideStructure.every((obj, i) => obj.type === 'pdf' && obj.pdfIndex === i);
@@ -71,8 +108,18 @@ export async function savePresentation() {
             newZip.file('config/annotations.json', JSON.stringify(nonEmptyAnnotations));
         }
 
-        // Save widget states so interactive widgets resume where they left off.
-        const widgetStates = await collectWidgetStates(1500);
+        // Save widget states so interactive widgets resume where they left off:
+        // the live state for every widget that's running, and for the rest —
+        // widgets on slides not opened this session — the state they were
+        // loaded with, so a save doesn't reset them. Only widgets still in
+        // the deck are kept.
+        const live = await collectWidgetStates(1500);
+        const loaded = getLoadedWidgetStates();
+        const widgetStates = {};
+        for (const id of widgetIds) {
+            if (live[id] !== undefined)        widgetStates[id] = live[id];
+            else if (loaded[id] !== undefined) widgetStates[id] = loaded[id];
+        }
         if (Object.keys(widgetStates).length > 0) {
             newZip.file('config/widget-states.json', JSON.stringify(widgetStates));
         }

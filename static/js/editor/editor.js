@@ -49,6 +49,18 @@ export function initEditor(state) {
 
     bus.on('slides:loaded', () => { if (ctx.state?.editMode) applySlideReorder(); });
 
+    // The view slide being configured is referenced by position, so it has
+    // to follow a reorder/insert/delete like everything else. Its panel is
+    // rebuilt too: the pane dropdowns are built from positions and labels,
+    // both of which have just changed.
+    bus.on('slides:remapped', (oldToNew) => {
+        if (ctx.selectedViewIdx === null) return;
+        const next = oldToNew(ctx.selectedViewIdx);
+        if (next == null || ctx.state.slideStructure[next]?.type !== 'view') { hideViewConfig(); return; }
+        ctx.selectedViewIdx = next;
+        if (ctx.state.editMode) showViewConfig(next);
+    });
+
     bus.on('slide:changed', () => {
         if (!ctx.state?.editMode) return;
         ctx.selectedOverlay = null;

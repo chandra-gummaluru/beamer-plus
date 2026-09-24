@@ -145,6 +145,15 @@ export function setWidgetStates(states) {
     _savedWidgetStates = (states && typeof states === 'object') ? states : {};
 }
 
+/**
+ * The widget states that came in with the deck. Saving needs them for every
+ * widget that hasn't been opened this session: those have no iframe to ask,
+ * and would otherwise silently lose their saved state on the next save.
+ */
+export function getLoadedWidgetStates() {
+    return { ..._savedWidgetStates };
+}
+
 // ── CSS selector helper ────────────────────────────────────────────────────
 // slideKey values are "L0", "R0", etc. – safe for attribute selectors.
 function _bySlideSel(slideKey) {

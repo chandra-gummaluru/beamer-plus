@@ -434,23 +434,45 @@ body.edit-mode .slide-nav-item.current-slide {
     border-style: dashed;
     opacity: 0.7 !important;
 }
-body.edit-mode .slide-nav-item.dragging { opacity: 0.3 !important; }
+body.edit-mode .slide-nav-item img { -webkit-user-drag: none; }
 
-body.edit-mode .slide-nav-item.drag-over-before { border-top: 3px solid var(--accent); }
-body.edit-mode .slide-nav-item.drag-over-after  { border-bottom: 3px solid var(--accent); }
-
-body.split-view-active.edit-mode .slide-nav-item.drag-over-before {
-    border-top: none;
-    border-left: 3px solid var(--accent);
+/* While a slide is being dragged (see editor/reorder.js): the other
+   thumbnails glide into the order they'd end up in, the dragged slide's own
+   slot becomes an outlined placeholder at its landing spot, and a ghost of
+   it follows the pointer. */
+body.nav-reordering,
+body.nav-reordering * { cursor: grabbing !important; user-select: none; }
+body.nav-reordering #slide-nav-slides .slide-nav-item {
+    transition: transform 180ms var(--ease);
+    box-shadow: none;
 }
-body.split-view-active.edit-mode .slide-nav-item.drag-over-after {
-    border-bottom: none;
-    border-right: 3px solid var(--accent);
+body.edit-mode .slide-nav-item.is-drag-source {
+    opacity: 1 !important;
+    background: var(--accent-soft);
+    border: 2px dashed var(--accent) !important;
+    box-shadow: none !important;
 }
+.slide-nav-item.is-drag-source > * { visibility: hidden; }
+/* body.edit-mode prefix: the ghost is a clone, so it also matches
+   `body.edit-mode .slide-nav-item`, whose !important pointer-events and
+   opacity it has to beat. */
+body.edit-mode .slide-nav-ghost {
+    position: fixed;
+    z-index: 10000;
+    margin: 0;
+    pointer-events: none !important;
+    opacity: 0.95 !important;
+    border-color: var(--accent) !important;
+    box-shadow: var(--shadow-3), 0 0 0 2px var(--accent);
+    transform: rotate(-2deg) scale(1.05);
+    transition: opacity var(--dur-fast), transform var(--dur-fast);
+}
+/* Dragged well off the list: dropping here cancels, so say so. */
+body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: scale(0.92); }
 
-@media (max-width: 1024px) {
-    .slide-nav-item.drag-over-before { border-top: none  !important; border-left:  3px solid var(--accent) !important; }
-    .slide-nav-item.drag-over-after  { border-bottom: none !important; border-right: 3px solid var(--accent) !important; }
+@media (prefers-reduced-motion: reduce) {
+    body.nav-reordering #slide-nav-slides .slide-nav-item { transition: none; }
+    body.edit-mode .slide-nav-ghost { transform: none; transition: none; }
 }
 
 /* ─── Widget picker modal ────────────────────────────────────── */
