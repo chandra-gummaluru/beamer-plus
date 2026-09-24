@@ -106,7 +106,6 @@ button { font-family:inherit; }
 .seg-btn:hover { background:var(--bg-subtle); color:var(--text); }
 .seg-btn.on { background:var(--text); color:var(--bg); font-weight:500; }
 
-.zoom-val { font-family:var(--font-mono); font-size:11px; color:var(--text-2); min-width:40px; text-align:center; }
 
 /* ───────────────────────── palette ───────────────────────── */
 .palette {
@@ -829,16 +828,35 @@ defineModule('engine', ['state'], (state) => {
 
   function visOf(kind) { return window.Modules.gates.GATE_VIS[kind]; }
 
+  // `flip` mirrors a part top-to-bottom in its own frame, before `facing`
+  // turns it. Rotation alone can't reorder the pins down a side (and 'left'
+  // is itself a mirror, so four facings × flip reaches all eight
+  // orientations), which is what a flip is for: bit 0 at the bottom of a
+  // SPLIT, a MUX select pointing down, a flip-flop's clock on top.
+  //
+  // The mirror line is the box's mid-height snapped to the grid, not its
+  // exact middle: a few boxes (REG, LOAD, SHIFT) aren't a whole number of
+  // grid cells tall, and mirroring about their true middle would knock
+  // every pin 10px off the grid. The body is drawn about the same line.
+  function flipAxis(vis) { return Math.round(vis.h/GRID)*GRID; }
+  function flipPin(p, vis, comp) {
+    return comp.flip ? { ...p, y: flipAxis(vis) - p.y } : p;
+  }
+  // cos/sin of 90°/270° aren't exactly 0 in floating point, which leaves a
+  // rotated pin at 380.00000000000006 — enough to fail the exact x===x /
+  // y===y tests the wire router relies on for straight runs.
+  const tidy = (v) => Math.round(v*1000)/1000;
+
   function pinAbs(comp, kind, idx) {
     const vis = visOf(comp.kind);
-    const p = (kind === 'in' ? vis.inputs[idx] : vis.outputs[idx]) || {x:0,y:0};
+    const p = flipPin((kind === 'in' ? vis.inputs[idx] : vis.outputs[idx]) || {x:0,y:0}, vis, comp);
     const cx = vis.w/2, cy = vis.h/2;
     if (comp.facing === 'left') return { x: comp.x + (vis.w - p.x), y: comp.y + p.y };
     const rad = (FACE_ROT[comp.facing] || 0) * Math.PI/180;
     const dx = p.x - cx, dy = p.y - cy;
     return {
-      x: comp.x + cx + (dx*Math.cos(rad) - dy*Math.sin(rad)),
-      y: comp.y + cy + (dx*Math.sin(rad) + dy*Math.cos(rad)),
+      x: tidy(comp.x + cx + (dx*Math.cos(rad) - dy*Math.sin(rad))),
+      y: tidy(comp.y + cy + (dx*Math.sin(rad) + dy*Math.cos(rad))),
     };
   }
 
@@ -848,7 +866,8 @@ defineModule('engine', ['state'], (state) => {
   function pinOutDir(comp, kind, idx) {
     const vis = visOf(comp.kind);
     const p = (kind === 'in' ? vis.inputs[idx] : vis.outputs[idx]) || {};
-    const base = PIN_DIR_VEC[p.dir || (kind === 'in' ? 'left' : 'right')];
+    const d = PIN_DIR_VEC[p.dir || (kind === 'in' ? 'left' : 'right')];
+    const base = comp.flip ? { x:d.x, y:-d.y } : d;
     return rotDir(base, comp.facing || 'right');
   }
 
@@ -1369,7 +1388,7 @@ defineModule('engine', ['state'], (state) => {
       return {
         version: 2,
         components: [...components.values()].map(c=>({
-          id:c.id, ioId:c.ioId, kind:c.kind, x:c.x, y:c.y, facing:c.facing, delay:c.delay, label:c.label,
+          id:c.id, ioId:c.ioId, kind:c.kind, x:c.x, y:c.y, facing:c.facing, flip:c.flip || undefined, delay:c.delay, label:c.label,
           bits: BIT_CAPABLE[kindBase(c.kind)] ? (c.bits || 1) : undefined,
           state: c.kind==='INPUT' ? { value:c.state.value }
                : c.kind==='CLOCK' ? { period:c.state.period, paused:c.state.paused } : {},
@@ -1419,6 +1438,7 @@ defineModule('engine', ['state'], (state) => {
         const c = addComponent(cd.kind, cd.x, cd.y, cd.facing, cd.delay);
         components.delete(c.id); if (c.ioId) ioComponents.delete(c.ioId);
         if (cd.label !== undefined) c.label = cd.label;
+        if (cd.flip) c.flip = true;
         if (BIT_CAPABLE[kindBase(c.kind)] && cd.bits) c.bits = clampBits(cd.bits);
         if (cd.state) Object.assign(c.state, cd.state);
         built.push({ c, cd });
@@ -1491,13 +1511,14 @@ defineModule('engine', ['state'], (state) => {
       setClockPeriod(id,p){ const c=components.get(id); if(c&&c.kind==='CLOCK') c.state.period=p; },
       setLabel(id,l){ const c=components.get(id); if(c) c.label=l; },
       setFacing(id,f){ const c=components.get(id); if(c) c.facing=f; },
+      toggleFlip(id){ const c=components.get(id); if(c) c.flip=!c.flip; },
       setWireLabel(id,l){ const w=wires.get(id); if(w) w.label=l; },
     };
   }
 
   return {
     GATE_DEFS, GRID, snapGridVal, GLOBAL_TICK_MS, snapToGlobalTick,
-    pinAbs, pinOutDir, rotDir, FACE_ROT,
+    pinAbs, pinOutDir, rotDir, FACE_ROT, flipAxis,
     resolveWire, pathD, polyLength, samplePoly, distToSeg, projectOnPoly, autoRoute,
     createCircuit,
     BIT_CAPABLE, MAX_BITS, clampBits, bitMask, formatBits, parseBits, busBaseOf,
@@ -1862,15 +1883,47 @@ defineModule('gates', ['state', 'engine'], (state, engine) => {
     return { x1:p.x-dx*12, y1:p.y-dy*12, x2:p.x, y2:p.y };
   }
 
+  /* ── orientation ───────────────────────────────────────────────────────
+     One transform for everything drawn in a part's own frame (body,
+     selection outline, in-place control): the optional top↔bottom flip is
+     applied first, then the facing. Must agree with engine.pinAbs. */
+  function orientT(comp, vis) {
+    const f = comp.facing === 'left'
+      ? `translate(${vis.w} 0) scale(-1 1)`
+      : `rotate(${comp.facing==='up'?270:comp.facing==='down'?90:0} ${vis.w/2} ${vis.h/2})`;
+    return comp.flip ? `${f} translate(0 ${engine.flipAxis(vis)}) scale(1 -1)` : f;
+  }
+
+  // A mirrored part would otherwise mirror its lettering too. Rather than
+  // hand-correct every <text> in every body, un-mirror each one in place
+  // about its own centre once it's laid out. Written as a plain `transform`
+  // attribute, not CSS, so the PDF export (which strips classes and styles)
+  // keeps it.
+  function useReadableText(ref, mx, my) {
+    React.useLayoutEffect(()=>{
+      const g = ref.current; if (!g) return;
+      g.querySelectorAll('text').forEach(t=>{
+        if (!mx && !my) {
+          if (t.hasAttribute('data-cf')) { t.removeAttribute('transform'); t.removeAttribute('data-cf'); }
+          return;
+        }
+        let b; try { b = t.getBBox(); } catch (_) { return; }  // not rendered yet
+        const cx = b.x + b.width/2, cy = b.y + b.height/2;
+        t.setAttribute('transform', `translate(${cx} ${cy}) scale(${mx?-1:1} ${my?-1:1}) translate(${-cx} ${-cy})`);
+        t.setAttribute('data-cf', '1');
+      });
+    });
+  }
+
   function GateBody({ comp, ghost }) {
+    const ref = React.useRef(null);
+    useReadableText(ref, comp.facing === 'left', !!comp.flip);
     const def = GATE_DEFS[comp.kind], vis = VIS[comp.kind];
     if (!vis || !def) return null;
     const fill = FAMILY_FILL[def.family] || '#fff';
     const edge = ghost ? 'var(--border-hi)' : (FAMILY_EDGE[def.family] || 'var(--ink)');
     const label = def.label;
-    return <g transform={comp.facing==='left'
-              ? `translate(${vis.w} 0) scale(-1 1)`
-              : `rotate(${comp.facing==='up'?270:comp.facing==='down'?90:0} ${vis.w/2} ${vis.h/2})`}>
+    return <g ref={ref} transform={orientT(comp, vis)}>
       {vis.inputs.map((p,i)=>{ const s=pinStub(p,'left');
         return <line key={'i'+i} {...s} stroke="var(--ink-2)" strokeWidth="2" strokeLinecap="round"/>; })}
       {vis.outputs.map((p,i)=>{ const s=pinStub(p,'right');
@@ -1878,12 +1931,10 @@ defineModule('gates', ['state', 'engine'], (state, engine) => {
       {vis.body(fill, comp, edge)}
       {['AND','OR','NAND','NOR','XOR','XNOR','MUX'].includes(engine.kindBase(comp.kind)) &&
         <text x={vis.w/2+2} y={vis.h/2+4} textAnchor="middle" fontFamily="var(--mono)"
-              fontSize="9.5" fontWeight="600" fill="var(--ink)" opacity=".38" pointerEvents="none"
-              transform={comp.facing==='left' ? `translate(${vis.w/2+2} 0) scale(-1 1) translate(${-(vis.w/2+2)} 0)` : undefined}>{label}</text>}
+              fontSize="9.5" fontWeight="600" fill="var(--ink)" opacity=".38" pointerEvents="none">{label}</text>}
       {['AND','OR','NOT','NAND','NOR','XOR','XNOR','MUX'].includes(engine.kindBase(comp.kind)) && (comp.bits||1) > 1 &&
         <text x={vis.w-3} y="10" textAnchor="end" fontFamily="var(--mono)"
-              fontSize="8" fontWeight="700" fill="var(--ink-2)" opacity=".55" pointerEvents="none"
-              transform={comp.facing==='left' ? `translate(${vis.w-3} 0) scale(-1 1) translate(${-(vis.w-3)} 0)` : undefined}>{(comp.bits||1)+'b'}</text>}
+              fontSize="8" fontWeight="700" fill="var(--ink-2)" opacity=".55" pointerEvents="none">{(comp.bits||1)+'b'}</text>}
     </g>;
   }
 
@@ -1963,7 +2014,12 @@ defineModule('gates', ['state', 'engine'], (state, engine) => {
      custom gate gets its own kind — that way every bit of existing
      machinery that keys off a component's `kind` (pin counts, save/load,
      the palette thumbnail) just works with no special-casing. */
-  const BUS_W = 64;
+  // A multiple of 2×GRID, like every gate box: pins sit on x=0 and x=BUS_W,
+  // and a 90° turn pivots about (w/2, h/2), so both edges and the centre
+  // have to land on grid lines for the pins to stay on the grid in every
+  // orientation. (It was 64 — 4px off the grid on the output side, and up
+  // to 12px off once rotated.)
+  const BUS_W = 40;
   function ensureBusKind(base, n) {
     n = engine.clampBits(n);
     const kind = base + ':' + n;
@@ -2029,7 +2085,7 @@ defineModule('gates', ['state', 'engine'], (state, engine) => {
   ensureBusKind('COMBINE', 4);
   ensureBusKind('SPLIT', 4);
 
-  return { GATE_VIS: VIS, FAMILY_FILL, FAMILY_EDGE, GateBody, registerCustomGate, toggleHit, ensureBusKind, ensureGateKind };
+  return { GATE_VIS: VIS, FAMILY_FILL, FAMILY_EDGE, GateBody, orientT, registerCustomGate, toggleHit, ensureBusKind, ensureGateKind };
 });
 </script>
 
@@ -2056,7 +2112,7 @@ defineModule('gates', ['state', 'engine'], (state, engine) => {
 defineModule('canvas', ['state', 'engine', 'gates'], (state, engine, gates) => {
 'use strict';
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
-const { GATE_VIS, GateBody, toggleHit } = gates;
+const { GATE_VIS, GateBody, orientT, toggleHit } = gates;
 const {
   GATE_DEFS, GRID, resolveWire, pathD, polyLength, samplePoly,
   projectOnPoly, autoRoute, pinAbs, pinOutDir,
@@ -2422,6 +2478,11 @@ function Canvas({
     circuit.setFacing(comp.id, ROTATE_ORDER[(ROTATE_ORDER.indexOf(comp.facing||'right')+1)%4]);
     onCommit?.('rotate');
   };
+  const flipComp = (e, comp)=>{
+    e.stopPropagation();
+    circuit.toggleFlip(comp.id);
+    onCommit?.('flip');
+  };
 
   /* ── pins ──────────────────────────────────────────────────────────── */
   const onPinMouseDown = (e, comp, kind, idx)=>{
@@ -2652,9 +2713,7 @@ function Canvas({
           const vis = GATE_VIS[comp.kind];
           if (!vis) return null;
           const isSel = selection === comp.id;
-          const rotT = comp.facing==='left'
-            ? `translate(${vis.w} 0) scale(-1 1)`
-            : `rotate(${comp.facing==='up'?270:comp.facing==='down'?90:0} ${vis.w/2} ${vis.h/2})`;
+          const rotT = orientT(comp, vis);
           return <g key={comp.id} transform={`translate(${comp.x},${comp.y})`}>
             <g onMouseDown={e=>onCompMouseDown(e,comp)}
                onContextMenu={e=>onCompContext(e,comp)}
@@ -2702,6 +2761,14 @@ function Canvas({
                 <circle r="9.5" strokeWidth="1.5"/>
                 <path d="M4.4 1.5a4.6 4.6 0 1 1 -1.1 -4.8L5.7 -1" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 <path d="M5.7 -4.1L5.7 -1L2.6 -1" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </g>
+              <g className="rotate-handle" data-x="1" transform={`translate(${vis.w+11},13)`} style={{cursor:'pointer'}}
+                 onMouseDown={e=>e.stopPropagation()} onClick={e=>flipComp(e,comp)}>
+                <title>Flip (F)</title>
+                <circle r="9.5" strokeWidth="1.5"/>
+                {/* Two arrowheads either side of a dashed mirror line */}
+                <path d="M-4.6 0H4.6" fill="none" strokeWidth="1.2" strokeDasharray="1.6 1.6" strokeLinecap="round"/>
+                <path d="M0 -2.6V-5.4M-2 -3.6L0 -5.6L2 -3.6M0 2.6V5.4M-2 3.6L0 5.6L2 3.6" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </g>
               <g className="kill-handle" data-x="1" transform={`translate(${vis.w+11},${vis.h+11})`} style={{cursor:'pointer'}}
                  onMouseDown={e=>e.stopPropagation()}
@@ -3176,8 +3243,6 @@ function describeDanglingInputs(circuit) {
 /* ── toolbar icons ─────────────────────────────────────────────────────── */
 const I = {
   reset: <svg width="13" height="13" viewBox="0 0 14 14"><path d="M11.5 7a4.5 4.5 0 1 1-1.6-3.45" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M11.6 1.2v3h-3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-  zin:   <svg width="14" height="14" viewBox="0 0 14 14"><circle cx="6" cy="6" r="4.2" fill="none" stroke="currentColor" strokeWidth="1.5"/><path d="M6 4.2v3.6M4.2 6h3.6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><line x1="9.2" y1="9.2" x2="12.4" y2="12.4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>,
-  zout:  <svg width="14" height="14" viewBox="0 0 14 14"><circle cx="6" cy="6" r="4.2" fill="none" stroke="currentColor" strokeWidth="1.5"/><path d="M4.2 6h3.6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><line x1="9.2" y1="9.2" x2="12.4" y2="12.4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>,
   fit:   <svg width="14" height="14" viewBox="0 0 14 14"><path d="M2 5V2.6h3M12 5V2.6H9M2 9v2.4h3M12 9v2.4H9" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
   save:  <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 1.8v6.4M4.4 6l2.6 2.6L9.6 6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M2.4 10.4v1.2h9.2v-1.2" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>,
   pdf:   <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3.2 1.6h5l2.6 2.6v8.2H3.2z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/><path d="M8.2 1.6v2.6h2.6M5 8.8h4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>,
@@ -3195,7 +3260,6 @@ function App() {
   const [customKinds, setCustomKinds] = useState(()=>hydrateCustomGates());
   const [running, setRunning] = useState(true);
   const [hopMs, setHopMs] = useState(1000);
-  const [zoom, setZoom] = useState(1);
   const [simTime, setSimTime] = useState(0);
   const [numFormat, setNumFormat] = useState('bin');
 
@@ -3306,6 +3370,11 @@ function App() {
           circuit.setFacing(c.id, order[(order.indexOf(c.facing||'right')+1)%4]);
           commit('rotate');
         }
+        return;
+      }
+      if ((e.key === 'f' || e.key === 'F') && selection && circuit.components.has(selection)) {
+        circuit.toggleFlip(selection);
+        commit('flip');
         return;
       }
       if ((e.key === 'Delete' || e.key === 'Backspace') && selection) {
@@ -3652,9 +3721,6 @@ function App() {
       </>}
       <div className="bw-spacer"/>
       <div className="tb-group">
-        <button className="bw-btn bw-btn--icon" onClick={()=>viewApi.current?.zoomBy(1/1.25)} title="Zoom out">{I.zout}</button>
-        <span className="zoom-val">{Math.round(zoom*100)}%</span>
-        <button className="bw-btn bw-btn--icon" onClick={()=>viewApi.current?.zoomBy(1.25)} title="Zoom in">{I.zin}</button>
         <button className="bw-btn bw-btn--icon" onClick={()=>viewApi.current?.fit()} title="Fit circuit to view">{I.fit}</button>
       </div>
       <div className="bw-sep"/>
@@ -3693,8 +3759,7 @@ function App() {
                 onClearPaletteDrag={()=>setPalDrag(null)}
                 onChange={refresh}
                 onCommit={commit}
-                viewApi={viewApi}
-                onViewChange={v=>setZoom(z=>z===v.zoom?z:v.zoom)}/>
+                viewApi={viewApi}/>
         {!compCount && !palDrag && <div className="empty-hint"><div className="empty-card">
           <h3>Empty board</h3>
           <p>Drag a part in from the left — or click it to drop one in the middle.
@@ -3720,6 +3785,7 @@ function App() {
           <li><kbd className="key">Space</kbd><span>run / halt</span></li>
           <li><kbd className="key">.</kbd><span>one hop</span></li>
           <li><kbd className="key">R</kbd><span>rotate</span></li>
+          <li><kbd className="key">F</kbd><span>flip</span></li>
         </ul>
         <ul className="hint-list">
           <li><kbd className="key">Del</kbd><span>delete</span></li>
