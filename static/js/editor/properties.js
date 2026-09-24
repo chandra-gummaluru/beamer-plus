@@ -1,40 +1,30 @@
-// Properties panel — position, size and z-index for the selected overlay,
-// plus the type-specific fields Beamer+ itself owns: video play mode, audio
-// play mode, model animation. Every change is applied to the in-memory
-// config immediately.
+// Properties panel — position, size and z-index for the selected media
+// overlay (video, audio, 3D model), plus the type-specific fields Beamer+
+// itself owns: video play mode, audio play mode, model animation. Every
+// change is applied to the in-memory config immediately. Also builds the
+// slide properties' item list (refreshSlideItems).
 //
-// A widget's own fields are shown here too, built from the field list the
-// widget declares in its `widget-schema` block (see editor/widget-schema.js).
-// They are read straight out of the widget's HTML rather than from a live
-// iframe, so they are there the moment a widget is added — before it has ever
-// been rendered.
-//
-// A widget is configured in its settings dialog (widget-settings-modal.js,
-// form built by widget-fields.js) — a narrow sidebar is no place for a
-// question, an answer list and a code template. The dialog opens from the
-// slide's "On this slide" list (refreshSlideItems), from the "Edit settings"
-// button shown here when a widget is selected on the slide, by
-// double-clicking the widget, and straight after a widget is added. The
-// sidebar keeps what goes with the box on the slide: its layout, and Remove.
-import { ctx, getSlideEl, getOrCreateConfig, escAttr, escHtml, setPanelMode, setPanelTitle,
+// Widgets have no panel here. A widget is configured entirely in its
+// settings dialog (widget-settings-modal.js; form from widget-fields.js,
+// fields read from the widget's own `widget-schema` block — see
+// widget-schema.js), which opens when the widget is clicked on the slide,
+// from Edit in the slide's item list, and straight after one is added. The
+// panel stays on the slide's properties throughout.
+import { ctx, getSlideEl, getOrCreateConfig, escAttr, setPanelMode, setPanelTitle,
          resolvePanelMode } from './context.js';
-import { cleanupEditOverlays, renderEditOverlays, positionOverlay } from './overlays.js';
+import { cleanupEditOverlays, renderEditOverlays, positionOverlay, selectOverlayEl } from './overlays.js';
 import { WIDGET_LABELS } from './widget-picker.js';
 import { getWidgetSchema } from './widget-schema.js';
 import { openWidgetSettings, isWidgetSettingsOpen } from './widget-settings-modal.js';
-import { selectOverlayEl } from './overlays.js';
-
-// Whether the widget "Layout" section was left open — kept across rebuilds.
-let _layoutOpen = true;
-// Bumped on every panel build so a schema that resolves late can tell whether
-// it is still the selection the user is looking at.
-let _widgetFieldsToken = 0;
 
 export function updatePropertiesPanel() {
     const panel = document.getElementById('editor-properties');
     if (!panel) return;
-    // Nothing selected — hand the panel back to the slide (or view) section.
-    if (!ctx.selectedOverlay) { setPanelMode(resolvePanelMode()); refreshSlideItems(); return; }
+    // Nothing (or a widget, which never gets a panel) selected — hand the
+    // panel back to the slide (or view) section.
+    if (!ctx.selectedOverlay || ctx.selectedOverlay.arrKey === 'widgets') {
+        setPanelMode(resolvePanelMode()); refreshSlideItems(); return;
+    }
     setPanelMode('item');
 
     const { arrKey, index } = ctx.selectedOverlay;
@@ -42,18 +32,12 @@ export function updatePropertiesPanel() {
     const item = cfg?.[arrKey]?.[index];
     if (!item) return;
 
-    const typeLabels = { videos: 'Video', audios: 'Audio', models: '3D Model', widgets: 'Widget' };
+    const typeLabels = { videos: 'Video', audios: 'Audio', models: '3D Model' };
     setPanelTitle(`${typeLabels[arrKey] || arrKey} Properties`);
 
     const body = document.getElementById('editor-properties-body');
     if (!body) return;
     body.innerHTML = buildPropsHTML(arrKey, item);
-    body.querySelector('#prop-layout')?.addEventListener('toggle', (e) => { _layoutOpen = e.target.open; });
-
-    // Whether a widget has settings to edit needs its HTML, so the summary
-    // arrives a tick later, into the placeholder buildPropsHTML left for it.
-    const fieldsToken = ++_widgetFieldsToken;
-    if (arrKey === 'widgets') fillWidgetSummary(item, index, fieldsToken);
 
     // Delete button
     body.querySelector('#prop-delete')?.addEventListener('click', () => deleteItem(arrKey, index));
@@ -78,21 +62,7 @@ export function updatePropertiesPanel() {
 function buildPropsHTML(arrKey, item) {
     const lockAR = arrKey === 'videos' || arrKey === 'models';
 
-    let html = '';
-
-    // ── Widget type badge (top of panel) ──────────────────────────────────
-    if (arrKey === 'widgets') {
-        const typeLabel = widgetTypeLabel(item);
-        html += `
-            <div class="editor-prop-row editor-prop-row--type-header">
-                <div class="editor-prop-label">Widget type</div>
-                <div class="editor-prop-type-badge">${escHtml(typeLabel)}</div>
-            </div>
-        `;
-        html += `<div class="editor-prop-divider"></div>`;
-    }
-
-    const geometry = `
+    let html = `
         <div class="editor-prop-row">
             <div class="editor-prop-label">Position</div>
             <div class="editor-prop-row-2col">
@@ -116,20 +86,6 @@ function buildPropsHTML(arrKey, item) {
             <input class="editor-prop-input" type="number" min="1" max="999" step="1" id="prop-z" value="${item.zIndex ?? 5}">
         </div>
     `;
-
-    if (arrKey === 'widgets') {
-        // The way into its settings (filled in by fillWidgetSummary once the
-        // schema is read), then its geometry.
-        html += `<div id="widget-summary"></div>`;
-        html += `
-            <details class="editor-prop-details" id="prop-layout"${_layoutOpen ? ' open' : ''}>
-                <summary class="editor-prop-details-summary">Layout</summary>
-                <div class="editor-prop-details-body">${geometry}</div>
-            </details>
-        `;
-    } else {
-        html += geometry;
-    }
 
     if (arrKey === 'videos') {
         html += `
@@ -245,27 +201,6 @@ export function deleteItem(arrKey, index) {
     updatePropertiesPanel();
 }
 
-/* ─── the selected widget: a way into its settings ────────────────── */
-
-async function fillWidgetSummary(item, index, token) {
-    const schema = await getWidgetSchema(item);
-    if (token !== _widgetFieldsToken) return;
-    const host = document.getElementById('widget-summary');
-    if (!host) return;
-    host.textContent = '';
-    if (!schema || !schema.fields.length) {
-        host.appendChild(hintRow('This widget has no settings of its own.'));
-        return;
-    }
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'btn editor-open-settings';
-    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>Edit settings';
-    btn.addEventListener('click', () => openWidgetSettingsFor(index));
-    host.appendChild(btn);
-    host.appendChild(hintRow('Or double-click the widget on the slide.'));
-}
-
 function hintRow(text) {
     const el = document.createElement('div');
     el.className = 'editor-prop-hint';
@@ -282,23 +217,24 @@ export function widgetTypeLabel(item) {
 /* ─── the widget settings dialog ──────────────────────────────────── */
 
 /**
- * Open the settings dialog for widget #index on the current slide.
- *
- * From the slide's item list (`fromList`) the dialog is all that opens: the
- * panel stays on the slide's properties, and the widget's box is only marked
- * on the slide while it's being edited. From the slide itself (Edit settings,
- * double-click, a newly added widget) the widget is selected, so closing the
- * dialog leaves you on its sidebar view with the box ready to drag.
+ * Open the settings dialog for widget #index on the current slide. The panel
+ * stays on the slide's properties; the widget's box is only marked on the
+ * slide while its settings are open.
  */
-export async function openWidgetSettingsFor(index, { fromList = false } = {}) {
+export async function openWidgetSettingsFor(index) {
     if (isWidgetSettingsOpen()) return;
     const item = getOrCreateConfig()?.widgets?.[index];
     if (!item) return;
     const schema = await getWidgetSchema(item);
 
     const overlay = document.querySelector(`.edit-overlay[data-arr-key="widgets"][data-item-index="${index}"]`);
-    if (fromList) overlay?.classList.add('is-editing');
-    else if (overlay && ctx.selectedOverlay?.div !== overlay) selectOverlayEl(overlay, 'widgets', index);
+    // Whatever media item was selected, the dialog is now what's being edited.
+    if (ctx.selectedOverlay) {
+        document.querySelectorAll('.edit-overlay.selected').forEach(el => el.classList.remove('selected'));
+        ctx.selectedOverlay = null;
+        updatePropertiesPanel();
+    }
+    overlay?.classList.add('is-editing');
 
     openWidgetSettings(item, schema || { label: null, fields: [] }, {
         title: item.title || schema?.label || widgetTypeLabel(item),
@@ -314,7 +250,6 @@ export async function openWidgetSettingsFor(index, { fromList = false } = {}) {
             if (!ctx.state?.editMode || removed) return;
             const label = document.querySelector(`.edit-overlay[data-arr-key="widgets"][data-item-index="${index}"] .edit-overlay-label`);
             if (label) label.textContent = item.title || widgetTypeLabel(item);
-            if (!fromList) updatePropertiesPanel();
             refreshSlideItems();                  // names may have changed
         },
     });
@@ -357,10 +292,7 @@ export function refreshSlideItems() {
     for (const arrKey of ['widgets', 'videos', 'audios', 'models']) {
         (cfg?.[arrKey] || []).forEach((item, index) => entries.push({ arrKey, item, index }));
     }
-    if (!entries.length) {
-        host.appendChild(hintRow('Nothing on this slide yet — add a widget or media with the buttons below.'));
-        return;
-    }
+    if (!entries.length) return;
 
     const list = document.createElement('div');
     list.className = 'slide-items';
@@ -394,7 +326,7 @@ export function refreshSlideItems() {
 
         edit.addEventListener('click', () => {
             box()?.classList.remove('is-hinted');
-            if (isWidget) { openWidgetSettingsFor(index, { fromList: true }); return; }
+            if (isWidget) { openWidgetSettingsFor(index); return; }
             const b = box();
             if (b) selectOverlayEl(b, arrKey, index);
         });

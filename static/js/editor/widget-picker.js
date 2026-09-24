@@ -8,7 +8,7 @@
 // so a new file in widgets/ appears here with no change to this module. The
 // only thing kept here is the icon, with a generic one for anything unlisted.
 import { ctx, getOrCreateConfig, escHtml } from './context.js';
-import { renderEditOverlays, cleanupEditOverlays, selectOverlayEl } from './overlays.js';
+import { renderEditOverlays, cleanupEditOverlays } from './overlays.js';
 import { openWidgetSettingsFor } from './properties.js';
 
 const WIDGET_ICONS = {
@@ -212,10 +212,7 @@ function _pickCustomWidget() {
         const newIndex = cfg.widgets.length - 1;
         cleanupEditOverlays();
         renderEditOverlays();
-        const ov = document.querySelector(`.edit-overlay[data-arr-key="widgets"][data-item-index="${newIndex}"]`);
-        if (ov) selectOverlayEl(ov, 'widgets', newIndex);
-        // A new widget always needs setting up — go straight to its settings
-        // (a widget without any just stays selected).
+        // A new widget always needs setting up — go straight to its settings.
         openWidgetSettingsFor(newIndex);
     });
     input.click();
@@ -239,7 +236,5 @@ function _doAddWidget(type) {
     const newIndex = cfg.widgets.length - 1;
     cleanupEditOverlays();
     renderEditOverlays();
-    const overlay = document.querySelector(`.edit-overlay[data-arr-key="widgets"][data-item-index="${newIndex}"]`);
-    if (overlay) selectOverlayEl(overlay, 'widgets', newIndex);
     openWidgetSettingsFor(newIndex);
 }

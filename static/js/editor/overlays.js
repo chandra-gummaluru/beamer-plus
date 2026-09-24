@@ -41,24 +41,27 @@ function buildOverlay(type, arrKey, item, index, container, rect) {
     handle.className = 'edit-resize-handle';
     div.appendChild(handle);
 
+    // A widget has no properties panel: clicking one opens its settings
+    // dialog, while dragging it (or its handle) still moves or resizes it —
+    // without selecting it, so the panel stays on the slide. Media items are
+    // selected as before and edited in the panel.
+    const isWidget = arrKey === 'widgets';
+    const grab = () => {
+        if (!isWidget) { selectOverlayEl(div, arrKey, index); return; }
+        if (ctx.selectedOverlay) deselectOverlay();
+    };
     handle.addEventListener('pointerdown', (e) => {
         e.stopPropagation();
-        selectOverlayEl(div, arrKey, index);
+        grab();
         startResize(e, div, handle, arrKey, index, container);
     });
     div.addEventListener('pointerdown', (e) => {
         if (e.target === handle) return;
-        selectOverlayEl(div, arrKey, index);
-        startMove(e, div, arrKey, index, container);
-    });
-    // A widget is configured in its settings dialog; a double-click is the
-    // shortest way there from the slide.
-    if (arrKey === 'widgets') {
-        div.addEventListener('dblclick', (e) => {
-            if (e.target === handle) return;
-            openWidgetSettingsFor(index);
+        grab();
+        startMove(e, div, arrKey, index, container, (moved) => {
+            if (isWidget && !moved) openWidgetSettingsFor(index);
         });
-    }
+    });
     return div;
 }
 
@@ -92,14 +95,21 @@ export function cleanupEditOverlays() {
 
 /* ─── drag-to-move ──────────────────────────────────────────── */
 
-function startMove(e, div, arrKey, index, container) {
+// `onEnd(moved)` runs on release; `moved` is false for a plain click (the
+// pointer never travelled more than a few pixels), which a widget treats as
+// "open my settings".
+function startMove(e, div, arrKey, index, container, onEnd) {
     e.preventDefault();
     div.setPointerCapture(e.pointerId);
     const dr = div.getBoundingClientRect();
     const offX = e.clientX - dr.left;
     const offY = e.clientY - dr.top;
+    const sx = e.clientX, sy = e.clientY;
+    let moved = false;
 
     const onMove = (e) => {
+        if (!moved && Math.hypot(e.clientX - sx, e.clientY - sy) < 4) return;
+        moved = true;
         const cr = container.getBoundingClientRect();
         div.style.left = `${Math.max(0, Math.min(cr.width  - div.offsetWidth,  e.clientX - cr.left - offX))}px`;
         div.style.top  = `${Math.max(0, Math.min(cr.height - div.offsetHeight, e.clientY - cr.top  - offY))}px`;
@@ -115,6 +125,7 @@ function startMove(e, div, arrKey, index, container) {
         div.releasePointerCapture(e.pointerId);
         div.removeEventListener('pointermove', onMove);
         div.removeEventListener('pointerup',   onUp);
+        onEnd?.(moved);
     };
     div.addEventListener('pointermove', onMove);
     div.addEventListener('pointerup',   onUp);
