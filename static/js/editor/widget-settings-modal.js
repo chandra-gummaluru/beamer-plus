@@ -44,7 +44,6 @@ export function openWidgetSettings(item, schema, { title, onChange, onLayout, on
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
                     Remove widget
                 </button>
-                <span class="wsm-footer-note">Changes apply as you type</span>
                 <button type="button" class="btn wsm-done">Done</button>
             </footer>
         </div>`;
@@ -152,6 +151,16 @@ function buildLayoutCard(item, onLayout) {
     card.innerHTML = `
         <div class="wf-group-title">Layout</div>
         <div class="wf-group-body">
+            <div class="wsm-layout-presets">
+                <button type="button" class="wsm-preset" data-preset="full" title="Cover the whole slide">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><rect x="6" y="7" width="12" height="10" rx="1" fill="currentColor" fill-opacity=".18"/></svg>
+                    Fill slide
+                </button>
+                <button type="button" class="wsm-preset" data-preset="center" title="Keep the size, move to the middle">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><rect x="8.5" y="9" width="7" height="6" rx="1" fill="currentColor" fill-opacity=".18"/><line x1="12" y1="4" x2="12" y2="7"/><line x1="12" y1="17" x2="12" y2="20"/></svg>
+                    Center
+                </button>
+            </div>
             <div class="editor-prop-row-2col">
                 <label class="editor-prop-row"><span class="editor-prop-label">X (%)</span>
                     <input class="editor-prop-input" type="number" min="0" max="100" step="1" data-k="x"></label>
@@ -164,16 +173,20 @@ function buildLayoutCard(item, onLayout) {
             </div>
             <label class="editor-prop-row"><span class="editor-prop-label">Layer<span class="editor-prop-label-note">higher is in front</span></span>
                 <input class="editor-prop-input" type="number" min="1" max="999" step="1" data-k="zIndex"></label>
-            <div class="wsm-layout-presets">
-                <button type="button" class="wf-chip-btn" data-preset="full">Fill the slide</button>
-                <button type="button" class="wf-chip-btn" data-preset="center">Centre it</button>
-            </div>
+
         </div>`;
     const inputs = Object.fromEntries(Array.from(card.querySelectorAll('input[data-k]')).map(i => [i.dataset.k, i]));
     const show = () => {
         inputs.x.value = pct(item.x, 0);          inputs.y.value = pct(item.y, 0);
         inputs.width.value = pct(item.width, 0.4); inputs.height.value = pct(item.height, 0.3);
         inputs.zIndex.value = item.zIndex ?? 10;
+        // Light up a preset while the box is already in that position.
+        const near = (a, b) => Math.abs((a ?? 0) - b) < 0.005;
+        const w = item.width ?? 0.4, h = item.height ?? 0.3;
+        const full = near(item.x, 0) && near(item.y, 0) && near(w, 1) && near(h, 1);
+        const centred = !full && near(item.x, (1 - w) / 2) && near(item.y, (1 - h) / 2);
+        card.querySelector('[data-preset="full"]').classList.toggle('is-active', full);
+        card.querySelector('[data-preset="center"]').classList.toggle('is-active', centred);
     };
     show();
     card.addEventListener('input', (e) => {
@@ -183,6 +196,9 @@ function buildLayoutCard(item, onLayout) {
         if (isNaN(n)) return;
         if (k === 'zIndex') item.zIndex = Math.round(n);
         else item[k] = Math.max(0, Math.min(100, n)) / 100;
+        const active = document.activeElement;
+        show();                                   // refresh the preset states…
+        if (active?.isConnected) active.focus();  // …without stealing the field
         onLayout();
     });
     card.addEventListener('click', (e) => {

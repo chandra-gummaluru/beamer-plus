@@ -182,11 +182,14 @@
         </div>
         <div id="editor-panel-body">
             <div id="editor-slide-settings">
-                <label class="editor-prop-checkbox-row">
-                    <input type="checkbox" id="slide-hidden-toggle">
-                    Hide in presentation
+                <label class="slide-setting">
+                    <span class="slide-setting-text">
+                        <span class="slide-setting-name">Hide in presentation</span>
+                        <span class="slide-setting-desc">Skipped when presenting</span>
+                    </span>
+                    <input type="checkbox" class="editor-switch" role="switch" id="slide-hidden-toggle">
                 </label>
-                <!-- Everything on the slide; a widget opens its settings
+                <!-- Everything on the slide, each with Edit and Delete
                      (refreshSlideItems in editor/properties.js). -->
                 <div id="editor-slide-items"></div>
             </div>

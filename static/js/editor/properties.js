@@ -22,7 +22,7 @@ import { cleanupEditOverlays, renderEditOverlays, positionOverlay } from './over
 import { WIDGET_LABELS } from './widget-picker.js';
 import { getWidgetSchema } from './widget-schema.js';
 import { openWidgetSettings, isWidgetSettingsOpen } from './widget-settings-modal.js';
-import { selectOverlayEl, deselectOverlay } from './overlays.js';
+import { selectOverlayEl } from './overlays.js';
 
 // Whether the widget "Layout" section was left open — kept across rebuilds.
 let _layoutOpen = true;
@@ -282,10 +282,13 @@ export function widgetTypeLabel(item) {
 /* ─── the widget settings dialog ──────────────────────────────────── */
 
 /**
- * Open the settings dialog for widget #index on the current slide. The widget
- * is selected on the slide too, so its box is highlighted while it's edited.
- * `fromList`: opened from the slide's item list — closing returns there
- * rather than to the widget's own sidebar view.
+ * Open the settings dialog for widget #index on the current slide.
+ *
+ * From the slide's item list (`fromList`) the dialog is all that opens: the
+ * panel stays on the slide's properties, and the widget's box is only marked
+ * on the slide while it's being edited. From the slide itself (Edit settings,
+ * double-click, a newly added widget) the widget is selected, so closing the
+ * dialog leaves you on its sidebar view with the box ready to drag.
  */
 export async function openWidgetSettingsFor(index, { fromList = false } = {}) {
     if (isWidgetSettingsOpen()) return;
@@ -294,7 +297,8 @@ export async function openWidgetSettingsFor(index, { fromList = false } = {}) {
     const schema = await getWidgetSchema(item);
 
     const overlay = document.querySelector(`.edit-overlay[data-arr-key="widgets"][data-item-index="${index}"]`);
-    if (overlay && ctx.selectedOverlay?.div !== overlay) selectOverlayEl(overlay, 'widgets', index);
+    if (fromList) overlay?.classList.add('is-editing');
+    else if (overlay && ctx.selectedOverlay?.div !== overlay) selectOverlayEl(overlay, 'widgets', index);
 
     openWidgetSettings(item, schema || { label: null, fields: [] }, {
         title: item.title || schema?.label || widgetTypeLabel(item),
@@ -306,17 +310,17 @@ export async function openWidgetSettingsFor(index, { fromList = false } = {}) {
         },
         onRemove: () => deleteItem('widgets', index),
         onClose: (removed) => {
+            document.querySelectorAll('.edit-overlay.is-editing').forEach(el => el.classList.remove('is-editing'));
             if (!ctx.state?.editMode || removed) return;
             const label = document.querySelector(`.edit-overlay[data-arr-key="widgets"][data-item-index="${index}"] .edit-overlay-label`);
             if (label) label.textContent = item.title || widgetTypeLabel(item);
-            if (fromList) deselectOverlay();      // back to the slide's list
-            else updatePropertiesPanel();
+            if (!fromList) updatePropertiesPanel();
             refreshSlideItems();                  // names may have changed
         },
     });
 }
 
-/* ─── "On this slide" — the slide properties' item list ───────────── */
+/* ─── the slide properties' item list ─────────────────────────────── */
 
 const ITEM_ICONS = {
     widgets: '<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/>',
@@ -325,21 +329,28 @@ const ITEM_ICONS = {
     models:  '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>',
 };
 const KIND_LABELS = { widgets: 'Widget', videos: 'Video', audios: 'Audio', models: '3D model' };
+const ICON_EDIT  = '<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>';
+const ICON_TRASH = '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>';
+
+function iconButton(cls, title, paths) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `slide-item-btn ${cls}`;
+    b.title = title;
+    b.setAttribute('aria-label', title);
+    b.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+    return b;
+}
 
 /**
  * Rebuild the list of everything on the current slide, in the slide
- * properties section. A widget opens its settings dialog; media selects its
- * box, whose properties then take over the panel as before.
+ * properties section. Each row has Edit — a widget's settings dialog, or a
+ * media item's properties — and Delete.
  */
 export function refreshSlideItems() {
     const host = document.getElementById('editor-slide-items');
     if (!host) return;
     host.textContent = '';
-
-    const head = document.createElement('div');
-    head.className = 'editor-prop-label';
-    head.textContent = 'On this slide';
-    host.appendChild(head);
 
     const cfg = getOrCreateConfig();
     const entries = [];
@@ -347,7 +358,7 @@ export function refreshSlideItems() {
         (cfg?.[arrKey] || []).forEach((item, index) => entries.push({ arrKey, item, index }));
     }
     if (!entries.length) {
-        host.appendChild(hintRow('Nothing yet — add a widget or media with the buttons below.'));
+        host.appendChild(hintRow('Nothing on this slide yet — add a widget or media with the buttons below.'));
         return;
     }
 
@@ -360,29 +371,49 @@ export function refreshSlideItems() {
             : (item.path ? item.path.split('/').pop() : `${KIND_LABELS[arrKey]} ${index + 1}`);
         const kind = isWidget && item.title ? widgetTypeLabel(item) : KIND_LABELS[arrKey];
 
-        const row = document.createElement('button');
-        row.type = 'button';
+        const row = document.createElement('div');
         row.className = 'slide-item';
-        row.title = isWidget ? `Edit ${name}` : `Select ${name}`;
         row.innerHTML = `
             <svg class="slide-item-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ITEM_ICONS[arrKey]}</svg>
             <span class="slide-item-text">
                 <span class="slide-item-name"></span>
                 <span class="slide-item-kind"></span>
-            </span>
-            <svg class="slide-item-go" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>`;
+            </span>`;
         row.querySelector('.slide-item-name').textContent = name;
         row.querySelector('.slide-item-kind').textContent = kind;
+
+        const edit = iconButton('slide-item-edit', isWidget ? `Edit ${name}` : `Edit ${name}'s properties`, ICON_EDIT);
+        const del  = iconButton('slide-item-delete', `Delete ${name}`, ICON_TRASH);
+        row.appendChild(edit);
+        row.appendChild(del);
 
         // Point out which box on the slide this row is.
         const box = () => document.querySelector(`.edit-overlay[data-arr-key="${arrKey}"][data-item-index="${index}"]`);
         row.addEventListener('mouseenter', () => box()?.classList.add('is-hinted'));
         row.addEventListener('mouseleave', () => box()?.classList.remove('is-hinted'));
-        row.addEventListener('click', () => {
+
+        edit.addEventListener('click', () => {
             box()?.classList.remove('is-hinted');
             if (isWidget) { openWidgetSettingsFor(index, { fromList: true }); return; }
             const b = box();
             if (b) selectOverlayEl(b, arrKey, index);
+        });
+        // Two clicks: the first arms it, since there's no undo.
+        del.addEventListener('click', () => {
+            if (!del.classList.contains('is-armed')) {
+                del.classList.add('is-armed');
+                del.title = 'Click again to delete';
+                row.classList.add('is-deleting');
+                setTimeout(() => {
+                    if (!del.isConnected) return;
+                    del.classList.remove('is-armed');
+                    del.title = `Delete ${name}`;
+                    row.classList.remove('is-deleting');
+                }, 3000);
+                return;
+            }
+            box()?.classList.remove('is-hinted');
+            deleteItem(arrKey, index);
         });
         list.appendChild(row);
     }
