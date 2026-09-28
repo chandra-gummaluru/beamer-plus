@@ -923,16 +923,39 @@ function ReturnSignal(v){ this.value = v; }
    Newlines are suppressed inside brackets so multi-line literals work.
 ------------------------------------------------------------------------- */
 var OPS = ['**=','//=','==','!=','<=','>=','//','**','+=','-=','*=','/=','%=','->',
-           '(',')','[',']','{','}',',',':','.',';','=','+','-','*','/','%','<','>'];
+           '(',')','[',']','{','}',',',':','.',';','=','+','-','*','/','%','<','>','|'];
 
 var KEYWORDS = ['and','as','break','class','continue','def','del','elif','else','except',
   'False','finally','for','from','global','if','import','in','is','lambda','None',
   'nonlocal','not','or','pass','raise','return','True','try','while','with','yield'];
 
+/* A triple-quoted string, which may run over several lines (docstrings).
+   Returns the token plus where tokenizing resumes: line index and column. */
+function readTriple(lines, li, start, isF){
+  var q = lines[li].substr(start, 3), lineNo = li + 1, out = '', i = start + 3;
+  while (li < lines.length){
+    var line = lines[li];
+    while (i < line.length){
+      if (line.substr(i, 3) === q){
+        return { tok: isF ? { type:'FSTRING', parts: splitFString(out, lineNo), line: lineNo }
+                          : { type:'STRING', value: out, line: lineNo },
+                 li: li, next: i + 3 };
+      }
+      var c = line[i];
+      if (c === '\\' && i + 1 < line.length){
+        var n = line[i+1];
+        out += n === 'n' ? '\n' : n === 't' ? '\t' : n;
+        i += 2; continue;
+      }
+      out += c; i++;
+    }
+    out += '\n'; li++; i = 0;
+  }
+  throw new PyError('SyntaxError', 'This triple-quoted string is missing its closing ' + q + '.', lineNo);
+}
+
 function readString(line, start, lineNo, isF){
   var quote = line[start];
-  if (line[start+1] === quote && line[start+2] === quote)
-    throw new PyError('SyntaxError', 'Triple-quoted strings are not supported here. Use a single-line string.', lineNo);
   var out = '', i = start + 1;
   while (i < line.length){
     var c = line[i];
@@ -1013,11 +1036,17 @@ function tokenize(source){
       if (ch === ' ' || ch === '\t'){ i++; continue; }
       if (ch === '#') break;
 
-      if (ch === '"' || ch === "'"){
-        var r = readString(line, i, lineNo, false); tokens.push(r.tok); i = r.next; continue;
-      }
-      if ((ch === 'f' || ch === 'F') && (line[i+1] === '"' || line[i+1] === "'")){
-        var rf = readString(line, i+1, lineNo, true); tokens.push(rf.tok); i = rf.next; continue;
+      var isF = (ch === 'f' || ch === 'F') && (line[i+1] === '"' || line[i+1] === "'");
+      var qAt = isF ? i + 1 : i;
+      if (isF || ch === '"' || ch === "'"){
+        var qc = line[qAt];
+        if (line[qAt+1] === qc && line[qAt+2] === qc){
+          var rt = readTriple(lines, li, qAt, isF);
+          tokens.push(rt.tok);
+          li = rt.li; line = lines[li]; lineNo = li + 1; i = rt.next;
+          continue;
+        }
+        var r = readString(line, qAt, lineNo, isF); tokens.push(r.tok); i = r.next; continue;
       }
       if (/[0-9]/.test(ch) || (ch === '.' && /[0-9]/.test(line[i+1] || ''))){
         var num = /^\d*\.?\d+(?:[eE][+-]?\d+)?/.exec(line.slice(i))[0];
@@ -1101,12 +1130,34 @@ Parser.prototype = {
     return this.parseSimpleLine();
   },
 
+  /* Type hints do nothing at run time, so they are read past and dropped.
+     Skips tokens up to (not including) one of `stops` at bracket depth 0. */
+  skipAnnotation: function(stops){
+    var depth = 0, start = this.i;
+    while (this.cur.type !== 'EOF'){
+      var t = this.cur;
+      if (depth === 0 && (t.type === 'NEWLINE' || (t.type === 'OP' && stops.indexOf(t.value) > -1))) break;
+      if (t.type === 'OP' && /^[(\[{]$/.test(t.value)) depth++;
+      else if (t.type === 'OP' && /^[)\]}]$/.test(t.value)) depth--;
+      this.i++;
+    }
+    if (this.i === start) this.fail('I expected a type here.');
+  },
+
+  /* Statements that do nothing when run: a string on its own (a docstring)
+     and an annotation with no value (x: int). They get no step. */
+  isNoOp: function(s){
+    return s.k === 'Skip' || (s.k === 'ExprStmt' && s.value.k === 'Str');
+  },
+
   parseSimpleLine: function(){
     var stmts = [this.parseSmall()];
     while (this.eatOp(';')){
       if (this.cur.type === 'NEWLINE' || this.cur.type === 'EOF') break;
       stmts.push(this.parseSmall());
     }
+    var self = this;
+    stmts = stmts.filter(function(s){ return !self.isNoOp(s); });
     if (this.cur.type === 'NEWLINE') this.i++;
     else if (this.cur.type !== 'EOF' && this.cur.type !== 'DEDENT')
       this.fail('I could not make sense of the rest of this line.');
@@ -1134,6 +1185,14 @@ Parser.prototype = {
     }
 
     var first = this.parseTestList();
+
+    if (this.isOp(':')){                      /* annotated:  x: int = 0  */
+      this.checkTarget(first, line);
+      this.i++;
+      this.skipAnnotation(['=', ';']);
+      if (!this.eatOp('=')) return { k:'Skip', line: line };
+      return { k:'Assign', targets: [first], value: this.parseTestList(), line: line };
+    }
 
     if (this.cur.type === 'OP' && AUG[this.cur.value]){
       var op = AUG[this.cur.value]; this.i++;
@@ -1219,11 +1278,13 @@ Parser.prototype = {
     var params = [];
     while (!this.isOp(')')){
       var p = this.expect('NAME', 'a parameter name').value, def = null;
+      if (this.eatOp(':')) this.skipAnnotation([',', '=', ')']);
       if (this.eatOp('=')) def = this.parseTest();
       params.push({ name: p, def: def });
       if (!this.eatOp(',')) break;
     }
     this.expectOp(')');
+    if (this.eatOp('->')) this.skipAnnotation([':']);
     var body = this.parseSuite();
     return { k:'FunctionDef', name: name, params: params, body: body, line: line };
   },
