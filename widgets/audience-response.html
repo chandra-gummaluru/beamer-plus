@@ -23,7 +23,8 @@
     {"key": "model", "label": "Model", "type": "ai-model", "showIf": {"responseType": "open"}, "section": "AI summaries"},
     {"key": "numSummaries", "label": "Number of summaries", "type": "number", "min": 1, "step": 1, "default": 3, "showIf": {"responseType": "open"}},
     {"key": "apiKey", "label": "API key", "type": "password", "placeholder": "Paste API key…", "showIf": {"responseType": "open"}},
-    {"key": "scale", "label": "Text size", "type": "select", "options": [{"v": "1", "l": "Small"}, {"v": "1.4", "l": "Medium"}, {"v": "1.8", "l": "Large"}, {"v": "2.2", "l": "Extra large"}], "default": "1.4", "section": "Display"}
+    {"key": "scale", "label": "Text size", "type": "select", "options": [{"v": "1", "l": "Small"}, {"v": "1.4", "l": "Medium"}, {"v": "1.8", "l": "Large"}, {"v": "2.2", "l": "Extra large"}], "default": "1.4", "section": "Display"},
+    {"key": "layout", "label": "Layout while collecting", "type": "select", "default": "side", "options": [{"v": "side", "l": "Side by side (QR on the right)"}, {"v": "stacked", "l": "Stacked (QR below the answers)"}], "showIf": {"responseType": ["choice", "truefalse"]}}
   ]
 }
 </script>
@@ -96,6 +97,17 @@
   align-items: center;
 }
 #stage.is-split #side { grid-column: 2; grid-row: 1; }
+/* Stacked: question, answers, then the QR straight underneath them — not
+   pinned to the bottom of the slide. The question row is capped rather than
+   1fr, so a short question leaves the QR close by, and a long one scrolls
+   inside its own row instead of pushing the QR off the slide. */
+#stage.is-stacked {
+  grid-template-rows: minmax(0, max-content) auto;
+  align-content: start;
+  gap: calc(16px * var(--u));
+}
+#stage.is-stacked #prompt { overflow-y: auto; scrollbar-width: thin; }
+#stage.is-stacked #qr-wrap { width: min(28vh, 40vw, 220px); }
 
 /* The right-hand column: exactly one of these at a time. */
 #side {
@@ -923,6 +935,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   // derived tallies instead, which are far smaller.
   const S = {
     type:      'choice',
+    layout:    'side',       // choice / truefalse while collecting: 'side' | 'stacked'
     question:  '',
     options:   [],           // choice / truefalse
     correct:   null,         // 0-based index, or null
@@ -1279,13 +1292,15 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     // results arrive without anything moving. The preview shows the finished
     // slide (sample results), so it draws no stand-in QR.
     const withJoin = collect;
-    const split    = isChoiceLike(t) && withJoin;
+    const stacked  = isChoiceLike(t) && withJoin && S.layout === 'stacked';
+    const split    = isChoiceLike(t) && withJoin && !stacked;
     stage.classList.toggle('is-split',   split);
+    stage.classList.toggle('is-stacked', stacked);
     // A template (or a list of answers) is read from the top, not centred.
     stage.classList.toggle('is-top',     isChoiceLike(t) || t === 'fill');
     stage.classList.toggle('is-preview', preview);
     stage.classList.toggle('is-data',    showData);
-    stage.classList.toggle('is-fill',    showData && !split);
+    stage.classList.toggle('is-fill',    showData && !split && !stacked);
 
     joinEl.style.display = withJoin ? 'flex' : 'none';
     sideEl.classList.toggle('is-empty', !withJoin);
@@ -2014,7 +2029,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   // slide looks exactly like a synced viewer.
   function getState() {
     return {
-      type: S.type, question: S.question, options: S.options, correct: S.correct,
+      type: S.type, layout: S.layout, question: S.question, options: S.options, correct: S.correct,
       scale: S.scale, unit: S.unit, answer: S.answer, words: S.words,
       template: S.template, fills: S.fills.slice(0, CAP.groups), fillIdx: S.fillIdx,
       phase: S.phase, surveyId: S.surveyId, joinUrl: S.joinUrl, total: S.total,
@@ -2046,6 +2061,8 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     }
 
     S.type      = TYPES[s.type] ? s.type : 'choice';
+    // The presenter's layout comes from its own config; only a viewer adopts it.
+    if (IS_VIEWER) S.layout = s.layout === 'stacked' ? 'stacked' : 'side';
     S.question  = s.question || '';
     S.options   = Array.isArray(s.options) ? s.options : [];
     S.correct   = s.correct ?? null;
@@ -2091,6 +2108,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     if (IS_VIEWER) { render(); return; }
 
     S.type     = TYPES[cfg.responseType] ? cfg.responseType : 'choice';
+    S.layout   = cfg.layout === 'stacked' ? 'stacked' : 'side';
     S.question = String(cfg.question || '').trim();
 
     S.options = S.type === 'choice' ? normaliseOptions(cfg.options)
