@@ -1121,8 +1121,7 @@ Parser.prototype = {
         case 'import': case 'from':
           this.fail('This visualizer runs without modules, so import is not available.');
           break;
-        case 'class':
-          this.fail('Classes are not supported yet in this visualizer.'); break;
+        case 'class': return [this.parseClass()];
         case 'try': case 'with': case 'lambda':
           this.fail("'" + t.value + "' is not supported yet in this visualizer."); break;
       }
@@ -1218,8 +1217,7 @@ Parser.prototype = {
       for (var i = 0; i < node.items.length; i++) this.checkTarget(node.items[i], line);
       return;
     }
-    if (node.k === 'Attribute')
-      this.fail('You cannot assign to an attribute in this visualizer.', line);
+    if (node.k === 'Attribute') return;
     this.fail('The left side of = has to be a variable name.', line);
   },
 
@@ -1269,6 +1267,28 @@ Parser.prototype = {
     var items = [this.parsePostfix()], comma = false;
     while (this.isOp(',')){ this.i++; comma = true; if (this.isKw('in')) break; items.push(this.parsePostfix()); }
     return comma ? { k:'Tuple', items: items, line: items[0].line } : items[0];
+  },
+
+  /* class Name:  or  class Name():  or  class Name(object):
+     The body may hold methods and plain class attributes (name = value). */
+  parseClass: function(){
+    var line = this.cur.line; this.i++;
+    var name = this.expect('NAME', 'a class name').value;
+    if (this.eatOp('(')){
+      if (!this.isOp(')')){
+        var base = this.expect('NAME', 'a class name').value;
+        if (base !== 'object') this.fail('Inheritance is not supported yet in this visualizer.', line);
+      }
+      this.expectOp(')');
+    }
+    var body = this.parseSuite();
+    for (var i = 0; i < body.length; i++){
+      var st = body[i];
+      var ok = st.k === 'FunctionDef' || st.k === 'Pass' ||
+               (st.k === 'Assign' && st.targets.every(function(t){ return t.k === 'Name'; }));
+      if (!ok) this.fail('Inside a class, this visualizer supports methods (def) and simple attributes (name = value).', st.line);
+    }
+    return { k:'ClassDef', name: name, body: body, line: line };
   },
 
   parseDef: function(){
@@ -1483,7 +1503,7 @@ function parse(tokens){ return new Parser(tokens).parseModule(); }
    in Python, and a loop that drew a fresh True on every comparison would be
    unreadable.
 ------------------------------------------------------------------------- */
-var BOXED = { list:1, dict:1, tuple:1, function:1 };
+var BOXED = { list:1, dict:1, tuple:1, function:1, instance:1, 'class':1 };
 
 function countBrackets(text){
   var d = 0, inStr = null;
@@ -1531,8 +1551,32 @@ Interpreter.prototype = {
   bool: function(v){ return this.intern('bool', !!v); },
   num:  function(v, asFloat){ return asFloat ? this.flt(v) : this.int(v); },
   obj:  function(id){ return this.heap.get(id); },
-  typeOf: function(id){ return this.heap.get(id).type; },
-  isBoxed: function(id){ return !!BOXED[this.typeOf(id)]; },
+  /* An object of a user class reports its class name, as type() does. */
+  typeOf: function(id){
+    var o = this.heap.get(id);
+    if (o.type === 'instance') return o.clsName;
+    if (o.type === 'class') return 'type';
+    return o.type;
+  },
+  isBoxed: function(id){ return !!BOXED[this.heap.get(id).type]; },
+
+  /* ---- user classes ---- */
+  /* Instance attributes first, then the class. A function found on the class
+     comes back bound to the instance, which is where self comes from. */
+  getAttr: function(oId, name, line){
+    var o = this.heap.get(oId);
+    if (o.type === 'instance' && o.attrs.has(name)) return o.attrs.get(name);
+    var cls = o.type === 'instance' ? this.heap.get(o.cls) : o;
+    if (cls.attrs.has(name)){
+      var v = cls.attrs.get(name);
+      if (o.type === 'instance' && this.heap.get(v).type === 'function')
+        return this.alloc({ type:'boundmethod', func: v, self: oId, name: name });
+      return v;
+    }
+    throw new PyError('AttributeError', o.type === 'instance'
+      ? 'This ' + o.clsName + " object has no attribute called '" + name + "'."
+      : 'The class ' + o.name + " has no attribute called '" + name + "'.", line);
+  },
 
   /* ---- frames ---- */
   frame: function(){ return this.frames[this.frames.length - 1]; },
@@ -1585,6 +1629,9 @@ Interpreter.prototype = {
       case 'method': return '<method ' + o.name + '>';
       case 'range': return 'range(' + o.start + ', ' + o.stop + (o.step !== 1 ? ', ' + o.step : '') + ')';
       case 'type': return "<class '" + o.name + "'>";
+      case 'class': return "<class '" + o.name + "'>";
+      case 'instance': return '<' + o.clsName + ' object>';
+      case 'boundmethod': return '<bound method ' + this.heap.get(o.self).clsName + '.' + o.name + '>';
     }
     return '?';
   },
@@ -1942,6 +1989,27 @@ Interpreter.prototype = {
         break;
       }
 
+      /* The class becomes one object holding its methods and attributes.
+         Its body runs as a single step: the lesson is in the objects made
+         from it, not in the definition. */
+      case 'ClassDef': {
+        var cattrs = new Map();
+        var cid = this.alloc({ type:'class', name: node.name, attrs: cattrs });
+        for (i = 0; i < node.body.length; i++){
+          var cs = node.body[i];
+          if (cs.k === 'FunctionDef'){
+            cattrs.set(cs.name, this.alloc({ type:'function', name: cs.name, qual: node.name + '.' + cs.name,
+                                             isMethod: true, params: cs.params, node: cs }));
+          } else if (cs.k === 'Assign'){
+            var cv = yield* this.evalExpr(cs.value);
+            cs.targets.forEach(function(t){ cattrs.set(t.id, cv); });
+          }
+        }
+        this.bind(node.name, cid);
+        this.note(node.line, null, 'defined class ' + node.name);
+        break;
+      }
+
       case 'Return': {
         var rv = node.value ? yield* this.evalExpr(node.value) : this.NONE;
         this.note(node.line, node.value ? this.unparse(node.value, true) : null, this.repr(rv));
@@ -1967,6 +2035,14 @@ Interpreter.prototype = {
 
   assignTo: function*(target, valId, line){
     if (target.k === 'Name'){ this.bind(target.id, valId); return; }
+    if (target.k === 'Attribute'){
+      var ownerId = yield* this.evalExpr(target.value);
+      var owner = this.heap.get(ownerId);
+      if (owner.type !== 'instance' && owner.type !== 'class')
+        throw new PyError('AttributeError', 'You cannot add attributes to a ' + this.typeOf(ownerId) + '.', line);
+      owner.attrs.set(target.attr, valId);
+      return;
+    }
     if (target.k === 'Subscript'){
       var contId = yield* this.evalExpr(target.value);
       var keyId = yield* this.evalExpr(target.index);
@@ -2066,7 +2142,7 @@ Interpreter.prototype = {
         var did = this.alloc({ type:'dict', pairs: pairs });
         for (i = 0; i < node.pairs.length; i++){
           var kk = yield* this.evalExpr(node.pairs[i][0]);
-          if (this.isBoxed(kk))
+          if (['list', 'dict'].indexOf(this.heap.get(kk).type) > -1)
             throw new PyError('TypeError', 'A ' + this.typeOf(kk) + ' cannot be used as a dictionary key.', node.line);
           var vv = yield* this.evalExpr(node.pairs[i][1]);
           this.dictSet(did, kk, vv);
@@ -2087,6 +2163,8 @@ Interpreter.prototype = {
       }
       case 'Attribute': {
         var oId = yield* this.evalExpr(node.value);
+        var ot = this.heap.get(oId).type;
+        if (ot === 'instance' || ot === 'class') return this.getAttr(oId, node.attr, node.line);
         if (!METHODS[this.typeOf(oId)] || !METHODS[this.typeOf(oId)][node.attr])
           throw new PyError('AttributeError',
             'A ' + this.typeOf(oId) + " has no method called '" + node.attr + "'.", node.line);
@@ -2119,6 +2197,27 @@ Interpreter.prototype = {
   callValue: function*(fnId, args, kw, node){
     var f = this.heap.get(fnId), i;
 
+    /* hi.change_name('x') is change_name(hi, 'x'): the object goes in first. */
+    if (f.type === 'boundmethod'){
+      args = [f.self].concat(args);
+      f = this.heap.get(f.func);
+    }
+
+    /* Calling a class makes a new, empty object, then runs __init__ on it. */
+    if (f.type === 'class'){
+      var inst = this.alloc({ type:'instance', cls: fnId, clsName: f.name, attrs: new Map() });
+      var init = f.attrs.get('__init__');
+      if (init !== undefined){
+        var r = yield* this.callValue(init, [inst].concat(args), kw, node);
+        if (r !== this.NONE)
+          throw new PyError('TypeError', '__init__() should not return a value.', node.line);
+      } else if (args.length){
+        throw new PyError('TypeError',
+          f.name + '() takes no arguments, because the class has no __init__ method.', node.line);
+      }
+      return inst;
+    }
+
     if (f.type === 'function'){
       if (this.frames.length >= MAX_FRAMES)
         throw new PyError('RecursionError',
@@ -2133,13 +2232,20 @@ Interpreter.prototype = {
         else throw new PyError('TypeError',
           f.name + '() needs a value for ' + p.name + '.', node.line);
       }
-      if (args.length > f.params.length)
+      if (args.length > f.params.length){
+        var forgotSelf = f.isMethod && (!f.params.length || f.params[0].name !== 'self');
         throw new PyError('TypeError',
           f.name + '() takes ' + f.params.length + ' argument' + (f.params.length === 1 ? '' : 's') +
-          ' but you gave it ' + args.length + '.', node.line);
+          ' but it was given ' + args.length + '.' +
+          (forgotSelf ? ' Python passes the object itself in first, so a method needs self as its first parameter.' : ''),
+          node.line);
+      }
 
       var self = this;
-      var label = f.name + '(' + args.map(function(a){ return self.repr(a); }).join(', ') + ')';
+      /* A method's frame is named for its class; its arguments, self
+         included, are right there in the frame. */
+      var label = f.isMethod ? f.qual
+        : f.name + '(' + args.map(function(a){ return self.repr(a); }).join(', ') + ')';
       this.frames.push({ label: label, kind:'call', name: f.name, vars: vars, globals: null, callLine: node.line });
       this.note(node.line, label, 'starts running ' + f.name + '()');
 
@@ -2471,6 +2577,20 @@ Interpreter.prototype = {
           break;
         case 'function':
           s.label = o.name + '(' + o.params.map(function(p){ return p.name; }).join(', ') + ')';
+          break;
+        /* An object: its class name in the header, then one row per
+           attribute - name, and the id of the object it refers to. */
+        case 'instance':
+          s.type = o.clsName;
+          s.kind = 'attrs';
+          s.cells = [];
+          o.attrs.forEach(function(ref, name){
+            var c = cellFor(ref); c.key = name; s.cells.push(c);
+          });
+          break;
+        case 'class':
+          s.type = 'type';
+          s.value = 'class ' + o.name;
           break;
         default:
           s.value = self.repr(id);
@@ -2917,7 +3037,7 @@ function measureObject(o){
       x += ws[i];
     });
     if (!cells.length) m.emptyAt = { x: x, y: D.hdrH + D.idxH, w: run, h: D.slotH };
-  } else if (o.type === 'dict'){
+  } else if (o.type === 'dict' || o.kind === 'attrs'){
     var rows = o.cells || [];
     var kW = D.slotMinW, vW = D.slotMinW;
     rows.forEach(function(c){ kW = Math.max(kW, slotW(c.key)); vW = Math.max(vW, slotW(c.text)); });
