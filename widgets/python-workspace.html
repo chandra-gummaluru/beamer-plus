@@ -2792,8 +2792,10 @@ function el(tag, cls, html){
      list      the same header over a run of index-labelled slots, indices
                written above the boxes, each slot holding an element's id
      dict      the same header over rows of [key][id]
-     arrow     one straight ink line from a slot to the object it names,
-               stopping on that object's outer border, with a solid head
+
+   No arrows: a slot names its object by id, and the id in the object's
+   header is the match. That is the CSC108 convention, and it keeps a busy
+   diagram free of crossing lines.
 
    Every stroke is hand-drawn: each edge keeps its true endpoints (give or
    take a fraction of a pixel) and bows by under a pixel at its midpoint, so
@@ -3006,7 +3008,7 @@ function renderMemory(state, prev, history){
   var shown = state.order.filter(function(id){ return depth[id] !== undefined; });
 
   /* Every object the program has orphaned so far stays on the diagram, faded
-     and with no arrows into it. Rebinding a name does not quietly erase what
+     and with no slot naming it. Rebinding a name does not quietly erase what
      it was pointing at, and it doesn't vanish on the next step either: the
      room can still point at it three statements later.
 
@@ -3142,11 +3144,10 @@ function renderMemory(state, prev, history){
   var W = Math.max(colX - D.colGap, frameW) + 8;
   var H = Math.max(maxY - D.frameGap, y - D.frameGap) + 8;
 
-  /* --- draw: fills first, then ink, then arrows on top ------------------- */
+  /* --- draw: fills first, then ink on top ------------------------------ */
   var fills = document.createElementNS(SVGNS, 'g');
   var ink = document.createElementNS(SVGNS, 'g');
-  var arrows = document.createElementNS(SVGNS, 'g');
-  svg.appendChild(fills); svg.appendChild(ink); svg.appendChild(arrows);
+  svg.appendChild(fills); svg.appendChild(ink);
 
   function fill(x, y, w, h){
     var r = document.createElementNS(SVGNS, 'rect');
@@ -3212,9 +3213,6 @@ function renderMemory(state, prev, history){
     fill(tyX, m.y, m.tyW, D.hdrH);
     box(tyX, m.y, m.tyW, D.hdrH, seed += 13, cls);
     label(tyX + m.tyW / 2, m.y + D.hdrH / 2 + 7, o.type, D.fs, tcls);
-    if (m.ghost){
-      label(m.x + m.w / 2, m.y + m.h + 18, 'no longer reachable', D.fsSmall, 'dim');
-    }
 
     if (m.body !== undefined){
       label(m.x + m.w / 2, m.y + m.bodyY + 24, m.body, D.fs, m.ghost ? 'ghost' : (mutated ? 'mut' : null));
@@ -3235,54 +3233,6 @@ function renderMemory(state, prev, history){
         label(m.x + sl.x + sl.w / 2, m.y + sl.y - 6, sl.idx, D.fsSmall, 'dim');
       }
     });
-  });
-
-  /* --- arrows: slot -> the outer border of the object it names ----------- */
-  var sources = [];
-  frames.forEach(function(m){
-    m.slots.forEach(function(sl){ if (sl.ref) sources.push({ from: m, sl: sl }); });
-  });
-  shown.forEach(function(id){
-    var m = placed[id];
-    if (m && !m.ghost) m.slots.forEach(function(sl){ if (sl.ref) sources.push({ from: m, sl: sl }); });
-  });
-
-  sources.forEach(function(src, i){
-    var target = placed[src.sl.ref];
-    if (!target || target.ghost) return;
-    var a = {
-      x: src.from.x + src.sl.x, y: src.from.y + src.sl.y,
-      w: src.sl.w, h: src.sl.h
-    };
-    var b = { x: target.x, y: target.y, w: target.w, h: target.h };
-    var ca = { x: a.x + a.w / 2, y: a.y + a.h / 2 };
-    var cb = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
-
-    /* A list's slots sit in a horizontal run, so a line drawn straight at the
-       target would cut across the neighbouring slots. Drop out of the bottom
-       edge instead, directly below the slot: unambiguous about which slot it
-       leaves, and it crosses nothing. */
-    var horizontal = src.from.o && (src.from.o.type === 'list' || src.from.o.type === 'tuple');
-    var p1 = horizontal
-      ? { x: ca.x, y: src.from.y + src.from.h }
-      : clipToRect(a, cb.x, cb.y);
-    var p2 = clipToRect(b, p1.x, p1.y);
-    if (Math.hypot(p2.x - p1.x, p2.y - p1.y) < 6) return;
-
-    /* Arrows stay ink even when their target changed: amber is reserved for
-       the thing that was mutated, and an arrow is not that thing. */
-    arrows.appendChild(handLine(p1.x, p1.y, p2.x, p2.y, 900 + i * 17, 'hd-ink'));
-
-    var ang = Math.atan2(p2.y - p1.y, p2.x - p1.x);
-    var ux = Math.cos(ang), uy = Math.sin(ang);
-    var bx = p2.x - 13 * ux, by = p2.y - 13 * uy;
-    var head = document.createElementNS(SVGNS, 'polygon');
-    head.setAttribute('points',
-      p2.x + ',' + p2.y + ' ' +
-      (bx - uy * 5) + ',' + (by + ux * 5) + ' ' +
-      (bx + uy * 5) + ',' + (by - ux * 5));
-    head.setAttribute('class', 'hd-head');
-    arrows.appendChild(head);
   });
 
   /* One constant scale, whatever the diagram contains. A box is the same
@@ -3326,7 +3276,9 @@ function setZoom(z, anchor){
     var dw = $('drawWrap');
     dw.scrollLeft = sx; dw.scrollTop = sy;
   } else {
-    if (app.painted) renderMemory(app.painted, null);
+    /* Same inputs as the last paint, or zooming would drop the faded
+       objects and the amber marks, which both come from the steps before. */
+    if (app.painted) renderMemory(app.painted, app.paintedPrev, app.paintedHistory);
     wrap.scrollLeft = sx;
     wrap.scrollTop = sy;
   }
@@ -3480,7 +3432,8 @@ function render(){
   var prev = app.idx > 0 ? states[app.idx - 1] : null;
 
   markLines(state);
-  renderMemory(state, prev, states.slice(0, app.idx));
+  var history = states.slice(0, app.idx);
+  renderMemory(state, prev, history);
   renderOutput(state, prev);
   renderStatus(state);
   renderError(state);
@@ -3490,6 +3443,8 @@ function render(){
   $('btnRun').disabled = app.idx >= states.length - 1;
 
   app.painted = state;
+  app.paintedPrev = prev;
+  app.paintedHistory = history;
   emit();
 }
 
