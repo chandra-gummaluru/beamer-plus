@@ -424,8 +424,14 @@ html.ar-dark {
 #stats {
   flex-shrink: 0;
   flex-wrap: wrap;
+  /* Big and small figures share a bottom edge, so their labels sit on one
+     line instead of stepping up and down across the row. */
+  align-items: flex-end;
   gap: calc(10px * var(--u)) calc(34px * var(--u));
 }
+/* Nothing to say (a numerical answer before its reveal): take no room, so
+   the chart doesn't shift down under an empty row. */
+#stats:empty { display: none !important; }
 .stat { display: flex; flex-direction: column; gap: 4px; }
 .stat-v {
   font-family: var(--font-mono);
@@ -437,8 +443,19 @@ html.ar-dark {
   white-space: nowrap;
 }
 .stat-v small { font-size: 0.5em; font-weight: 500; color: var(--text-3); margin-left: 4px; }
-.stat.is-minor .stat-v { font-size: var(--fs-lead); color: var(--text-2); }
+/* All figures one size: a row of mixed sizes read as untidy rather than
+   as a hierarchy. The revealed answer's green is the only emphasis. */
 .stat.is-answer .stat-v { color: var(--ok); }
+/* Sized off --u like the figures above them — the toolbar-sized hint class
+   left these as specks at the back of the room. */
+.stat-l {
+  font-size: calc(9.5px * var(--u));
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  white-space: nowrap;
+}
 
 /* ── Column chart (rating, numeric) ─────────────────── */
 #chart {
@@ -1364,7 +1381,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     // has answered — the type is obvious from what's on the slide.
     // The count has one home, above the question, from the moment the poll
     // opens — so closing it doesn't shift a thing.
-    const countText = D.phase === 'idle' ? '' : plural(D.total, 'response', 'responses');
+    let countText = D.phase === 'idle' ? '' : plural(D.total, 'response', 'responses');
     if (countText !== kickerEl.textContent) {
       kickerEl.textContent = countText;
       if (D.total > lastTally && !preview) {
@@ -1600,7 +1617,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
       const v = document.createElement('div'); v.className = 'stat-v';
       v.textContent = it.value;
       if (it.small) { const sm = document.createElement('small'); sm.textContent = it.small; v.appendChild(sm); }
-      const l = document.createElement('div'); l.className = 'bw-hint'; l.textContent = it.label;
+      const l = document.createElement('div'); l.className = 'stat-l'; l.textContent = it.label;
       s.appendChild(v); s.appendChild(l);
       statsEl.appendChild(s);
     }
@@ -1755,17 +1772,17 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     const top    = Math.max(0, ...shown.map(g => g.n));
     const right  = D.nums.filter(x => isRight(x, D)).length;
     const pct    = D.nums.length ? Math.round(right / D.nums.length * 100) : 0;
-    const common = groups.filter(g => g.n === top && top > 0).map(g => fmtNum(g.v));
 
+    const common = groups.filter(g => g.n === top && top > 0).map(g => fmtNum(g.v));
     const stats = [];
     if (reveal) {
       const tol = D.tol ? ` ± ${fmtNum(D.tol)}` : '';
-      stats.push({ value: fmtNum(D.answer) + tol, small: D.unit, label: 'Answer', answer: true });
-      stats.push({ value: pct + '%', label: `${right} of ${D.nums.length} got it right` });
+      stats.push({ value: fmtNum(D.answer) + tol, small: D.unit, label: 'Correct answer', answer: true });
+      stats.push({ value: pct + '%', label: `Got it right · ${right} of ${D.nums.length}` });
     }
     stats.push({ value: common.length ? common.slice(0, 3).join(', ') : '–', small: common.length ? D.unit : '',
-                 label: common.length > 1 ? 'Most common (tied)' : 'Most common', minor: reveal });
-    stats.push({ value: String(groups.length), label: groups.length === 1 ? 'Distinct answer' : 'Distinct answers', minor: true });
+                 label: common.length > 1 ? 'Most common (tied)' : 'Most common' });
+    stats.push({ value: String(groups.length), label: groups.length === 1 ? 'Distinct answer' : 'Distinct answers' });
     renderStats(stats);
 
     markerEl.style.display = 'none';
