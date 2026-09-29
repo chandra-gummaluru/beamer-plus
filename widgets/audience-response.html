@@ -28,7 +28,7 @@
     {"key": "numSummaries", "label": "Number of summaries", "type": "number", "min": 1, "step": 1, "default": 3, "showIf": {"responseType": "open"}},
     {"key": "apiKey", "label": "API key", "type": "password", "placeholder": "Paste API key…", "showIf": {"responseType": "open"}},
     {"key": "scale", "label": "Text size", "type": "select", "options": [{"v": "1", "l": "Small"}, {"v": "1.4", "l": "Medium"}, {"v": "1.8", "l": "Large"}, {"v": "2.2", "l": "Extra large"}], "default": "1.4", "section": "Display"},
-    {"key": "layout", "label": "Layout while collecting", "type": "select", "default": "side", "options": [{"v": "side", "l": "Side by side (QR on the right)"}, {"v": "stacked", "l": "Stacked (QR below the answers)"}], "showIf": {"responseType": ["choice", "truefalse"]}}
+    {"key": "layout", "label": "Layout while collecting", "type": "select", "default": "side", "options": [{"v": "side", "l": "Side by side (QR on the right)"}, {"v": "stacked", "l": "Stacked (QR below the question)"}]}
   ]
 }
 </script>
@@ -101,6 +101,9 @@
   align-items: center;
 }
 #stage.is-split #side { grid-column: 2; grid-row: 1; }
+/* The QR hangs from the same top line as the question rather than floating
+   in the middle of its column — the slide reads top-down in every phase. */
+#stage.is-split #side { align-self: start; justify-content: flex-start; }
 /* Stacked: question, answers, then the QR straight underneath them — not
    pinned to the bottom of the slide. The question row is capped rather than
    1fr, so a short question leaves the QR close by, and a long one scrolls
@@ -593,8 +596,10 @@ html.ar-dark {
   align-items: center;
   gap: 10px;
   font-family: var(--font-mono);
-  font-size: var(--fs-chrome-sm);
-  color: var(--text-3);
+  /* The room reads this line ("most common — …"), so it scales with the
+     slide like the rest of the results, not with the toolbar. */
+  font-size: var(--fs-small);
+  color: var(--text-2);
 }
 #fill-stats { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #fill-foot .bw-spacer { flex: 1; }
@@ -1368,19 +1373,24 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
       lastTally = preview ? 0 : D.total;
     }
 
-    // Layout. While a multiple-choice poll is open the slide splits — question
+    // Layout. While a poll is open the slide splits (or stacks) — question
     // and options on the left, the QR on the right. From the moment it closes
     // the right column is gone for good and the slide is one column, so the
     // results arrive without anything moving. The preview shows the finished
     // slide (sample results), so it draws no stand-in QR.
     const withJoin = collect;
-    const stacked  = isChoiceLike(t) && withJoin && S.layout === 'stacked';
-    const split    = isChoiceLike(t) && withJoin && !stacked;
+    // Every type gets the presenter's layout while the QR is up. (It used to
+    // be choice-only; the others stacked the QR at the very bottom of the
+    // slide, far from the question it belongs to.)
+    const stacked  = withJoin && S.layout === 'stacked';
+    const split    = withJoin && !stacked;
     stage.classList.toggle('is-split',   split);
     stage.classList.toggle('is-stacked', stacked);
     wantStacked = stacked;   // fitStage() may fall back to side by side
     // A template (or a list of answers) is read from the top, not centred.
-    stage.classList.toggle('is-top',     isChoiceLike(t) || t === 'fill');
+    // Always from the top: a centred question sits in a different place in
+    // each phase (QR up, closed, results) and visibly jumps between them.
+    stage.classList.add('is-top');
     stage.classList.toggle('is-preview', preview);
     stage.classList.toggle('is-data',    showData);
     stage.classList.toggle('is-fill',    showData && !split && !stacked);
