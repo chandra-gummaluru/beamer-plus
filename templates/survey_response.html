@@ -359,7 +359,7 @@ function buildInput(data) {
     inputEl.autocomplete = 'off';
     if (kind === 'numeric') {
       inputEl.inputMode = 'decimal';
-      inputEl.placeholder = 'Your estimate';
+      inputEl.placeholder = meta.prompt || 'Your estimate';
       if (meta.unit) wrap.appendChild(el('span', 'line-unit', meta.unit));
     } else {
       inputEl.maxLength = 60;

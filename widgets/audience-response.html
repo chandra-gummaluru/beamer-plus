@@ -6,7 +6,7 @@
   "label": "Audience Response",
   "category": "Audience Response",
   "fields": [
-    {"key": "responseType", "label": "Question type", "type": "select", "default": "choice", "options": [{"v": "choice", "l": "Multiple choice"}, {"v": "truefalse", "l": "True / False"}, {"v": "rating", "l": "Rating scale"}, {"v": "numeric", "l": "Numeric estimate"}, {"v": "wordcloud", "l": "Word cloud"}, {"v": "fill", "l": "Fill in the blanks"}, {"v": "open", "l": "Open-ended"}], "section": "Question"},
+    {"key": "responseType", "label": "Question type", "type": "select", "default": "choice", "options": [{"v": "choice", "l": "Multiple choice"}, {"v": "truefalse", "l": "True / False"}, {"v": "rating", "l": "Rating scale"}, {"v": "numeric", "l": "Numeric estimate"}, {"v": "exact", "l": "Numerical answer"}, {"v": "wordcloud", "l": "Word cloud"}, {"v": "fill", "l": "Fill in the blanks"}, {"v": "open", "l": "Open-ended"}], "section": "Question"},
     {"key": "question", "label": "Question text", "type": "textarea", "rows": 4, "placeholder": "Consider the following code:\n\n```python\nx = 5\nif x > 2:\n    x = -3\n```\n\nWhat is `x`?", "note": "Markdown & $LaTeX$"},
     {"key": "template", "label": "Template", "type": "textarea", "rows": 6, "placeholder": ">>> f(BLANK, BLANK)\nTrue\n>>> f(BLANK, BLANK)\nFalse", "showIf": {"responseType": "fill"}, "note": "each blank is one answer", "mono": true, "blanks": {"pattern": "\\bBLANK\\b|_{3,}", "insert": "BLANK"}},
     {"key": "options", "label": "Options", "type": "textarea-lines", "rows": 4, "placeholder": "Option A\nOption B\nOption C", "showIf": {"responseType": "choice"}, "section": "Answers", "editor": "list", "itemLabel": "option", "itemPlaceholder": "Option", "correct": {"key": "correctAnswer", "base": 1}},
@@ -16,7 +16,9 @@
     {"key": "ratingLow", "label": "Low-end label", "type": "text", "placeholder": "Strongly disagree", "showIf": {"responseType": "rating"}},
     {"key": "ratingHigh", "label": "High-end label", "type": "text", "placeholder": "Strongly agree", "showIf": {"responseType": "rating"}},
     {"key": "numericAnswer", "label": "Actual value", "type": "number-nullable", "showIf": {"responseType": "numeric"}, "note": "revealed on click"},
-    {"key": "numericUnit", "label": "Unit", "type": "text", "placeholder": "ms", "showIf": {"responseType": "numeric"}, "note": "optional"},
+    {"key": "exactAnswer", "label": "Correct answer", "type": "number-nullable", "showIf": {"responseType": "exact"}, "note": "revealed on click"},
+    {"key": "exactTolerance", "label": "Accept within ±", "type": "number-nullable", "min": 0, "showIf": {"responseType": "exact"}, "note": "blank = exact match"},
+    {"key": "numericUnit", "label": "Unit", "type": "text", "placeholder": "ms", "showIf": {"responseType": ["numeric", "exact"]}, "note": "optional"},
     {"key": "wordsPerResponse", "label": "Each response counts as", "type": "select", "default": "1", "options": [{"v": "1", "l": "One word"}, {"v": "2", "l": "Up to two words"}, {"v": "3", "l": "Up to three words"}], "showIf": {"responseType": "wordcloud"}},
     {"key": "autoStart", "label": "Start collecting when the slide opens", "type": "checkbox", "default": true, "section": "Collecting"},
     {"key": "timerMode", "label": "Timer", "type": "select", "default": "none", "options": [{"v": "none", "l": "None"}, {"v": "down", "l": "Count down, then close the poll"}, {"v": "up", "l": "Count up"}]},
@@ -111,6 +113,20 @@
 #stage.is-stacked #prompt { overflow-y: auto; scrollbar-width: thin; }
 #stage.is-stacked #qr-wrap { width: min(28vh, 40vw, 220px); }
 #stage.is-stacked #timer-track { width: min(28vh, 40vw, 220px); }
+
+/* ── Fit, don't scroll ──────────────────────────────────
+   The type tokens are re-declared here so they resolve against #stage's own
+   --u. Normally that is just the host's value, inherited. When the content
+   doesn't fit, fitStage() sets a smaller --u inline on #stage and everything
+   the room reads shrinks together — text, gaps, badges — until it fits,
+   instead of growing a scrollbar. Same formulas as widget-base.css. */
+#stage {
+  --fs-body:  calc(14px * var(--u));
+  --fs-lead:  calc(18px * var(--u));
+  --fs-head:  calc(24px * var(--u));
+  --fs-code:  calc(13px * var(--u));
+  --fs-small: calc(11.5px * var(--u));
+}
 
 /* The right-hand column: exactly one of these at a time. */
 #side {
@@ -909,6 +925,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     truefalse: { title: 'True or False',    kicker: 'True or false' },
     rating:    { title: 'Rating Scale',     kicker: 'Rating' },
     numeric:   { title: 'Numeric Estimate', kicker: 'Estimate' },
+    exact:     { title: 'Numerical Answer', kicker: 'Answer' },
     wordcloud: { title: 'Word Cloud',       kicker: 'Word cloud' },
     fill:      { title: 'Fill in the Blanks', kicker: 'Fill in the blanks' },
     open:      { title: 'Open Response',    kicker: 'Open question' },
@@ -990,7 +1007,8 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     correct:   null,         // 0-based index, or null
     scale:     { min: 1, max: 5, low: '', high: '' },   // rating
     unit:      '',           // numeric
-    answer:    null,         // numeric: the actual value, or null
+    answer:    null,         // numeric / exact: the actual value, or null
+    tol:       0,            // exact: how far off still counts as right
     words:     1,            // wordcloud: words kept per response
     template:  '',           // fill: the text, with a BLANK per slot
     fills:     [],           // fill: [[answer, answer, …], …] one per response
@@ -1215,7 +1233,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
         if (n >= S.scale.min && n <= S.scale.max) r[n] = (r[n] || 0) + 1;
       }
       S.ratings = r;
-    } else if (S.type === 'numeric') {
+    } else if (S.type === 'numeric' || S.type === 'exact') {
       S.nums = texts.map(t => Number(t.replace(/[\s,_]/g, ''))).filter(Number.isFinite);
     } else if (S.type === 'fill') {
       // Each response is one JSON array — an answer per blank, in order. An
@@ -1287,6 +1305,8 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
                : { 1: 1, 2: 3, 3: 7, 4: 9, 5: 4 } };
       case 'numeric': return { ...base, question: q || 'How many comparisons does binary search need for 1,000,000 items?',
         unit: S.unit, nums: [5, 8, 10, 12, 15, 18, 20, 20, 20, 21, 22, 25, 30, 30, 40, 50, 64, 100, 20, 19, 24, 16, 20, 25] };
+      case 'exact': return { ...base, question: q || 'How many times does `f(5)` call itself?',
+        unit: S.unit, answer: S.answer, tol: S.tol, nums: [15, 15, 15, 15, 15, 15, 15, 15, 15, 14, 14, 14, 5, 5, 5, 16, 16, 32, 10, 15, 15, 14, 5, 25] };
       case 'wordcloud': return { ...base, question: q || 'Describe today\'s lecture in one word.',
         cloud: [['interesting', 7], ['fast', 5], ['confusing', 4], ['useful', 4], ['fun', 3], ['dense', 3],
                 ['clear', 2], ['recursion', 2], ['challenging', 2], ['long', 1], ['engaging', 1], ['abstract', 1],
@@ -1362,8 +1382,9 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
 
     const show = (el, on, how) => { el.style.display = on ? (how || 'flex') : 'none'; };
     show(choicesEl, isChoiceLike(t), 'grid');
-    show(statsEl,   showData && (t === 'rating' || t === 'numeric'));
-    show(chartEl,   showData && (t === 'rating' || t === 'numeric'));
+    const columns = t === 'rating' || t === 'numeric' || t === 'exact';
+    show(statsEl,   showData && columns);
+    show(chartEl,   showData && columns);
     show(cloudEl,   showData && t === 'wordcloud');
     // The template is the answer sheet: it goes up when the poll closes, not
     // while the room is still filling it in on their phones.
@@ -1376,6 +1397,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     if (isChoiceLike(t))  renderChoices(D, showData);
     if (showData && t === 'rating')    renderRating(D);
     if (showData && t === 'numeric')   renderNumeric(D);
+    if (showData && t === 'exact')     renderExact(D);
     if (showData && t === 'wordcloud') renderCloud(D);
     if (showFill) renderFill(D, showData);
     if (t === 'open')     renderWall(D);
@@ -1385,6 +1407,8 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     renderTimer();
     renderSpotlight(D);
     renderToolbar(preview);
+    lastShowData = showData;
+    fitStage();
   }
 
   // Three plain steps, always in the same order: close the poll, put the
@@ -1403,7 +1427,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     viewWall.classList.toggle('is-active', S.view === 'wall');
     viewSum .classList.toggle('is-active', S.view === 'summary');
 
-    const canReveal = (isChoiceLike(t) && S.correct != null) || (t === 'numeric' && S.answer != null);
+    const canReveal = (isChoiceLike(t) && S.correct != null) || ((t === 'numeric' || t === 'exact') && S.answer != null);
     const min       = parseInt(cfg.minResponses, 10) || 1;
     const tooFew    = t === 'open' && S.total < min;
 
@@ -1674,6 +1698,56 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     }
   }
 
+  // ── Numerical answer (one right number) ─────────────────────────────────────
+  // Unlike an estimate, the spread isn't the story — which wrong answers the
+  // room converged on is. So every distinct answer gets its own column, most
+  // popular first, and the reveal turns the right one(s) green and says what
+  // share of the room got there.
+  const EXACT_COLS = 10;
+  function isRight(x, D) {
+    if (D.answer == null) return false;
+    const tol = Math.max(0, D.tol || 0);
+    // A hair of slack so 0.1 + 0.2 still counts as 0.3.
+    return Math.abs(x - D.answer) <= tol + 1e-9 * Math.max(1, Math.abs(D.answer));
+  }
+
+  function renderExact(D) {
+    const reveal = D.revealed && D.answer != null;
+    const m = new Map();
+    for (const x of D.nums) m.set(x, (m.get(x) || 0) + 1);
+    let groups = [...m].map(([v, n]) => ({ v, n, ok: isRight(v, D) }))
+                       .sort((a, b) => b.n - a.n || a.v - b.v);
+    // Past ten columns the labels stop being readable; the rest are counted
+    // in a note, but a right answer is never the one that gets dropped.
+    let shown = groups.slice(0, EXACT_COLS);
+    if (reveal) {
+      const rightOut = groups.slice(EXACT_COLS).filter(g => g.ok);
+      if (rightOut.length) shown = [...groups.filter(g => g.ok), ...groups.filter(g => !g.ok)].slice(0, EXACT_COLS)
+                                     .sort((a, b) => b.n - a.n || a.v - b.v);
+    }
+    const hidden = D.nums.length - shown.reduce((a, g) => a + g.n, 0);
+    const top    = Math.max(0, ...shown.map(g => g.n));
+    const right  = D.nums.filter(x => isRight(x, D)).length;
+    const pct    = D.nums.length ? Math.round(right / D.nums.length * 100) : 0;
+    const common = groups.filter(g => g.n === top && top > 0).map(g => fmtNum(g.v));
+
+    const stats = [];
+    if (reveal) {
+      const tol = D.tol ? ` ± ${fmtNum(D.tol)}` : '';
+      stats.push({ value: fmtNum(D.answer) + tol, small: D.unit, label: 'Answer', answer: true });
+      stats.push({ value: pct + '%', label: `${right} of ${D.nums.length} got it right` });
+    }
+    stats.push({ value: common.length ? common.slice(0, 3).join(', ') : '–', small: common.length ? D.unit : '',
+                 label: common.length > 1 ? 'Most common (tied)' : 'Most common', minor: reveal });
+    stats.push({ value: String(groups.length), label: groups.length === 1 ? 'Distinct answer' : 'Distinct answers', minor: true });
+    renderStats(stats);
+
+    markerEl.style.display = 'none';
+    chartEl.classList.remove('is-edges');
+    renderColumns(shown.map(g => ({ label: fmtNum(g.v), n: g.n, top: !reveal && g.n === top, hit: reveal && g.ok })),
+                  hidden > 0 ? ['', `${plural(hidden, 'other answer', 'other answers')} not shown`] : null);
+  }
+
   // ── Word cloud ──────────────────────────────────────────────────────────────
   // Laid out by the browser (flex-wrap, centred) rather than on a canvas, so
   // it's crisp at any size, takes the deck's font and theme, and new words
@@ -1822,6 +1896,37 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     }
   }
 
+  // ── Fit to the slide ────────────────────────────────────────────────────────
+  // A scrollbar on a projected slide is content the room can't see. So when
+  // anything overflows, shrink the stage's --u (all the room-facing type and
+  // spacing hang off it) until it fits. Binary search, ~7 reflows. Below
+  // FIT_MIN of the presenter's size the text would stop being readable from
+  // the back, so there it stops and the scrollbar comes back as a last resort.
+  const FIT_MIN = 0.55;
+  let lastShowData = false;
+
+  function overflowing() {
+    const els = [promptEl, questionEl, choicesEl, fillTpl, wallEl, ...questionEl.querySelectorAll('pre')];
+    return els.some(el => el.offsetParent !== null && el.clientHeight > 0 &&
+      (el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1));
+  }
+
+  function fitStage() {
+    stage.style.removeProperty('--u');
+    const relayout = () => { if (isChoiceLike(S.type) && choiceRows.length) layoutChoices(lastShowData); };
+    relayout();
+    if (!overflowing()) return;
+    const base = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--u')) || 1.4;
+    let lo = FIT_MIN, hi = 1;
+    const tryAt = f => { stage.style.setProperty('--u', String(base * f)); relayout(); return !overflowing(); };
+    if (!tryAt(lo)) return;                 // won't fit even at the floor: keep the floor, allow scrolling
+    for (let i = 0; i < 7; i++) {
+      const mid = (lo + hi) / 2;
+      if (tryAt(mid)) lo = mid; else hi = mid;
+    }
+    tryAt(lo);
+  }
+
   // ── Timer ───────────────────────────────────────────────────────────────────
   // Runs only while collecting. The presenter owns it: at 0:00 on a countdown
   // it closes the poll exactly as the Close button would. A viewer ticks its
@@ -1957,6 +2062,9 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     if (isChoiceLike(S.type)) body.options = S.options;
     if (S.type === 'rating')    body.meta = { ...S.scale };
     if (S.type === 'numeric')   body.meta = { unit: S.unit };
+    // The phone page already has a number field; this reuses it with a
+    // prompt that doesn't ask the room to guess.
+    if (S.type === 'exact')     { body.kind = 'numeric'; body.meta = { unit: S.unit, prompt: 'Your answer' }; }
     if (S.type === 'wordcloud') body.meta = { words: S.words };
     if (S.type === 'fill')      body.meta = { template: S.template };
     if (S.type === 'open') {
@@ -2152,7 +2260,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
       type: S.type, layout: S.layout, timer: S.timer,
       timerStart: S.timerStart, timerElapsed: S.timerStart == null ? null : elapsedMs(),
       question: S.question, options: S.options, correct: S.correct,
-      scale: S.scale, unit: S.unit, answer: S.answer, words: S.words,
+      scale: S.scale, unit: S.unit, answer: S.answer, tol: S.tol, words: S.words,
       template: S.template, fills: S.fills.slice(0, CAP.groups), fillIdx: S.fillIdx,
       phase: S.phase, surveyId: S.surveyId, joinUrl: S.joinUrl, total: S.total,
       votes: S.votes, ratings: S.ratings,
@@ -2166,7 +2274,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
 
   function pollIdentity(type, question, options, scale, unit, words, template) {
     return JSON.stringify([type, question, options || [], type === 'rating' ? scale : null,
-                           type === 'numeric' ? unit : null, type === 'wordcloud' ? words : null,
+                           type === 'numeric' || type === 'exact' ? unit : null, type === 'wordcloud' ? words : null,
                            type === 'fill' ? template || '' : null]);
   }
 
@@ -2191,6 +2299,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     S.scale     = s.scale && typeof s.scale === 'object' ? { ...S.scale, ...s.scale } : S.scale;
     S.unit      = s.unit || '';
     S.answer    = Number.isFinite(s.answer) ? s.answer : null;
+    S.tol       = Number.isFinite(s.tol) ? s.tol : 0;
     S.words     = s.words || 1;
     S.template  = s.template || '';
     S.fills     = Array.isArray(s.fills) ? s.fills : [];
@@ -2264,13 +2373,16 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
 
     const max = Math.min(10, Math.max(2, parseInt(cfg.ratingMax, 10) || 5));
     S.scale  = { min: 1, max, low: String(cfg.ratingLow || '').trim(), high: String(cfg.ratingHigh || '').trim() };
-    const ans = cfg.numericAnswer === '' || cfg.numericAnswer == null ? NaN : Number(cfg.numericAnswer);
+    const rawAns = S.type === 'exact' ? cfg.exactAnswer : cfg.numericAnswer;
+    const ans = rawAns === '' || rawAns == null ? NaN : Number(rawAns);
+    const tol = Number(cfg.exactTolerance);
+    S.tol    = Number.isFinite(tol) && tol > 0 ? tol : 0;
     S.answer = Number.isFinite(ans) ? ans : null;
     S.unit   = String(cfg.numericUnit || '').trim();
     S.words  = Math.min(3, Math.max(1, parseInt(cfg.wordsPerResponse, 10) || 1));
     S.template = S.type === 'fill' ? String(cfg.template || '') : '';
 
-    const canReveal = S.correct != null || (S.type === 'numeric' && S.answer != null);
+    const canReveal = S.correct != null || ((S.type === 'numeric' || S.type === 'exact') && S.answer != null);
     if (!canReveal) S.revealed = false;
 
     const key = pollIdentity(S.type, S.question, S.options, S.scale, S.unit, S.words, S.template);
@@ -2347,7 +2459,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
 
   // The slide region can change size (the host's font-size control, a resized
   // widget); what fits in a row changes with it.
-  window.addEventListener('resize', () => { if (isChoiceLike(S.type)) render(); });
+  window.addEventListener('resize', () => render());
 
   // Without this the host's Reset reloads the iframe, and a reloaded page only
   // restarts if the host happens to re-send its config.
