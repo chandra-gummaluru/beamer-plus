@@ -19,6 +19,8 @@
     {"key": "numericUnit", "label": "Unit", "type": "text", "placeholder": "ms", "showIf": {"responseType": "numeric"}, "note": "optional"},
     {"key": "wordsPerResponse", "label": "Each response counts as", "type": "select", "default": "1", "options": [{"v": "1", "l": "One word"}, {"v": "2", "l": "Up to two words"}, {"v": "3", "l": "Up to three words"}], "showIf": {"responseType": "wordcloud"}},
     {"key": "autoStart", "label": "Start collecting when the slide opens", "type": "checkbox", "default": true, "section": "Collecting"},
+    {"key": "timerMode", "label": "Timer", "type": "select", "default": "none", "options": [{"v": "none", "l": "None"}, {"v": "down", "l": "Count down, then close the poll"}, {"v": "up", "l": "Count up"}]},
+    {"key": "timerSeconds", "label": "Countdown length (seconds)", "type": "number", "min": 5, "step": 5, "default": 60, "showIf": {"timerMode": "down"}},
     {"key": "minResponses", "label": "Responses needed to close", "type": "number", "min": 1, "step": 1, "default": 1, "showIf": {"responseType": "open"}},
     {"key": "model", "label": "Model", "type": "ai-model", "showIf": {"responseType": "open"}, "section": "AI summaries"},
     {"key": "numSummaries", "label": "Number of summaries", "type": "number", "min": 1, "step": 1, "default": 3, "showIf": {"responseType": "open"}},
@@ -108,6 +110,7 @@
 }
 #stage.is-stacked #prompt { overflow-y: auto; scrollbar-width: thin; }
 #stage.is-stacked #qr-wrap { width: min(28vh, 40vw, 220px); }
+#stage.is-stacked #timer-track { width: min(28vh, 40vw, 220px); }
 
 /* The right-hand column: exactly one of these at a time. */
 #side {
@@ -714,6 +717,43 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   line-height: 0;
 }
 #qr img, #qr canvas { width: 100% !important; height: auto !important; }
+/* ── Timer ──────────────────────────────────────────── */
+/* Under the QR, because it only runs while the QR is up: it's the room's cue
+   for how long they have to scan and answer. Mono and tabular so the digits
+   don't jitter as they tick. */
+#timer {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(6px * var(--u));
+  width: 100%;
+}
+#timer.is-on { display: flex; }
+#timer-text {
+  font-family: var(--font-mono);
+  font-size: var(--fs-lead);
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  transition: color 0.2s;
+}
+/* Countdown only: a hairline that empties as time runs out, the width of
+   the QR above it. */
+#timer-track {
+  display: none;
+  width: min(100%, 260px);
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+#timer.is-down #timer-track { display: block; }
+#timer-fill { height: 100%; background: var(--text-2); transform-origin: left; transition: transform 0.25s linear; }
+/* The last ten seconds are the one moment the timer should be loud. */
+#timer.is-urgent #timer-text { color: var(--err); }
+#timer.is-urgent #timer-fill { background: var(--err); }
+
 /* The count reads as one phrase — "12 responses" — in the deck's own type,
    both here and above the question once the poll is closed. */
 #kicker {
@@ -730,7 +770,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
 @keyframes ar-bump { 40% { transform: scale(1.18); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .fill, .meter-fill, .choice, .hbar, .hn { transition: none; }
+  .fill, .meter-fill, .choice, .hbar, .hn, #timer-fill { transition: none; }
   .resp.is-new, .word.is-new, #spot.is-open, #kicker.bump { animation: none; }
 }
 
@@ -816,6 +856,10 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     <aside id="side">
       <div id="join">
         <div id="qr-wrap"><div id="qr"></div></div>
+        <div id="timer" aria-live="off">
+          <span id="timer-text"></span>
+          <div id="timer-track"><div id="timer-fill"></div></div>
+        </div>
       </div>
     </aside>
 
@@ -913,6 +957,9 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   const wallEmpty   = $('wall-empty');
   const sideEl      = $('side');
   const joinEl      = $('join');
+  const timerEl     = $('timer');
+  const timerText   = $('timer-text');
+  const timerFill   = $('timer-fill');
   const qrEl        = $('qr');
   const previewMsg  = $('preview-msg');
   const previewBtn  = $('preview-open');
@@ -936,6 +983,8 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   const S = {
     type:      'choice',
     layout:    'side',       // choice / truefalse while collecting: 'side' | 'stacked'
+    timer:     { mode: 'none', secs: 60 },   // 'none' | 'down' | 'up'
+    timerStart: null,        // Date.now() when collecting began, in THIS window's clock
     question:  '',
     options:   [],           // choice / truefalse
     correct:   null,         // 0-based index, or null
@@ -1333,6 +1382,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     if (summary)          renderSummary(D);
 
     renderJoin(D, preview);
+    renderTimer();
     renderSpotlight(D);
     renderToolbar(preview);
   }
@@ -1772,6 +1822,71 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     }
   }
 
+  // ── Timer ───────────────────────────────────────────────────────────────────
+  // Runs only while collecting. The presenter owns it: at 0:00 on a countdown
+  // it closes the poll exactly as the Close button would. A viewer ticks its
+  // own copy between syncs so the digits move smoothly, but never acts on it.
+  let tickTimer = null, closingOnTime = false;
+
+  function elapsedMs() {
+    return S.timerStart == null ? 0 : Math.max(0, Date.now() - S.timerStart);
+  }
+
+  function fmtClock(sec) {
+    sec = Math.max(0, Math.floor(sec));
+    const h = Math.floor(sec / 3600), m = Math.floor(sec / 60) % 60, x = sec % 60;
+    const mm = h ? String(m).padStart(2, '0') : String(m);
+    return (h ? h + ':' : '') + mm + ':' + String(x).padStart(2, '0');
+  }
+
+  function renderTimer() {
+    const mode = S.timer.mode;
+    const on   = mode !== 'none' && S.phase === 'collect' && S.timerStart != null;
+    timerEl.classList.toggle('is-on', on);
+    if (!on) return;
+    const el = elapsedMs() / 1000;
+    const down = mode === 'down';
+    timerEl.classList.toggle('is-down', down);
+    if (down) {
+      const total  = S.timer.secs;
+      // Ceil, so the display reads 0:01 through the last second and 0:00
+      // only at the moment the poll closes.
+      const remain = Math.max(0, Math.ceil(total - el));
+      timerText.textContent = fmtClock(remain);
+      timerFill.style.transform = `scaleX(${total ? Math.max(0, 1 - el / total) : 0})`;
+      timerEl.classList.toggle('is-urgent', remain <= 10);
+    } else {
+      timerText.textContent = fmtClock(el);
+      timerEl.classList.remove('is-urgent');
+    }
+  }
+
+  function tick() {
+    renderTimer();
+    if (IS_VIEWER || S.phase !== 'collect' || S.timer.mode !== 'down' || closingOnTime) return;
+    if (elapsedMs() >= S.timer.secs * 1000) {
+      closingOnTime = true;
+      closePoll().finally(() => { closingOnTime = false; });
+    }
+  }
+
+  function startTicking() {
+    stopTicking();
+    if (S.timer.mode === 'none' || S.phase !== 'collect') return;
+    tickTimer = setInterval(tick, 250);
+    tick();
+  }
+
+  function stopTicking() {
+    if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
+  }
+
+  function readTimerCfg(c) {
+    const mode = c.timerMode === 'down' || c.timerMode === 'up' ? c.timerMode : 'none';
+    const secs = Math.max(5, Math.min(24 * 3600, parseInt(c.timerSeconds, 10) || 60));
+    return { mode, secs };
+  }
+
   function renderSpotlight(D) {
     const g  = D.groups[D.spotlight];
     const on = D.type === 'open' && !!g;
@@ -1824,7 +1939,9 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
       votes: {}, ratings: {}, nums: [], cloud: [], groups: [], fills: [], fillIdx: 0,
       revealed: false, view: 'wall', summaries: null,
       sIdx: 0, sumBusy: false, sumError: '', spotlight: -1, error: '',
+      timerStart: null,
     });
+    stopTicking();
     lastTally = 0;
   }
 
@@ -1867,7 +1984,9 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
       // public origin in front of it.
       S.joinUrl  = publicOrigin() + data.url;
       S.phase    = 'collect';
+      S.timerStart = Date.now();
       pollTimer  = setInterval(fetchResponses, POLL_MS);
+      startTicking();
       render(); emitState();
     } catch (e) {
       if (token !== startToken) return;
@@ -1908,6 +2027,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   async function closePoll() {
     if (IS_VIEWER || S.phase !== 'collect') return;
     stopPolling();
+    stopTicking();
     await fetchResponses();
     await fetchResponses();   // the first may have been one already in flight
     closeOnServer(S.surveyId);
@@ -2029,7 +2149,9 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   // slide looks exactly like a synced viewer.
   function getState() {
     return {
-      type: S.type, layout: S.layout, question: S.question, options: S.options, correct: S.correct,
+      type: S.type, layout: S.layout, timer: S.timer,
+      timerStart: S.timerStart, timerElapsed: S.timerStart == null ? null : elapsedMs(),
+      question: S.question, options: S.options, correct: S.correct,
       scale: S.scale, unit: S.unit, answer: S.answer, words: S.words,
       template: S.template, fills: S.fills.slice(0, CAP.groups), fillIdx: S.fillIdx,
       phase: S.phase, surveyId: S.surveyId, joinUrl: S.joinUrl, total: S.total,
@@ -2088,12 +2210,28 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     S.sIdx      = s.sIdx || 0;
     S.spotlight = Number.isInteger(s.spotlight) ? s.spotlight : -1;
 
+    // Timer. A viewer's clock can disagree with the presenter's, so it rebuilds
+    // the start from the elapsed time rather than trusting a foreign timestamp.
+    // The presenter keeps its own timer settings (from config) and only takes
+    // back the start time it saved.
+    if (IS_VIEWER) {
+      if (s.timer && typeof s.timer === 'object') S.timer = readTimerCfg({ timerMode: s.timer.mode, timerSeconds: s.timer.secs });
+      S.timerStart = Number.isFinite(s.timerElapsed) ? Date.now() - s.timerElapsed : null;
+    } else {
+      S.timerStart = Number.isFinite(s.timerStart) ? s.timerStart
+                   : S.phase === 'collect' ? Date.now() : null;
+    }
+
     if (!IS_VIEWER && S.phase === 'collect') {
       // Resume the live poll: refetch everything, then keep polling.
       S.responses = [];
       fetchResponses();
       pollTimer = setInterval(fetchResponses, POLL_MS);
     }
+    // After the polling is back, not before: a countdown that ran out while
+    // the slide was parked closes on the first tick, and closing has to find
+    // the poll timer already running to stop it.
+    if (S.phase === 'collect') startTicking(); else stopTicking();
     render();
   }
 
@@ -2109,6 +2247,8 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
 
     S.type     = TYPES[cfg.responseType] ? cfg.responseType : 'choice';
     S.layout   = cfg.layout === 'stacked' ? 'stacked' : 'side';
+    const prevTimer = S.timer;
+    S.timer    = readTimerCfg(cfg);
     S.question = String(cfg.question || '').trim();
 
     S.options = S.type === 'choice' ? normaliseOptions(cfg.options)
@@ -2143,11 +2283,16 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     } else if (S.phase !== 'idle') {
       recompute();   // e.g. the words-per-response setting changes the tallies
     }
+    // Timer edited mid-poll: keep the clock where it is, just change what it
+    // does — switching to a countdown already past its length closes at once.
+    if (S.phase === 'collect' && S.timerStart == null) S.timerStart = Date.now();
+    if (S.phase === 'collect' && (prevTimer.mode !== S.timer.mode || prevTimer.secs !== S.timer.secs || !tickTimer)) startTicking();
     render(); emitState();
   }
 
   function destroy() {
     stopPolling();
+    stopTicking();
     startToken++;
     clearTimeout(syncTimer);
     if (socket && socket.disconnect) socket.disconnect();
