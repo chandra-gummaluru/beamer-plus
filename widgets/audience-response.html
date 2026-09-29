@@ -110,7 +110,11 @@
   align-content: start;
   gap: calc(16px * var(--u));
 }
-#stage.is-stacked #prompt { overflow-y: auto; scrollbar-width: thin; }
+#stage.is-stacked #prompt { overflow-y: auto; justify-content: flex-start; }
+/* Same as split: natural heights, and the column scrolls as one if it must,
+   rather than the question and the answers each clipping their own half. */
+#stage.is-stacked #question,
+#stage.is-stacked #choices { flex: 0 0 auto; overflow: visible; max-height: none; }
 #stage.is-stacked #qr-wrap { width: min(28vh, 40vw, 220px); }
 #stage.is-stacked #timer-track { width: min(28vh, 40vw, 220px); }
 
@@ -161,7 +165,6 @@
   align-self: stretch;
   min-height: 0;
   overflow-y: auto;
-  scrollbar-width: thin;
   /* Top-aligned, not centred: a question with a listing is taller than the
      slide, and a centred column clips its own first line when it overflows. */
   justify-content: flex-start;
@@ -804,8 +807,18 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
 
 }
 
+/* The question side never shows a bar: fitStage() shrinks the text to fit
+   first, and if it still can't, the overflow scrolls (wheel, touch) without
+   a bar on the slide. */
+#question, #choices, #prompt, #fill-tpl, #question pre { scrollbar-width: none; }
+#question::-webkit-scrollbar, #choices::-webkit-scrollbar, #prompt::-webkit-scrollbar,
+#fill-tpl::-webkit-scrollbar, #question pre::-webkit-scrollbar { display: none; }
+/* …unless it genuinely can't fit: then a hairline bar, so the room can tell
+   there's more rather than missing the end of the question. */
+#stage.is-overflow :is(#question, #choices, #prompt, #fill-tpl, #question pre) { scrollbar-width: thin; }
+
 /* Scrollbars: hairline, never louder than the content. */
-#choices::-webkit-scrollbar, #wall::-webkit-scrollbar, #spot-card::-webkit-scrollbar { width: 6px; }
+#wall::-webkit-scrollbar, #spot-card::-webkit-scrollbar { width: 6px; }
 #choices::-webkit-scrollbar-thumb, #wall::-webkit-scrollbar-thumb, #spot-card::-webkit-scrollbar-thumb {
   background: var(--border); border-radius: 3px;
 }
@@ -1365,6 +1378,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     const split    = isChoiceLike(t) && withJoin && !stacked;
     stage.classList.toggle('is-split',   split);
     stage.classList.toggle('is-stacked', stacked);
+    wantStacked = stacked;   // fitStage() may fall back to side by side
     // A template (or a list of answers) is read from the top, not centred.
     stage.classList.toggle('is-top',     isChoiceLike(t) || t === 'fill');
     stage.classList.toggle('is-preview', preview);
@@ -1548,7 +1562,9 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     // Still taller than the room left under the question? Trade line breaks
     // for rows until it fits, or until every answer has its own column.
     const room = promptEl.getBoundingClientRect().bottom - choicesEl.getBoundingClientRect().top;
-    while (cols < n && choicesEl.scrollHeight > room + 1) { set(++cols); }
+    // Never past the point where an answer would wrap onto more than about
+    // two lines — six columns of one letter per line is worse than scrolling.
+    while (cols < n && choicesEl.scrollHeight > room + 1 && fits(cols + 1, 2)) { set(++cols); }
   }
 
   // Counts, percentages and the shade each option draws — the pie and the
@@ -1898,33 +1914,88 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
 
   // ── Fit to the slide ────────────────────────────────────────────────────────
   // A scrollbar on a projected slide is content the room can't see. So when
-  // anything overflows, shrink the stage's --u (all the room-facing type and
-  // spacing hang off it) until it fits. Binary search, ~7 reflows. Below
-  // FIT_MIN of the presenter's size the text would stop being readable from
-  // the back, so there it stops and the scrollbar comes back as a last resort.
-  const FIT_MIN = 0.55;
-  let lastShowData = false;
+  // the question or its answers overflow, shrink the stage's --u a little (all
+  // the room-facing type and spacing hang off it) until they fit. Only a
+  // little: below FIT_MIN of the presenter's chosen size it stops, and what's
+  // left scrolls with the bar hidden. Results views (charts, the response
+  // wall) are left alone — they have their own layouts and a wall that shrank
+  // with every response would end up unreadable.
+  const FIT_MIN = 0.8;
+  let lastShowData = false, wantStacked = false;
 
   function overflowing() {
-    const els = [promptEl, questionEl, choicesEl, fillTpl, wallEl, ...questionEl.querySelectorAll('pre')];
+    const els = [questionEl, choicesEl, fillTpl, ...questionEl.querySelectorAll('pre')];
+    // The prompt column only scrolls as a whole in the split / stacked layouts.
+    if (stage.classList.contains('is-split') || stage.classList.contains('is-stacked')) els.push(promptEl);
     return els.some(el => el.offsetParent !== null && el.clientHeight > 0 &&
-      (el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1));
+      (el.scrollHeight > el.clientHeight + 2 || el.scrollWidth > el.clientWidth + 2));
   }
 
   function fitStage() {
-    stage.style.removeProperty('--u');
+    // Start from the layout the presenter chose; a previous fit may have
+    // swapped it for side by side.
+    if (wantStacked) { stage.classList.add('is-stacked'); stage.classList.remove('is-split'); }
     const relayout = () => { if (isChoiceLike(S.type) && choiceRows.length) layoutChoices(lastShowData); };
+    // Not laid out yet (a slide that hasn't been shown, a region mid-resize):
+    // measuring now would shrink to the floor and stay there.
+    const measurable = () => stage.clientHeight >= 120 && stage.clientWidth >= 200;
+
+    if (shrinkToFit(relayout, measurable)) return;
+    // Stacked puts the QR under everything, which a long question (a code
+    // listing, say) can't spare the height for. Rather than hide the answers
+    // below the fold, fall back to side by side for this slide.
+    if (wantStacked) {
+      stage.classList.remove('is-stacked'); stage.classList.add('is-split');
+      shrinkToFit(relayout, measurable);
+    }
+  }
+
+  // Largest --u (between FIT_MIN and the presenter's size) at which nothing
+  // overflows. Returns false, leaving the floor applied and the stage marked
+  // is-overflow, when even the floor doesn't fit.
+  function shrinkToFit(relayout, measurable) {
+    stage.style.removeProperty('--u');
+    stage.classList.remove('is-overflow');
     relayout();
-    if (!overflowing()) return;
+    if (!measurable() || !overflowing()) return true;
     const base = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--u')) || 1.4;
-    let lo = FIT_MIN, hi = 1;
     const tryAt = f => { stage.style.setProperty('--u', String(base * f)); relayout(); return !overflowing(); };
-    if (!tryAt(lo)) return;                 // won't fit even at the floor: keep the floor, allow scrolling
-    for (let i = 0; i < 7; i++) {
+    let lo = FIT_MIN, hi = 1;
+    // Can't fit even at the floor: stop there and let it scroll — with a
+    // visible bar, so nothing is silently cut off the slide.
+    if (!tryAt(lo)) { stage.classList.add('is-overflow'); return false; }
+    for (let i = 0; i < 6; i++) {
       const mid = (lo + hi) / 2;
       if (tryAt(mid)) lo = mid; else hi = mid;
     }
     tryAt(lo);
+    return true;
+  }
+
+
+  // The host applies the presenter's text size by writing --u onto <html>,
+  // sometimes after the first render. Our inline --u was computed from the
+  // old value, so refit whenever it changes — otherwise the slide stays at
+  // whatever size the first measurement settled on.
+  if (window.MutationObserver) {
+    let lastU = document.documentElement.style.getPropertyValue('--u');
+    new MutationObserver(() => {
+      const u = document.documentElement.style.getPropertyValue('--u');
+      if (u !== lastU) { lastU = u; fitStage(); }
+    }).observe(document.documentElement, { attributes: true, attributeFilter: ['style'] });
+  }
+
+  // Refit whenever the stage itself changes size — the iframe is often laid
+  // out after the first render, and a resize event doesn't always follow.
+  if (window.ResizeObserver) {
+    let fitRaf = 0, lastSize = '';
+    new ResizeObserver(() => {
+      const size = stage.clientWidth + 'x' + stage.clientHeight;
+      if (size === lastSize) return;
+      lastSize = size;
+      cancelAnimationFrame(fitRaf);
+      fitRaf = requestAnimationFrame(fitStage);
+    }).observe(stage);
   }
 
   // ── Timer ───────────────────────────────────────────────────────────────────
