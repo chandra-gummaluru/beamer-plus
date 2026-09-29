@@ -1104,6 +1104,13 @@ defineModule('engine', ['state'], (state) => {
         return idx === 1 ? 1 : (comp.bits || 1);      // SO is 1 bit; Q is the register width
       }
       if (BIT_CAPABLE[base]) return comp.bits || 1;
+      // Custom modules carry a fixed width per pin, taken from the IN/OUT
+      // components inside them when they were registered.
+      const def = GATE_DEFS[comp.kind];
+      if (def && def.family === 'custom') {
+        const arr = type === 'in' ? def.inBits : def.outBits;
+        return (arr && arr[idx]) || 1;
+      }
       const bb = busBaseOf(comp.kind);
       // COMBINE's inputs and SPLIT's outputs are each a single bit; the
       // *other* side is the one wide bus pin.
@@ -2121,6 +2128,10 @@ defineModule('gates', ['state', 'engine'], (state, engine) => {
     const outs = [...tmp.ioComponents.values()].filter(c=>c.kind==='OUTPUT').sort((a,b)=>a.y-b.y);
     const inIds=ins.map(c=>c.ioId), outIds=outs.map(c=>c.ioId);
     const inLabels=ins.map(c=>c.label), outLabels=outs.map(c=>c.label);
+    // Each outside pin is as wide as the INPUT/OUTPUT it stands for, so a
+    // 4-bit IN inside the module becomes a 4-bit pin on the box.
+    const inBits  = ins.map(c=>engine.clampBits(c.bits||1));
+    const outBits = outs.map(c=>engine.clampBits(c.bits||1));
 
     const h = boxHeightFor(Math.max(inIds.length, outIds.length, 1));
     const inYs = pinYs(inIds.length, h), outYs = pinYs(outIds.length, h);
@@ -2130,14 +2141,15 @@ defineModule('gates', ['state', 'engine'], (state, engine) => {
 
     GATE_DEFS[kindKey] = {
       kind:kindKey, label:name, inputs:inIds.length, outputs:outIds.length, family:'custom',
+      inBits, outBits,
       compute(inputVals, st) {
         if (!st.sub) { st.sub = engine.createCircuit(); st.sub.load(data); }
         const sub = st.sub;
-        inIds.forEach((ioId,i)=>{ const c=sub.ioComponents.get(ioId); if (c) c.state.value = inputVals[i]?1:0; });
+        inIds.forEach((ioId,i)=>{ const c=sub.ioComponents.get(ioId); if (c) c.state.value = (inputVals[i]||0) & engine.bitMask(inBits[i]); });
         // A custom gate is one hop from the outside, so its interior settles
         // instantly rather than adding its own internal hop count.
         for (let i=0;i<8;i++) sub.step(state.widgetState.now, 0, true);
-        return outIds.map(ioId=>{ const c=sub.ioComponents.get(ioId); return c ? (c.inputVals[0]||0) : 0; });
+        return outIds.map((ioId,i)=>{ const c=sub.ioComponents.get(ioId); return c ? ((c.inputVals[0]||0) & engine.bitMask(outBits[i])) : 0; });
       },
     };
 
