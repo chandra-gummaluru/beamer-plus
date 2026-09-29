@@ -105,6 +105,10 @@ button { font-family:inherit; }
 .seg-btn + .seg-btn { border-left:1px solid var(--border); }
 .seg-btn:hover { background:var(--bg-subtle); color:var(--text); }
 .seg-btn.on { background:var(--text); color:var(--bg); font-weight:500; }
+/* Signed/unsigned only means something in DEC; greyed out, not hidden, so it stays findable. */
+.seg-btn:disabled { cursor:default; opacity:.45; }
+.seg-btn:disabled:hover { background:var(--bg); color:var(--text-2); }
+.seg-btn.on:disabled:hover { background:var(--text); color:var(--bg); }
 
 
 /* ───────────────────────── palette ───────────────────────── */
@@ -645,6 +649,7 @@ defineModule('state', [], () => {
     now: 0,               // simulation clock (ms)
     circuit: null,
     numFormat: 'bin',     // how multi-bit bus values are displayed: bin | dec | hex
+    numSigned: false,     // DEC only: read the bits as two's complement instead of unsigned
   };
   return { widgetState };
 });
@@ -722,23 +727,34 @@ defineModule('engine', ['state'], (state) => {
   // is exactly the "decrement past 0" behaviour a bus should have.
   const bitMask = (bits) => (1 << clampBits(bits)) - 1;
 
-  function formatBits(value, bits, fmt) {
+  // `signed` only changes DEC. BIN and HEX show the raw bit pattern, which is
+  // the same whichever way you choose to read it.
+  function formatBits(value, bits, fmt, signed) {
     bits = clampBits(bits);
     const v = (value || 0) & bitMask(bits);
-    if (fmt === 'dec') return String(v);
+    if (fmt === 'dec') return String(signed ? toSigned(v, bits) : v);
     if (fmt === 'hex') return '0x' + v.toString(16).toUpperCase().padStart(Math.ceil(bits / 4), '0');
     return v.toString(2).padStart(bits, '0');
   }
   // Inverse of formatBits — used by the value editor on a multi-bit INPUT.
   // Returns null for text that doesn't parse as the current format so the
   // caller can leave the field alone rather than clobber it with 0.
-  function parseBits(str, bits, fmt) {
+  // Two's-complement reading of an already-masked value: the top bit weighs -2^(n-1).
+  function toSigned(v, bits) {
+    return (v & (1 << (bits - 1))) ? v - (1 << bits) : v;
+  }
+  function parseBits(str, bits, fmt, signed) {
     if (str == null) return null;
     str = String(str).trim();
     if (!str) return 0;
     let n;
     if (fmt === 'hex') { const s = str.replace(/^0x/i, ''); if (!/^[0-9a-f]+$/i.test(s)) return null; n = parseInt(s, 16); }
-    else if (fmt === 'dec') { if (!/^\d+$/.test(str)) return null; n = parseInt(str, 10); }
+    else if (fmt === 'dec') {
+      // In signed mode a leading minus is allowed; `& mask` below turns it into
+      // the matching two's-complement pattern (-1 on 4 bits → 1111).
+      if (!(signed ? /^-?\d+$/ : /^\d+$/).test(str)) return null;
+      n = parseInt(str, 10);
+    }
     else { if (!/^[01]+$/.test(str)) return null; n = parseInt(str, 2); }
     return Number.isNaN(n) ? null : (n & bitMask(bits));
   }
@@ -1818,7 +1834,7 @@ defineModule('gates', ['state', 'engine'], (state, engine) => {
       // left/right split for step-down / step-up, same in-place-control
       // feel as the single-bit switch.
       const val = comp.state.value || 0;
-      const text = engine.formatBits(val, bits, state.widgetState.numFormat);
+      const text = engine.formatBits(val, bits, state.widgetState.numFormat, state.widgetState.numSigned);
       const fontSize = text.length > 10 ? 8 : text.length > 6 ? 9.5 : 11;
       return <g>
         <rect x="4" y="4" width="72" height="32" rx="9"
@@ -1890,7 +1906,7 @@ defineModule('gates', ['state', 'engine'], (state, engine) => {
       }
       // Multi-bit: a read-only numeric pill, same amber-when-nonzero cue as
       // every other signal on the board.
-      const text = engine.formatBits(on, bits, state.widgetState.numFormat);
+      const text = engine.formatBits(on, bits, state.widgetState.numFormat, state.widgetState.numSigned);
       const fontSize = text.length > 10 ? 7 : text.length > 6 ? 9 : 11;
       return <g>
         {on ? <rect x="0" y="3" width="56" height="34" rx="8" fill="var(--high)" opacity=".14"/> : null}
@@ -1960,7 +1976,7 @@ defineModule('gates', ['state', 'engine'], (state, engine) => {
   function ffVal(comp, cy, w) {
     const bits = comp.bits || 1;
     const val = comp.state.q || 0;
-    const text = engine.formatBits(val, bits, state.widgetState.numFormat);
+    const text = engine.formatBits(val, bits, state.widgetState.numFormat, state.widgetState.numSigned);
     const fontSize = text.length > 12 ? 6.5 : text.length > 8 ? 8 : text.length > 5 ? 10 : 12;
     // Capped well short of the box edge so it can never grow into the D/▷/Q
     // pin labels flanking it, no matter how long the text gets.
@@ -2857,7 +2873,7 @@ function Canvas({
               if (bits <= 1) return null;
               const [lx,ly] = samplePoly(path, .5);
               const val = sig ? (sig.value||0) : 0;
-              const text = engine.formatBits(val, bits, state.widgetState.numFormat);
+              const text = engine.formatBits(val, bits, state.widgetState.numFormat, state.widgetState.numSigned);
               const wd = 12 + text.length*6.6;
               const dy = w.label ? -27 : -13;
               return <g transform={`translate(${lx},${ly+dy})`} pointerEvents="none">
@@ -3088,6 +3104,7 @@ function SelectionPanel({ circuit, selection, onChange, onCommit, onSelect }) {
     const bits = comp ? (comp.bits || 1) : 1;
     const locked = comp ? circuit.hasConnections(comp.id) : false;
     const fmt = state.widgetState.numFormat;
+    const signed = state.widgetState.numSigned;
     return <div className="tb-selpanel">
       <span className="sel-key">{wire ? 'Wire' : comp.kind === 'INPUT' ? 'Input' : 'Output'}</span>
       <input className="prop-input" style={{width:comp?76:118}} value={value} autoFocus={!comp}
@@ -3104,10 +3121,10 @@ function SelectionPanel({ circuit, selection, onChange, onCommit, onSelect }) {
         </select>
       </>}
       {isInput && bits > 1 && <input className="prop-input" style={{width:72,fontFamily:'var(--mono)'}}
-             value={engine.formatBits(comp.state.value||0, bits, fmt)}
-             title={`Value in ${fmt === 'hex' ? 'hex' : fmt === 'dec' ? 'decimal' : 'binary'}`}
+             value={engine.formatBits(comp.state.value||0, bits, fmt, signed)}
+             title={`Value in ${fmt === 'hex' ? 'hex' : fmt === 'dec' ? (signed ? 'signed decimal' : 'unsigned decimal') : 'binary'}`}
              onChange={e=>{
-               const n = engine.parseBits(e.target.value, bits, fmt);
+               const n = engine.parseBits(e.target.value, bits, fmt, signed);
                if (n !== null) { circuit.setInputValue(comp.id, n); onChange?.(); }
              }}
              onBlur={()=>onCommit?.('input value')}
@@ -3441,6 +3458,7 @@ function App() {
   const [hopMs, setHopMs] = useState(1000);
   const [simTime, setSimTime] = useState(0);
   const [numFormat, setNumFormat] = useState('bin');
+  const [numSigned, setNumSigned] = useState(false);
 
   const [showHelp, setShowHelp] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -3456,6 +3474,7 @@ function App() {
   useEffect(()=>{ runningRef.current = running; state.widgetState.running = running; },[running]);
   useEffect(()=>{ hopRef.current = hopMs; state.widgetState.hopMs = hopMs; },[hopMs]);
   useEffect(()=>{ state.widgetState.numFormat = numFormat; },[numFormat]);
+  useEffect(()=>{ state.widgetState.numSigned = numSigned; },[numSigned]);
 
   /* ── history ────────────────────────────────────────────────────────────
      Snapshots of serialize(), pushed on discrete edits (a drag commits once
@@ -3908,6 +3927,17 @@ function App() {
           {[['bin','BIN'],['dec','DEC'],['hex','HEX']].map(([v,l])=>(
             <button key={v} className={'seg-btn'+(numFormat===v?' on':'')}
                     onClick={()=>setNumFormat(v)}>{l}</button>
+          ))}
+        </div>
+      </div>
+      <div className="tb-group" title={numFormat === 'dec'
+             ? 'Read bus values as unsigned or as two\'s-complement signed'
+             : 'Only affects DEC — BIN and HEX show the raw bits'}>
+        <div className="seg">
+          {[[false,'UNSIGNED'],[true,'SIGNED']].map(([v,l])=>(
+            <button key={l} className={'seg-btn'+(numSigned===v?' on':'')}
+                    disabled={numFormat !== 'dec'}
+                    onClick={()=>setNumSigned(v)}>{l}</button>
           ))}
         </div>
       </div>
