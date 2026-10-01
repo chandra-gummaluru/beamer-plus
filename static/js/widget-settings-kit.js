@@ -999,6 +999,40 @@
     }
 
     var _printScale = 2;
+    // A print copy is asked as soon as its iframe loads, but a widget whose
+    // scripts come from a slow CDN may not have run yet: its handler isn't
+    // registered, its stylesheet may still be loading, and a state posted to
+    // it would arrive before anything is listening and be lost. So the request
+    // carries the state, and nothing happens until the document is complete,
+    // every stylesheet has applied and the fonts are in; only then is the
+    // state handed over (as the widget-set-state message it already handles)
+    // and the widget asked to draw.
+    var READY_LIMIT_MS = 30000;
+    function whenLoaded() {
+        return new Promise(function (ok) {
+            if (document.readyState === 'complete') return ok();
+            window.addEventListener('load', function () { ok(); }, { once: true });
+            setTimeout(ok, READY_LIMIT_MS);
+        });
+    }
+    function whenStyled() {
+        var links = [].slice.call(document.querySelectorAll('link[rel="stylesheet"]'));
+        return Promise.all(links.map(function (l) {
+            if (l.sheet) return null;
+            return new Promise(function (ok) {
+                l.addEventListener('load', ok, { once: true });
+                l.addEventListener('error', ok, { once: true });
+                setTimeout(ok, 10000);
+            });
+        }));
+    }
+    function whenFonts() {
+        try { return document.fonts && document.fonts.ready ? document.fonts.ready : null; }
+        catch (e) { return null; }
+    }
+    var wait = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+
+    var _printing = {};   // requestId → true: the host re-sends until it hears back
     function handlePrint(d) {
         var reply = function (msg) {
             msg.type = 'widget-print-result';
@@ -1006,16 +1040,30 @@
             msg.widgetId = cfg().id;
             post(msg);
         };
-        if (!_printHandler) { reply({ ok: false, reason: 'unsupported' }); return; }
+        post({ type: 'widget-print-ack', requestId: d.requestId });
+        if (_printing[d.requestId]) return;
+        _printing[d.requestId] = true;
         _printScale = d.scale || 2;
         var root = document.documentElement;
-        root.classList.add('bw-printing');
-        nextFrames().then(function () {
-            return _printHandler({ scale: _printScale });
-        }).then(function (res) {
-            res = res || {};
-            return Promise.resolve(res.image).then(function (image) {
-                reply({ ok: true, image: toDataUrl(image), pages: normalisePages(res.pages) });
+
+        whenLoaded().then(whenStyled).then(whenFonts).then(function () {
+            if (d.state !== undefined) {
+                // To ourselves, so it reaches the widget's own listener like
+                // any host message would.
+                try { window.postMessage({ type: 'widget-set-state', state: d.state }, '*'); } catch (e) {}
+            }
+            // Let the state apply and any re-render it starts settle.
+            return wait(350);
+        }).then(nextFrames).then(function () {
+            if (!_printHandler) { reply({ ok: false, reason: 'unsupported' }); return; }
+            root.classList.add('bw-printing');
+            return nextFrames().then(function () {
+                return _printHandler({ scale: _printScale });
+            }).then(function (res) {
+                res = res || {};
+                return Promise.resolve(res.image).then(function (image) {
+                    reply({ ok: true, image: toDataUrl(image), pages: normalisePages(res.pages) });
+                });
             });
         }).catch(function (err) {
             console.warn('[widget] print failed', err);

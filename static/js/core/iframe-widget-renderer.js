@@ -53,7 +53,7 @@ const _WIDGET_BASE_INJECT = `<link rel="preconnect" href="https://fonts.googleap
     setTimeout(function () {
       if (e.defaultPrevented) return;
       if (isEditable(document.activeElement)) return;
-      try { parent.postMessage({ type: 'widget-nav', key: e.key }, '*'); } catch (_) {}
+      try { parent.postMessage({ type: 'widget-nav', key: e.key, repeat: !!e.repeat }, '*'); } catch (_) {}
     }, 0);
   });
 })();
@@ -697,7 +697,7 @@ export function isPrintWindow(win) { return !!win && _printWindows.has(win); }
  * `box` is the widget's size in CSS px; `state` is the state to show.
  */
 export async function printWidget(w, { zipFile, box, fullBox = null, state, scale = 2, host = document.body,
-                                       loadTimeoutMs = 10000, printTimeoutMs = 20000 } = {}) {
+                                       loadTimeoutMs = 30000, printTimeoutMs = 45000 } = {}) {
     let label = w?.type || 'Widget';
     let loaded;
     try { loaded = await _loadWidgetSource(w, zipFile); }
@@ -739,6 +739,10 @@ export async function printWidget(w, { zipFile, box, fullBox = null, state, scal
 
     const requestId = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
     try {
+        // The load event waits for every script and stylesheet, CDN ones
+        // included; on a slow network that can take a while. The kit inside
+        // waits for the same things before it answers, so a timeout here only
+        // means "ask anyway".
         await new Promise(resolve => {
             const t = setTimeout(resolve, loadTimeoutMs);
             iframe.addEventListener('load', () => { clearTimeout(t); resolve(); }, { once: true });
@@ -747,27 +751,42 @@ export async function printWidget(w, { zipFile, box, fullBox = null, state, scal
         const win = iframe.contentWindow;
         if (!win) return tag({ ok: false, reason: 'widget did not load' });
         _printWindows.add(win);
-        try { win.postMessage({ type: 'widget-config', config: payload }, '*'); } catch (_) {}
-        if (state !== undefined) {
-            try { win.postMessage({ type: 'widget-set-state', state }, '*'); } catch (_) {}
-        }
-        // Let it lay out, draw and pull in fonts before it's asked.
-        await new Promise(r => setTimeout(r, 400));
-        try { await win.document.fonts?.ready; } catch (_) {}
 
+        // The state travels with the request; the kit applies it once the
+        // widget is ready to receive it (see handlePrint in the kit).
         return await new Promise(resolve => {
-            const done = (res) => { clearTimeout(timer); window.removeEventListener('message', onMsg); resolve(tag(res)); };
-            const timer = setTimeout(() => done({ ok: false, reason: 'timed out' }), printTimeoutMs);
+            let acked = false, resend = null, timer = null;
+            const done = (res) => {
+                clearTimeout(timer); clearInterval(resend);
+                window.removeEventListener('message', onMsg);
+                resolve(tag(res));
+            };
+            const ask = () => {
+                try { win.postMessage({ type: 'widget-print', requestId, scale, state }, '*'); }
+                catch (err) { done({ ok: false, reason: err.message }); }
+            };
             function onMsg(e) {
                 if (e.source !== win) return;
                 const d = e.data || {};
-                if (d.type !== 'widget-print-result' || d.requestId !== requestId) return;
+                if (d.requestId !== requestId) return;
+                if (d.type === 'widget-print-ack' && !acked) {
+                    // Heard: stop re-asking, and give it its full time from now
+                    // (it may still be waiting on the network).
+                    acked = true;
+                    clearInterval(resend);
+                    clearTimeout(timer);
+                    timer = setTimeout(() => done({ ok: false, reason: 'timed out' }), printTimeoutMs);
+                }
+                if (d.type !== 'widget-print-result') return;
                 if (d.ok) done({ ok: true, image: d.image || null, pages: Array.isArray(d.pages) ? d.pages : [] });
                 else      done({ ok: false, reason: d.reason || 'unsupported' });
             }
             window.addEventListener('message', onMsg);
-            try { win.postMessage({ type: 'widget-print', requestId, scale }, '*'); }
-            catch (err) { done({ ok: false, reason: err.message }); }
+            // The kit's listener may not exist yet if the document is still
+            // parsing; ask again until it says it heard.
+            timer  = setTimeout(() => done({ ok: false, reason: 'no answer' }), loadTimeoutMs);
+            resend = setInterval(ask, 1000);
+            ask();
         });
     } catch (err) {
         return tag({ ok: false, reason: err.message });

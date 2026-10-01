@@ -408,8 +408,8 @@ function wireKeyboardNav() {
         if (e.ctrlKey || e.metaKey || e.altKey) return;
 
         // Fixed: navigation & escape
-        if (e.key === 'ArrowLeft'  || e.key === 'PageUp')   navStep(-1);
-        if (e.key === 'ArrowRight' || e.key === 'PageDown') navStep(+1);
+        if (e.key === 'ArrowLeft'  || e.key === 'PageUp')   navStep(-1, e.repeat);
+        if (e.key === 'ArrowRight' || e.key === 'PageDown') navStep(+1, e.repeat);
         if (e.key === 'Escape') { bus.emit('ui:escape'); BeamerModal?.close(); }
         if (e.key === '.' && state.slideStructure.length) toggleMute();
 
@@ -433,16 +433,48 @@ function wireKeyboardNav() {
     window.addEventListener('message', (e) => {
         if (e.data?.type !== 'widget-nav') return;
         const key = e.data.key;
-        if (key === 'ArrowLeft'  || key === 'PageUp')   navStep(-1);
-        if (key === 'ArrowRight' || key === 'PageDown') navStep(+1);
+        if (key === 'ArrowLeft'  || key === 'PageUp')   navStep(-1, !!e.data.repeat);
+        if (key === 'ArrowRight' || key === 'PageDown') navStep(+1, !!e.data.repeat);
     });
 }
 
-// Sequential navigation: a slide's reveal steps come before moving on.
-function navStep(dir) {
-    if (stepReveal(dir)) return;
-    if (dir > 0) goToSlide(state.currentSlide + 1, 'forward');
-    else goToSlide(state.currentSlide - 1, 'back');
+// ── One navigation at a time ─────────────────────────────────────────────
+// Moving to a slide is async (commit the text editor, park widgets, render
+// the PDF page, load its config and media), and every step of it reads and
+// writes the current slide. Two moves running at once — a held arrow key
+// fires ~30 keydowns a second — interleave: a render bails half-way because
+// the slide changed under it, a loading overlay is left up, ink is saved
+// onto the wrong slide, split view opens and closes over itself. So every
+// move goes through one queue and runs to the end before the next starts.
+let _navChain   = Promise.resolve();
+let _navPending = 0;          // sequential steps queued or running
+
+function queueNav(fn) {
+    const run = _navChain.then(fn).catch(err => console.error('[nav] navigation failed', err));
+    _navChain = run;
+    return run;
+}
+
+// Direct jumps (thumbnail, bookmark, editor) wait their turn too.
+function goToSlide(i, direction = null, isSplitPaneNav = false) {
+    return queueNav(() => _goToSlide(i, direction, isSplitPaneNav));
+}
+
+// Sequential navigation: a slide's reveal steps come before moving on. The
+// target is worked out when the step runs, not when the key was pressed, so
+// queued steps count from wherever the previous one landed. A held key
+// (auto-repeat) only queues a step when nothing is pending, so holding the
+// arrow moves as fast as slides render and stops as soon as it's released,
+// rather than draining a backlog afterwards.
+function navStep(dir, repeat = false) {
+    if (repeat && _navPending > 0) return;
+    if (_navPending >= 3) return;       // a burst of taps: don't run away
+    _navPending++;
+    queueNav(async () => {
+        if (stepReveal(dir)) return;
+        if (dir > 0) await _goToSlide(state.currentSlide + 1, 'forward');
+        else         await _goToSlide(state.currentSlide - 1, 'back');
+    }).finally(() => { _navPending--; });
 }
 
 /* ─── mute ─────────────────────────────────────────────────────── */
@@ -661,7 +693,7 @@ function applySplitRatio(ratioPercent) {
 bus.on('slide:goto', (i) => goToSlide(i));
 bus.on('slide:next', () => navStep(+1));
 bus.on('slide:prev', () => navStep(-1));
-bus.on('slide:goto-right', async (i) => {
+bus.on('slide:goto-right', (i) => queueNav(async () => {
     if (!state.splitView || i === state.currentSlide) return;
     await commitOpenTextEditor(state);
     saveCurrentAnnotations();
@@ -671,9 +703,9 @@ bus.on('slide:goto-right', async (i) => {
     await renderLogicalSlide(i, true);
     updateSlideNavigator();
     bus.emit('slide:changed', state.currentSlide);
-});
+}));
 
-async function goToSlide(i, direction = null, isSplitPaneNav = false) {
+async function _goToSlide(i, direction = null, isSplitPaneNav = false) {
     if (i < 0 || i >= state.slideStructure.length) return;
     await commitOpenTextEditor(state);
 
@@ -711,7 +743,7 @@ async function goToSlide(i, direction = null, isSplitPaneNav = false) {
         // Pass direction so the hidden-slide while loop runs in the recursive call.
         // Forward: skips right-pane if hidden, continues to next visible slide.
         // Back: skips left-pane if hidden, continues to previous visible slide.
-        await goToSlide(targetIdx, direction, false);
+        await _goToSlide(targetIdx, direction, false);
         return;
     }
 
@@ -744,7 +776,7 @@ async function goToSlide(i, direction = null, isSplitPaneNav = false) {
         const previewRatio = state.editMode ? 50 : (prelimObj.ratio ?? null);
         if (leftIdx !== rightIdx) await setSplitActive(true, rightIdx, previewRatio);
         state.currentViewIndex = i;   // remember which view slide drives this split
-        await goToSlide(leftIdx, null, true);  // isSplitPaneNav — skip auto-close
+        await _goToSlide(leftIdx, null, true);  // isSplitPaneNav — skip auto-close
         return;
     }
 
