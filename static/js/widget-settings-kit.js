@@ -61,6 +61,20 @@
             fields.unshift({ key: 'title', label: 'Name', type: 'text',
                              placeholder: schema.label || 'Title and download file name' });
         }
+        // …and a Text size, the stepper's default, offering its steps. Keep in
+        // step with textSizeField() in editor/widget-schema.js.
+        if (schema && schema.fontSize !== false) {
+            var own = -1;
+            for (var k = 0; k < fields.length; k++) if (fields[k].key === 'scale') { own = k; break; }
+            var def = own >= 0 && fields[own].default != null ? String(fields[own].default) : '1.4';
+            if (own >= 0) fields.splice(own, 1);
+            var at = 0;
+            for (var t = 0; t < fields.length; t++) if (fields[t].key === 'title') { at = t + 1; break; }
+            fields.splice(at, 0, { key: 'scale', label: 'Text size', type: 'select', default: def,
+                options: ['1', '1.2', '1.4', '1.7', '2', '2.4'].map(function (v) {
+                    return { v: v, l: Math.round(parseFloat(v) * 100) + '%' };
+                }) });
+        }
         customSettings = !!(schema && schema.customSettings);
         hasSettings = !customSettings && fields.length > 0;
         return true;
@@ -161,8 +175,17 @@
             'border:1px solid var(--border-med,#d4d4cf);border-radius:var(--radius,6px)}',
             '.bws-area{font-family:var(--font-mono,ui-monospace,monospace);resize:vertical;line-height:1.45}',
             '.bws-input:focus,.bws-select:focus,.bws-area:focus{outline:none;border-color:var(--accent,#52524e)}',
-            '.bws-check{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}',
-            '.bws-check input{width:15px;height:15px;accent-color:var(--accent,#52524e);cursor:pointer}',
+            // On/off: a row shaped like the inputs, label left, switch right.
+            '.bws-check{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;',
+            'cursor:pointer;padding:5px 6px 5px 8px;background:var(--bg-subtle,#f9f9f8);',
+            'border:1px solid var(--border-med,#d4d4cf);border-radius:var(--radius,6px)}',
+            '.bws-switch{appearance:none;-webkit-appearance:none;flex:0 0 auto;position:relative;width:34px;',
+            'height:20px;margin:0;border-radius:999px;background:var(--border-med,#d4d4cf);cursor:pointer;',
+            'transition:background .12s}',
+            '.bws-switch::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;',
+            'border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .12s}',
+            '.bws-switch:checked{background:var(--text,#1a1a18)}',
+            '.bws-switch:checked::after{transform:translateX(14px)}',
             '.bws-file{display:flex;gap:6px;align-items:center}',
             '.bws-file .bws-input{flex:1 1 auto;min-width:0}',
             '.bws-btn{flex:0 0 auto;padding:6px 11px;font-size:12px;font-family:inherit;cursor:pointer;',
@@ -203,18 +226,20 @@
 
         if (field.type === 'checkbox') {
             var lab = el('label', 'bws-check');
-            input = el('input');
-            input.type = 'checkbox';
-            input.checked = eff === true;
-            lab.appendChild(input);
             var span = el('span');
             span.textContent = field.label || field.key;
+            input = el('input', 'bws-switch');
+            input.type = 'checkbox';
+            input.setAttribute('role', 'switch');
+            input.checked = eff === true;
             lab.appendChild(span);
+            lab.appendChild(input);
             row.appendChild(lab);
 
         } else if (field.type === 'select') {
             row.appendChild(labelFor(field));
             input = el('select', 'bws-select');
+            var matched = false;
             // Options may be declared as { v, l } pairs or as plain strings.
             // Compare as strings: a deck may have stored 1.4 where the schema
             // declares "1.4", and a strict compare would lose the selection.
@@ -225,9 +250,19 @@
                 var opt = el('option');
                 opt.value = v;
                 opt.textContent = l;
-                if (String(eff) === String(v)) opt.selected = true;
+                if (String(eff) === String(v)) { opt.selected = true; matched = true; }
                 input.appendChild(opt);
             });
+            // A saved value no option matches (an older deck's 1.8 where the
+            // sizes now step 1.7, 2): show the nearest, not the first.
+            if (!matched && !isNaN(parseFloat(eff))) {
+                var best = -1, bestD = Infinity;
+                for (var oi = 0; oi < input.options.length; oi++) {
+                    var dd = Math.abs(parseFloat(input.options[oi].value) - parseFloat(eff));
+                    if (dd < bestD) { bestD = dd; best = oi; }
+                }
+                if (best >= 0) input.selectedIndex = best;
+            }
             row.appendChild(input);
 
         } else if (field.type === 'ai-model') {

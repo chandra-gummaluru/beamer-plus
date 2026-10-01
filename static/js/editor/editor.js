@@ -19,6 +19,7 @@ import { applySlideReorder, removeSlideReorder } from './reorder.js';
 import { initWidgetSettings } from './widget-settings.js';
 import { savePresentation } from './save.js';
 import { realSlideCount } from '../slides/structure.js';
+import { PAPER_STYLES, PAPER_SPACING, PAPER_THICKNESS, PAPER_COLORS, normalizePaper } from '../slides/paper.js';
 
 /* ─── init ──────────────────────────────────────────────────── */
 
@@ -48,6 +49,8 @@ export function initEditor(state) {
         e.stopPropagation();
         if (e.key === 'Enter' || e.key === 'Escape') titleInput.blur();
     });
+
+    initPaperSettings();
 
     document.getElementById('slide-hidden-toggle')?.addEventListener('change', e => {
         const obj = ctx.state?.slideStructure?.[ctx.state?.currentSlide];
@@ -218,7 +221,43 @@ function updateSlideSettingsPanel() {
     if (toggle) toggle.checked = !!obj?.hidden;
     const title = document.getElementById('slide-title-input');
     if (title && document.activeElement !== title) title.value = obj?.title || '';
+    syncPaperSettings(obj);
     refreshSlideItems();
+}
+
+/* ─── blank-slide paper ─────────────────────────────────────── */
+const PAPER_FIELDS = { style: PAPER_STYLES, spacing: PAPER_SPACING, thickness: PAPER_THICKNESS, color: PAPER_COLORS };
+
+function initPaperSettings() {
+    for (const [key, list] of Object.entries(PAPER_FIELDS)) {
+        const sel = document.getElementById(`paper-${key}`);
+        if (!sel) continue;
+        sel.innerHTML = list.map(o => `<option value="${o.v}">${o.l}</option>`).join('');
+        sel.addEventListener('change', () => {
+            const obj = ctx.state?.slideStructure?.[ctx.state?.currentSlide];
+            if (obj?.type !== 'blank') return;
+            const paper = { ...normalizePaper(obj.paper), [key]: sel.value };
+            if (paper.style === 'none') delete obj.paper; else obj.paper = paper;
+            syncPaperSettings(obj);
+            bus.emit('paper:changed');
+        });
+    }
+}
+
+function syncPaperSettings(obj) {
+    const box = document.getElementById('slide-paper-settings');
+    if (!box) return;
+    box.hidden = obj?.type !== 'blank';
+    if (box.hidden) return;
+    const p = normalizePaper(obj.paper);
+    for (const key of Object.keys(PAPER_FIELDS)) {
+        const sel = document.getElementById(`paper-${key}`);
+        if (sel) sel.value = p[key];
+    }
+    const opts = document.getElementById('paper-options');
+    if (opts) opts.hidden = p.style === 'none';
+    const tl = document.getElementById('paper-thickness-label');
+    if (tl) tl.textContent = p.style === 'dots' ? 'Dot size' : 'Line weight';
 }
 
 // Disable the add-media buttons when the current slide is a view slide

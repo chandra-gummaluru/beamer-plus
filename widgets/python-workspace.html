@@ -405,19 +405,14 @@ body.is-viewer #gutter { cursor: default; }
   font-weight: 600;
   margin: 0 2px 6px;
 }
-/* Which frame the variables belong to — a small tag, not more heading. */
+/* Which frame the variables belong to — plain text after the heading. */
 .dbg-scope {
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 11px;
   text-transform: none;
   letter-spacing: 0;
   font-weight: 500;
   color: var(--text-2);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 0 7px;
-  line-height: 16px;
 }
 .dbg-box {
   background: var(--bg);
@@ -441,12 +436,7 @@ body.is-viewer #gutter { cursor: default; }
 .dbg-stack li.is-sel { background: var(--bg-subtle); box-shadow: inset 2px 0 0 var(--text); }
 .dbg-stack .fn { color: var(--text); }
 .dbg-stack li.is-sel .fn { font-weight: 600; }
-.dbg-stack .ln {
-  font-family: var(--font-ui);
-  font-size: 11px;
-  color: var(--text-3);
-  white-space: nowrap;
-}
+.dbg-stack .ln { color: var(--text-3); white-space: nowrap; }
 body.is-viewer .dbg-stack li { cursor: default; }
 
 .dbg-vars { width: 100%; border-collapse: collapse; }
@@ -458,31 +448,14 @@ body.is-viewer .dbg-stack li { cursor: default; }
 .dbg-vars .v.ty-int, .dbg-vars .v.ty-float, .dbg-vars .v.ty-complex { color: var(--code-num); }
 .dbg-vars .v.ty-str  { color: var(--code-str); }
 .dbg-vars .v.ty-bool, .dbg-vars .v.ty-NoneType { color: var(--code-kw); }
-.dbg-vars .t {
-  white-space: nowrap;
-  width: 1%;
-  text-align: right;
-  font-family: var(--font-ui);
-  font-size: 10.5px;
-  color: var(--text-3);
-}
+.dbg-vars .t { white-space: nowrap; width: 1%; text-align: right; color: var(--text-3); }
 /* What the step just changed: a quiet amber wash and a bar, not amber text. */
 .dbg-vars tr.is-ch td { background: var(--mutate-soft); }
 .dbg-vars tr.is-ch td:first-child { box-shadow: inset 2px 0 0 var(--mutate); }
 .dbg-vars tr.is-fn td, .dbg-vars tr.is-fn .v { color: var(--text-3); }
-.dbg-none {
-  padding: 7px 10px;
-  font-family: var(--font-ui);
-  font-size: 12px;
-  color: var(--text-3);
-}
+.dbg-none { padding: 5px 10px; color: var(--text-3); }
 
-.dbg-ret {
-  margin: 0 2px 8px;
-  font-family: var(--font-ui);
-  font-size: 12px;
-  color: var(--text-2);
-}
+.dbg-ret { margin: 0 2px 8px; color: var(--text-2); }
 .dbg-ret code { font-family: var(--font-mono); color: var(--code-def); }
 .dbg-ret b { font-family: var(--font-mono); font-weight: 500; color: var(--mutate); }
 
@@ -495,7 +468,7 @@ body.is-viewer .dbg-stack li { cursor: default; }
   font: inherit;
 }
 .dbg-out .fresh { background: var(--mutate-soft); border-radius: 3px; }
-.dbg-out .empty { font-family: var(--font-ui); font-size: 12px; color: var(--text-3); }
+.dbg-out .empty { color: var(--text-3); }
 .dbg-err {
   margin: 0;
   padding: 8px 10px;
@@ -507,49 +480,17 @@ body.is-viewer .dbg-stack li { cursor: default; }
   border: 1px solid color-mix(in srgb, var(--err) 25%, transparent);
   border-radius: 8px;
 }
-.dbg-note { font-family: var(--font-ui); font-size: 12px; color: var(--text-2); margin: 0 2px; }
+.dbg-note { color: var(--text-2); margin: 0 2px; }
 
-.dbg-empty {
-  font-family: var(--font-ui);
-  font-size: calc(9.5px * var(--u, 1) * var(--ws));
-  color: var(--text-2);
-  max-width: 48ch;
-  line-height: 1.55;
-}
-.dbg-empty p { margin: 0 0 .7em; }
-.dbg-empty b { color: var(--text); font-weight: 600; }
-.dbg-keys {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 4px 14px;
-  margin: 1em 0 0;
-  color: var(--text-3);
-  font-size: .9em;
-}
-.dbg-keys dt { font-family: var(--font-mono); color: var(--text-2); }
-.dbg-keys dd { margin: 0; }
 .dbg-rec { display: flex; align-items: center; gap: 8px; color: var(--text-3); font-family: var(--font-ui); }
 .dbg-rec .bw-spinner { width: 12px; height: 12px; }
 
-/* Status: a neutral pill with a coloured dot for the state. */
+/* Status: plain text in the pane header; colour carries the state. */
 #dbg-status[hidden] { display: none; }
-#dbg-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-family: var(--font-ui);
-  color: var(--text-2);
-  border-color: var(--border);
-}
-#dbg-status::before {
-  content: '';
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: var(--text-3);
-}
-#dbg-status.is-live::before { background: var(--warn); }
-#dbg-status.is-done::before { background: var(--ok); }
-#dbg-status.is-err::before  { background: var(--err); }
+#dbg-status { font-family: var(--font-ui); color: var(--text-2); }
+#dbg-status.is-live { color: var(--warn); }
+#dbg-status.is-done { color: var(--ok); }
+#dbg-status.is-err  { color: var(--err); }
 
 /* Colour only — bold or italic can change glyph advance in some monospace
    fonts and knock the highlight out of step with the caret. */
@@ -872,17 +813,13 @@ html[data-theme="dark"]{
 /* ── Memory diagram — the centrepiece ──────────────────────────────────── */
 /* The step status lives in the pane head, where the IDE keeps its controls. */
 .chip{
-  font-family: var(--font-mono);
+  font-family: var(--font-ui);
   font-size: var(--fs-chrome-sm);
-  padding: 1px 8px;
-  border-radius: 20px;
-  border:1px solid var(--border-med);
   color: var(--text-2);
-  background: var(--bg);
   white-space:nowrap;
 }
-.chip.loop{ border-color: var(--t-list); color: var(--t-list); background: var(--mutate-soft); }
-.chip.done{ border-color: var(--ok); color: var(--ok); background: transparent; }
+.chip.loop{ color: var(--t-list); }
+.chip.done{ color: var(--ok); }
 
 .memory-wrap{
   flex:1; min-height:0; overflow:auto;
@@ -6976,21 +6913,8 @@ def _debug_file(src, fname, limit):
     chip.className = 'chip';
     chip.hidden = !v;
     if (!v) {
-      dbgBody.innerHTML = IS_VIEWER
-        ? '<div class="dbg-empty"><p>Nothing is being debugged.</p></div>'
-        : `<div class="dbg-empty">
-             <p><b>Click a line number</b> in the editor to set a breakpoint, then press <b>Debug</b>.</p>
-             <p>The program pauses there (or on its first line, if there are no breakpoints) and this pane shows the call stack and every variable. Changed values are highlighted.</p>
-             <dl class="dbg-keys">
-               <dt>F6</dt><dd>Debug</dd>
-               <dt>F5</dt><dd>Continue to the next breakpoint</dd>
-               <dt>F10</dt><dd>Step over</dd>
-               <dt>F11</dt><dd>Step into</dd>
-               <dt>Shift+F11</dt><dd>Step out</dd>
-               <dt>Shift+F5</dt><dd>Stop</dd>
-               <dt>F9</dt><dd>Breakpoint on the caret's line</dd>
-             </dl>
-           </div>`;
+      // Nothing being debugged: the pane stays empty.
+      dbgBody.innerHTML = '';
       return;
     }
     if (v.recording) {

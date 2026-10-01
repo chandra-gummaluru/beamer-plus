@@ -21,6 +21,7 @@ import { initThumbnails } from './slides/thumbnails.js';
 import { initSlideStructure, getSlideLabels, slideUid, configKeyOf, realSlideCount, isDeletableSlide } from './slides/structure.js';
 import { initNavDrawer, isNavCollapsed, setNavCollapsed } from './slides/drawer.js';
 import { initReveals, renderReveals, resetRevealsOnArrival, stepReveal, updateStepBadge } from './slides/reveals.js';
+import { applyPaper } from './slides/paper.js';
 import { initSpotlight, hideSpotlight, renderSpotlight,
          setWidgetInteractivityForSpotlight } from './slides/spotlight.js';
 import { initMedia, renderMedia, updateMediaPositions, resetMediaCache } from './slides/media.js';
@@ -164,6 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
     wireAnnotationClear();
     wireKeyboardNav();
     wireResizeAndFullscreen();
+    document.getElementById('mute-btn')?.addEventListener('click', () => toggleMute());
     updateStageEmptyState();
     maybeStartTourFromUrl();
 
@@ -409,6 +411,7 @@ function wireKeyboardNav() {
         if (e.key === 'ArrowLeft'  || e.key === 'PageUp')   navStep(-1);
         if (e.key === 'ArrowRight' || e.key === 'PageDown') navStep(+1);
         if (e.key === 'Escape') { bus.emit('ui:escape'); BeamerModal?.close(); }
+        if (e.key === '.' && state.slideStructure.length) toggleMute();
 
         // Configurable shortcuts
         const sc = loadShortcuts();
@@ -440,6 +443,22 @@ function navStep(dir) {
     if (stepReveal(dir)) return;
     if (dir > 0) goToSlide(state.currentSlide + 1, 'forward');
     else goToSlide(state.currentSlide - 1, 'back');
+}
+
+/* ─── mute ─────────────────────────────────────────────────────── */
+// Blanks the stage — slide, widgets, media and ink — until toggled again,
+// e.g. to take the room's attention off the screen. Navigation still works
+// underneath, so you can move on while hidden. Playing media is paused.
+function toggleMute(force) {
+    const on = typeof force === 'boolean' ? force : !document.body.classList.contains('slide-muted');
+    document.body.classList.toggle('slide-muted', on);
+    const btn = document.getElementById('mute-btn');
+    if (btn) {
+        btn.classList.toggle('btn_selected', on);
+        btn.setAttribute('aria-pressed', String(on));
+        btn.title = on ? 'Show slide (.)' : 'Hide slide (.)';
+    }
+    if (on) document.querySelectorAll('#main-content video, #main-content audio').forEach(m => { try { m.pause(); } catch (_) {} });
 }
 
 /* ─── guided tour ─────────────────────────────────────────────── */
@@ -945,6 +964,10 @@ async function renderLogicalSlide(logicalIndex, isRight = false, suppressOverlay
     const loading = suppressOverlay ? null : _slideOverlay(isRight);
     if (loading) loading.classList.add('visible');
 
+    // A blank slide's paper (lined, grid, dots) is the container's own
+    // background; a PDF page covers the container, so clear it there.
+    applyPaper(slideContainer, obj.type === 'blank' ? obj.paper : null);
+
     if (obj.type === 'pdf') {
         if (cvs.canvas) cvs.canvas.style.visibility = 'visible';
         if (annContainer) annContainer.style.background = '';
@@ -1101,6 +1124,7 @@ function saveCurrentAnnotations() {
 // are already in the DOM the first time this runs.
 const STAGE_CONTROL_SELECTOR = [
     '#split-toggle',
+    '#mute-btn',
     '#duplicate-slide-btn',
     '#edit-save-btn',
     '#bookmark-btn',
@@ -1144,6 +1168,7 @@ function updateStageEmptyState() {
     const isEmpty = state.slideStructure.length === 0;
     el.hidden = !isEmpty;
     setStageControlsEnabled(!isEmpty);
+    if (isEmpty) toggleMute(false);   // nothing left to hide
     if (!isEmpty) return;
     // Nothing behind the placeholder: drop any ink and hide the slide bitmap
     // left over from a deck that has just been emptied. The non-empty case is
@@ -1163,6 +1188,7 @@ function populateSlideNavigator() {
             label:    labels[i],
             title:    obj.type === 'blank' ? labels[i] : `Slide ${labels[i]}`,
             customTitle: typeof obj.title === 'string' ? obj.title : '',
+            paper:    obj.type === 'blank' ? (obj.paper || null) : null,
             thumbUrl: obj.type === 'pdf'   ? (state.slideThumbnailCache[obj.pdfIndex] ?? null) : null,
         };
         if (obj.type === 'view') {
@@ -1177,7 +1203,18 @@ function populateSlideNavigator() {
     updateSlideNavigator();
     updateStageEmptyState();
     updateStepBadge();
+    // Pins show each slide's title/thumbnail too, so they follow any change.
+    populateBookmarkPins();
 }
+
+// The editor changed a blank slide's paper: repaint the pane(s) showing it.
+bus.on('paper:changed', () => {
+    const left  = state.slideStructure[state.currentSlide];
+    const right = state.splitView ? state.slideStructure[state.rightSlideIndex] : null;
+    if (left?.type === 'blank')  applyPaper(document.getElementById('pdf-canvas'), left.paper);
+    if (right?.type === 'blank') applyPaper(document.getElementById('pdf-canvas-2'), right.paper);
+    populateSlideNavigator();
+});
 
 bus.on('nav:refresh', () => populateSlideNavigator());
 // Duplicating a slide copies its annotations — commit what's on stage first.
@@ -1238,6 +1275,7 @@ function populateBookmarkPins() {
             const img = document.createElement('img'); img.src = thumb; preview.appendChild(img);
         } else {
             const span = document.createElement('span'); span.textContent = `Slide ${lbl}`; preview.appendChild(span);
+            if (obj?.type === 'blank') applyPaper(preview, obj.paper, { thumb: true });
         }
         item.appendChild(preview);
         item.addEventListener('click', () => goToSlide(i));

@@ -38,6 +38,7 @@ body.split-view-active:not(.edit-mode) #edit-mode-container {
 body.focus-mode #slide-navigator,
 body.focus-mode #floating-annotation-toolbar,
 body.focus-mode #edit-mode-container,
+body.focus-mode #mute-container,
 body.focus-mode #top-right-controls #upload-container,
 body.focus-mode #top-right-controls #save-container {
     display: none !important;
@@ -89,4 +90,24 @@ body.focus-mode #main-content {
         right: auto;
         top: var(--sp-2);
     }
+}
+
+/* ── Mute — bottom-right corner ───────────────────────────────── */
+#mute-container {
+    position: fixed;
+    right: var(--sp-3);
+    bottom: var(--sp-3);
+    z-index: 230;
+}
+#mute-container .btn {
+    width: var(--hit-min);
+    min-width: var(--hit-min);
+    min-height: var(--hit-min);
+    padding: 0;
+}
+body.edit-mode #mute-container { display: none; }
+/* Split view puts the navigator along the bottom: sit just above it. */
+body.split-view-active #mute-container { bottom: calc(88px + var(--sp-3)); }
+@media (max-width: 1024px) {
+    #mute-container { bottom: calc(100px + var(--sp-3)); right: var(--sp-2); }
 }

@@ -1,5 +1,6 @@
 // Thumbnails — render slide-nav items, attach click handlers.
 import { bus } from '../core/events.js';
+import { applyPaper } from './paper.js';
 
 export function initThumbnails(state) {
     bus.on('slides:loaded', (slides) => render(slides, state));
@@ -93,6 +94,7 @@ function render(slides, state) {
             const span = document.createElement('span');
             span.textContent = s.title || `Slide ${lbl}`;
             preview.appendChild(span);
+            if (s.paper) applyPaper(preview, s.paper, { thumb: true });
         }
         item.appendChild(preview);
 
@@ -124,4 +126,29 @@ function render(slides, state) {
     if (state.currentSlide < slides.length) {
         host.children[state.currentSlide]?.classList.add('current-slide');
     }
+
+    // Edit mode: a delete button in each preview's top-right corner, shown on
+    // hover (CSS). Two clicks — the first arms it — since there's no undo.
+    Array.from(host.children).forEach((item) => {
+        const i = parseInt(item.dataset.index, 10);
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'slide-del-btn';
+        del.title = 'Delete slide';
+        del.setAttribute('aria-label', 'Delete slide');
+        del.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>';
+        // Don't let a press on the button start a drag-to-reorder.
+        del.addEventListener('pointerdown', (e) => e.stopPropagation());
+        del.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!del.classList.contains('is-armed')) {
+                del.classList.add('is-armed');
+                del.title = 'Click again to delete';
+                setTimeout(() => { if (del.isConnected) { del.classList.remove('is-armed'); del.title = 'Delete slide'; } }, 3000);
+                return;
+            }
+            bus.emit('slide:delete', i);
+        });
+        item.appendChild(del);
+    });
 }

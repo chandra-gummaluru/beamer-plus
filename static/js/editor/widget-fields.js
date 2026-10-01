@@ -192,13 +192,19 @@ function buildFieldRow(field, item, variant) {
     let input, wide = false;
 
     if (field.type === 'checkbox') {
+        // An on/off setting is the same switch row as the slide's own
+        // "Hide in presentation": label on the left, switch on the right.
         const lab = document.createElement('label');
         lab.className = 'editor-prop-checkbox-row';
+        const text = document.createElement('span');
+        text.textContent = field.label || field.key;
         input = document.createElement('input');
         input.type = 'checkbox';
+        input.className = 'editor-switch';
+        input.setAttribute('role', 'switch');
         input.checked = eff === true;
+        lab.appendChild(text);
         lab.appendChild(input);
-        lab.appendChild(document.createTextNode(field.label || field.key));
         row.appendChild(lab);
 
     } else if (field.type === 'select') {
@@ -216,6 +222,21 @@ function buildFieldRow(field, item, variant) {
             // declares "1.4", and a strict compare would lose the selection.
             if (String(eff) === String(value)) opt.selected = true;
             input.appendChild(opt);
+        }
+        // A saved value that isn't one of the options (an older deck's 1.8 on
+        // a list that now steps 1.7, 2): pick the nearest number rather than
+        // silently showing the first option.
+        const matched = (field.options || []).some(o => String(o && typeof o === 'object' ? o.v : o) === String(eff));
+        if (!matched) {
+            const n = parseFloat(eff);
+            if (!isNaN(n)) {
+                let best = -1, bestD = Infinity;
+                Array.from(input.options).forEach((o, i) => {
+                    const d = Math.abs(parseFloat(o.value) - n);
+                    if (d < bestD) { bestD = d; best = i; }
+                });
+                if (best >= 0) input.selectedIndex = best;
+            }
         }
         row.appendChild(input);
 

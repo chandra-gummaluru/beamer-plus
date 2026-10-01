@@ -142,14 +142,14 @@ function buildPropsHTML(arrKey, item) {
         html += `
             <div class="editor-prop-row">
                 <label class="editor-prop-checkbox-row">
-                    <input type="checkbox" id="prop-autoRotate" ${item.autoRotate ? 'checked' : ''}>
-                    Auto-rotate
+                    <span>Auto-rotate</span>
+                    <input type="checkbox" class="editor-switch" role="switch" id="prop-autoRotate" ${item.autoRotate ? 'checked' : ''}>
                 </label>
             </div>
             <div class="editor-prop-row">
                 <label class="editor-prop-checkbox-row">
-                    <input type="checkbox" id="prop-animate" ${item.animate !== false ? 'checked' : ''}>
-                    Play animation
+                    <span>Play animation</span>
+                    <input type="checkbox" class="editor-switch" role="switch" id="prop-animate" ${item.animate !== false ? 'checked' : ''}>
                 </label>
             </div>
             <div class="editor-prop-row">

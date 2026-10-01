@@ -1105,3 +1105,109 @@ body.edit-mode #ann-canvas-2 { mask-image: none !important; -webkit-mask-image: 
 }
 body.split-view-active #slide-navigator .slide-preview--titled { padding: 14px 4px 4px; }
 body.split-view-active #slide-navigator .slide-preview--titled .slide-preview-title { font-size: 10px; -webkit-line-clamp: 2; }
+
+/* ============================================================
+   Mute — the stage goes blank (main.js toggleMute, "." key)
+   ============================================================ */
+#mute-overlay {
+    position: absolute;
+    inset: 0;
+    /* Above the slides, widgets and ink (each pane is its own low stacking
+       context), below the floating chrome (200+) so the toolbar and the
+       mute button itself stay usable. */
+    z-index: 190;
+    background: var(--surface-stage);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 200ms var(--ease), visibility 0s linear 200ms;
+}
+body.slide-muted #mute-overlay {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 200ms var(--ease), visibility 0s;
+}
+body.edit-mode #mute-overlay { display: none; }
+/* The text tool lifts the ink canvas high above the slide; not while muted. */
+body.slide-muted #ann-canvas, body.slide-muted #ann-canvas-2 { z-index: 2 !important; }
+
+/* ============================================================
+   Delete a slide — edit mode, top-right of the hovered preview
+   ============================================================ */
+.slide-del-btn {
+    display: none;
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    z-index: 12;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid oklch(20% 0.01 260 / 0.12);
+    border-radius: var(--r-sm);
+    background: oklch(99% 0 0 / 0.92);
+    color: var(--ink-2);
+    cursor: pointer;
+    pointer-events: auto;
+    box-shadow: 0 1px 2px oklch(20% 0.01 260 / 0.10);
+    transition: background var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast);
+}
+.slide-del-btn svg { width: 13px; height: 13px; }
+.slide-del-btn:hover { color: var(--danger, #c0392b); border-color: currentColor; }
+.slide-del-btn.is-armed { background: var(--danger, #c0392b); color: #fff; border-color: transparent; }
+body.edit-mode #slide-nav-slides .slide-nav-item:hover .slide-del-btn,
+body.edit-mode #slide-nav-slides .slide-del-btn.is-armed { display: flex; }
+/* The current slide's card is click-through (pointer-events:none) — its
+   delete button still has to be reachable. */
+body.edit-mode #slide-nav-slides .slide-nav-item.current-slide { pointer-events: auto; cursor: default; }
+
+/* ============================================================
+   Add page chooser (slides/structure.js openAddPageModal)
+   ============================================================ */
+.add-page { display: flex; flex-direction: column; gap: var(--sp-4); text-align: left; }
+.add-page-styles {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--sp-3);
+}
+.add-page-card {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    padding: 6px;
+    border: 1px solid oklch(86% 0.005 260);
+    border-radius: var(--r-md);
+    background: var(--surface-paper);
+    cursor: pointer;
+    font-family: var(--font-sans);
+    transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+.add-page-card:hover { border-color: var(--ink-4); }
+.add-page-card.is-active { border-color: var(--ink-1); box-shadow: 0 0 0 1px var(--ink-1); }
+.add-page-sheet {
+    display: block;
+    aspect-ratio: 4 / 3;
+    background-color: #fff;
+    border: 1px solid oklch(90% 0.005 260);
+    border-radius: 4px;
+}
+.add-page-name { font-size: var(--fs-sm); font-weight: 600; color: var(--ink-1); text-align: center; }
+.add-page-opts { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-3); }
+.add-page-opts[hidden] { display: none; }
+.add-page-field { display: flex; flex-direction: column; gap: 4px; }
+.add-page-label {
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+}
+@media (max-width: 520px) {
+    .add-page-styles { grid-template-columns: repeat(2, 1fr); }
+    .add-page-opts { grid-template-columns: 1fr; }
+}

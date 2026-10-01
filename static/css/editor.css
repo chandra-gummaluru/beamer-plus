@@ -268,22 +268,25 @@ body.edit-mode #editor-panel { display: flex; }
     border: 1px solid oklch(88% 0.004 260);
     border-radius: var(--r-pill);
 }
+/* An on/off setting: a row shaped like the inputs around it, label on the
+   left and the editor's switch on the right (as "Hide in presentation"). */
 .editor-prop-checkbox-row {
     display: flex;
     align-items: center;
-    gap: var(--sp-2);
+    justify-content: space-between;
+    gap: var(--sp-3);
+    min-height: 30px;
+    padding: 4px 6px 4px var(--sp-2);
+    box-sizing: border-box;
+    border: 1px solid oklch(86% 0.005 260);
+    border-radius: var(--r-sm);
+    background: var(--surface-paper);
     font-size: var(--fs-sm);
     font-family: var(--font-sans);
     color: var(--ink-1);
     cursor: pointer;
 }
-.editor-prop-checkbox-row input {
-    width: 15px;
-    height: 15px;
-    accent-color: var(--accent);
-    cursor: pointer;
-    flex: 0 0 auto;
-}
+.wf--modal .editor-prop-checkbox-row { min-height: 34px; font-size: var(--fs-base); }
 
 /* Textareas share the input's box, minus its fixed single-line height. */
 .editor-prop-area {
@@ -1173,3 +1176,32 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
     color: var(--ink-1);
     padding: 0;
 }
+.wf--modal .editor-prop-file-btn { min-height: 34px; font-size: var(--fs-sm); }
+
+/* Blank-slide paper settings: the same rows as the settings above. */
+#slide-paper-settings, #paper-options { display: flex; flex-direction: column; gap: var(--sp-3); }
+#slide-paper-settings[hidden], #paper-options[hidden] { display: none; }
+.slide-setting > .slide-setting-name { flex: 1 1 auto; }
+.slide-setting > .slide-setting-name { min-width: 0; }
+/* Our own chevron rather than the native control's: the native arrow and
+   padding vary by platform and were clipping the chosen value. */
+.slide-setting-select {
+    flex: 0 0 auto;
+    appearance: none;
+    -webkit-appearance: none;
+    min-width: 0;
+    max-width: 60%;
+    margin: 0;
+    padding: 2px 20px 2px 6px;
+    border: none;
+    border-radius: var(--r-sm);
+    background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23555' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 4px center;
+    font: inherit;
+    font-size: var(--fs-sm);
+    line-height: 1.4;
+    color: var(--ink-1);
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+.slide-setting-select:hover { background-color: var(--surface-cream-2); }
+.slide-setting-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }

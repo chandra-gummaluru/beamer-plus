@@ -6,15 +6,17 @@
 // remapSlideIndices, which moves all of it in one place.
 import { bus } from '../core/events.js';
 import { discardParkedWidgets, requestWidgetStates, seedWidgetStates } from '../core/iframe-widget-renderer.js';
+import { PAPER_STYLES, PAPER_SPACING, PAPER_THICKNESS, PAPER_COLORS, normalizePaper, applyPaper } from './paper.js';
 
 let _state = null;
 
 export function initSlideStructure(state) {
     _state = state;
-    document.getElementById('add-blank-btn')?.addEventListener('click', () => insertBlankAfterCurrent());
+    document.getElementById('add-blank-btn')?.addEventListener('click', () => openAddPageModal());
     document.getElementById('duplicate-slide-btn')?.addEventListener('click', () => duplicateCurrentSlide());
     document.getElementById('add-view-btn')?.addEventListener('click',  () => insertViewAfterCurrent());
     document.getElementById('delete-blank-btn')?.addEventListener('click', () => deleteCurrentBlank());
+    bus.on('slide:delete', (i) => deleteSlideAt(i));
 }
 
 /* ─── labels ──────────────────────────────────────────────────── */
@@ -148,13 +150,92 @@ export function removeSlideAt(idx) {
 
 /* ─── blank / view slide management ───────────────────────────── */
 
-function insertBlankAfterCurrent() {
+/* ─── add page (with a style) ─────────────────────────────────── */
+// The add button opens a small chooser: Plain, Lined, Grid or Dots, plus
+// spacing / weight / colour for the patterned ones, previewed live. The last
+// choice is remembered for the session, so adding several pages of the same
+// paper is one click each.
+let _lastPaper = { style: 'none' };
+
+function openAddPageModal() {
+    const choice = normalizePaper(_lastPaper);
+    const root = document.createElement('div');
+    root.className = 'add-page';
+
+    const grid = document.createElement('div');
+    grid.className = 'add-page-styles';
+    root.appendChild(grid);
+
+    const opts = document.createElement('div');
+    opts.className = 'add-page-opts';
+    root.appendChild(opts);
+
+    const cards = PAPER_STYLES.map(st => {
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'add-page-card';
+        card.innerHTML = '<span class="add-page-sheet"></span><span class="add-page-name"></span>';
+        card.querySelector('.add-page-name').textContent = st.l;
+        card.addEventListener('click', () => { choice.style = st.v; sync(); });
+        card.addEventListener('dblclick', () => { choice.style = st.v; add(); window.BeamerModal?.close(); });
+        grid.appendChild(card);
+        return { st, card, sheet: card.querySelector('.add-page-sheet') };
+    });
+
+    const selects = {};
+    const field = (key, list, label) => {
+        const wrap = document.createElement('label');
+        wrap.className = 'add-page-field';
+        wrap.innerHTML = '<span class="add-page-label"></span>';
+        wrap.querySelector('.add-page-label').textContent = label;
+        const sel = document.createElement('select');
+        sel.className = 'editor-prop-select';
+        sel.innerHTML = list.map(o => `<option value="${o.v}">${o.l}</option>`).join('');
+        sel.addEventListener('change', () => { choice[key] = sel.value; sync(); });
+        wrap.appendChild(sel);
+        opts.appendChild(wrap);
+        selects[key] = { sel, wrap };
+    };
+    field('spacing', PAPER_SPACING, 'Spacing');
+    field('thickness', PAPER_THICKNESS, 'Line weight');
+    field('color', PAPER_COLORS, 'Colour');
+
+    function sync() {
+        for (const { st, card, sheet } of cards) {
+            card.classList.toggle('is-active', st.v === choice.style);
+            applyPaper(sheet, { ...choice, style: st.v }, { thumb: true });
+        }
+        for (const [k, { sel }] of Object.entries(selects)) sel.value = choice[k];
+        opts.hidden = choice.style === 'none';
+        selects.thickness.wrap.querySelector('.add-page-label').textContent =
+            choice.style === 'dots' ? 'Dot size' : 'Line weight';
+    }
+    function add() {
+        _lastPaper = { ...choice };
+        insertBlankAfterCurrent(choice.style === 'none' ? null : { ...choice });
+    }
+    sync();
+
+    window.BeamerModal?.show({
+        kind: 'info',
+        title: 'Add page',
+        body: root,
+        buttons: [
+            { label: 'Cancel', kind: 'cancel' },
+            { label: 'Add page', kind: 'ok', onClick: add },
+        ],
+    });
+}
+
+function insertBlankAfterCurrent(paper = null) {
     // On an empty deck (fresh session, nothing uploaded) there is no "current"
     // slide to insert after — the blank becomes slide 0. Otherwise it lands
     // immediately after the slide on stage.
     const ins = _state.slideStructure.length === 0 ? 0 : _state.currentSlide + 1;
     const blankId = `b${Date.now()}`;
-    _state.slideStructure.splice(ins, 0, { type: 'blank', blankId, parent: null });
+    const obj = { type: 'blank', blankId, parent: null };
+    if (paper) obj.paper = paper;
+    _state.slideStructure.splice(ins, 0, obj);
     remapSlideIndices(shiftedFrom(ins));
     // Refresh first so totalSlides / the navigator know about the new slide
     // before anything navigates to it.
@@ -191,6 +272,20 @@ function insertViewAfterCurrent() {
 // PDF pages (the original page stays in the deck either way).
 export function isDeletableSlide(obj) {
     return obj?.type === 'blank' || (obj?.type === 'pdf' && !!obj.cfgId);
+}
+
+// Delete any slide (from the navigator's hover button in edit mode). A PDF
+// page removed this way leaves the deck; its page stays in slides.pdf, so
+// re-uploading the deck brings it back.
+function deleteSlideAt(idx) {
+    const s = _state;
+    if (!s.editMode || idx < 0 || idx >= s.slideStructure.length) return;
+    const wasCurrent = idx === s.currentSlide;
+    removeSlideAt(idx);
+    const n = s.slideStructure.length;
+    s.currentSlide = Math.max(0, Math.min(wasCurrent ? idx : s.currentSlide, n - 1));
+    bus.emit('nav:refresh');
+    if (n) bus.emit('slide:goto', s.currentSlide);
 }
 
 function deleteCurrentBlank() {
@@ -231,6 +326,7 @@ async function duplicateCurrentSlide() {
             copy = { ...src, viewId: `v${stamp}` };
         } else if (src.type === 'blank') {
             copy = { type: 'blank', blankId: `b${stamp}`, parent: src.parent ?? null };
+            if (src.paper) copy.paper = { ...src.paper };
         } else {
             copy = { type: 'pdf', pdfIndex: src.pdfIndex, cfgId: `d${stamp}` };
         }

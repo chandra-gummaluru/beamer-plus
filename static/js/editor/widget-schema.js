@@ -76,6 +76,17 @@ async function loadSchema(item) {
     // widget that declares its own `title` field keeps that one.
     if (!fields.some(f => f.key === 'title')) fields.unshift(nameField(schema?.label));
 
+    // Every widget also gets a Text size: the default for the top bar's
+    // stepper, offering the same steps. A widget's own `scale` field is
+    // replaced by it (keeping its default), so all widgets offer one set of
+    // sizes. Skipped for widgets that opt out of the stepper (fontSize: false).
+    if (schema?.fontSize !== false) {
+        const own = fields.findIndex(f => f.key === 'scale');
+        const def = own >= 0 && fields[own].default != null ? String(fields[own].default) : '1.4';
+        if (own >= 0) fields.splice(own, 1);
+        fields.splice(fields.findIndex(f => f.key === 'title') + 1, 0, textSizeField(def));
+    }
+
     return {
         label: typeof schema?.label === 'string' ? schema.label : null,
         customSettings: !!schema?.customSettings,
@@ -83,6 +94,20 @@ async function loadSchema(item) {
         // canvas): the editor locks its box to fill the slide.
         fullSlide: schema?.fullSlide === true,
         fields,
+    };
+}
+
+/** The steps of the top bar's text-size stepper (SCALE_STEPS in widget-settings-kit.js). */
+export const TEXT_SIZES = ['1', '1.2', '1.4', '1.7', '2', '2.4'];
+
+/** The universal Text size field. Keep in step with textSizeField() in widget-settings-kit.js. */
+export function textSizeField(def = '1.4') {
+    return {
+        key: 'scale',
+        label: 'Text size',
+        type: 'select',
+        options: TEXT_SIZES.map(v => ({ v, l: `${Math.round(parseFloat(v) * 100)}%` })),
+        default: def,
     };
 }
 
