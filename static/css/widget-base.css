@@ -517,3 +517,16 @@ summary::-webkit-details-marker { display: none; }
 input[type="search"]::-webkit-search-decoration,
 input[type="search"]::-webkit-search-cancel-button,
 input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; }
+
+/* ── Printing (notes PDF) ───────────────────────────────────────────────────
+   Set on <html> by the settings kit while a widget is being captured for the
+   notes PDF. Captures read computed styles at one instant, so anything still
+   mid-transition would be printed half-way; and a widget can mark chrome that
+   means nothing on paper (a "view only" toast, a hover hint) to leave out. */
+.bw-printing *,
+.bw-printing *::before,
+.bw-printing *::after {
+  transition: none !important;
+  animation: none !important;
+}
+.bw-printing [data-bw-print-hide] { display: none !important; }

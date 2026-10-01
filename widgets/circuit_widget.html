@@ -351,127 +351,14 @@ kbd.key {
 <div id="root"></div>
 
 <script>
-/* ═══ PDF EXPORT ═══════════════════════════════════════════════════════════
-   The board on one page, laid out like the other Beamer+ exports (the Python
-   Workspace's memory model, the notebook): a title block, the drawing in a
-   hairline box, and a footer with a key to the colours.
-
-   No library and no print dialog: the page is written as a PDF by hand and
-   handed to the browser as a download. The text is real text; the circuit is
-   the live SVG, rasterised at print resolution and embedded losslessly —
-   gates, wires and labels exactly as they look on the board. */
-window.CircuitPdf = (function () {
+/* ═══ THE BOARD AS AN IMAGE ═══════════════════════════════════════════════
+   For Beamer+'s notes PDF (the deck's Download -> Notes): the board cropped
+   to what is on it, gates, wires and labels exactly as they look, on white.
+   The live SVG is cloned with its computed styles written in, rasterised at
+   print resolution, and handed to the host as a canvas. */
+window.CircuitPrint = (function () {
   'use strict';
 
-  const COL = {
-    ink: '#1A1A18', dim: '#85857D', rule: '#DAD9D4', paper: '#FFFFFF',
-    high: '#F59E0B', low: '#CFCEC9',
-  };
-  const RES = 3, MAX_PX = 6e6;
-
-  // Helvetica advance widths (1/1000 em), printable ASCII.
-  const HELV = [278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,
-    556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,
-    667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,
-    278,278,278,469,556,333,
-    556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,
-    334,260,334,584];
-  const HELV_B = [278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,
-    556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,
-    722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,
-    333,278,333,584,556,333,
-    556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,
-    389,280,389,584];
-  const FONTS = [['F1', 'Helvetica'], ['F2', 'Helvetica-Bold']];
-
-  const n = v => (Math.round(v * 100) / 100).toString();
-  function esc(s) {
-    s = String(s == null ? '' : s);
-    let out = '';
-    for (let i = 0; i < s.length; i++) {
-      const ch = s.charAt(i), c = s.charCodeAt(i);
-      if (ch === '\\' || ch === '(' || ch === ')') out += '\\' + ch;
-      else if (c < 32) out += ' ';
-      else if (c < 127) out += ch;
-      else if (c < 256) out += '\\' + ('000' + c.toString(8)).slice(-3);
-      else out += '?';
-    }
-    return out;
-  }
-  function width(str, size, font, tr) {
-    const t = font === 'F2' ? HELV_B : HELV;
-    let w = 0;
-    for (const ch of String(str)) {
-      const c = ch.charCodeAt(0);
-      w += (c >= 32 && c <= 126 ? t[c - 32] : 556) * size / 1000 + (tr || 0);
-    }
-    return w;
-  }
-
-  // A page addressed from the top left, like the screen.
-  function Page(w, h) { this.w = w; this.h = h; this.ops = []; }
-  Page.prototype.rgb = function (hex, stroke) {
-    const v = parseInt(hex.slice(1), 16);
-    this.ops.push([(v >> 16) & 255, (v >> 8) & 255, v & 255].map(x => (x / 255).toFixed(3)).join(' ') + (stroke ? ' RG' : ' rg'));
-  };
-  Page.prototype.text = function (x, top, str, size, hex, font, opts = {}) {
-    const tr = opts.tracking || 0;
-    const w = width(str, size, font, tr);
-    if (opts.align === 'right') x -= w;
-    this.rgb(hex, false);
-    this.ops.push(`BT /${font || 'F1'} ${n(size)} Tf ${n(tr)} Tc ${n(x)} ${n(this.h - top - size * 0.8)} Td (${esc(str)}) Tj 0 Tc ET`);
-    return w;
-  };
-  Page.prototype.rect = function (x, top, w, h, fill, stroke, lw) {
-    if (fill) this.rgb(fill, false);
-    if (stroke) { this.rgb(stroke, true); this.ops.push(n(lw || 0.75) + ' w'); }
-    this.ops.push(`${n(x)} ${n(this.h - top - h)} ${n(w)} ${n(h)} re ${fill && stroke ? 'B' : fill ? 'f' : 'S'}`);
-  };
-  Page.prototype.line = function (x1, y, x2, hex, lw) {
-    this.rgb(hex, true);
-    this.ops.push(`${n(lw)} w ${n(x1)} ${n(this.h - y)} m ${n(x2)} ${n(this.h - y)} l S`);
-  };
-  Page.prototype.image = function (x, top, w, h) {
-    this.ops.push(`q ${n(w)} 0 0 ${n(h)} ${n(x)} ${n(this.h - top - h)} cm /Im0 Do Q`);
-  };
-
-  function file(pw, ph, content, img) {
-    const objs = [
-      { dict: '<< /Type /Catalog /Pages 2 0 R >>' },
-      { dict: '<< /Type /Pages /Kids [3 0 R] /Count 1 >>' },
-      { dict: '' },
-    ];
-    const fonts = FONTS.map(f => {
-      objs.push({ dict: `<< /Type /Font /Subtype /Type1 /BaseFont /${f[1]} /Encoding /WinAnsiEncoding >>` });
-      return `/${f[0]} ${objs.length} 0 R`;
-    }).join(' ');
-    objs.push({ dict: `<< /Type /XObject /Subtype /Image /Width ${img.w} /Height ${img.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /${img.filter} /Length ${img.data.length} >>`, data: img.data });
-    const imgRef = objs.length;
-    objs.push({ dict: `<< /Length ${content.length} >>`, data: content });
-    objs[2].dict = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pw} ${ph}] /Resources << /Font << ${fonts} >> /XObject << /Im0 ${imgRef} 0 R >> >> /Contents ${objs.length} 0 R >>`;
-
-    const parts = []; let len = 0;
-    const put = p => { parts.push(p); len += p.length; };
-    put('%PDF-1.4\n%âãÏÓ\n');
-    const offsets = [];
-    objs.forEach((o, i) => {
-      offsets.push(len);
-      put(`${i + 1} 0 obj\n${o.dict}\n`);
-      if (o.data) { put('stream\n'); put(o.data); put('\nendstream\n'); }
-      put('endobj\n');
-    });
-    const xref = len;
-    put(`xref\n0 ${objs.length + 1}\n0000000000 65535 f \n` + offsets.map(o => ('0000000000' + o).slice(-10) + ' 00000 n \n').join(''));
-    put(`trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
-    return new Blob(parts.map(p => {
-      if (typeof p !== 'string') return p;
-      const u = new Uint8Array(p.length);
-      for (let i = 0; i < p.length; i++) u[i] = p.charCodeAt(i) & 0xFF;
-      return u;
-    }), { type: 'application/pdf' });
-  }
-
-  // ── the drawing, as pixels ────────────────────────────────────────────────
   const PROPS = ['fill', 'fill-opacity', 'stroke', 'stroke-width', 'stroke-opacity',
     'stroke-linecap', 'stroke-linejoin', 'stroke-dasharray', 'opacity',
     'font-family', 'font-size', 'font-weight', 'font-style', 'text-anchor', 'dominant-baseline'];
@@ -510,20 +397,14 @@ window.CircuitPdf = (function () {
     return { svg: clone, w: vb.w, h: vb.h };
   }
 
-  async function deflate(bytes) {
-    if (typeof CompressionStream === 'undefined') return null;
-    try {
-      const cs = new CompressionStream('deflate');
-      const w = cs.writable.getWriter();
-      w.write(bytes); w.close();
-      return new Uint8Array(await new Response(cs.readable).arrayBuffer());
-    } catch (_) { return null; }
-  }
-
-  async function raster(snap, ptW, ptH) {
-    let res = RES;
-    while (ptW * res * ptH * res > MAX_PX && res > 1) res -= 0.25;
-    const pxW = Math.max(1, Math.round(ptW * res)), pxH = Math.max(1, Math.round(ptH * res));
+  async function image(svg, maxPx = 2400) {
+    const world = svg.querySelector(':scope > g');
+    if (!world) return null;
+    const bb = world.getBBox();
+    if (!bb.width && !bb.height) return null;   // an empty board
+    const snap = snapshot(svg);
+    const k = Math.min(maxPx / snap.w, maxPx / snap.h, 4);
+    const pxW = Math.max(1, Math.round(snap.w * k)), pxH = Math.max(1, Math.round(snap.h * k));
     snap.svg.setAttribute('width', pxW);
     snap.svg.setAttribute('height', pxH);
     const src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(snap.svg));
@@ -539,78 +420,10 @@ window.CircuitPdf = (function () {
     cx.fillStyle = '#FFFFFF';
     cx.fillRect(0, 0, pxW, pxH);
     cx.drawImage(img, 0, 0, pxW, pxH);
-    const rgba = cx.getImageData(0, 0, pxW, pxH).data;
-    const rgb = new Uint8Array(pxW * pxH * 3);
-    for (let i = 0, j = 0; i < rgba.length; i += 4) {
-      let r = rgba[i], g = rgba[i + 1], b = rgba[i + 2];
-      if (r >= 250 && g >= 250 && b >= 250) r = g = b = 255;   // paper is paper
-      rgb[j++] = r; rgb[j++] = g; rgb[j++] = b;
-    }
-    const z = await deflate(rgb);
-    if (z) return { w: pxW, h: pxH, data: z, filter: 'FlateDecode' };
-    const url = cv.toDataURL('image/jpeg', 0.95);
-    const bin = atob(url.slice(url.indexOf(',') + 1));
-    const u = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
-    return { w: pxW, h: pxH, data: u, filter: 'DCTDecode' };
+    return cv;
   }
 
-  function today() {
-    try { return new Date().toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' }); }
-    catch (_) { return new Date().toDateString(); }
-  }
-
-  /* info: { title } */
-  async function build(svg, info) {
-    const snap = snapshot(svg);
-    // The page turns to suit the circuit.
-    const landscape = snap.w >= snap.h * 0.9;
-    const PW = landscape ? 792 : 612, PH = landscape ? 612 : 792;
-    const M = 36, W = PW - 2 * M;
-    const page = new Page(PW, PH);
-
-    // Title block
-    page.text(M, M, 'CIRCUIT', 6.8, COL.dim, 'F2', { tracking: 0.9 });
-    page.text(M, M + 12, info.title || 'Circuit', 17, COL.ink, 'F2');
-    page.text(M + W, M + 18, today(), 8.5, COL.dim, 'F1', { align: 'right' });
-    page.line(M, M + 40, M + W, COL.ink, 0.8);
-
-    // The board
-    const top = M + 56;
-    page.text(M, top, 'BOARD', 6.8, COL.dim, 'F2', { tracking: 0.9 });
-    const boxY = top + 13, footY = PH - M - 10, boxH = footY - 14 - boxY, pad = 18;
-    const k = Math.min((W - 2 * pad) / snap.w, (boxH - 2 * pad) / snap.h, 1.4);
-    const ptW = snap.w * k, ptH = snap.h * k;
-    const img = await raster(snap, ptW, ptH);
-    const bh = Math.min(boxH, ptH + 2 * pad);
-    page.rect(M, boxY, W, bh, COL.paper, COL.rule, 0.75);
-    page.image(M + (W - ptW) / 2, boxY + pad, ptW, ptH);
-
-    // Footer, with a key to the only two colours that carry meaning
-    page.line(M, footY, M + W, COL.rule, 0.5);
-    const ty = footY + 7;
-    page.text(M, ty, 'Beamer+ · Circuit Simulator', 7, COL.dim, 'F1');
-    let rx = M + W;
-    for (const [label, sw] of [['LOW  0', COL.low], ['HIGH  1', COL.high]]) {
-      rx -= page.text(rx, ty, label, 7, COL.dim, 'F1', { align: 'right' }) + 5;
-      page.rect(rx - 12, ty + 1.5, 12, 2.6, sw);
-      rx -= 12 + 14;
-    }
-    return file(PW, PH, page.ops.join('\n'), img);
-  }
-
-  async function download(svg, info, name) {
-    const blob = await build(svg, info);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = name || 'circuit.pdf';
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 5000);
-  }
-
-  return { build, download };
+  return { image };
 })();
 </script>
 
@@ -3454,7 +3267,6 @@ const I = {
   reset: <svg width="13" height="13" viewBox="0 0 14 14"><path d="M11.5 7a4.5 4.5 0 1 1-1.6-3.45" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M11.6 1.2v3h-3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
   fit:   <svg width="14" height="14" viewBox="0 0 14 14"><path d="M2 5V2.6h3M12 5V2.6H9M2 9v2.4h3M12 9v2.4H9" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
   save:  <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 1.8v6.4M4.4 6l2.6 2.6L9.6 6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M2.4 10.4v1.2h9.2v-1.2" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>,
-  pdf:   <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3.2 1.6h5l2.6 2.6v8.2H3.2z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/><path d="M8.2 1.6v2.6h2.6M5 8.8h4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>,
   load:  <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 8.2V1.8M4.4 4l2.6-2.6L9.6 4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M2.4 10.4v1.2h9.2v-1.2" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>,
 };
 
@@ -3852,21 +3664,15 @@ function App() {
     a.click();
     setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
   };
-  // The board as a one-page PDF, laid out like the other Beamer+ exports.
-  const [pdfBusy, setPdfBusy] = useState(false);
-  const exportPdf = async ()=>{
-    const svg = viewApi.current?.svg?.();
-    if (!svg || pdfBusy) return;
-    setPdfBusy(true);
-    try {
-      await window.CircuitPdf.download(svg, { title: wName('Circuit') }, wFile('circuit', '.pdf'));
-    } catch (err) {
-      console.error('[circuit] PDF export failed', err);
-      alert('The PDF could not be made: ' + err.message);
-    } finally {
-      setPdfBusy(false);
-    }
-  };
+  // Beamer+'s notes PDF: the board, cropped to what's on it, in the
+  // widget's box on its slide. Registered once; it reads the live SVG
+  // through the ref, so it always prints the board as it is now.
+  useEffect(()=>{
+    window.BeamerWidget?.print?.register(async ()=>{
+      const svg = viewApi.current?.svg?.();
+      return { image: svg ? await window.CircuitPrint.image(svg) : null };
+    });
+  },[]);
   const importFileRef = useRef(null);
   const importCircuitFile = (e)=>{
     const file = e.target.files?.[0];
@@ -3958,10 +3764,6 @@ function App() {
       <div className="tb-group">
         <button className="bw-btn" onClick={()=>importFileRef.current?.click()} title="Load a circuit from a JSON file">{I.load}<span className="bl">Import</span></button>
         <button className="bw-btn" onClick={exportJson} title="Download this circuit as JSON">{I.save}<span className="bl">Export</span></button>
-        <button className="bw-btn" onClick={exportPdf} disabled={pdfBusy || !compCount}
-                title={compCount ? 'Download the board as a PDF' : 'Nothing on the board yet'}>
-          {I.pdf}<span className="bl">{pdfBusy ? 'PDF…' : 'PDF'}</span>
-        </button>
         <input ref={importFileRef} type="file" accept="application/json,.json" onChange={importCircuitFile} hidden/>
       </div>
     </>, document.getElementById('tb-slot'))}

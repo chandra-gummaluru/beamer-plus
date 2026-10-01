@@ -468,12 +468,12 @@ body {
 #notebook-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
 #notebook-area::-webkit-scrollbar-thumb:hover { background: var(--border-med); }
 
-/* ── Paper: the PDF export, and Ctrl+P ─────────────────────────────
-   One look for both, the same as the Python Workspace's PDF: a title
-   block, a quiet grey panel for code, white boxes for output, a red card
-   for errors. Everything is scoped to .paper — the PDF button builds an
-   offscreen copy of the notebook inside it, and printing puts the class on
-   the notebook itself for as long as the print dialog is open. */
+/* ── Paper: the deck's notes PDF, and Ctrl+P ───────────────────────
+   One look for both: a title block, a quiet grey panel for code, white
+   boxes for output, a red card for errors. Everything is scoped to .paper —
+   the notes export builds an offscreen copy of the notebook inside it, and
+   printing puts the class on the notebook itself for as long as the print
+   dialog is open. */
 @media print {
   html, body {
     height: auto;
@@ -659,18 +659,10 @@ body {
 
   <div class="sep"></div>
 
-  <!-- Two plain buttons rather than a Download menu: the settings kit moves
-       this toolbar into the shared top bar, whose actions strip clips
-       anything that hangs below it — a drop-down opens into nothing. -->
   <button class="tb-btn" id="btn-download" disabled onclick="downloadNotebook()"
           title="Download this notebook as a .ipynb file">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
     Notebook
-  </button>
-  <button class="tb-btn" id="btn-download-pdf" disabled onclick="downloadPdf()"
-          title="Download the notebook as a PDF">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-    <span class="pdf-label">PDF</span>
   </button>
 </div>
 
@@ -699,7 +691,7 @@ body {
 </div>
 
 <!-- ── Viewer overlay ─────────────────────────────────────────────────── -->
-<div id="viewer-toast">View-only · synced with presenter</div>
+<div id="viewer-toast" data-bw-print-hide>View-only · synced with presenter</div>
 
 <script>
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1750,7 +1742,7 @@ function removeBoot() {
 
 function enablePresenterToolbar() {
   ['btn-run-all',
-   'btn-download', 'btn-download-pdf'].forEach(id => {
+   'btn-download'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.disabled = false;
   });
@@ -1759,11 +1751,10 @@ function enablePresenterToolbar() {
 // ─────────────────────────────────────────────────────────────────────────────
 // DOWNLOAD
 //
-// Two shapes of the same notebook. The .ipynb is rebuilt from what's on
-// screen — sources, outputs and execution counts — so it opens in Jupyter
-// with the results of the talk still in it. The PDF is the browser's own
-// print-to-file, which keeps text and maths as vectors; see the @media print
-// block for the document it prints.
+// The .ipynb is rebuilt from what's on screen — sources, outputs and
+// execution counts — so it opens in Jupyter with the results of the talk
+// still in it. For paper there is the deck's notes PDF (see the print
+// handler below) and Ctrl+P (the @media print block).
 // ─────────────────────────────────────────────────────────────────────────────
 
 /* The widget's Name setting (every widget has one — the settings kit adds it)
@@ -1997,139 +1988,69 @@ window.addEventListener('afterprint', () => {
   document.getElementById('notebook-area').classList.remove('paper');
 });
 
-// ── PDF download ─────────────────────────────────────────────────────────────
-// Builds the file in the page and downloads it: an offscreen copy of the
-// notebook in its paper style, each cell captured with html2canvas and laid
-// onto US Letter pages with jsPDF. The title block and footer are real text.
-// Both libraries load on first use, so a slide that never exports never
-// fetches them.
-const PDF_LIBS = [
-  'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
-];
-let pdfLibsReady = null;
-function loadPdfLibs() {
-  if (!pdfLibsReady) {
-    pdfLibsReady = PDF_LIBS.reduce((p, src) => p.then(() => new Promise((ok, bad) => {
-      const s = document.createElement('script');
-      s.src = src;
-      s.onload = ok;
-      s.onerror = () => bad(new Error('could not load ' + src.split('/').slice(-2).join('/')));
-      document.head.appendChild(s);
-    })), Promise.resolve()).catch(err => { pdfLibsReady = null; throw err; });
-  }
-  return pdfLibsReady;
-}
 
-let pdfBusy = false;
-
-async function downloadPdf() {
-  if (pdfBusy) return;
-  const btn = document.getElementById('btn-download-pdf');
-  const label = btn?.querySelector('.pdf-label');
-  pdfBusy = true;
-  if (btn) btn.disabled = true;
-  if (label) label.textContent = 'PDF…';
-
-  // Markdown left open for editing would show its textarea instead of its
-  // rendered form, so close every editor first.
+// Close every markdown editor — one left open would print its textarea
+// instead of its rendered form.
+function commitOpenMarkdown() {
   document.querySelectorAll('.cell-block[data-cell-type="markdown"]').forEach(b => {
     const edit = document.getElementById('md-edit-' + b.dataset.id);
     if (edit && edit.style.display !== 'none') commitMarkdown(b.dataset.id);
   });
+}
+
+/**
+ * Capture every cell in its paper style, top to bottom: an offscreen copy of
+ * the notebook, one html2canvas pass per cell, for the deck's notes export.
+ * html2canvas must already be loaded.
+ * @returns {Promise<{ canvases: HTMLCanvasElement[], widthPx: number, scale: number }>}
+ */
+async function captureCellsOnPaper(scale) {
+  commitOpenMarkdown();
   preparePrint();
-
-  let stage = null;
+  if (document.fonts?.ready) await document.fonts.ready;
+  const stage = document.createElement('div');
+  stage.className = 'paper pdf-stage';
+  stage.setAttribute('aria-hidden', 'true');
+  // The copy keeps id="notebook" (the paper rules key on it); it only
+  // exists for the moment the cells are being captured.
+  const nb = document.getElementById('notebook').cloneNode(true);
+  stage.appendChild(nb);
+  document.body.appendChild(stage);
   try {
-    await loadPdfLibs();
-    if (document.fonts?.ready) await document.fonts.ready;
-
-    stage = document.createElement('div');
-    stage.className = 'paper pdf-stage';
-    stage.setAttribute('aria-hidden', 'true');
-    const nb = document.getElementById('notebook').cloneNode(true);
-    // The copy keeps id="notebook" (the paper rules key on it); it only
-    // exists for the moment the cells are being captured.
-    stage.appendChild(nb);
-    document.body.appendChild(stage);
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ unit: 'pt', format: 'letter', compress: true });
-    const PW = 612, PH = 792, ML = 43, CW = PW - 2 * ML;
-    const TOP = 40, BOTTOM = PH - 52;
-    const pxToPt = CW / stage.getBoundingClientRect().width;
-    const INK = [26, 26, 24], DIM = [133, 133, 125], RULE = [218, 217, 212];
-
-    // Title block, as text.
-    const name = wName(notebookName || 'Untitled.ipynb');
-    let date;
-    try { date = new Date().toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' }); }
-    catch (_) { date = new Date().toDateString(); }
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.8); doc.setTextColor(...DIM);
-    doc.text('PYTHON NOTEBOOK', ML, TOP + 5.5, { charSpace: 0.9 });
-    doc.setFont('courier', 'bold'); doc.setFontSize(17); doc.setTextColor(...INK);
-    doc.text(doc.splitTextToSize(name, CW - 140)[0], ML, TOP + 25);
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...DIM);
-    doc.text(date, ML + CW, TOP + 24, { align: 'right' });
-    doc.setDrawColor(...INK); doc.setLineWidth(0.8);
-    doc.line(ML, TOP + 40, ML + CW, TOP + 40);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.8); doc.setTextColor(...DIM);
-    doc.text('CELLS', ML, TOP + 61.5, { charSpace: 0.9 });
-    let y = TOP + 72;
-
-    const SCALE = 3, GAP = 10;
-    const blocks = [...nb.querySelectorAll(':scope > .cell-block')];
-    for (const block of blocks) {
-      const canvas = await html2canvas(block, {
-        scale: SCALE, backgroundColor: '#ffffff', logging: false, useCORS: true,
-      });
-      const hPt = canvas.height / SCALE * pxToPt;
-      const wPt = canvas.width  / SCALE * pxToPt;
-      if (y + hPt > BOTTOM && y > TOP) { doc.addPage(); y = TOP; }
-      if (y + hPt <= BOTTOM) {
-        doc.addImage(canvas, 'PNG', ML, y, wPt, hPt, undefined, 'FAST');
-        y += hPt + GAP;
-        continue;
-      }
-      // Taller than a page: slice it.
-      const perPagePx = Math.floor((BOTTOM - TOP) / pxToPt * SCALE);
-      for (let sy = 0; sy < canvas.height; sy += perPagePx) {
-        const part = document.createElement('canvas');
-        part.width = canvas.width;
-        part.height = Math.min(perPagePx, canvas.height - sy);
-        part.getContext('2d').drawImage(canvas, 0, sy, canvas.width, part.height, 0, 0, canvas.width, part.height);
-        if (sy > 0) { doc.addPage(); y = TOP; }
-        const ph = part.height / SCALE * pxToPt;
-        doc.addImage(part, 'PNG', ML, y, wPt, ph, undefined, 'FAST');
-        y += ph + GAP;
-      }
+    const widthPx = stage.getBoundingClientRect().width;
+    const canvases = [];
+    for (const block of nb.querySelectorAll(':scope > .cell-block')) {
+      canvases.push(await html2canvas(block, {
+        scale, backgroundColor: '#ffffff', logging: false, useCORS: true,
+      }));
     }
-
-    // Footer on every page.
-    const pages = doc.getNumberOfPages();
-    for (let i = 1; i <= pages; i++) {
-      doc.setPage(i);
-      doc.setDrawColor(...RULE); doc.setLineWidth(0.5);
-      doc.line(ML, PH - 36, ML + CW, PH - 36);
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...DIM);
-      doc.text('Beamer+ · Python Notebook', ML, PH - 26);
-      doc.text(`Page ${i} of ${pages}`, ML + CW, PH - 26, { align: 'right' });
-    }
-
-    doc.save(wFile(notebookName.replace(/\.ipynb$/i, '').replace(/[^\w.-]+/g, '-') || 'notebook', '.pdf'));
-    if (label) label.textContent = 'PDF';
-  } catch (err) {
-    console.error('[notebook] PDF export failed', err);
-    if (label) {
-      label.textContent = 'Failed';
-      setTimeout(() => { label.textContent = 'PDF'; }, 2000);
-    }
+    return { canvases, widthPx, scale };
   } finally {
-    stage?.remove();
-    pdfBusy = false;
-    if (btn) btn.disabled = false;
+    stage.remove();
   }
+}
+
+// ── Notes PDF (Beamer+ deck export) ──────────────────────────────────────────
+// On the slide: the notebook as the room saw it. After the slide: every cell,
+// in the paper style (the same one Ctrl+P uses), flowed over as many pages as
+// it takes. The host hands us a viewer copy already set to the live state.
+if (window.BeamerWidget?.print) {
+  BeamerWidget.print.register(async ({ scale }) => {
+    const image = await BeamerWidget.print.snapshot('#notebook-area', { ignore: '#print-header' });
+    if (!window.html2canvas) await BeamerWidget.print.html2canvas();
+    const S = Math.max(2, scale || 2);
+    const { canvases, widthPx } = await captureCellsOnPaper(S);
+    if (!canvases.length) return { image };
+    return {
+      image,
+      pages: [{
+        title: wName(notebookName || 'Untitled.ipynb'),
+        columnWidth: widthPx,
+        blocks: canvases.map(c => ({ type: 'image', src: c, width: c.width / S, height: c.height / S })),
+      }],
+    };
+  });
 }
 
 
@@ -2143,7 +2064,7 @@ function escHtml(s) {
 if (IS_VIEWER) {
   document.addEventListener('DOMContentLoaded', () => {
     ['btn-run-all',
-   'btn-download', 'btn-download-pdf'].forEach(id => {
+   'btn-download'].forEach(id => {
       document.getElementById(id)?.remove();
     });
     document.getElementById('viewer-toast').style.display = 'block';
@@ -2222,13 +2143,15 @@ function _nbSetState(s) {
   // If content is already on screen the iframe is live (opacity-based
   // navigation keeps iframes in the DOM), or the notebook file got there
   // first. Either way the DOM — including outputs — is intact, so skip.
-  if (contentLoaded) return;
+  // (A print copy is the exception: it must show the state it was handed,
+  // even if the notebook file rendered first.)
+  if (contentLoaded && !window.BEAMER_PRINT) return;
   // An untouched starter cell doesn't count; anything else someone typed does.
   const blocks = document.querySelectorAll('.cell-block');
   const onlyPlaceholder = blocks.length === 1
     && blocks[0].dataset.id === placeholderId
     && !document.getElementById('ta-' + placeholderId)?.value;
-  if (blocks.length && !onlyPlaceholder) return;
+  if (blocks.length && !onlyPlaceholder && !window.BEAMER_PRINT) return;
   contentLoaded = true;
   placeholderId = null;
   // Fresh iframe (restoring from saved ZIP state) — rebuild from scratch.

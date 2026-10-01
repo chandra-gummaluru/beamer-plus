@@ -634,8 +634,6 @@ body.tb-tight .bw-topbar-actions > .bw-sep:first-child,
 }
 .pop-item:hover, .pop-item:focus-visible { background: var(--bg-subtle); outline: none; }
 #mm-tools[hidden] { display: none; }
-#pdf-wrap { display: contents; }
-#pdf-wrap[hidden] { display: none; }
 
 /* The tool groups are transparent to the flex row they sit in; `hidden`
    has to beat `display: contents`, hence the second rule. */
@@ -653,8 +651,7 @@ body.tb-tight .bw-topbar-actions > .bw-sep:first-child,
 body.is-viewer #view-badge { display: inline-flex; }
 body.is-viewer .presenter-only { display: none !important; }
 body.is-viewer #mm-head .modeswitch,
-body.is-viewer #drawTools,
-body.is-viewer #btnPdf { display: none !important; }
+body.is-viewer #drawTools { display: none !important; }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
@@ -707,8 +704,7 @@ body.is-viewer #btnPdf { display: none !important; }
   --r:    var(--radius);
 
   /* Syntax colours for the editor. The deck's --chart-* ramp is greyscale,
-     which made every token the same ink — code needs real hues. Matches the
-     PDF export palette (PDF_COL) so the printout looks like the screen. */
+     which made every token the same ink — code needs real hues. */
   --code-kw:  #7A3EAD;
   --code-str: #0E7C6B;
   --code-num: #2F5DD1;
@@ -918,12 +914,6 @@ html[data-theme="dark"]{
         <span class="bl">Layout</span>
       </button>
     </div>
-    <span id="pdf-wrap" hidden>
-      <div class="bw-sep"></div>
-      <button class="bw-btn" id="btnPdf" type="button" title="Download the program and diagram as a PDF (P)" aria-label="Download as PDF">
-        <svg class="bi" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M3.5 1.8h6l3 3v9.4h-9z"/><path d="M9.5 1.8v3h3M6 10.5h4"/></svg><span class="bl" id="btnPdfLabel">PDF</span>
-      </button>
-    </span>
     <div class="bw-spacer"></div>
     <span class="bw-status" id="view-badge">View-only · synced with presenter</span>
     <input type="file" id="file-input" accept=".py,.txt,text/x-python,text/plain">
@@ -1073,7 +1063,7 @@ html[data-theme="dark"]{
 
 <!-- ═══════════════════════════════════════════════════════════════════════
      MEMORY MODEL ENGINE — the Python Memory Model widget's interpreter,
-     trace, renderer, draw mode and PDF export. It exposes
+     trace, renderer, draw mode and diagram snapshots. It exposes
      window.PythonVisualizer; the workspace script below drives it.
      ═══════════════════════════════════════════════════════════════════════ -->
 <script>
@@ -3029,8 +3019,7 @@ var HL_RE = new RegExp(
   'g');
 
 /* One pass over a line, returned as runs of text with the class each run
-   should be painted in. The editor turns these into spans; the PDF exporter
-   turns them into coloured Courier, so there is one highlighter, not two. */
+   should be painted in. The editor turns these into spans. */
 function highlightRuns(line){
   var runs = [], last = 0, m;
   HL_RE.lastIndex = 0;
@@ -3912,7 +3901,6 @@ function setupControls(){
   $('btnBack').addEventListener('click', stepBackward);
   $('btnRun').addEventListener('click', runAll);
   $('btnReset').addEventListener('click', resetAll);
-  $('btnPdf').addEventListener('click', downloadPdf);
 }
 
 /* This build is presentation-only. The method stays so that decks written
@@ -3963,7 +3951,6 @@ function setupKeys(){
       case '-': case '_': e.preventDefault(); setZoom(app.zoom / 1.2); break;
       case '0': e.preventDefault(); setZoom(1); break;
       case 'f': case 'F': fitToPane(); break;
-      case 'p': case 'P': e.preventDefault(); downloadPdf(); break;
       case 'm': case 'M': if (MM.readOnly) break; setMode(app.mode === 'draw' ? 'trace' : 'draw'); break;
       case 'Delete': case 'Backspace':
         if (app.mode === 'draw'){ e.preventDefault(); deleteSelected(); }
@@ -3977,201 +3964,12 @@ function setupKeys(){
 }
 
 /* ===========================================================================
-   PDF EXPORT — the program and the diagram on one page
-
-   Offline like everything else here: no print dialog, no library, no CDN. The
-   page is assembled as a PDF by hand and handed to the browser as a download.
-
-     left column    the program, in Courier, syntax coloured, line numbered,
-                    with the current line marked, and the console underneath
-     right column   the memory diagram
-
-   The code goes in as real text, so it can be selected, searched and copied
-   out of the PDF. The diagram cannot: it is hand-drawn strokes in a
-   handwriting face, so it is rasterised through a canvas at print resolution
-   and embedded as a single lossless image.
-
-   The export is always on white paper with dark ink, whatever the screen
-   theme, because a dark slide is for the room and this is for a printer.
+   THE DIAGRAM, AS AN IMAGE
+   Beamer+'s notes PDF (the deck's Download -> Notes) prints this widget; the
+   diagram goes in as pixels. A serialised SVG travels without the stylesheet
+   that colours it, so the live SVG is cloned with every inherited colour and
+   face written onto the elements themselves.
 =========================================================================== */
-
-var PDF = {
-  pw: 792, ph: 612,      /* US Letter, landscape, in points        */
-  margin: 36,
-  gutter: 22,            /* between the two columns                */
-  leftFrac: 0.39,        /* share of the width the program gets    */
-  res: 3,                /* raster pixels per point, ~216 dpi      */
-  maxPx: 4.5e6,          /* ceiling on the raster, to stay modest  */
-  maxPtPerUnit: 1.6      /* a one-frame diagram must not balloon   */
-};
-
-var PDF_FONTS = [
-  ['F1', 'Courier'], ['F2', 'Courier-Bold'], ['F3', 'Courier-Oblique'], ['F4', 'Helvetica'],
-  ['F5', 'Helvetica-Bold']
-];
-
-/* The light palette, frozen: the PDF does not follow the theme. */
-var PDF_COL = {
-  ink: '#1A1A18', dim: '#85857D', rule: '#DAD9D4', paper: '#FFFFFF', code: '#F6F6F3',
-  mark: '#E4EBFA', markBar: '#2F5DD1', err: '#FCECEA', errBar: '#B3261E',
-  mutate: '#C46A00',
-  't-kw': '#7A3EAD', 't-str': '#0E7C6B', 't-num': '#2F5DD1',
-  't-com': '#8A938E', 't-bi': '#A03A82'
-};
-
-/* Courier is 600/1000 of its size, every glyph, which is what lets the
-   exporter place coloured runs without measuring anything. */
-var CW = 0.6;
-
-function pdfN(n){ return (Math.round(n * 100) / 100).toString(); }
-
-/* Literal strings are written in WinAnsi: ASCII through, Latin-1 in octal,
-   anything above that as a question mark rather than as mojibake. */
-function pdfEsc(s){
-  s = String(s == null ? '' : s);
-  var out = '';
-  for (var i = 0; i < s.length; i++){
-    var ch = s.charAt(i), c = s.charCodeAt(i);
-    if (ch === '\\' || ch === '(' || ch === ')') out += '\\' + ch;
-    else if (c < 32) out += ' ';
-    else if (c < 127) out += ch;
-    else if (c < 256) out += '\\' + ('000' + c.toString(8)).slice(-3);
-    else out += '?';
-  }
-  return out;
-}
-
-/* ---------------------------------------------------------------------------
-   A page of content operators, addressed from the top left like the screen.
---------------------------------------------------------------------------- */
-function PdfPage(w, h){ this.w = w; this.h = h; this.ops = []; }
-
-PdfPage.prototype.op = function(s){ this.ops.push(s); };
-
-PdfPage.prototype.rgb = function(hex, stroke){
-  var n = parseInt(hex.slice(1), 16);
-  this.op([((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]
-            .map(function(v){ return v.toFixed(3); }).join(' ') + (stroke ? ' RG' : ' rg'));
-};
-
-/* A rounded rectangle, one continuous path, in top-down coordinates. */
-PdfPage.prototype.rrPath = function(x, top, w, h, r){
-  r = Math.max(0, Math.min(r, w / 2, h / 2));
-  var y = this.h - top - h, k = 0.5523 * r;
-  var L = x, R = x + w, B = y, T = y + h;
-  var c = function(a, b, cc, d, e, f2){
-    return [a, b, cc, d, e, f2].map(pdfN).join(' ') + ' c';
-  };
-  this.op(pdfN(L + r) + ' ' + pdfN(B) + ' m');
-  this.op(pdfN(R - r) + ' ' + pdfN(B) + ' l');
-  this.op(c(R - r + k, B, R, B + r - k, R, B + r));
-  this.op(pdfN(R) + ' ' + pdfN(T - r) + ' l');
-  this.op(c(R, T - r + k, R - r + k, T, R - r, T));
-  this.op(pdfN(L + r) + ' ' + pdfN(T) + ' l');
-  this.op(c(L + r - k, T, L, T - r + k, L, T - r));
-  this.op(pdfN(L) + ' ' + pdfN(B + r) + ' l');
-  this.op(c(L, B + r - k, L + r - k, B, L + r, B));
-  this.op('h');
-};
-
-PdfPage.prototype.box = function(x, top, w, h, fill, stroke, r){
-  if (fill) this.rgb(fill, false);
-  if (stroke){ this.rgb(stroke, true); this.op('0.8 w'); }
-  this.rrPath(x, top, w, h, r === undefined ? 6 : r);
-  this.op(fill && stroke ? 'B' : fill ? 'f' : 'S');
-};
-
-PdfPage.prototype.fillRect = function(x, top, w, h, hex){
-  this.rgb(hex, false);
-  this.op([x, this.h - top - h, w, h].map(pdfN).join(' ') + ' re f');
-};
-
-PdfPage.prototype.text = function(x, top, str, size, hex, font){
-  var s = pdfEsc(str);
-  if (!s.length) return;
-  this.rgb(hex || PDF_COL.ink, false);
-  this.op('BT /' + (font || 'F1') + ' ' + pdfN(size) + ' Tf ' +
-          pdfN(x) + ' ' + pdfN(this.h - top - size * 0.8) + ' Td (' + s + ') Tj ET');
-};
-
-PdfPage.prototype.image = function(x, top, w, h){
-  this.op('q ' + [w, 0, 0, h, x, this.h - top - h].map(pdfN).join(' ') + ' cm /Im0 Do Q');
-};
-
-/* Overlong code lines are cut off at the column edge rather than running
-   across the diagram. */
-PdfPage.prototype.clipIn = function(x, top, w, h){
-  this.op('q ' + [x, this.h - top - h, w, h].map(pdfN).join(' ') + ' re W n');
-};
-PdfPage.prototype.clipOut = function(){ this.op('Q'); };
-
-/* ---------------------------------------------------------------------------
-   THE FILE
-   Seven or eight objects: catalogue, page tree, page, the four base fonts,
-   the diagram, and one content stream. Offsets are counted in bytes, so the
-   parts are assembled as a list and joined once at the end.
---------------------------------------------------------------------------- */
-function pdfFile(pageW, pageH, content, img){
-  var objs = [];
-  objs.push({ dict: '<< /Type /Catalog /Pages 2 0 R >>' });              /* 1 */
-  objs.push({ dict: '<< /Type /Pages /Kids [3 0 R] /Count 1 >>' });      /* 2 */
-  objs.push({ dict: '' });                                              /* 3, below */
-
-  var fonts = PDF_FONTS.map(function(f){
-    objs.push({ dict: '<< /Type /Font /Subtype /Type1 /BaseFont /' + f[1] +
-                      ' /Encoding /WinAnsiEncoding >>' });
-    return '/' + f[0] + ' ' + objs.length + ' 0 R';
-  }).join(' ');
-
-  var xobj = '';
-  if (img){
-    objs.push({ dict: '<< /Type /XObject /Subtype /Image /Width ' + img.w +
-                      ' /Height ' + img.h + ' /ColorSpace /DeviceRGB' +
-                      ' /BitsPerComponent 8 /Filter /' + img.filter +
-                      ' /Length ' + img.data.length + ' >>', data: img.data });
-    xobj = ' /XObject << /Im0 ' + objs.length + ' 0 R >>';
-  }
-
-  objs.push({ dict: '<< /Length ' + content.length + ' >>', data: content });
-  objs[2].dict = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + pageW + ' ' + pageH + ']' +
-                 ' /Resources << /ProcSet [/PDF /Text /ImageC] /Font << ' + fonts + ' >>' +
-                 xobj + ' >> /Contents ' + objs.length + ' 0 R >>';
-
-  var parts = [], len = 0;
-  var put = function(p){ parts.push(p); len += p.length; };
-  put('%PDF-1.4\n%âãÏÓ\n');
-
-  var offsets = [];
-  objs.forEach(function(o, i){
-    offsets.push(len);
-    put((i + 1) + ' 0 obj\n' + o.dict + '\n');
-    if (o.data){ put('stream\n'); put(o.data); put('\nendstream\n'); }
-    put('endobj\n');
-  });
-
-  var startxref = len;
-  var xref = 'xref\n0 ' + (objs.length + 1) + '\n0000000000 65535 f \n';
-  offsets.forEach(function(off){
-    xref += ('0000000000' + off).slice(-10) + ' 00000 n \n';
-  });
-  put(xref);
-  put('trailer\n<< /Size ' + (objs.length + 1) + ' /Root 1 0 R >>\nstartxref\n' +
-      startxref + '\n%%EOF\n');
-
-  return new Blob(parts.map(function(p){
-    if (typeof p !== 'string') return p;
-    var u = new Uint8Array(p.length);
-    for (var i = 0; i < p.length; i++) u[i] = p.charCodeAt(i) & 0xFF;
-    return u;
-  }), { type: 'application/pdf' });
-}
-
-/* ---------------------------------------------------------------------------
-   THE DIAGRAM, AS PIXELS
-   The live SVG is cloned with every inherited colour and face written onto
-   the elements themselves, because a serialised SVG travels without the
-   stylesheet that was colouring it.
---------------------------------------------------------------------------- */
 var PDF_SVG_PROPS = ['fill', 'fill-opacity', 'stroke', 'stroke-width', 'stroke-opacity',
   'stroke-linecap', 'stroke-linejoin', 'stroke-dasharray', 'opacity',
   'font-family', 'font-size', 'font-weight', 'font-style', 'text-anchor'];
@@ -4248,397 +4046,6 @@ function pdfSvgSnapshot(){
   return { svg: clone, w: vb.w, h: vb.h };
 }
 
-function pdfDeflate(bytes){
-  if (typeof CompressionStream === 'undefined') return Promise.resolve(null);
-  try {
-    var cs = new CompressionStream('deflate');   /* zlib: exactly FlateDecode */
-    var w = cs.writable.getWriter();
-    w.write(bytes); w.close();
-    return new Response(cs.readable).arrayBuffer().then(function(b){ return new Uint8Array(b); });
-  } catch (e){ return Promise.resolve(null); }
-}
-
-function pdfJpeg(canvas, base){
-  var url = canvas.toDataURL('image/jpeg', 0.94);
-  var bin = atob(url.slice(url.indexOf(',') + 1));
-  var u = new Uint8Array(bin.length);
-  for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
-  base.data = u; base.filter = 'DCTDecode';
-  return base;
-}
-
-function pdfEncodeRaster(canvas, ctx, base){
-  var rgba = null;
-  try { rgba = ctx.getImageData(0, 0, base.w, base.h).data; } catch (e){}
-  if (!rgba) return Promise.resolve(pdfJpeg(canvas, base));
-  var rgb = new Uint8Array(base.w * base.h * 3);
-  for (var i = 0, j = 0; i < rgba.length; i += 4){
-    var r = rgba[i], g = rgba[i + 1], bl = rgba[i + 2];
-    if (r >= 250 && g >= 250 && bl >= 250){ r = g = bl = 255; }
-    rgb[j++] = r; rgb[j++] = g; rgb[j++] = bl;
-  }
-  return pdfDeflate(rgb).then(function(z){
-    if (!z) return pdfJpeg(canvas, base);
-    base.data = z; base.filter = 'FlateDecode';
-    return base;
-  }, function(){ return pdfJpeg(canvas, base); });
-}
-
-function pdfDiagram(slotW, slotH){
-  var snap = pdfSvgSnapshot();
-  var k = Math.min(slotW / snap.w, slotH / snap.h, app.mode === 'draw' ? 0.9 : PDF.maxPtPerUnit);
-  var ptW = snap.w * k, ptH = snap.h * k;
-
-  var res = PDF.res;
-  while (ptW * res * ptH * res > PDF.maxPx && res > 1) res -= 0.25;
-  var pxW = Math.max(1, Math.round(ptW * res)), pxH = Math.max(1, Math.round(ptH * res));
-  snap.svg.setAttribute('width', pxW);
-  snap.svg.setAttribute('height', pxH);
-
-  var src = 'data:image/svg+xml;charset=utf-8,' +
-            encodeURIComponent(new XMLSerializer().serializeToString(snap.svg));
-
-  return new Promise(function(resolve, reject){
-    var img = new Image();
-    img.onload = function(){
-      var cv = document.createElement('canvas');
-      cv.width = pxW; cv.height = pxH;
-      var cx = cv.getContext('2d');
-      cx.fillStyle = '#FFFFFF';
-      cx.fillRect(0, 0, pxW, pxH);
-      cx.drawImage(img, 0, 0, pxW, pxH);
-      resolve(pdfEncodeRaster(cv, cx, { w: pxW, h: pxH, ptW: ptW, ptH: ptH }));
-    };
-    img.onerror = function(){ reject(new Error('the diagram could not be rasterised')); };
-    img.src = src;
-  });
-}
-
-/* ---------------------------------------------------------------------------
-   THE LEFT COLUMN
---------------------------------------------------------------------------- */
-function pdfCodeLines(){
-  var lines = app.code.replace(/\t/g, '    ').split('\n');
-  while (lines.length > 1 && !lines[lines.length - 1].trim()) lines.pop();
-  return lines;
-}
-
-/* ---------------------------------------------------------------------------
-   TYPE METRICS
-   Helvetica's advance widths (per 1000 em) for printable ASCII, so labels can
-   be right-aligned and messages wrapped without a text engine. Courier needs
-   none: every glyph is 600.
---------------------------------------------------------------------------- */
-var HELV = [278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,
-  556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,
-  667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,
-  278,278,278,469,556,333,
-  556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,
-  334,260,334,584];
-var HELV_B = [278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,
-  556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,
-  722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,
-  333,278,333,584,556,333,
-  556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,
-  389,280,389,584];
-
-/* Width of `str` in points. Tracking is added per glyph, as Tc does. */
-function pdfWidth(str, size, font, tracking){
-  str = String(str == null ? '' : str);
-  if (font === 'F1' || font === 'F2' || font === 'F3') return str.length * (size * CW + (tracking || 0));
-  var t = font === 'F5' ? HELV_B : HELV, w = 0;
-  for (var i = 0; i < str.length; i++){
-    var c = str.charCodeAt(i);
-    w += (c >= 32 && c <= 126 ? t[c - 32] : 556) * size / 1000 + (tracking || 0);
-  }
-  return w;
-}
-
-/* Greedy word wrap in Helvetica. A word longer than the line is cut. */
-function pdfWrap(str, size, font, maxW){
-  var out = [];
-  String(str || '').split('\n').forEach(function(para){
-    var line = '';
-    para.split(/\s+/).forEach(function(word){
-      if (!word) return;
-      var next = line ? line + ' ' + word : word;
-      if (pdfWidth(next, size, font) <= maxW){ line = next; return; }
-      if (line) out.push(line);
-      while (pdfWidth(word, size, font) > maxW && word.length > 1){
-        var k = word.length - 1;
-        while (k > 1 && pdfWidth(word.slice(0, k), size, font) > maxW) k--;
-        out.push(word.slice(0, k));
-        word = word.slice(k);
-      }
-      line = word;
-    });
-    out.push(line);
-  });
-  return out;
-}
-
-/* Text with the options the layout needs: alignment and letter-spacing. */
-PdfPage.prototype.label = function(x, top, str, size, hex, font, opts){
-  opts = opts || {};
-  var s = pdfEsc(str);
-  if (!s.length) return;
-  var tr = opts.tracking || 0;
-  var w = pdfWidth(str, size, font || 'F4', tr);
-  if (opts.align === 'right') x -= w;
-  else if (opts.align === 'center') x -= w / 2;
-  this.rgb(hex || PDF_COL.ink, false);
-  this.op('BT /' + (font || 'F4') + ' ' + pdfN(size) + ' Tf ' + pdfN(tr) + ' Tc ' +
-          pdfN(x) + ' ' + pdfN(this.h - top - size * 0.8) + ' Td (' + s + ') Tj 0 Tc ET');
-  return w;
-};
-
-PdfPage.prototype.rule = function(x1, y1, x2, y2, hex, width){
-  this.rgb(hex, true);
-  this.op(pdfN(width || 0.6) + ' w 0 J');
-  this.op(pdfN(x1) + ' ' + pdfN(this.h - y1) + ' m ' + pdfN(x2) + ' ' + pdfN(this.h - y2) + ' l S');
-};
-
-/* ---------------------------------------------------------------------------
-   THE PAGE, SECTION BY SECTION
---------------------------------------------------------------------------- */
-
-/* An uppercase, tracked section heading — the same voice as the widget's
-   pane labels. */
-function pdfSection(page, x, y, text){
-  page.label(x, y, text.toUpperCase(), 6.8, PDF_COL.dim, 'F5', { tracking: 0.9 });
-  return y + 13;
-}
-
-/* The widget's Name setting (every widget has one — the settings kit adds it)
-   is its title everywhere: the bar, the heading inside an exported PDF, and
-   the downloaded file's name. Blank falls back to the widget's own default. */
-function wName(fallback){
-  return (window.BeamerWidget && BeamerWidget.name) ? BeamerWidget.name(fallback) : fallback;
-}
-function wFile(fallback, ext){
-  return (window.BeamerWidget && BeamerWidget.fileName) ? BeamerWidget.fileName(fallback, ext) : fallback + ext;
-}
-
-function pdfTitle(){
-  var f = document.getElementById('filename');
-  var name = f && f.value.trim();
-  return wName(name || 'main.py');
-}
-
-function pdfDate(){
-  try {
-    return new Date().toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' });
-  } catch (e){ return new Date().toDateString(); }
-}
-
-function pdfHeader(page, x, y, w){
-  var drawing = app.mode === 'draw';
-  page.label(x, y, 'MEMORY MODEL', 6.8, PDF_COL.dim, 'F5', { tracking: 0.9 });
-  page.label(x, y + 12, drawing ? wName('Drawing') : pdfTitle(), 17, PDF_COL.ink, drawing ? 'F5' : 'F2');
-  page.label(x + w, y + 18, pdfDate(), 8.5, PDF_COL.dim, 'F4', { align: 'right' });
-  page.rule(x, y + 40, x + w, y + 40, PDF_COL.ink, 0.8);
-  return y + 56;
-}
-
-function pdfFooter(page, x, y, w){
-  page.rule(x, y, x + w, y, PDF_COL.rule, 0.5);
-  var ty = y + 7;
-  page.label(x, ty, 'Beamer+ · Python Workspace', 7, PDF_COL.dim, 'F4');
-  if (app.mode === 'draw') return;
-  /* The legend reads right to left from the page edge. */
-  var rx = x + w;
-  var put = function(text, swatch, bar){
-    var tw = page.label(rx, ty, text, 7, PDF_COL.dim, 'F4', { align: 'right' });
-    rx -= tw + 5;
-    page.fillRect(rx - 9, ty - 0.5, 9, 7, swatch);
-    if (bar) page.fillRect(rx - 9, ty - 0.5, 1.5, 7, bar);
-    rx -= 9 + 14;
-  };
-  put('changed by the last step', PDF_COL.mutate);
-  put('line about to run', PDF_COL.mark, PDF_COL.markBar);
-}
-
-/* The program, line-numbered and coloured. Returns the height used. */
-function pdfCode(page, x, y, w, maxH){
-  var lines = pdfCodeLines();
-  var state = app.painted;
-  var current = app.idx === 0 ? null : (state && state.line);
-  var errLine = (app.revealErrors && state && state.error) ? state.error.line : null;
-
-  /* The largest size at which the whole program fits. Height is the hard
-     limit; width gives way once the type would be too small to read, and
-     over-long lines are cut at the edge instead. */
-  var longest = 0;
-  lines.forEach(function(l){ longest = Math.max(longest, l.length); });
-  var digits = Math.max(2, String(lines.length).length), fs, lead, padY = 9;
-  for (fs = 9.5; fs > 5.5; fs -= 0.25){
-    lead = fs * 1.55;
-    var fitsW = (digits + 2) * fs * CW + 20 + longest * fs * CW <= w;
-    if (lines.length * lead + 2 * padY <= maxH && (fitsW || fs <= 7)) break;
-  }
-  lead = fs * 1.55;
-  var gutW = (digits + 1.6) * fs * CW + 8;
-  var h = Math.min(maxH, lines.length * lead + 2 * padY);
-
-  page.box(x, y, w, h, PDF_COL.code, null, 3);
-  page.fillRect(x + gutW, y, 0.5, h, PDF_COL.rule);
-  page.clipIn(x, y, w, h);
-  var ty = y + padY, rows = Math.floor((h - 2 * padY) / lead + 0.01);
-  for (var i = 0; i < lines.length && i < rows; i++){
-    var n = i + 1;
-    var hit = n === current || n === errLine;
-    if (hit){
-      page.fillRect(x, ty, w, lead, n === errLine ? PDF_COL.err : PDF_COL.mark);
-      page.fillRect(x, ty, 2, lead, n === errLine ? PDF_COL.errBar : PDF_COL.markBar);
-    }
-    var base = ty + (lead - fs) / 2;
-    page.text(x + gutW - 7 - String(n).length * fs * CW, base, String(n), fs,
-              hit ? PDF_COL.ink : PDF_COL.dim, hit ? 'F2' : 'F1');
-    var cx = x + gutW + 8;
-    highlightRuns(lines[i]).forEach(function(r){
-      page.text(cx, base, r.text, fs,
-                r.cls ? PDF_COL[r.cls] : PDF_COL.ink,
-                r.cls === 't-kw' ? 'F2' : r.cls === 't-com' ? 'F3' : 'F1');
-      cx += r.text.length * fs * CW;
-    });
-    ty += lead;
-  }
-  page.clipOut();
-  if (rows < lines.length){
-    page.label(x + w - 8, y + h - 10, '+' + (lines.length - rows) + ' more lines', 6.5, PDF_COL.dim, 'F4', { align: 'right' });
-  }
-  return h;
-}
-
-/* What the program printed, wrapped. Returns the height used. */
-function pdfOutput(page, x, y, w, maxH){
-  var output = ((app.painted && app.painted.output) || '').replace(/\n+$/, '');
-  var fs = 8, lead = 11, pad = 8;
-  var per = Math.max(8, Math.floor((w - 2 * pad) / (fs * CW)));
-  var rows = [];
-  if (output){
-    output.split('\n').forEach(function(ln){
-      if (!ln.length) return rows.push('');
-      for (var i = 0; i < ln.length; i += per) rows.push(ln.substr(i, per));
-    });
-  }
-  var room = Math.max(1, Math.floor((maxH - 2 * pad) / lead));
-  if (rows.length > room){ rows = rows.slice(rows.length - room); rows[0] = '…'; }
-  var h = Math.max(1, rows.length) * lead + 2 * pad - 3;
-  page.box(x, y, w, h, PDF_COL.paper, PDF_COL.rule, 3);
-  if (!rows.length){
-    page.label(x + pad, y + pad, 'Nothing printed yet.', 7.5, PDF_COL.dim, 'F4');
-    return h;
-  }
-  var ty = y + pad;
-  rows.forEach(function(r){ page.text(x + pad, ty, r, fs, PDF_COL.ink, 'F1'); ty += lead; });
-  return h;
-}
-
-/* The error, explained in words. Returns the height used. */
-function pdfError(page, x, y, w){
-  var st = app.painted;
-  if (!st || !st.error || !app.revealErrors) return 0;
-  var e = st.error, pad = 9, inner = w - 2 * pad - 3;
-  var msg = pdfWrap(e.message, 8.5, 'F4', inner);
-  var src = (app.code.split('\n')[e.line - 1] || '').trim();
-  var h = pad + 12 + msg.length * 11.5 + 6 + 10 + pad;
-  page.box(x, y, w, h, PDF_COL.err, null, 3);
-  page.fillRect(x, y, 2.5, h, PDF_COL.errBar);
-  var ty = y + pad;
-  page.label(x + pad + 3, ty, e.type, 10, PDF_COL.errBar, 'F5');
-  ty += 15;
-  msg.forEach(function(m){ page.label(x + pad + 3, ty, m, 8.5, PDF_COL.ink, 'F4'); ty += 11.5; });
-  ty += 3;
-  var where = 'Line ' + e.line + (src ? ':  ' : '');
-  var ww = page.label(x + pad + 3, ty, where, 7.5, PDF_COL.dim, 'F4');
-  if (src){
-    var fit = Math.floor((inner - ww) / (7.5 * CW));
-    page.text(x + pad + 3 + ww, ty, src.length > fit ? src.slice(0, fit - 1) + '…' : src, 7.5, PDF_COL.dim, 'F1');
-  }
-  return h;
-}
-
-function buildPdf(){
-  var page = new PdfPage(PDF.pw, PDF.ph);
-  var M = PDF.margin, W = PDF.pw - 2 * M;
-  var drawing = app.mode === 'draw';
-
-  var top = pdfHeader(page, M, M, W);
-  var footY = PDF.ph - M - 10;
-  var bottom = footY - 14;
-
-  var leftW  = drawing ? 0 : Math.round((W - PDF.gutter) * PDF.leftFrac);
-  var rightX = drawing ? M : M + leftW + PDF.gutter;
-  var rightW = drawing ? W : W - leftW - PDF.gutter;
-
-  var boxY = top + 13, boxH = bottom - boxY, pad = 18;
-  return pdfDiagram(rightW - 2 * pad, boxH - 2 * pad).then(function(img){
-    var leftEnd = boxY;
-    if (!drawing){
-      var y = pdfSection(page, M, top, 'Program');
-      /* Leave the output and any error their room before sizing the code. */
-      var errReserve = (app.painted && app.painted.error && app.revealErrors) ? 90 : 0;
-      var codeH = pdfCode(page, M, y, leftW, bottom - y - 70 - errReserve);
-      y += codeH + 16;
-      y = pdfSection(page, M, y, 'Output');
-      y += pdfOutput(page, M, y, leftW, bottom - y - errReserve - 10);
-      leftEnd = y;
-      if (errReserve) leftEnd = y + 12 + pdfError(page, M, y + 12, leftW);
-    }
-
-    pdfSection(page, rightX, top, drawing ? 'Drawing' : 'Memory');
-    /* As tall as the diagram needs, and at least as tall as the column
-       beside it, so the two columns end together. */
-    var bh = Math.min(boxH, Math.max(img.ptH + 2 * pad, leftEnd - boxY));
-    page.box(rightX, boxY, rightW, bh, PDF_COL.paper, PDF_COL.rule, 3);
-    /* Hung from the top, like the program beside it, so the eye reads across
-       from line 1 to the global frame. */
-    page.image(rightX + (rightW - img.ptW) / 2, boxY + pad, img.ptW, img.ptH);
-
-    pdfFooter(page, M, footY, W);
-
-    var f = document.getElementById('filename');
-    var stem = ((f && f.value.trim()) || 'main.py').replace(/\.[^.]+$/, '').replace(/[^\w.-]+/g, '-') || 'memory-model';
-    return {
-      blob: pdfFile(PDF.pw, PDF.ph, page.ops.join('\n'), img),
-      name: wFile(drawing ? stem + '-drawing' : stem + '-step-' + app.idx, '.pdf')
-    };
-  });
-}
-
-function downloadPdf(){
-  var btn = $('btnPdf'), label = $('btnPdfLabel');
-  if (btn && btn.disabled) return false;
-  if (btn) btn.disabled = true;
-  var settle = function(msg){
-    if (btn) btn.disabled = false;
-    if (!label) return;
-    label.textContent = msg || 'PDF';
-    if (msg) setTimeout(function(){ label.textContent = 'PDF'; }, 1800);
-  };
-  if (label) label.textContent = '…';
-
-  buildPdf().then(function(res){
-    var url = URL.createObjectURL(res.blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = res.name;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function(){
-      if (a.parentNode) a.parentNode.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 5000);
-    settle();
-  })['catch'](function(err){
-    if (window.console && console.error) console.error('PythonVisualizer: PDF export failed', err);
-    settle('failed');
-  });
-  return true;
-}
-
 /* -------------------------------------------------------------------------
    BEAMER+ INTEGRATION
    A small imperative API, plus postMessage for iframe embedding so a slide
@@ -4669,6 +4076,60 @@ function getState(){
       return { frame: f.label, variables: o };
     })
   };
+}
+
+/* ---------------------------------------------------------------------------
+   FOR THE DECK'S NOTES PDF
+   Beamer+ can download a whole deck as one PDF, each widget drawn as it
+   stands. The workspace script captures its panes with html2canvas, which
+   cannot see the stylesheet colouring the diagram, so the diagram is handed
+   over as pixels from here instead, through the style-inlining clone above.
+--------------------------------------------------------------------------- */
+function svgPixels(svg, pxW, pxH){
+  return new Promise(function(resolve, reject){
+    var img = new Image();
+    img.onload = function(){
+      var cv = document.createElement('canvas');
+      cv.width = pxW; cv.height = pxH;
+      cv.getContext('2d').drawImage(img, 0, 0, pxW, pxH);
+      resolve(cv);
+    };
+    img.onerror = function(){ reject(new Error('the diagram could not be rasterised')); };
+    img.src = 'data:image/svg+xml;charset=utf-8,' +
+              encodeURIComponent(new XMLSerializer().serializeToString(svg));
+  });
+}
+
+/* The live diagram exactly as it sits on screen (same theme, viewBox and
+   fit), at pxW x pxH, on a transparent background. */
+function screenDiagram(live, pxW, pxH){
+  var clone = live.cloneNode(true);
+  inlineSvgStyles(live, clone);
+  clone.setAttribute('xmlns', SVGNS);
+  clone.setAttribute('width', pxW);
+  clone.setAttribute('height', pxH);
+  clone.removeAttribute('style');
+  return svgPixels(clone, pxW, pxH);
+}
+
+/* The diagram on paper: light theme, cropped to what is
+   drawn, on white. Null when there is nothing to show yet. */
+function paperDiagram(maxPx){
+  if (app.mode === 'draw' ? !draw.shapes.length : !(app.idx > 0)) return Promise.resolve(null);
+  var snap = pdfSvgSnapshot();
+  var k = Math.min((maxPx || 1600) / snap.w, (maxPx || 1600) / snap.h, 3);
+  var pxW = Math.max(1, Math.round(snap.w * k)), pxH = Math.max(1, Math.round(snap.h * k));
+  snap.svg.setAttribute('width', pxW);
+  snap.svg.setAttribute('height', pxH);
+  return svgPixels(snap.svg, pxW, pxH).then(function(cv){
+    var out = document.createElement('canvas');
+    out.width = pxW; out.height = pxH;
+    var cx = out.getContext('2d');
+    cx.fillStyle = '#FFFFFF';
+    cx.fillRect(0, 0, pxW, pxH);
+    cx.drawImage(cv, 0, 0);
+    return { canvas: out, w: snap.w, h: snap.h, mode: app.mode, step: app.idx };
+  });
 }
 
 window.PythonVisualizer = {
@@ -4703,8 +4164,8 @@ window.PythonVisualizer = {
   setZoom: function(z){ return setZoom(z); },
   getZoom: function(){ return app.zoom; },
   fitToPane: fitToPane,
-  downloadPdf: downloadPdf,
-  buildPdfBlob: function(){ return buildPdf(); },
+  screenDiagram: screenDiagram,
+  paperDiagram: paperDiagram,
   loadExample: function(nameOrIndex){
     var i = typeof nameOrIndex === 'number'
       ? nameOrIndex
@@ -6448,7 +5909,6 @@ def _debug_file(src, fname, limit):
 
     // The memory model's controls follow its pane into and out of view.
     mmTools.hidden = IS_VIEWER || !!DBG.session || !shown.includes('memory');
-    $('pdf-wrap').hidden = IS_VIEWER || !shown.includes('memory');
     fitToolbar();
     PV.setVisible(shown.includes('memory'));
     syncScroll();
@@ -7123,6 +6583,94 @@ def _debug_file(src, fname, limit):
     stopWorker();
     if (socket && socket.disconnect) socket.disconnect();
     socket = null;
+  }
+
+  // ── Notes PDF (Beamer+ deck export) ─────────────────────────────────────────
+  // On the slide: the panes as the room saw them (the host hands us a viewer
+  // copy already set to the live state). After the slide: the program as
+  // real, selectable text, the shell transcript, and the memory diagram at a
+  // readable size — the panes on the slide are often too small to read.
+  //
+  // html2canvas captures the panes but can't see the stylesheet that colours
+  // the diagram, so the diagram is left out of that pass and painted in
+  // afterwards from the engine's own style-inlined copy.
+  async function printPanes(scale) {
+    const h2c  = await BeamerWidget.print.html2canvas();
+    const s    = Math.max(1, scale || 2);
+    const base = panesEl.getBoundingClientRect();
+    const svgs = [$('diagram'), $('canvas')].filter(el => el && el.getClientRects().length);
+    const bg   = getComputedStyle(root).backgroundColor || '#ffffff';
+    const cv = await h2c(panesEl, {
+      scale: s, backgroundColor: bg, logging: false, useCORS: true,
+      ignoreElements: n => svgs.includes(n) || n.id === 'cellEditor' ||
+                           !!(n.matches && n.matches('[data-bw-print-hide]')),
+    });
+    const ctx = cv.getContext('2d');
+    // html2canvas leaves its own scale on the context; work in raw pixels.
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    for (const svg of svgs) {
+      const r    = svg.getBoundingClientRect();
+      const clip = svg.parentElement.getBoundingClientRect();
+      if (r.width < 1 || r.height < 1) continue;
+      // The drawing sheet is 2400x1600 and mostly off screen; cap its pixels.
+      const k = Math.min(s, 4096 / r.width, 4096 / r.height);
+      try {
+        const pic = await PV.screenDiagram(svg, Math.round(r.width * k), Math.round(r.height * k));
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect((clip.left - base.left) * s, (clip.top - base.top) * s, clip.width * s, clip.height * s);
+        ctx.clip();
+        ctx.drawImage(pic, (r.left - base.left) * s, (r.top - base.top) * s, r.width * s, r.height * s);
+        ctx.restore();
+      } catch (err) { console.warn('[workspace] diagram capture failed', err); }
+    }
+    return cv;
+  }
+
+  async function printPages() {
+    const blocks = [];
+    const lines  = S.code.replace(/\s+$/, '').split('\n');
+    const width  = String(lines.length).length;
+    blocks.push({ type: 'heading', text: 'Program' });
+    blocks.push({ type: 'text', mono: true,
+                  text: lines.map((l, i) => String(i + 1).padStart(width) + '  ' + l).join('\n') });
+
+    if (S.entries.length) {
+      blocks.push({ type: 'heading', text: 'Shell' });
+      // Consecutive lines of the same tone share a block, so the transcript
+      // reads as one console with errors set apart in red.
+      let cur = null;
+      for (const e of S.entries) {
+        const tone = e.k === 'err' ? 'error' : e.k === 'sys' ? 'muted' : null;
+        const text = e.k === 'in'
+          ? e.s.split('\n').map((l, i) => (i ? PS2 : (e.p || PS1)) + l).join('\n')
+          : e.s.replace(/\n+$/, '');
+        if (cur && cur.tone === tone) cur.text += '\n' + text;
+        else blocks.push(cur = { type: 'text', mono: true, tone, text });
+      }
+    }
+
+    try {
+      const d = await PV.paperDiagram(1600);
+      if (d) {
+        blocks.push({ type: 'heading', text: d.mode === 'draw' ? 'Memory model (drawing)'
+                                                               : `Memory model (step ${d.step})` });
+        blocks.push({ type: 'image', src: d.canvas, width: d.w, height: d.h });
+      }
+    } catch (err) { console.warn('[workspace] diagram export failed', err); }
+
+    return [{ title: S.filename || 'main.py', columnWidth: 760, blocks }];
+  }
+
+  if (window.BeamerWidget?.print) {
+    BeamerWidget.print.register(async ({ scale }) => {
+      openMenu(false);
+      openAddMenu(false);
+      renderLayout();
+      PV.render();
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      return { image: await printPanes(scale), pages: await printPages() };
+    });
   }
 
   // ── Beamer+ message bridge ──────────────────────────────────────────────────

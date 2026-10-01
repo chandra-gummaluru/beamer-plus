@@ -90,6 +90,7 @@ function _ensureExpandListener() {
     if (_expandListenerAttached) return;
     _expandListenerAttached = true;
     window.addEventListener('message', e => {
+        if (isPrintWindow(e.source)) return;   // a print copy speaks for no live iframe
         const { type } = e.data || {};
         // The registry is keyed by the string form of the id (dataset values are
         // always strings); a deck whose JSON carries numeric ids would otherwise
@@ -129,6 +130,9 @@ function _ensureExpandListener() {
 const _capturedStates = new Map(); // String(widgetId) → state
 
 window.addEventListener('message', e => {
+    // A print copy (see printWidget) shares the live widget's id; what it
+    // reports must never stand in for the live widget's state.
+    if (isPrintWindow(e.source)) return;
     if (e.data?.type === 'widget-state' && e.data.widgetId != null && e.data.state !== undefined) {
         _capturedStates.set(String(e.data.widgetId), e.data.state);
     }
@@ -183,6 +187,7 @@ export function requestWidgetStates(ids, timeoutMs = 800) {
         const done = () => { clearTimeout(timer); window.removeEventListener('message', onMsg); resolve(states); };
         const timer = setTimeout(done, timeoutMs);
         function onMsg(e) {
+            if (isPrintWindow(e.source)) return;
             const id = e.data?.widgetId != null ? String(e.data.widgetId) : null;
             if (e.data?.type !== 'widget-state' || !id || !pending.has(id) || e.data.state === undefined) return;
             states[id] = e.data.state;
@@ -290,6 +295,7 @@ export async function collectWidgetStates(timeoutMs = 1500) {
         const timer = setTimeout(done, timeoutMs);
 
         function handler(e) {
+            if (isPrintWindow(e.source)) return;
             if (e.data?.type === 'widget-state' && e.data.widgetId && e.data.state !== undefined) {
                 states[e.data.widgetId] = e.data.state;
                 pending.delete(e.data.widgetId);
@@ -514,58 +520,13 @@ export function renderWidgets(slideConfig, container, zipFile, viewerMode = fals
         _ensureExpandListener();
 
         try {
-            let htmlContent;
-
-            if (w.builtin) {
-                const res = await fetch(`/widgets/${encodeURIComponent(w.type)}.html`);
-                if (!res.ok) throw new Error(`Built-in widget not found: ${w.type} (${res.status})`);
-                htmlContent = await res.text();
-            } else if (w.src && /^blob:/i.test(w.src)) {
-                // Blob URLs are ephemeral — they only resolve within the page
-                // load that created them (via URL.createObjectURL). A deck saved
-                // with a blob src (or simply reloaded) carries a dead URL, so on
-                // failure fall back to the widget's HTML stored in the ZIP.
-                try {
-                    const res = await fetch(w.src);
-                    if (!res.ok) throw new Error('Could not load custom widget blob');
-                    htmlContent = await res.text();
-                } catch (blobErr) {
-                    const fallbackPath = resolveWidgetPath(w);
-                    const fallbackFile = findWidgetFile(zipFile, fallbackPath);
-                    if (!fallbackFile) throw blobErr;
-                    htmlContent = await fallbackFile.async('string');
-                }
-            } else {
-                const widgetPath = resolveWidgetPath(w);
-                const widgetFile = findWidgetFile(zipFile, widgetPath);
-                if (!widgetFile) {
-                    console.error(`Widget file not found in zip: ${widgetPath}`);
-                    iframe.srcdoc = `<div style="padding:20px;font-family:sans-serif;color:#666;">Widget not found: ${_escapeHtml(widgetPath)}</div>`;
-                    return;
-                }
-                htmlContent = await widgetFile.async('string');
+            const loaded = await _loadWidgetSource(w, zipFile);
+            if (loaded.missing) {
+                console.error(`Widget file not found in zip: ${loaded.missing}`);
+                iframe.srcdoc = `<div style="padding:20px;font-family:sans-serif;color:#666;">Widget not found: ${_escapeHtml(loaded.missing)}</div>`;
+                return;
             }
-
-            // Pre-load notebook from zip if widget config specifies a local path.
-            // Remote URLs (http/https) are passed through as-is and fetched by the
-            // widget itself, so we skip the ZIP lookup for those.
-            let notebookContent = null;
-            if (w.notebook && typeof w.notebook === 'string' && w.notebook.trim()) {
-                const nb = w.notebook.trim();
-                if (/^https?:\/\//i.test(nb)) {
-                    // Remote URL — widget handles the fetch; nothing to pre-load here.
-                } else {
-                    const nbPath = nb.replace(/^\/+/, '');
-                    const nbFile = zipFile?.file(nbPath)
-                        || zipFile?.filter((p, f) => !f.dir && p.toLowerCase() === nbPath.toLowerCase())[0];
-                    if (nbFile) {
-                        try { notebookContent = JSON.parse(await nbFile.async('string')); }
-                        catch (e) { console.warn(`Failed to parse notebook ${nbPath}:`, e); }
-                    } else {
-                        console.warn(`Notebook file not found in zip: ${nbPath}`);
-                    }
-                }
-            }
+            const { htmlContent, notebookContent } = loaded;
 
             // Pin full-slide-only widgets to the whole slide (older decks may
             // have saved a smaller box for them).
@@ -582,15 +543,7 @@ export function renderWidgets(slideConfig, container, zipFile, viewerMode = fals
                 role: viewerMode ? 'viewer' : 'presenter',
                 ...(notebookContent !== null ? { notebookContent } : {}),
             });
-            const _configJson   = JSON.stringify(_configPayload).replace(/<\/script>/gi, '<\\/script>');
-            const _configScript = `<script>window.WIDGET_CONFIG=${_configJson};<\/script>`;
-            // Inject shared base theme + widget config + settings kit right after <head>.
-            // _WIDGET_BASE_INJECT comes first so each widget's own <style> wins over
-            // defaults; the kit comes last because it reads window.WIDGET_CONFIG.
-            const _injectedHtml = htmlContent.replace(
-                /(<head[^>]*>)/i,
-                `$1${_WIDGET_BASE_INJECT}${_configScript}${_SETTINGS_KIT_INJECT}`
-            );
+            const _injectedHtml = _buildSrcdoc(htmlContent, _configPayload);
 
             await new Promise(resolve => {
                 let settled = false;
@@ -623,6 +576,206 @@ export function renderWidgets(slideConfig, container, zipFile, viewerMode = fals
     });
 
     return Promise.all(promises);
+}
+
+// ── Widget source ──────────────────────────────────────────────────────────
+
+/**
+ * Fetch a widget's HTML (built-in, custom blob, or from the deck) plus its
+ * pre-loaded notebook, if it names one. Resolves `{ missing: path }` when a
+ * deck widget's file isn't in the ZIP; throws on any other failure.
+ */
+async function _loadWidgetSource(w, zipFile) {
+    let htmlContent;
+
+    if (w.builtin) {
+        const res = await fetch(`/widgets/${encodeURIComponent(w.type)}.html`);
+        if (!res.ok) throw new Error(`Built-in widget not found: ${w.type} (${res.status})`);
+        htmlContent = await res.text();
+    } else if (w.src && /^blob:/i.test(w.src)) {
+        // Blob URLs are ephemeral — they only resolve within the page
+        // load that created them (via URL.createObjectURL). A deck saved
+        // with a blob src (or simply reloaded) carries a dead URL, so on
+        // failure fall back to the widget's HTML stored in the ZIP.
+        try {
+            const res = await fetch(w.src);
+            if (!res.ok) throw new Error('Could not load custom widget blob');
+            htmlContent = await res.text();
+        } catch (blobErr) {
+            const fallbackPath = resolveWidgetPath(w);
+            const fallbackFile = findWidgetFile(zipFile, fallbackPath);
+            if (!fallbackFile) throw blobErr;
+            htmlContent = await fallbackFile.async('string');
+        }
+    } else {
+        const widgetPath = resolveWidgetPath(w);
+        const widgetFile = findWidgetFile(zipFile, widgetPath);
+        if (!widgetFile) return { missing: widgetPath };
+        htmlContent = await widgetFile.async('string');
+    }
+
+    // Pre-load notebook from zip if widget config specifies a local path.
+    // Remote URLs (http/https) are passed through as-is and fetched by the
+    // widget itself, so we skip the ZIP lookup for those.
+    let notebookContent = null;
+    if (w.notebook && typeof w.notebook === 'string' && w.notebook.trim()) {
+        const nb = w.notebook.trim();
+        if (!/^https?:\/\//i.test(nb)) {
+            const nbPath = nb.replace(/^\/+/, '');
+            const nbFile = zipFile?.file(nbPath)
+                || zipFile?.filter((p, f) => !f.dir && p.toLowerCase() === nbPath.toLowerCase())[0];
+            if (nbFile) {
+                try { notebookContent = JSON.parse(await nbFile.async('string')); }
+                catch (e) { console.warn(`Failed to parse notebook ${nbPath}:`, e); }
+            } else {
+                console.warn(`Notebook file not found in zip: ${nbPath}`);
+            }
+        }
+    }
+    return { htmlContent, notebookContent };
+}
+
+// Inject shared base theme + widget config + settings kit right after <head>.
+// _WIDGET_BASE_INJECT comes first so each widget's own <style> wins over
+// defaults; the kit comes last because it reads window.WIDGET_CONFIG.
+// `prelude` goes ahead of all of it (the print copy's socket stub).
+function _buildSrcdoc(htmlContent, configPayload, prelude = '') {
+    const configJson   = JSON.stringify(configPayload).replace(/<\/script>/gi, '<\\/script>');
+    const configScript = `<script>window.WIDGET_CONFIG=${configJson};<\/script>`;
+    return htmlContent.replace(
+        /(<head[^>]*>)/i,
+        // A function, not a string: a widget's HTML or config can contain
+        // `$&` / `$1`, which String.replace would otherwise expand.
+        (head) => `${head}${prelude}${_WIDGET_BASE_INJECT}${configScript}${_SETTINGS_KIT_INJECT}`
+    );
+}
+
+/** The schema block a widget declares, or null. */
+function _readSchema(html) {
+    const m = /<script\b[^>]*\bid=["']widget-schema["'][^>]*>([\s\S]*?)<\/script>/i.exec(html || '');
+    if (!m) return null;
+    try { return JSON.parse(m[1].trim()); } catch (_) { return null; }
+}
+
+// ── Printing (notes PDF) ───────────────────────────────────────────────────
+// A widget is printed from a throwaway copy, never from the live iframe: the
+// copy can be sized to the page and its state set without anything moving on
+// stage or reaching the room. It runs as a viewer, with printMode set, and
+// with socket.io stubbed out before any widget script runs — a print copy
+// must never broadcast (a fresh presenter copy would push its starting state
+// to every phone) or open polls.
+//
+// Protocol, host → widget:  { type: 'widget-print', requestId, scale }
+//           widget → host:  { type: 'widget-print-result', requestId, ok, image?, pages?, reason? }
+// The settings kit (injected into every widget) answers on the widget's
+// behalf: ok:false / 'unsupported' unless the widget registered a handler
+// with BeamerWidget.print.register(). See bpwidget-skill.md.
+
+const _PRINT_PRELUDE = `<script id="bw-print-sandbox">
+(function () {
+  function noop() { return sock; }
+  var sock = { connected: false, id: null, on: noop, once: noop, off: noop, emit: noop,
+               connect: noop, disconnect: noop, close: noop, removeAllListeners: noop,
+               io: { on: noop, off: noop } };
+  function io() { return sock; }
+  io.connect = io; io.Manager = function () {}; io.Socket = function () {};
+  try { Object.defineProperty(window, 'io', { get: function () { return io; }, set: function () {}, configurable: false }); }
+  catch (_) { window.io = io; }
+  window.BEAMER_PRINT = true;
+})();
+<\/script>`;
+
+// Windows of print copies — their messages must not be taken for the live
+// widget's (they share its widget id).
+const _printWindows = new WeakSet();
+export function isPrintWindow(win) { return !!win && _printWindows.has(win); }
+
+/**
+ * Print one widget. Resolves to
+ *   { ok: true,  image?, pages?, label }   — the widget answered
+ *   { ok: false, reason, label }           — unsupported, failed or timed out
+ * `box` is the widget's size in CSS px; `state` is the state to show.
+ */
+export async function printWidget(w, { zipFile, box, fullBox = null, state, scale = 2, host = document.body,
+                                       loadTimeoutMs = 10000, printTimeoutMs = 20000 } = {}) {
+    let label = w?.type || 'Widget';
+    let loaded;
+    try { loaded = await _loadWidgetSource(w, zipFile); }
+    catch (err) { return { ok: false, reason: err.message, label }; }
+    if (loaded.missing) return { ok: false, reason: 'widget file not found', label };
+    const schema = _readSchema(loaded.htmlContent);
+    label = (typeof w.title === 'string' && w.title.trim()) || schema?.label || label;
+
+    // A full-slide-only widget is laid out over the whole slide, whatever
+    // box an older deck saved for it — on paper as on stage.
+    const fullOnly = schema?.fullSlide === true;
+    if (fullOnly && fullBox) box = fullBox;
+    const tag = (res) => ({ ...res, label, fullSlide: fullOnly });
+    const payload = _withPendingAssets({
+        ...w,
+        ...(fullOnly ? _FULL_GEOM : {}),
+        ...widgetSessionConfig(),
+        role: 'viewer',
+        printMode: true,
+        autoStart: false,
+        ...(loaded.notebookContent !== null ? { notebookContent: loaded.notebookContent } : {}),
+    });
+
+    const iframe = document.createElement('iframe');
+    iframe.className = 'widget-print-iframe';
+    iframe.setAttribute('aria-hidden', 'true');
+    iframe.tabIndex = -1;
+    // In the viewport and laid out at full size (so layout, canvases and
+    // html2canvas see real dimensions), but invisible and inert. Parked live
+    // widgets are hidden the same way and keep running.
+    Object.assign(iframe.style, {
+        position: 'fixed', left: '0px', top: '0px',
+        width: `${Math.max(40, Math.round(box.width))}px`,
+        height: `${Math.max(30, Math.round(box.height))}px`,
+        border: 'none', opacity: '0', pointerEvents: 'none', zIndex: '-1',
+        background: 'transparent',
+    });
+    host.appendChild(iframe);
+
+    const requestId = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    try {
+        await new Promise(resolve => {
+            const t = setTimeout(resolve, loadTimeoutMs);
+            iframe.addEventListener('load', () => { clearTimeout(t); resolve(); }, { once: true });
+            iframe.srcdoc = _buildSrcdoc(loaded.htmlContent, payload, _PRINT_PRELUDE);
+        });
+        const win = iframe.contentWindow;
+        if (!win) return tag({ ok: false, reason: 'widget did not load' });
+        _printWindows.add(win);
+        try { win.postMessage({ type: 'widget-config', config: payload }, '*'); } catch (_) {}
+        if (state !== undefined) {
+            try { win.postMessage({ type: 'widget-set-state', state }, '*'); } catch (_) {}
+        }
+        // Let it lay out, draw and pull in fonts before it's asked.
+        await new Promise(r => setTimeout(r, 400));
+        try { await win.document.fonts?.ready; } catch (_) {}
+
+        return await new Promise(resolve => {
+            const done = (res) => { clearTimeout(timer); window.removeEventListener('message', onMsg); resolve(tag(res)); };
+            const timer = setTimeout(() => done({ ok: false, reason: 'timed out' }), printTimeoutMs);
+            function onMsg(e) {
+                if (e.source !== win) return;
+                const d = e.data || {};
+                if (d.type !== 'widget-print-result' || d.requestId !== requestId) return;
+                if (d.ok) done({ ok: true, image: d.image || null, pages: Array.isArray(d.pages) ? d.pages : [] });
+                else      done({ ok: false, reason: d.reason || 'unsupported' });
+            }
+            window.addEventListener('message', onMsg);
+            try { win.postMessage({ type: 'widget-print', requestId, scale }, '*'); }
+            catch (err) { done({ ok: false, reason: err.message }); }
+        });
+    } catch (err) {
+        return tag({ ok: false, reason: err.message });
+    } finally {
+        try { iframe.contentWindow?.postMessage({ type: 'widget-cleanup' }, '*'); } catch (_) {}
+        // Give cleanup a tick to run before the document goes away.
+        setTimeout(() => iframe.remove(), 50);
+    }
 }
 
 // ── Talking to one widget ──────────────────────────────────────────────────

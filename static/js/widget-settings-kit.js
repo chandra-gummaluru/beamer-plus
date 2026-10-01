@@ -896,6 +896,142 @@
         onReset: function (fn) { resetHandler = typeof fn === 'function' ? fn : null; },
     };
 
+    /* ─── printing (notes PDF) ──────────────────────────────────── */
+    // When the presenter downloads the notes version of a deck, each widget
+    // is asked how it should look on paper. A widget opts in with
+    //
+    //   BeamerWidget.print.register(async ({ scale }) => ({
+    //       image: await BeamerWidget.print.snapshot(),   // drawn in the widget's box
+    //       pages: [ { title, blocks: [ … ] } ],           // optional, after the slide
+    //   }));
+    //
+    // A widget that registers nothing is drawn as a labelled placeholder box.
+    // The host asks a throwaway copy (role 'viewer', printMode true, sockets
+    // stubbed), already set to the live widget's state — so a handler only
+    // has to draw what's in front of it. Images may be data URLs or canvases.
+    var _printHandler = null;
+    // html2canvas-pro: a maintained html2canvas fork that understands modern
+    // colour syntax (oklch, color(), color-mix) — the base stylesheet uses it,
+    // and stock html2canvas 1.4 throws on the first such colour it meets.
+    var H2C_SRC = '/static/vendor/html2canvas-pro.min.js';
+    var _h2cReady = null;
+
+    function loadHtml2Canvas() {
+        if (window.html2canvas) return Promise.resolve(window.html2canvas);
+        if (!_h2cReady) {
+            _h2cReady = new Promise(function (ok, bad) {
+                var s = document.createElement('script');
+                s.src = H2C_SRC;
+                s.onload = function () { window.html2canvas ? ok(window.html2canvas) : bad(new Error('html2canvas missing')); };
+                s.onerror = function () { _h2cReady = null; bad(new Error('could not load html2canvas')); };
+                document.head.appendChild(s);
+            });
+        }
+        return _h2cReady;
+    }
+
+    function cssVar(name, fallback) {
+        try {
+            var v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+            return v || fallback;
+        } catch (e) { return fallback; }
+    }
+
+    // Two frames: enough for a re-render triggered by the printing class (or
+    // by the handler itself) to reach layout and paint before it's captured.
+    function nextFrames() {
+        return new Promise(function (r) { requestAnimationFrame(function () { requestAnimationFrame(r); }); });
+    }
+
+    /**
+     * Rasterise part of the widget to a PNG data URL. `target` defaults to the
+     * widget's content (everything under the host's top bar). Elements that
+     * match `opts.ignore`, the top bar itself, and anything marked
+     * data-bw-print-hide are left out.
+     */
+    function snapshot(target, opts) {
+        opts = opts || {};
+        var el = typeof target === 'string' ? document.querySelector(target)
+               : target || document.getElementById('bw-topbar-body') || document.body;
+        if (!el) return Promise.reject(new Error('nothing to snapshot'));
+        var scale = opts.scale || _printScale || 2;
+        var ignoreSel = '.bw-topbar, [data-bw-print-hide], .bws-root' + (opts.ignore ? ', ' + opts.ignore : '');
+        return loadHtml2Canvas().then(function (h2c) {
+            return h2c(el, {
+                scale: scale,
+                backgroundColor: opts.background || cssVar('--bg', '#ffffff'),
+                logging: false,
+                useCORS: true,
+                ignoreElements: function (n) {
+                    try { return n.matches && n.matches(ignoreSel); } catch (e) { return false; }
+                },
+            });
+        }).then(function (canvas) { return canvas.toDataURL('image/png'); });
+    }
+
+    function toDataUrl(img) {
+        if (!img) return null;
+        if (typeof img === 'string') return img;
+        if (img.toDataURL) return img.toDataURL('image/png');   // a canvas
+        return null;
+    }
+
+    // Canvases inside page blocks are converted here, so a handler can hand
+    // back whatever it drew without encoding it itself.
+    function normalisePages(pages) {
+        if (!Array.isArray(pages)) return [];
+        return pages.map(function (p) {
+            if (!p || typeof p !== 'object') return null;
+            var blocks = Array.isArray(p.blocks) ? p.blocks.map(function (b) {
+                if (!b || typeof b !== 'object') return null;
+                if (b.type === 'image') {
+                    var w = b.width, h = b.height;
+                    if (b.src && b.src.width && !w) { w = b.src.width; h = b.src.height; }
+                    var src = toDataUrl(b.src);
+                    return src ? { type: 'image', src: src, width: w || null, height: h || null } : null;
+                }
+                return { type: b.type || 'text', text: String(b.text == null ? '' : b.text),
+                         mono: !!b.mono, tone: b.tone || null };
+            }).filter(Boolean) : [];
+            return { title: p.title ? String(p.title) : '', blocks: blocks,
+                     columnWidth: +p.columnWidth > 0 ? +p.columnWidth : null };
+        }).filter(Boolean);
+    }
+
+    var _printScale = 2;
+    function handlePrint(d) {
+        var reply = function (msg) {
+            msg.type = 'widget-print-result';
+            msg.requestId = d.requestId;
+            msg.widgetId = cfg().id;
+            post(msg);
+        };
+        if (!_printHandler) { reply({ ok: false, reason: 'unsupported' }); return; }
+        _printScale = d.scale || 2;
+        var root = document.documentElement;
+        root.classList.add('bw-printing');
+        nextFrames().then(function () {
+            return _printHandler({ scale: _printScale });
+        }).then(function (res) {
+            res = res || {};
+            return Promise.resolve(res.image).then(function (image) {
+                reply({ ok: true, image: toDataUrl(image), pages: normalisePages(res.pages) });
+            });
+        }).catch(function (err) {
+            console.warn('[widget] print failed', err);
+            reply({ ok: false, reason: (err && err.message) || 'print failed' });
+        }).then(function () { root.classList.remove('bw-printing'); });
+    }
+
+    var printApi = {
+        register: function (fn) { _printHandler = typeof fn === 'function' ? fn : null; },
+        snapshot: snapshot,
+        /** The vendored html2canvas, loaded on first use. */
+        html2canvas: loadHtml2Canvas,
+        /** True inside the copy the host makes for printing. */
+        get active() { return !!(window.BEAMER_PRINT || cfg().printMode); },
+    };
+
     /* ─── wiring ────────────────────────────────────────────────── */
 
     window.addEventListener('message', function (e) {
@@ -904,6 +1040,7 @@
         if (d.type === 'widget-open-settings')  { readSchema(); if (hasSettings) openPanel(); return; }
         if (d.type === 'widget-close-settings') { closePanel(true); return; }
         if (d.type === 'widget-asset-saved')    { onAssetSaved(d); return; }
+        if (d.type === 'widget-print')          { handlePrint(d); return; }
         if (d.type === 'widget-flush-files') {
             if (_flushHandler) { try { _flushHandler(); } catch (err) { console.warn('[widget] flush failed', err); } }
             return;
@@ -942,6 +1079,7 @@
         topbar:        topbarApi,
         name:          function (fallback) { readSchema(); return name(fallback); },
         fileName:      function (fallback, ext) { readSchema(); return fileName(fallback, ext); },
+        print:         printApi,
     };
 
     function init() {

@@ -439,7 +439,7 @@ body.is-viewer #trace-tip { display: none !important; }
 
 </div>
 
-<div id="viewer-toast">View-only · synced with presenter</div>
+<div id="viewer-toast" data-bw-print-hide>View-only · synced with presenter</div>
 
 <script>
 // ─────────────────────────────────────────────────────────
@@ -1794,6 +1794,22 @@ if (IS_VIEWER) {
 addExpression('', null, false);
 
 applyConfig(CFG);
+
+// ── Notes PDF (Beamer+ deck export) ─────────────────────────────────────────
+// The graph and its expression list, as on the slide, minus the controls
+// (zoom buttons, the add row, the readouts that follow the pointer). The host
+// hands us a copy already set to the live state; draw it fresh at print size.
+if (window.BeamerWidget?.print) {
+  BeamerWidget.print.register(async () => {
+    resize();
+    plot();
+    return {
+      image: await BeamerWidget.print.snapshot('#main', {
+        ignore: '#add-expr-row, .split-handle, #zoom-btns, #coord-display, #trace-tip',
+      }),
+    };
+  });
+}
 
 // ── Beamer+ state persistence protocol ──────────────────────────────────────
 window.addEventListener('message', function(e) {

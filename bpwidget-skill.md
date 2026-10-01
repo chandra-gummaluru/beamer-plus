@@ -251,6 +251,7 @@ origin. Falling back: `cfg.serverUrl || cfg.socketUrl || window.parent.location.
 | `widget-get-state` | reply `postMessage({ type:'widget-state', widgetId, state }, '*')` |
 | `widget-set-state` | restore from `e.data.state` |
 | `widget-layout` | box moved/resized (`x`, `y`, `width`, `height`); the kit handles it — partial-slide mode |
+| `widget-print` | the kit answers it — register a handler with `BeamerWidget.print.register` (§5, Printing) |
 
 ### Messages out
 
@@ -266,6 +267,9 @@ BeamerWidget.serverUrl()         // session-scoped base
 BeamerWidget.topbar.el           // null until the host bar is built
 BeamerWidget.topbar.addButton({ label, title, onClick })
 BeamerWidget.topbar.onReset(fn)
+BeamerWidget.print.register(fn)  // how the widget looks in the notes PDF (§5, Printing)
+BeamerWidget.print.snapshot(el?, { ignore })   // → PNG data URL of part of the widget
+BeamerWidget.print.active        // true inside the copy the host makes for printing
 ```
 
 `topbar.el` can be null when the widget boots first — retry on a timer with a bounded
@@ -332,6 +336,70 @@ timer restores paused; the word cloud stores a palette **index**, not a colour l
 because the literal would be wrong in the other theme. Cap what you keep
 (`entries.slice(-400)`).
 
+### Printing (notes PDF)
+
+The download button offers a **Notes** PDF: every visible slide, with annotations,
+media and each widget drawn in as it stands. This is the one way a widget reaches
+paper — **don't give a widget its own PDF button**; register a print handler instead
+(file exports that reopen elsewhere, like `.ipynb` or circuit `.json`, are fine). A widget says how it looks on paper by
+registering a print handler; a widget that registers nothing is drawn as a dashed
+placeholder box with its name, so this is opt-in but worth doing for anything whose
+state matters after the lecture (results, plots, code and its output).
+
+```js
+if (window.BeamerWidget?.print) {
+  BeamerWidget.print.register(async ({ scale }) => ({
+    // Drawn into the widget's box on its slide (contain-fit, centred).
+    image: await BeamerWidget.print.snapshot('#main', { ignore: '#zoom-btns' }),
+    // Optional: extra pages, right after the slide, the slide's page size.
+    pages: [{
+      title: 'All responses',
+      columnWidth: 700,            // CSS px an image block this wide fills the column at
+      blocks: [
+        { type: 'heading', text: 'Themes' },
+        { type: 'text', text: 'Plain paragraph — wrapped, flowed over pages' },
+        { type: 'text', text: 'print(42)', mono: true },          // shaded code line(s)
+        { type: 'text', text: 'Traceback …', tone: 'error' },     // or 'muted'
+        { type: 'image', src: canvasOrDataUrl, width: 640, height: 300 },  // CSS px
+      ],
+    }],
+  }));
+}
+```
+
+What the host does, so a handler doesn't have to:
+
+- It never prints the live iframe. It loads a **throwaway copy** at the widget's
+  on-stage size with `role: 'viewer'`, `printMode: true` and `autoStart: false`,
+  sends it the live widget's current state (`widget-set-state`), then asks. The copy
+  has socket.io stubbed out before any script runs, so it cannot broadcast or join a
+  room. Design the handler for a viewer that has just been handed state — and fall
+  back to the config when there is none (a poll never run: print the question, not
+  sample data). Return `{ image: null }` for "nothing to show".
+- While the handler runs, `<html>` carries `bw-printing`: transitions and animations
+  are off (a capture reads styles at one instant) and anything marked
+  `data-bw-print-hide` is hidden — put it on view-only toasts and hover hints.
+- `snapshot(target?, opts)` rasterises with html2canvas-pro (vendored, loaded on first
+  use). `target` is a selector or element, default the content under the host bar;
+  the bar itself, `data-bw-print-hide` and `opts.ignore` are left out. A `<canvas>`
+  is captured as drawn — call your draw function first if the size changed.
+- Images may be data URLs (PNG, JPEG, SVG…) or canvases. Text goes in as real PDF
+  text in the standard fonts (Latin-1; other characters are transliterated or
+  replaced), so prefer `text` blocks over pictures of text where you can.
+- The handler has ~20 s. A throw, a timeout or no handler → placeholder.
+
+Raw protocol, for reference (the kit does this): host →
+`{ type: 'widget-print', requestId, scale }`; widget →
+`{ type: 'widget-print-result', requestId, widgetId, ok, image?, pages?, reason? }`.
+Examples: `function-plotter.html` (snapshot only), `audience-response.html` (results
+forced on, full answer list as pages), `ipynb_widget.html` (every cell as pages),
+`circuit_widget.html` (the board's SVG, style-inlined and cropped, as the image),
+`python-workspace.html` (panes captured with html2canvas, the SVG diagram painted in
+from a style-inlined copy because html2canvas can't see the stylesheet colouring it;
+program and transcript as text pages, the full diagram as an image). If you draw
+onto the canvas html2canvas returns, reset its transform first — it leaves its own
+scale on the context.
+
 ---
 
 ## 6. Server endpoints available
@@ -353,7 +421,9 @@ listing in the student's hand.
 Socket events from the server: `widget_state`, `widget_event`, `survey_response`.
 
 Vendored libraries under `/static/vendor/`: `socket.io.min.js`, `qrcode.min.js`,
-`pdfjs/pdf.min.mjs` + `pdf.worker.min.mjs`. Anything else comes from a CDN **with an
+`pdfjs/pdf.min.mjs` + `pdf.worker.min.mjs`, `html2canvas-pro.min.js` (2.5.0 — reach it
+through `BeamerWidget.print.snapshot` / `.html2canvas()` rather than loading it yourself)
+and `pdf-lib.min.js` (1.17.1, used by the host's notes export). Anything else comes from a CDN **with an
 exact pinned version** (mathjs 11.11.0, marked 9.1.6, KaTeX 0.16.x, Pyodide 0.25.0,
 Leaflet 1.9.4). Prefer a version a sibling widget already uses so a
 deck downloads it once.
@@ -412,6 +482,8 @@ deck downloads it once.
 - [ ] Cleanup tears down timers, rAF, sockets, streams, players
 - [ ] Fills the iframe at both a wide and a narrow slide region; nothing scrolls `body`
 - [ ] Works with the network absent, if the widget can (clear message, not a blank pane)
+- [ ] Prints: a `BeamerWidget.print.register` handler that shows the state that matters,
+      works from a viewer copy with no live connection, and hides view-only chrome
 
 ---
 

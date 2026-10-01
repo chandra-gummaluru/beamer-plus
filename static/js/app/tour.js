@@ -75,7 +75,7 @@ const STEPS = [
         sel:   '#edit-save-btn',
         place: 'auto',
         title: 'Save your work',
-        body:  'Download the presentation as a Beamer+ ZIP. This bundles your slides together with all widgets, overlays, and annotations so you can reload it later.',
+        body:  'Download the presentation as a Beamer+ ZIP — your slides with all widgets, overlays, and annotations, to reload later — or as notes: one PDF with your annotations, widgets, media, and poll results drawn in.',
     },
 ];
 

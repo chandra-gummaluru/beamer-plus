@@ -2442,19 +2442,12 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     render();
   }
 
-  // ── Config ──────────────────────────────────────────────────────────────────
-  function applyConfig(c) {
-    if (!c) return;
-    cfg       = { ...cfg, ...c };
-    WIDGET_ID = cfg.id || cfg.widgetId || WIDGET_ID;
-    IS_VIEWER = cfg.role === 'viewer' || IS_VIEWER;
-
-    initSocket(cfg.socketUrl);
-    if (IS_VIEWER) { render(); return; }
-
+  // The question as the config describes it. The presenter builds its poll
+  // from this; a viewer normally takes everything from the presenter's state
+  // instead (and a print copy with no state falls back to it).
+  function adoptConfig() {
     S.type     = TYPES[cfg.responseType] ? cfg.responseType : 'choice';
     S.layout   = cfg.layout === 'stacked' ? 'stacked' : 'side';
-    const prevTimer = S.timer;
     S.timer    = readTimerCfg(cfg);
     S.question = String(cfg.question || '').trim();
 
@@ -2479,6 +2472,20 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     S.unit   = String(cfg.numericUnit || '').trim();
     S.words  = Math.min(3, Math.max(1, parseInt(cfg.wordsPerResponse, 10) || 1));
     S.template = S.type === 'fill' ? String(cfg.template || '') : '';
+  }
+
+  // ── Config ──────────────────────────────────────────────────────────────────
+  function applyConfig(c) {
+    if (!c) return;
+    cfg       = { ...cfg, ...c };
+    WIDGET_ID = cfg.id || cfg.widgetId || WIDGET_ID;
+    IS_VIEWER = cfg.role === 'viewer' || IS_VIEWER;
+
+    initSocket(cfg.socketUrl);
+    if (IS_VIEWER) { render(); return; }
+
+    const prevTimer = S.timer;
+    adoptConfig();
 
     const canReveal = S.correct != null || ((S.type === 'numeric' || S.type === 'exact') && S.answer != null);
     if (!canReveal) S.revealed = false;
@@ -2507,6 +2514,59 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     clearTimeout(syncTimer);
     if (socket && socket.disconnect) socket.disconnect();
     socket = null; socketUrlInUse = null;
+  }
+
+  // ── Notes PDF (Beamer+ deck export) ─────────────────────────────────────────
+  // The host hands us a viewer copy already set to the live poll's state. On
+  // paper there's no room to scan a QR code and nothing left to wait for, so
+  // a poll that's open or closed is printed with its results if it has any,
+  // else as the bare question. A poll that never ran (no state at all) is
+  // printed from its config, without sample data. Open-ended answers, which
+  // the slide can only show a few of, are listed in full after the slide.
+  function printAnswers() {
+    const t = S.type;
+    const answers = [];
+    if (t === 'open') {
+      S.groups.forEach(g => answers.push({ type: 'text', text: g.n > 1 ? `${g.text}  (×${g.n})` : g.text }));
+    } else if (t === 'fill') {
+      S.fills.forEach(f => answers.push({ type: 'text', mono: true, text: (Array.isArray(f) ? f : [f]).join('  |  ') }));
+    } else if (t === 'wordcloud') {
+      S.cloud.slice().sort((a, b) => b.n - a.n).forEach(w => answers.push({ type: 'text', text: `${w.text}  (${w.n})` }));
+    }
+    // The summary card shows one theme at a time; on paper, all of them.
+    const themes = t === 'open' ? (S.summaries?.summaries || []) : [];
+    const blocks = [];
+    if (themes.length > 1) {
+      blocks.push({ type: 'heading', text: 'Themes' });
+      themes.forEach(th => blocks.push({ type: 'text',
+        text: `${th.summary}  (${plural(th.num_respondents, 'respondent', 'respondents')})` }));
+    }
+    // A handful of answers is already legible on the slide itself.
+    if (answers.length > 6) {
+      if (blocks.length) blocks.push({ type: 'heading', text: 'All responses' });
+      blocks.push(...answers);
+    }
+    if (!blocks.length) return [];
+    return [{ title: S.question.replace(/[`$*_]/g, '') || 'Responses',
+              blocks: [{ type: 'text', tone: 'muted', text: plural(S.total, 'response', 'responses') }, ...blocks] }];
+  }
+
+  if (window.BeamerWidget?.print) {
+    BeamerWidget.print.register(async () => {
+      if (!S.question && String(cfg.question || '').trim()) {
+        adoptConfig();
+        S.phase = 'idle';
+      }
+      if (!S.question) return { image: null };   // nothing set up: just the placeholder
+      if (S.phase === 'collect' || S.phase === 'closed') S.phase = S.total > 0 ? 'results' : 'idle';
+      stopTicking();
+      render();
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const image = await BeamerWidget.print.snapshot(null, {
+        ignore: '#preview-tag, #spot',
+      });
+      return { image, pages: printAnswers() };
+    });
   }
 
   // ── Beamer+ message bridge ──────────────────────────────────────────────────

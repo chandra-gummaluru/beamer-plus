@@ -60,6 +60,21 @@ presentation.zip
     └── <model>.py              # optional survey-summarization models (see below)
 ```
 
+## Downloading
+
+The download button (top-right) offers two files:
+
+- **Presentation (ZIP)** — everything above, to reopen and keep presenting.
+- **Notes (PDF)** — one flat PDF to hand out. Every visible slide (hidden and
+  split-view slides are skipped) with pen annotations drawn on; each widget as it
+  stands at that moment; videos as a still frame, 3D models as a rendered picture,
+  audio as a labelled bar; and poll results. A widget can add pages of its own
+  right after its slide (the circuit sandbox prints its board; the notebook prints every cell; the Python workspace
+  prints its program, shell transcript and memory diagram; an open-ended poll
+  lists every answer). Widgets that don't describe how to print appear as a labelled
+  placeholder box. Built in the browser with pdf-lib; PDF slides are copied as
+  vector pages, so their text stays selectable.
+
 ## Surveys
 
 Survey widgets generate a QR code that audience members scan to answer from
@@ -93,7 +108,9 @@ PDF textbook viewer, Python REPL, shell, timer, and YouTube player.
 To add your own, drop an `.html` file in `widgets/`. A `<script
 id="widget-schema" type="application/json">` block in the file describes the
 editable fields the editor shows for it, and widgets can sync state across
-instances by emitting `widget_state` over Socket.IO.
+instances by emitting `widget_state` over Socket.IO. A widget can also say how it appears in
+the notes PDF by registering a print handler (`BeamerWidget.print.register`; see
+`bpwidget-skill.md`).
 
 ## Security model
 
