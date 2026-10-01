@@ -323,6 +323,7 @@ export async function downloadNotes() {
             items.sort((a, b) => a.z - b.z);
 
             const extraSections = [];
+            let fillsSlide = null;   // a widget covering the whole slide, and what it printed
             for (const it of items) {
                 const d = it.d;
                 if (it.kind === 'video') {
@@ -351,12 +352,25 @@ export async function downloadNotes() {
                         drawPlaceholder(page, r, res.label, res.ok ? 'Nothing to show' : 'Interactive widget', fonts, rgb);
                     }
                     for (const sec of res.pages || []) extraSections.push({ ...sec, from: res.label });
+                    const covers = full || (d.x <= 0.005 && d.y <= 0.005 &&
+                                            d.x + d.width >= 0.995 && d.y + d.height >= 0.995);
+                    if (covers) fillsSlide = res;
                 }
             }
 
             // ── Ink on top of everything, as on stage ────────────────
             const ann = s.annotations?.[sl.i];
-            if (typeof ann === 'string' && ann.length > 100) {
+            const inked = await hasInk(ann);
+
+            // A widget that fills the slide and prints its own pages (the
+            // notebook, the Python workspace) would otherwise appear twice:
+            // once as a screenshot of the slide, then again, readably, on its
+            // pages. Keep only the pages — unless the slide carries more than
+            // the widget (other media, or ink drawn over it).
+            const replaced = items.length === 1 && fillsSlide?.ok && fillsSlide.pages?.length > 0 && !inked;
+            if (replaced) {
+                out.removePage(out.getPageCount() - 1);
+            } else if (inked) {
                 const img = await embedAny(out, ann);
                 if (img) page.drawImage(img, { x: P.x, y: P.y, width: P.w, height: P.h });
             }
@@ -386,6 +400,23 @@ export async function downloadNotes() {
     } finally {
         _busy = false;
     }
+}
+
+// Whether an annotation snapshot has anything on it. The canvas is saved
+// whenever its slide is left, so an untouched slide still has a (blank) PNG.
+async function hasInk(dataUrl) {
+    if (typeof dataUrl !== 'string' || dataUrl.length <= 100) return false;
+    try {
+        const img = await loadImage(dataUrl);
+        const W = 320, H = Math.max(1, Math.round(W * (img.naturalHeight / img.naturalWidth || 0.75)));
+        const c = document.createElement('canvas');
+        c.width = W; c.height = H;
+        const cx = c.getContext('2d', { willReadFrequently: true });
+        cx.drawImage(img, 0, 0, W, H);
+        const px = cx.getImageData(0, 0, W, H).data;
+        for (let i = 3; i < px.length; i += 4) if (px[i] > 8) return true;
+        return false;
+    } catch (_) { return true; }   // can't tell: keep it
 }
 
 // A slide's config as it stands: in memory if it has been loaded (and maybe

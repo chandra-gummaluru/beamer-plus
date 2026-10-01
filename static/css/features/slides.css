@@ -1196,8 +1196,35 @@ body.edit-mode #slide-nav-slides .slide-nav-item.current-slide { pointer-events:
     border-radius: 4px;
 }
 .add-page-name { font-size: var(--fs-sm); font-weight: 600; color: var(--ink-1); text-align: center; }
-.add-page-opts { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-3); }
+.add-page-card.is-active .add-page-sheet { border-color: oklch(80% 0.005 260); }
+
+/* The large preview: what will actually be added, at slide proportions,
+   beside the settings that shape it (or, for a plain page, a short note). */
+.add-page-detail {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: var(--sp-4);
+    align-items: start;
+}
+.add-page-preview {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    background-color: #fff;
+    border: 1px solid oklch(86% 0.005 260);
+    border-radius: var(--r-sm);
+    box-shadow: 0 1px 2px oklch(20% 0.01 260 / 0.06);
+}
+.add-page-opts { display: flex; flex-direction: column; gap: var(--sp-3); }
 .add-page-opts[hidden] { display: none; }
+.add-page-note {
+    margin: 0;
+    padding-top: 22px;   /* level with the first setting's label */
+    font-family: var(--font-sans);
+    font-size: var(--fs-sm);
+    line-height: 1.45;
+    color: var(--ink-3);
+}
+.add-page-note[hidden] { display: none; }
 .add-page-field { display: flex; flex-direction: column; gap: 4px; }
 .add-page-label {
     font-family: var(--font-sans);
@@ -1209,5 +1236,5 @@ body.edit-mode #slide-nav-slides .slide-nav-item.current-slide { pointer-events:
 }
 @media (max-width: 520px) {
     .add-page-styles { grid-template-columns: repeat(2, 1fr); }
-    .add-page-opts { grid-template-columns: 1fr; }
+    .add-page-detail { grid-template-columns: minmax(0, 1fr); }
 }

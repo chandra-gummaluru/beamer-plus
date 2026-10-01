@@ -166,9 +166,27 @@ function openAddPageModal() {
     grid.className = 'add-page-styles';
     root.appendChild(grid);
 
+    // Below the cards: a large preview of exactly what will be added (real
+    // spacing, weight and colour, at slide proportions) beside the settings.
+    const detail = document.createElement('div');
+    detail.className = 'add-page-detail';
+    root.appendChild(detail);
+
+    const preview = document.createElement('div');
+    preview.className = 'add-page-preview';
+    preview.setAttribute('aria-hidden', 'true');
+    detail.appendChild(preview);
+
     const opts = document.createElement('div');
     opts.className = 'add-page-opts';
-    root.appendChild(opts);
+    detail.appendChild(opts);
+
+    // Plain has nothing to set; say so in the same spot, so switching styles
+    // doesn't reflow the dialog.
+    const plainNote = document.createElement('p');
+    plainNote.className = 'add-page-note';
+    plainNote.textContent = 'A blank white page. Choose Lined, Grid or Dots for a pattern you can set the spacing, weight and colour of.';
+    detail.appendChild(plainNote);
 
     const cards = PAPER_STYLES.map(st => {
         const card = document.createElement('button');
@@ -203,10 +221,12 @@ function openAddPageModal() {
     function sync() {
         for (const { st, card, sheet } of cards) {
             card.classList.toggle('is-active', st.v === choice.style);
-            applyPaper(sheet, { ...choice, style: st.v }, { thumb: true });
+            applyPaper(sheet, { ...choice, style: st.v }, { card: true });
         }
+        applyPaper(preview, choice);
         for (const [k, { sel }] of Object.entries(selects)) sel.value = choice[k];
         opts.hidden = choice.style === 'none';
+        plainNote.hidden = choice.style !== 'none';
         selects.thickness.wrap.querySelector('.add-page-label').textContent =
             choice.style === 'dots' ? 'Dot size' : 'Line weight';
     }

@@ -44,24 +44,35 @@ export function normalizePaper(p) {
     };
 }
 
+// The style cards in the Add page chooser are ~80px wide. At the real
+// spacing a grid there is a 3px mesh of hairlines — grey mush, with lined,
+// grid and dots barely telling apart. So a card shows a close-up instead:
+// about nine cells across and a darker ink, enough to read the style at a
+// glance. It's centred, and the spacing isn't a whole fraction of the card,
+// so no line lands on the card's own border and doubles it.
+// (The chooser's large preview shows the real spacing, weight and colour.)
+const CARD = { pct: 11, line: 1, dot: 1.6, c: 'rgba(26, 26, 24, 0.34)' };
+
 /**
  * CSS background for `paper`, or null for plain. `thumb` draws hairline
- * strokes, for the navigator's small previews.
+ * strokes, for the navigator's small previews; `card` draws the close-up
+ * used on the Add page chooser's style cards.
  */
-export function paperCss(paper, { thumb = false } = {}) {
+export function paperCss(paper, { thumb = false, card = false } = {}) {
     if (!paper || !paper.style || paper.style === 'none') return null;
     const p  = normalizePaper(paper);
-    const sx = pick(PAPER_SPACING, p.spacing, 'm').pct;
+    const sx = card ? CARD.pct : pick(PAPER_SPACING, p.spacing, 'm').pct;
     const sy = sx / 0.75;
     const th = pick(PAPER_THICKNESS, p.thickness, 'm');
-    const c  = pick(PAPER_COLORS, p.color, 'grey').c;
-    const t  = thumb ? 1 : th.line;
+    const c  = card ? CARD.c : pick(PAPER_COLORS, p.color, 'grey').c;
+    const t  = card ? CARD.line : thumb ? 1 : th.line;
     const size = `${sx}% ${sy}%`;
+    const pos  = card ? 'center' : '0 0';
     if (p.style === 'lined') {
         return {
             backgroundImage: `linear-gradient(to bottom, ${c} ${t}px, transparent ${t}px)`,
             backgroundSize: `100% ${sy}%`,
-            backgroundPosition: '0 0',
+            backgroundPosition: pos,
         };
     }
     if (p.style === 'grid') {
@@ -69,15 +80,15 @@ export function paperCss(paper, { thumb = false } = {}) {
             backgroundImage: `linear-gradient(to right, ${c} ${t}px, transparent ${t}px), ` +
                              `linear-gradient(to bottom, ${c} ${t}px, transparent ${t}px)`,
             backgroundSize: `${size}, ${size}`,
-            backgroundPosition: '0 0, 0 0',
+            backgroundPosition: `${pos}, ${pos}`,
         };
     }
     // dots
-    const r = thumb ? 0.8 : th.dot;
+    const r = card ? CARD.dot : thumb ? 0.8 : th.dot;
     return {
         backgroundImage: `radial-gradient(circle at center, ${c} ${r}px, transparent ${r + 0.7}px)`,
         backgroundSize: size,
-        backgroundPosition: '0 0',
+        backgroundPosition: pos,
     };
 }
 

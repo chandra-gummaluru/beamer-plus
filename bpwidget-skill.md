@@ -387,6 +387,10 @@ What the host does, so a handler doesn't have to:
   text in the standard fonts (Latin-1; other characters are transliterated or
   replaced), so prefer `text` blocks over pictures of text where you can.
 - The handler has ~20 s. A throw, a timeout or no handler → placeholder.
+- A widget that fills its slide and returns `pages` is printed **only** as its pages:
+  the slide page is dropped so the widget doesn't appear twice (unless the slide also
+  has other media or pen ink). A widget on part of a slide keeps both — the image in
+  its box, then its pages.
 
 Raw protocol, for reference (the kit does this): host →
 `{ type: 'widget-print', requestId, scale }`; widget →
