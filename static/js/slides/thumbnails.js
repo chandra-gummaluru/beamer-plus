@@ -17,10 +17,27 @@ function render(slides, state) {
         item.dataset.index = String(i);
 
         // ── View slides ────────────────────────────────────────────
+        // The number shown under the card (see .slide-nav-item::after).
+        item.dataset.label = s.label || String(i + 1);
+
         if (s.kind === 'view') {
             const preview = document.createElement('div');
             preview.className = 'slide-preview slide-preview-view';
             preview.dataset.slideNumber = s.label || String(i + 1);
+            if (s.customTitle) {
+                preview.classList.add('slide-preview--titled');
+                const t = document.createElement('span');
+                t.className = 'slide-preview-title';
+                t.textContent = s.customTitle;
+                preview.appendChild(t);
+                item.appendChild(preview);
+                item.addEventListener('click', () => {
+                    if (document.body.classList.contains('edit-mode')) bus.emit('view:select', i);
+                    bus.emit('slide:goto', i);
+                });
+                host.appendChild(item);
+                return;
+            }
 
             const leftPane = document.createElement('div');
             leftPane.className = 'view-preview-pane';
@@ -60,7 +77,14 @@ function render(slides, state) {
              s.kind === 'label'  ? ' slide-preview-label'  : '');
         const lbl = s.label || String(i + 1);
         preview.dataset.slideNumber = lbl;
-        if (s.thumbUrl) {
+        if (s.customTitle) {
+            // A presenter-given title replaces the thumbnail on the card.
+            preview.classList.add('slide-preview--titled');
+            const t = document.createElement('span');
+            t.className = 'slide-preview-title';
+            t.textContent = s.customTitle;
+            preview.appendChild(t);
+        } else if (s.thumbUrl) {
             const img = document.createElement('img');
             img.src = s.thumbUrl;
             img.alt = s.title || `Slide ${lbl}`;

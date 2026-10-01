@@ -38,7 +38,7 @@ corner of the app.
 
 ## Loading a presentation
 
-Use the upload button (top-right) to load either:
+Use the upload button (top-right), or drag the file onto the window, to load either:
 
 - **A plain PDF** — every page becomes a slide.
 - **A presentation ZIP** — a PDF plus saved configuration, media, widgets and

@@ -11,13 +11,14 @@
 // - save.js          rebuild + download the presentation ZIP
 import { bus } from '../core/events.js';
 import { ctx, setPanelMode } from './context.js';
-import { renderEditOverlays, cleanupEditOverlays, deselectOverlay, pickMediaFile, onMediaFileSelected } from './overlays.js';
+import { renderEditOverlays, cleanupEditOverlays, deselectOverlay, pickMediaFile, onMediaFileSelected, addReveal } from './overlays.js';
 import { updatePropertiesPanel, refreshSlideItems } from './properties.js';
 import { addWidget } from './widget-picker.js';
 import { showViewConfig, hideViewConfig } from './view-config.js';
 import { applySlideReorder, removeSlideReorder } from './reorder.js';
 import { initWidgetSettings } from './widget-settings.js';
 import { savePresentation } from './save.js';
+import { realSlideCount } from '../slides/structure.js';
 
 /* ─── init ──────────────────────────────────────────────────── */
 
@@ -32,6 +33,21 @@ export function initEditor(state) {
     document.getElementById('edit-add-audio-btn')?.addEventListener('click', () => pickMediaFile('audio', 'audio/*'));
     document.getElementById('edit-add-model-btn')?.addEventListener('click', () => pickMediaFile('model', '.glb,.gltf'));
     document.getElementById('edit-add-widget-btn')?.addEventListener('click', addWidget);
+    document.getElementById('edit-add-reveal-btn')?.addEventListener('click', addReveal);
+
+    const titleInput = document.getElementById('slide-title-input');
+    titleInput?.addEventListener('input', () => {
+        const obj = ctx.state?.slideStructure?.[ctx.state?.currentSlide];
+        if (!obj) return;
+        const t = titleInput.value.trim();
+        if (t) obj.title = t; else delete obj.title;
+        bus.emit('nav:refresh');
+    });
+    // Typed letters are the title, not slide shortcuts.
+    titleInput?.addEventListener('keydown', e => {
+        e.stopPropagation();
+        if (e.key === 'Enter' || e.key === 'Escape') titleInput.blur();
+    });
 
     document.getElementById('slide-hidden-toggle')?.addEventListener('change', e => {
         const obj = ctx.state?.slideStructure?.[ctx.state?.currentSlide];
@@ -200,6 +216,8 @@ function updateSlideSettingsPanel() {
     const obj    = ctx.state?.slideStructure?.[ctx.state?.currentSlide];
     const toggle = document.getElementById('slide-hidden-toggle');
     if (toggle) toggle.checked = !!obj?.hidden;
+    const title = document.getElementById('slide-title-input');
+    if (title && document.activeElement !== title) title.value = obj?.title || '';
     refreshSlideItems();
 }
 
@@ -207,8 +225,11 @@ function updateSlideSettingsPanel() {
 // (view slides have no content layer to attach media to).
 function _updateAddMediaButtons() {
     const isView = ctx.state?.slideStructure?.[ctx.state?.currentSlide]?.type === 'view';
-    for (const id of ['edit-add-video-btn', 'edit-add-audio-btn', 'edit-add-model-btn', 'edit-add-widget-btn']) {
+    for (const id of ['edit-add-video-btn', 'edit-add-audio-btn', 'edit-add-model-btn', 'edit-add-widget-btn', 'edit-add-reveal-btn']) {
         const btn = document.getElementById(id);
         if (btn) btn.disabled = isView;
     }
+    // A split view pairs two real slides — none to pair until there are two.
+    const viewBtn = document.getElementById('add-view-btn');
+    if (viewBtn) viewBtn.disabled = realSlideCount(ctx.state?.slideStructure) < 2;
 }

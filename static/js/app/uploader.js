@@ -1,62 +1,91 @@
-// Upload — shows modal with PDF / ZIP / folder options.
-// Uses bus events to decouple from main.js.
+// Upload — loading a presentation from a PDF or a saved Beamer+ ZIP.
+// Two ways in: the upload button (one file picker that takes either), or
+// dropping the file anywhere on the window. Both route by file type and hand
+// off through bus events, keeping this decoupled from main.js.
 import { bus } from '../core/events.js';
 
-export function initUploader(state) {
-    document.getElementById('upload-presentation-btn')?.addEventListener('click', showUploadModal);
+export function initUploader() {
+    const input = document.getElementById('upload-presentation');
+    document.getElementById('upload-presentation-btn')?.addEventListener('click', () => input?.click());
 
-    document.getElementById('upload-zip')?.addEventListener('change', async (e) => {
+    input?.addEventListener('change', (e) => {
         const file = e.target.files?.[0];
         e.target.value = '';
-        if (!file) return;
-        bus.emit('upload:zip', file);
+        if (file) openPresentationFile(file);
     });
 
-    document.getElementById('upload-folder')?.addEventListener('change', async (e) => {
-        const files = Array.from(e.target.files || []);
-        e.target.value = '';
-        if (!files.length) return;
-        bus.emit('upload:folder', files);
-    });
-
-    document.getElementById('upload-pdf')?.addEventListener('change', async (e) => {
-        const file = e.target.files?.[0];
-        e.target.value = '';
-        if (!file) return;
-        bus.emit('upload:pdf', file);
-    });
+    initDropZone();
 }
 
-function showUploadModal() {
-    const body = document.createElement('div');
-    body.style.cssText = 'display:flex;flex-direction:column;gap:10px;';
+function kindOf(file) {
+    const name = (file?.name || '').toLowerCase();
+    if (name.endsWith('.pdf') || file?.type === 'application/pdf') return 'pdf';
+    if (name.endsWith('.zip') || /zip/.test(file?.type || '')) return 'zip';
+    return null;
+}
 
-    const _ZIP_SVG    = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="12" x2="12" y2="18"/><polyline points="9 15 12 18 15 15"/></svg>`;
-    const _FOLDER_SVG = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`;
-    const _PDF_SVG    = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="12" y2="17"/></svg>`;
-
-    const options = [
-        { type: 'zip',    svg: _ZIP_SVG,    label: 'Upload ZIP File' },
-        { type: 'folder', svg: _FOLDER_SVG, label: 'Select Folder' },
-        { type: 'pdf',    svg: _PDF_SVG,    label: 'Upload PDF' },
-    ];
-
-    options.forEach(({ type, svg, label }) => {
-        const btn = document.createElement('button');
-        btn.className = 'custom-modal-btn upload-option-btn';
-        btn.innerHTML = `${svg} ${label}`;
-        btn.addEventListener('click', () => {
-            window.BeamerModal?.close();
-            document.getElementById(`upload-${type}`)?.click();
+/** Load a PDF or Beamer+ ZIP, whichever `file` is. */
+export function openPresentationFile(file) {
+    const kind = kindOf(file);
+    if (!kind) {
+        window.BeamerModal?.show({
+            kind: 'error',
+            title: 'Can’t open that file',
+            message: `“${file?.name || 'This file'}” isn’t a PDF or a Beamer+ ZIP.`,
         });
-        body.appendChild(btn);
-    });
+        return;
+    }
+    bus.emit(kind === 'pdf' ? 'upload:pdf' : 'upload:zip', file);
+}
 
-    window.BeamerModal?.show({
-        kind: 'info',
-        title: 'Upload Presentation',
-        message: 'Choose how you want to upload your presentation',
-        body,
-        buttons: [{ label: 'Cancel', kind: 'cancel' }],
+/* ─── drag and drop ───────────────────────────────────────────── */
+// Drop a PDF or ZIP anywhere on the presenter window to load it. Only file
+// drags are intercepted (dragging text or an annotation is left alone), and
+// only while uploading is allowed at all — the upload button is the source
+// of truth for that (split view disables it, for instance). Drops onto a
+// widget never reach here: they land in the widget's own iframe.
+
+function uploadAllowed() {
+    const btn = document.getElementById('upload-presentation-btn');
+    return !!btn && !btn.disabled && !document.body.classList.contains('edit-mode');
+}
+
+function hasFiles(e) {
+    return Array.from(e.dataTransfer?.types || []).includes('Files');
+}
+
+function initDropZone() {
+    const overlay = document.getElementById('drop-overlay');
+    if (!overlay) return;
+    let depth = 0;   // dragenter/leave fire for every child element crossed
+    const show = (on) => overlay.classList.toggle('is-visible', on);
+
+    window.addEventListener('dragenter', (e) => {
+        if (!hasFiles(e) || !uploadAllowed()) return;
+        e.preventDefault();
+        depth++;
+        show(true);
+    });
+    window.addEventListener('dragover', (e) => {
+        if (!hasFiles(e)) return;
+        // preventDefault marks this as a drop target; without it the browser
+        // would open the file in the tab and throw the session away.
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = uploadAllowed() ? 'copy' : 'none';
+    });
+    window.addEventListener('dragleave', (e) => {
+        if (!hasFiles(e)) return;
+        depth = Math.max(0, depth - 1);
+        if (!depth) show(false);
+    });
+    window.addEventListener('drop', (e) => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        depth = 0;
+        show(false);
+        if (!uploadAllowed()) return;
+        const files = Array.from(e.dataTransfer.files || []);
+        const file = files.find(kindOf) || files[0];
+        if (file) openPresentationFile(file);
     });
 }

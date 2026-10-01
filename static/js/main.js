@@ -18,13 +18,14 @@ import { initTextAnnotations, wireTextCanvas, commitOpenTextEditor,
 
 import { initNavigator } from './slides/navigator.js';
 import { initThumbnails } from './slides/thumbnails.js';
-import { initSlideStructure, getSlideLabels, slideUid } from './slides/structure.js';
+import { initSlideStructure, getSlideLabels, slideUid, configKeyOf, realSlideCount, isDeletableSlide } from './slides/structure.js';
+import { initNavDrawer, isNavCollapsed, setNavCollapsed } from './slides/drawer.js';
+import { initReveals, renderReveals, resetRevealsOnArrival, stepReveal, updateStepBadge } from './slides/reveals.js';
 import { initSpotlight, hideSpotlight, renderSpotlight,
          setWidgetInteractivityForSpotlight } from './slides/spotlight.js';
 import { initMedia, renderMedia, updateMediaPositions, resetMediaCache } from './slides/media.js';
 
 import { initSettings, loadShortcuts } from './app/settings.js';
-import { showHelpModal } from './app/help.js';
 import { initUploader } from './app/uploader.js';
 import { startTour } from './app/tour.js';
 import { initEditor } from './editor/editor.js';
@@ -135,6 +136,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initNavigator(state);
     initThumbnails(state);
     initSlideStructure(state);
+    initNavDrawer();
+    initReveals(state);
     initMedia(state);
     initToolbar(state);
     initPenSlots(state);
@@ -161,8 +164,8 @@ document.addEventListener('DOMContentLoaded', () => {
     wireAnnotationClear();
     wireKeyboardNav();
     wireResizeAndFullscreen();
-    wireMenuBtn();
     updateStageEmptyState();
+    maybeStartTourFromUrl();
 
     // annotation sync + active-pane tracking
     state.activeAnnCvs = state.annCvs;
@@ -180,22 +183,6 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const data = await readUserFileBytes(file);
             const zip  = await JSZip.loadAsync(data);
-            await uploadZipToServer(zip, modal);
-        } catch (err) {
-            modal?.close();
-            window.BeamerModal?.show({ kind: 'error', title: 'Upload failed', message: err.message });
-        }
-    });
-
-    bus.on('upload:folder', async (files) => {
-        const modal = window.BeamerModal;
-        modal?.show({ kind: 'loading', title: 'Uploading folder…', message: 'Zipping files…' });
-        try {
-            const zip = new JSZip();
-            for (const file of files) {
-                const rel = file.webkitRelativePath.split('/').slice(1).join('/');
-                if (rel) zip.file(rel, await readUserFileBytes(file));
-            }
             await uploadZipToServer(zip, modal);
         } catch (err) {
             modal?.close();
@@ -419,8 +406,8 @@ function wireKeyboardNav() {
         if (e.ctrlKey || e.metaKey || e.altKey) return;
 
         // Fixed: navigation & escape
-        if (e.key === 'ArrowLeft'  || e.key === 'PageUp')  goToSlide(state.currentSlide - 1, 'back');
-        if (e.key === 'ArrowRight' || e.key === 'PageDown') goToSlide(state.currentSlide + 1, 'forward');
+        if (e.key === 'ArrowLeft'  || e.key === 'PageUp')   navStep(-1);
+        if (e.key === 'ArrowRight' || e.key === 'PageDown') navStep(+1);
         if (e.key === 'Escape') { bus.emit('ui:escape'); BeamerModal?.close(); }
 
         // Configurable shortcuts
@@ -443,30 +430,43 @@ function wireKeyboardNav() {
     window.addEventListener('message', (e) => {
         if (e.data?.type !== 'widget-nav') return;
         const key = e.data.key;
-        if (key === 'ArrowLeft'  || key === 'PageUp')   goToSlide(state.currentSlide - 1, 'back');
-        if (key === 'ArrowRight' || key === 'PageDown') goToSlide(state.currentSlide + 1, 'forward');
+        if (key === 'ArrowLeft'  || key === 'PageUp')   navStep(-1);
+        if (key === 'ArrowRight' || key === 'PageDown') navStep(+1);
     });
 }
 
-function wireMenuBtn() {
-    document.getElementById('menu-btn')?.addEventListener('click', () => {
-        showHelpModal({
-            onStartTour: () => {
-                // Defer to a fresh task so the Help & Settings modal finishes
-                // closing before the tour (and its demo-loading modal) mount.
-                setTimeout(() => {
-                    const loader = state.zipFile ? null : async () => {
-                        window.BeamerModal?.show({ kind: 'loading', title: 'Loading demo…', message: 'Fetching demo presentation…' });
-                        const resp = await fetch('/api/demo-zip');
-                        if (!resp.ok) { window.BeamerModal?.close(); return; }
-                        const blob = await resp.blob();
-                        await loadZipPresentation(new File([blob], 'demo.zip', { type: 'application/zip' }));
-                    };
-                    startTour(loader);
-                }, 0);
-            },
-        });
-    });
+// Sequential navigation: a slide's reveal steps come before moving on.
+function navStep(dir) {
+    if (stepReveal(dir)) return;
+    if (dir > 0) goToSlide(state.currentSlide + 1, 'forward');
+    else goToSlide(state.currentSlide - 1, 'back');
+}
+
+/* ─── guided tour ─────────────────────────────────────────────── */
+// Launched from the welcome page's "Take a tour" button, which creates a
+// session and lands here with ?tour=1. Loads the demo deck if nothing is
+// loaded yet, so every step has something to point at.
+function launchTour() {
+    if (isNavCollapsed()) setNavCollapsed(false, { persist: false });
+    const loader = state.zipFile ? null : async () => {
+        window.BeamerModal?.show({ kind: 'loading', title: 'Loading demo…', message: 'Fetching demo presentation…' });
+        const resp = await fetch('/api/demo-zip');
+        if (!resp.ok) { window.BeamerModal?.close(); return; }
+        const blob = await resp.blob();
+        await loadZipPresentation(new File([blob], 'demo.zip', { type: 'application/zip' }));
+    };
+    startTour(loader);
+}
+
+function maybeStartTourFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('tour')) return;
+    // Drop the flag so a reload doesn't restart the tour.
+    params.delete('tour');
+    const qs = params.toString();
+    history.replaceState(null, '', window.location.pathname + (qs ? `?${qs}` : '') + window.location.hash);
+    // Wait out the splash screen (removed ~2s after load).
+    setTimeout(launchTour, 2100);
 }
 
 /* ─── bookmark button ─────────────────────────────────────────── */
@@ -485,9 +485,10 @@ function toggleBookmark(i) {
 
 /* ─── focus mode ─────────────────────────────────────────────── */
 function toggleFocusMode() {
+    // resizeOnly() below blanks both bitmaps, so commit the ink first…
+    saveCurrentAnnotations();
     document.body.classList.toggle('focus-mode');
-    // Trigger canvas resize so annotations stay aligned with the new layout
-    setTimeout(() => {
+    setTimeout(async () => {
         sizeSlideCanvases();
         state.annCvs?.resizeOnly?.();
         state.pdfCvs?.resizeOnly?.();
@@ -495,6 +496,12 @@ function toggleFocusMode() {
             state.annCvs2?.resizeOnly?.();
             state.pdfCvs2?.resizeOnly?.();
         }
+        // …and redraw the slide at the new size. Without this the stage stayed
+        // empty until the next navigation repainted it.
+        if (!state.slideStructure.length) return;
+        if (state.splitView) await renderSplitSlides(state.currentSlide, state.rightSlideIndex);
+        else await renderLogicalSlide(state.currentSlide, false, true);
+        _updateAllOverlayPositions();
     }, 300); // wait for CSS transition to finish
 }
 
@@ -514,6 +521,8 @@ function wireSplitViewButton(annContainer2, pdfContainer2) {
     btn.addEventListener('click', async () => {
         await commitOpenTextEditor(state);
         const enteringSplit = !state.splitView;
+        // Split view needs two real slides (view slides don't count).
+        if (enteringSplit && realSlideCount(state.slideStructure) < 2) return;
         // Save before setSplitActive — resizeOnly() inside it clears the canvas
         saveCurrentAnnotations();
         // Show overlay(s) immediately before any layout work
@@ -631,14 +640,15 @@ function applySplitRatio(ratioPercent) {
 
 /* ─── slide navigation ────────────────────────────────────────── */
 bus.on('slide:goto', (i) => goToSlide(i));
-bus.on('slide:next', () => goToSlide(state.currentSlide + 1, 'forward'));
-bus.on('slide:prev', () => goToSlide(state.currentSlide - 1, 'back'));
+bus.on('slide:next', () => navStep(+1));
+bus.on('slide:prev', () => navStep(-1));
 bus.on('slide:goto-right', async (i) => {
     if (!state.splitView || i === state.currentSlide) return;
     await commitOpenTextEditor(state);
     saveCurrentAnnotations();
     _slideOverlay(true)?.classList.add('visible');
     state.rightSlideIndex = i;
+    resetRevealsOnArrival(state.slideStructure[i], null);
     await renderLogicalSlide(i, true);
     updateSlideNavigator();
     bus.emit('slide:changed', state.currentSlide);
@@ -708,6 +718,10 @@ async function goToSlide(i, direction = null, isSplitPaneNav = false) {
         const leftIdx  = Math.max(0, Math.min(state.slideStructure.length - 1, prelimObj.left  ?? 0));
         const rightIdx = Math.max(0, Math.min(state.slideStructure.length - 1, prelimObj.right ?? 0));
         saveCurrentAnnotations();
+        // Both panes start with their reveal steps hidden (all shown when
+        // arriving backwards); the left pane's goToSlide below won't reset.
+        resetRevealsOnArrival(state.slideStructure[leftIdx], direction);
+        resetRevealsOnArrival(state.slideStructure[rightIdx], direction);
         const previewRatio = state.editMode ? 50 : (prelimObj.ratio ?? null);
         if (leftIdx !== rightIdx) await setSplitActive(true, rightIdx, previewRatio);
         state.currentViewIndex = i;   // remember which view slide drives this split
@@ -736,6 +750,7 @@ async function goToSlide(i, direction = null, isSplitPaneNav = false) {
         await setSplitActive(false);
     }
 
+    if (!isSplitPaneNav && i !== state.currentSlide) resetRevealsOnArrival(state.slideStructure[i], direction);
     state.currentSlide = i;
 
     if (state.splitView) {
@@ -753,6 +768,7 @@ async function goToSlide(i, direction = null, isSplitPaneNav = false) {
     }
     updateSlideNavigator();
     updateBlankSlideButtons();
+    updateStepBadge();
     bus.emit('slide:changed', i);
 }
 
@@ -853,9 +869,10 @@ function updateBlankSlideButtons() {
     const addBtn  = document.getElementById('add-blank-btn');
     const delBtn  = document.getElementById('delete-blank-btn');
     if (delBtn) {
-        const isBlank = obj?.type === 'blank';
-        delBtn.disabled = !isBlank;
-        delBtn.style.opacity = isBlank ? '1' : '0.5';
+        const deletable = isDeletableSlide(obj);
+        delBtn.disabled = !deletable;
+        delBtn.style.opacity = deletable ? '1' : '0.5';
+        delBtn.title = obj?.type === 'pdf' ? 'Delete duplicated slide' : 'Delete blank slide';
     }
 }
 
@@ -920,7 +937,7 @@ async function renderLogicalSlide(logicalIndex, isRight = false, suppressOverlay
     // rebuilt by renderWidgets itself. Discarding everything rebooted every
     // widget on the slide each time edit mode was left — a notebook loaded twice.
     if (forceRefresh) {
-        const cfgKey = obj.type === 'pdf' ? obj.pdfIndex : obj.blankId;
+        const cfgKey = configKeyOf(obj);
         const keep = new Set((state.slideConfigs[cfgKey]?.widgets || []).map(w => String(w.id)));
         discardParkedWidgets(newSlideKey, keep);
     }
@@ -949,6 +966,10 @@ async function renderLogicalSlide(logicalIndex, isRight = false, suppressOverlay
             }
         }
     }
+
+    // Reveal-step covers and "appear on step" media, for whichever slide is
+    // now showing in this pane.
+    if (myGen === _renderGen[paneKey]) renderReveals(slideContainer, obj, newSlideKey);
 
     // Only record which slide this container is showing if this render is
     // still the latest one for this pane — a faster later render may have
@@ -989,7 +1010,9 @@ async function renderPdfSlide(pdfIndex, logicalIndex, isRight = false, slideKey 
         annCvs.resetHistory?.();
     }
 
-    const config = await loadSlideConfig(pdfIndex);
+    // A duplicated page shows the same PDF page but has its own config.
+    const cfgId = state.slideStructure[logicalIndex]?.cfgId;
+    const config = cfgId ? await loadBlankConfig(cfgId) : await loadSlideConfig(pdfIndex);
     if (!config) return;
 
     const rect = container.getBoundingClientRect();
@@ -1078,6 +1101,7 @@ function saveCurrentAnnotations() {
 // are already in the DOM the first time this runs.
 const STAGE_CONTROL_SELECTOR = [
     '#split-toggle',
+    '#duplicate-slide-btn',
     '#edit-save-btn',
     '#bookmark-btn',
     '#floating-annotation-toolbar button',
@@ -1094,6 +1118,14 @@ function setStageControlsEnabled(enabled) {
     if (editBtn && !state.editMode) editBtn.disabled = !enabled || state.splitView;
 
     if (!enabled) return;
+    // Split view needs two real slides to show side by side. Leaving split
+    // view must always stay possible, so only the way in is blocked.
+    const splitBtn = document.getElementById('split-toggle');
+    if (splitBtn && !state.splitView) {
+        const tooFew = realSlideCount(state.slideStructure) < 2;
+        splitBtn.disabled = tooFew;
+        splitBtn.title = tooFew ? 'Split view needs at least two slides' : 'Split view';
+    }
     // Split view independently blocks save/download (see setSplitActive) —
     // re-apply that rule so re-enabling here can't quietly override it.
     const saveBtn = document.getElementById('edit-save-btn');
@@ -1130,6 +1162,7 @@ function populateSlideNavigator() {
             kind:     obj.type,
             label:    labels[i],
             title:    obj.type === 'blank' ? labels[i] : `Slide ${labels[i]}`,
+            customTitle: typeof obj.title === 'string' ? obj.title : '',
             thumbUrl: obj.type === 'pdf'   ? (state.slideThumbnailCache[obj.pdfIndex] ?? null) : null,
         };
         if (obj.type === 'view') {
@@ -1143,9 +1176,12 @@ function populateSlideNavigator() {
     }));
     updateSlideNavigator();
     updateStageEmptyState();
+    updateStepBadge();
 }
 
 bus.on('nav:refresh', () => populateSlideNavigator());
+// Duplicating a slide copies its annotations — commit what's on stage first.
+bus.on('annotations:flush', () => saveCurrentAnnotations());
 
 // Live divider-position preview while the slider is being dragged.
 // Only adjusts CSS flex proportions — does NOT resize canvas pixel dimensions,
@@ -1191,10 +1227,14 @@ function populateBookmarkPins() {
         preview.className = 'slide-preview bookmark-preview';
         const lbl = labels[i] || String(i + 1);
         preview.dataset.slideNumber = lbl;
+        item.dataset.label = lbl;
         // Thumbnail cache is keyed by pdfIndex, not structure index — once
         // blank/view slides exist the two diverge.
         const thumb = obj?.type === 'pdf' ? state.slideThumbnailCache[obj.pdfIndex] : null;
-        if (thumb) {
+        if (obj?.title) {
+            preview.classList.add('slide-preview--titled');
+            const t = document.createElement('span'); t.className = 'slide-preview-title'; t.textContent = obj.title; preview.appendChild(t);
+        } else if (thumb) {
             const img = document.createElement('img'); img.src = thumb; preview.appendChild(img);
         } else {
             const span = document.createElement('span'); span.textContent = `Slide ${lbl}`; preview.appendChild(span);
@@ -1277,7 +1317,10 @@ function wireResizeAndFullscreen() {
 }
 
 /* ─── editor: exit → re-render so added media appears immediately */
-bus.on('editor:exited', () => renderLogicalSlide(state.currentSlide, false, false, true));
+bus.on('editor:exited', async () => {
+    await renderLogicalSlide(state.currentSlide, false, false, true);
+    updateStepBadge();   // reveal steps may have been added or removed
+});
 
 /* ─── editor: slide reorder ───────────────────────────────────── */
 bus.on('slides:reordered', async () => {

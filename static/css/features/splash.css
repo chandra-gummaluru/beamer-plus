@@ -263,6 +263,7 @@ body.welcome-page {
 
 .welcome-actions-row .welcome-btn--primary {
     flex: 1 1 auto;
+    white-space: nowrap;
 }
 
 .welcome-btn--help {
@@ -296,6 +297,21 @@ body.welcome-page {
 
 .welcome-btn--primary:hover:not(:disabled) {
     background: var(--accent-strong);
+}
+
+/* "Take a tour" — sits beside New Session, quieter than it. */
+.welcome-btn--secondary {
+    flex: 0 0 auto;
+    width: auto;
+    white-space: nowrap;
+    padding: 0 var(--sp-5);
+    background: var(--surface-paper);
+    color: var(--ink-1);
+    border-color: var(--ink-4);
+}
+
+.welcome-btn--secondary:hover:not(:disabled) {
+    background: var(--surface-cream-2);
 }
 
 

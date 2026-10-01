@@ -28,7 +28,7 @@
     // Keys the layout system owns — a widget never edits these about itself.
     // The parent enforces the same list; this copy just keeps them out of the UI.
     var RESERVED = [
-        'id', 'type', 'x', 'y', 'width', 'height', 'zIndex',
+        'id', 'type', 'x', 'y', 'width', 'height', 'zIndex', 'step',
         'builtin', 'src', 'interactive',
         'notebookContent', 'role', 'socketUrl',
         'sessionId', 'serverUrl', 'publicBaseUrl',
@@ -777,6 +777,66 @@
         actionsEl.appendChild(own);
     }
 
+    /* ─── partial-slide mode ────────────────────────────────────── */
+    // A widget that fills the slide carries the full bar. One placed on part
+    // of a slide is an inset, not a window: it drops the title and the shared
+    // utilities (font size, reset), and keeps its own controls as a slim strip
+    // — or no bar at all when it has none. Widgets that declare
+    // "fullSlide": true are always laid out full-slide by the host, so they
+    // never get here.
+
+    function near(a, b) { return Math.abs((+a || 0) - b) < 0.005; }
+
+    function isPartial() {
+        if (!readSchema()) return false;
+        if (schema && schema.fullSlide === true) return false;
+        var c = cfg();
+        var w = c.width == null ? 1 : c.width, h = c.height == null ? 1 : c.height;
+        return !(near(c.x, 0) && near(c.y, 0) && near(w, 1) && near(h, 1));
+    }
+
+    var CONTROL_SEL = 'button, input, select, textarea, a[href], [role="button"]';
+    var controlsQueued = false;
+
+    // Does the bar hold anything to operate? (A title or a status pill alone
+    // isn't worth a bar in an inset.)
+    function syncBarControls() {
+        controlsQueued = false;
+        if (!barEl || !actionsEl) return;
+        var any = false, list = actionsEl.querySelectorAll(CONTROL_SEL);
+        for (var i = 0; i < list.length && !any; i++) {
+            var c = list[i];
+            if (c.hidden) continue;
+            try { if (window.getComputedStyle(c).display === 'none') continue; } catch (e) {}
+            any = true;
+        }
+        barEl.classList.toggle('bw-topbar--no-controls', !any);
+    }
+
+    function queueBarControls() {
+        if (controlsQueued) return;
+        controlsQueued = true;
+        (window.requestAnimationFrame || setTimeout)(syncBarControls);
+    }
+
+    function syncLayoutMode() {
+        if (!document.body) return;
+        document.body.classList.toggle('bw-partial', isPartial());
+        syncBarControls();
+    }
+
+    var controlsWatched = false;
+    function watchBarControls() {
+        if (controlsWatched || !actionsEl) return;
+        controlsWatched = true;
+        try {
+            new MutationObserver(queueBarControls).observe(actionsEl, {
+                childList: true, subtree: true,
+                attributes: true, attributeFilter: ['hidden', 'style', 'class'],
+            });
+        } catch (e) {}
+    }
+
     // What a widget uses to put its own controls in the bar and say what
     // resetting it means.
     var topbarApi = {
@@ -818,7 +878,18 @@
             applyScale();
             syncScaleButtons();
             if (titleEl) titleEl.textContent = barTitle();
+            syncLayoutMode();
             announce();  // the id may only have arrived with this message
+            return;
+        }
+        // The host moved or resized the widget's box (edited in the editor
+        // while the iframe stayed alive).
+        if (d.type === 'widget-layout') {
+            var c = cfg();
+            ['x', 'y', 'width', 'height'].forEach(function (k) {
+                if (typeof d[k] === 'number') c[k] = d[k];
+            });
+            syncLayoutMode();
         }
     });
 
@@ -838,7 +909,10 @@
         fileName:      function (fallback, ext) { readSchema(); return fileName(fallback, ext); },
     };
 
-    function init() { applyScale(); announce(); buildTopbar(); syncScaleButtons(); }
+    function init() {
+        applyScale(); announce(); buildTopbar(); syncScaleButtons();
+        watchBarControls(); syncLayoutMode();
+    }
 
     init();
     if (document.readyState === 'loading') {

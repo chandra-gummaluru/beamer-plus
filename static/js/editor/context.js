@@ -1,5 +1,6 @@
 // Shared editor context — the presenter-state handle, current selections,
 // and small helpers used by every editor module.
+import { configKeyOf } from '../slides/structure.js';
 
 export const ctx = {
     state: null,            // shared presenter state (set by initEditor)
@@ -51,10 +52,9 @@ export function getCurrentPdfIndex() {
 export function getOrCreateConfig() {
     const obj = ctx.state.slideStructure[ctx.state.currentSlide];
     if (!obj) return null;
-    // PDF slides use their stable pdfIndex; blank slides use their stable blankId.
-    const key = obj.type === 'pdf' ? obj.pdfIndex
-              : obj.type === 'blank' ? obj.blankId
-              : null;
+    // PDF slides use their stable pdfIndex (a duplicated page its own cfgId);
+    // blank slides use their stable blankId.
+    const key = configKeyOf(obj);
     if (key === null || key === undefined) return null;
     if (!ctx.state.slideConfigs[key]) ctx.state.slideConfigs[key] = {};
     return ctx.state.slideConfigs[key];
@@ -65,14 +65,15 @@ export function getOrCreateConfig() {
    but never these: they are Beamer+'s to set, and a widget that could
    rewrite its own src or geometry could move or re-point itself. */
 export const WIDGET_RESERVED = new Set([
-    'id', 'type', 'x', 'y', 'width', 'height', 'zIndex',
+    'id', 'type', 'x', 'y', 'width', 'height', 'zIndex', 'step',
     'builtin', 'src', 'interactive',
     'notebookContent', 'role', 'socketUrl',
     'sessionId', 'serverUrl', 'publicBaseUrl',
 ]);
 
 export function arrKeyForType(type) {
-    return type === 'video' ? 'videos' : type === 'audio' ? 'audios' : type === 'model' ? 'models' : 'widgets';
+    return type === 'video' ? 'videos' : type === 'audio' ? 'audios' : type === 'model' ? 'models'
+         : type === 'reveal' ? 'reveals' : 'widgets';
 }
 
 export function getConfigItems(cfg) {
@@ -81,6 +82,7 @@ export function getConfigItems(cfg) {
         ...(cfg.audios  || []).map((a, i) => ({ type: 'audio',  arrKey: 'audios',  item: a, index: i })),
         ...(cfg.models  || []).map((m, i) => ({ type: 'model',  arrKey: 'models',  item: m, index: i })),
         ...(cfg.widgets || []).map((w, i) => ({ type: 'widget', arrKey: 'widgets', item: w, index: i })),
+        ...(cfg.reveals || []).map((r, i) => ({ type: 'reveal', arrKey: 'reveals', item: r, index: i })),
     ];
 }
 

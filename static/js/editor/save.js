@@ -4,6 +4,7 @@
 import { collectWidgetStates, getLoadedWidgetStates } from '../core/iframe-widget-renderer.js';
 import { requestWidgetFileFlush } from './widget-settings.js';
 import { ctx } from './context.js';
+import { configKeyOf } from '../slides/structure.js';
 
 // Custom widgets are added with an ephemeral `blob:` URL as their `src` (for
 // immediate in-session preview), while the .html bytes are stashed in
@@ -52,8 +53,8 @@ export async function savePresentation() {
         // config (and its widgets' saved state) with it.
         const liveKeys = new Set();
         for (const obj of ctx.state.slideStructure) {
-            if (obj?.type === 'pdf')                  liveKeys.add(String(obj.pdfIndex));
-            else if (obj?.type === 'blank' && obj.blankId) liveKeys.add(String(obj.blankId));
+            const key = configKeyOf(obj);
+            if (key != null) liveKeys.add(String(key));
         }
         const cfgs = ctx.state.slideConfigs;
         const inMemory = (key) => Object.prototype.hasOwnProperty.call(cfgs, key) && cfgs[key];
@@ -97,7 +98,10 @@ export async function savePresentation() {
             noteWidgets(cfg);
         }
 
-        const isDefault = ctx.state.slideStructure.every((obj, i) => obj.type === 'pdf' && obj.pdfIndex === i);
+        // Default = plain PDF pages in order with nothing extra on them (a
+        // title or "hidden" has to be written out, or it's lost on reload).
+        const isDefault = ctx.state.slideStructure.every((obj, i) =>
+            obj.type === 'pdf' && obj.pdfIndex === i && Object.keys(obj).every(k => k === 'type' || k === 'pdfIndex'));
         if (!isDefault) newZip.file('config/slide-order.json', JSON.stringify(ctx.state.slideStructure));
 
         // Save annotations so pen strokes persist across re-uploads.

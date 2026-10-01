@@ -170,12 +170,8 @@ function fieldLabel(field) {
     const lab = document.createElement('div');
     lab.className = 'editor-prop-label';
     lab.textContent = field.label || field.key;
-    if (field.note) {
-        const note = document.createElement('span');
-        note.className = 'editor-prop-label-note';
-        note.textContent = field.note;
-        lab.appendChild(note);
-    }
+    // A schema field's `note` is no longer shown: the editor keeps labels
+    // to the label alone, without grey asides.
     return lab;
 }
 

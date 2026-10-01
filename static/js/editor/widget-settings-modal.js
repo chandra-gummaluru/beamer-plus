@@ -31,7 +31,6 @@ export function openWidgetSettings(item, schema, { title, onChange, onLayout, on
         <div class="wsm-dialog" role="dialog" aria-modal="true" aria-labelledby="wsm-title">
             <header class="wsm-header">
                 <div class="wsm-heading">
-                    <div class="wsm-kicker">Widget settings</div>
                     <h2 class="wsm-title" id="wsm-title"></h2>
                 </div>
                 <button type="button" class="wsm-close" title="Close (Esc)" aria-label="Close">
@@ -55,7 +54,9 @@ export function openWidgetSettings(item, schema, { title, onChange, onLayout, on
 
     // The box on the slide, as a card under the short settings (or on its
     // own, for a widget with nothing else to configure).
-    const layout = buildLayoutCard(item, () => onLayout?.());
+    const layout = schema.fullSlide
+        ? buildFullSlideCard(item, () => onLayout?.())
+        : buildLayoutCard(item, () => onLayout?.());
     let side = form.node.querySelector(':scope > .wf-col--side');
     if (!side) {
         side = document.createElement('div');
@@ -63,12 +64,6 @@ export function openWidgetSettings(item, schema, { title, onChange, onLayout, on
         form.node.appendChild(side);
     }
     side.appendChild(layout);
-    if (!schema.fields.length) {
-        const none = document.createElement('div');
-        none.className = 'editor-prop-hint wsm-empty';
-        none.textContent = 'This widget has no settings of its own — only its place on the slide.';
-        side.prepend(none);
-    }
     form.syncVisibility();
 
     const apply = (e) => {
@@ -171,8 +166,9 @@ function buildLayoutCard(item, onLayout) {
                 <label class="editor-prop-row"><span class="editor-prop-label">Height (%)</span>
                     <input class="editor-prop-input" type="number" min="1" max="100" step="1" data-k="height"></label>
             </div>
-            <label class="editor-prop-row"><span class="editor-prop-label">Layer<span class="editor-prop-label-note">higher is in front</span></span>
+            <label class="editor-prop-row"><span class="editor-prop-label">Layer</span>
                 <input class="editor-prop-input" type="number" min="1" max="999" step="1" data-k="zIndex"></label>
+            ${STEP_ROW}
 
         </div>`;
     const inputs = Object.fromEntries(Array.from(card.querySelectorAll('input[data-k]')).map(i => [i.dataset.k, i]));
@@ -189,12 +185,14 @@ function buildLayoutCard(item, onLayout) {
         card.querySelector('[data-preset="center"]').classList.toggle('is-active', centred);
     };
     show();
+    wireStepField(card, item, onLayout);
     card.addEventListener('input', (e) => {
         const k = e.target.dataset?.k;
         if (!k) return;
         const n = parseFloat(e.target.value);
         if (isNaN(n)) return;
         if (k === 'zIndex') item.zIndex = Math.round(n);
+        else if (k === 'step') return;   // handled by wireStepField
         else item[k] = Math.max(0, Math.min(100, n)) / 100;
         const active = document.activeElement;
         show();                                   // refresh the preset states…
@@ -211,6 +209,40 @@ function buildLayoutCard(item, onLayout) {
         }
         show(); onLayout();
     });
+    return card;
+}
+
+// "Appear on step N" — the widget stays hidden while presenting until that
+// reveal step (slides/reveals.js). Blank means always shown.
+const STEP_ROW = `
+            <label class="editor-prop-row"><span class="editor-prop-label">Appear on step</span>
+                <input class="editor-prop-input" type="number" min="1" max="99" step="1" placeholder="—" data-k="step"></label>`;
+function wireStepField(card, item, onLayout) {
+    const input = card.querySelector('input[data-k="step"]');
+    if (!input) return;
+    const n = parseInt(item.step, 10);
+    input.value = n > 0 ? String(n) : '';
+    input.addEventListener('input', () => {
+        const v = parseInt(input.value, 10);
+        if (v > 0) item.step = v; else delete item.step;
+        onLayout();
+    });
+}
+
+// A widget that only works as the whole slide gets no box to edit: its
+// geometry is pinned to fill the slide (fixing any older deck that saved a
+// smaller one) and the card just says so.
+function buildFullSlideCard(item, onLayout) {
+    const card = document.createElement('section');
+    card.className = 'wf-group wsm-layout';
+    card.innerHTML = `
+        <div class="wf-group-title">Layout</div>
+        <div class="wf-group-body">
+            ${STEP_ROW}
+        </div>`;
+    wireStepField(card, item, onLayout);
+    const full = (item.x ?? 0) === 0 && (item.y ?? 0) === 0 && item.width === 1 && item.height === 1;
+    if (!full) { Object.assign(item, { x: 0, y: 0, width: 1, height: 1 }); onLayout(); }
     return card;
 }
 

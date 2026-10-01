@@ -21,7 +21,7 @@ const MATHJAX_SRC = '/static/vendor/mathjax/tex-svg.js';
 // "content-box origin" (used for measuring/drawing/storing the rendered
 // text) needs this same offset, or the committed ink lands to the left of
 // where it visually sat while editing. Keep in sync with the CSS.
-const EDITOR_INSET = { x: 5, y: 3 };   // border(1) + padding-left(4) / padding-top(2)
+const EDITOR_INSET = { x: 9, y: 5 };   // border(1) + padding-left(8) / padding-top(4)
 // Must match .text-annotation-editor's line-height in annotations.css — the
 // canvas has to stack its lines on exactly the same rhythm the textarea used.
 const LINE_HEIGHT_RATIO = 1.35;
@@ -136,20 +136,103 @@ function findBoxAt(state, slideIdx, pos) {
     return null;
 }
 
-/* ─── $...$ parsing ──────────────────────────────────────────────────── */
-function parseLineSegments(line) {
-    const segments = [];
-    const re = /\$([^$\n]+?)\$/g;
-    let lastIndex = 0, m;
-    while ((m = re.exec(line))) {
-        if (m.index > lastIndex) segments.push({ type: 'text', value: line.slice(lastIndex, m.index) });
-        segments.push({ type: 'math', value: m[1].trim() });
-        lastIndex = re.lastIndex;
+/* ─── parsing: $math$ + a little markdown ────────────────────────────── */
+// Each line is split into segments. $...$ is math (rendered by MathJax);
+// everything else is text carrying inline markdown styles:
+//   **bold** / __bold__   *italic* / _italic_   `code`   ~~strike~~
+// plus per-line markers:
+//   "- item" / "* item" / "+ item"  → a bullet  •
+//   "# Heading" / "## Heading"      → a larger, bold line
+//   "> quote"                       → an italic, muted line with a bar
+// A backslash escapes a marker (\* \_ \` \$ \~ \#). Markers that never close
+// are left as typed. The raw text is kept, so reopening a box shows the
+// markdown again for editing.
+
+const ESC_RE = /\\([*_`$~#>\\-])/g;
+// Escaped markers are swapped for private-use characters while parsing and
+// restored at the end, so nothing treats them as syntax.
+const ESC_MAP = { '*': '', '_': '', '`': '', '$': '', '~': '', '#': '', '>': '', '\\': '', '-': '' };
+const UNESC = Object.fromEntries(Object.entries(ESC_MAP).map(([k, v]) => [v, k]));
+const unescape = (s) => s.replace(/[-]/g, c => UNESC[c]);
+
+function parseLine(rawLine) {
+    let line = rawLine.replace(ESC_RE, (_, c) => ESC_MAP[c]);
+    let kind = 'text';
+    let scale = 1;
+    let prefix = '';
+
+    let m;
+    if ((m = /^(#{1,3})\s+(.*)$/.exec(line))) {
+        kind = 'heading';
+        scale = [1.5, 1.3, 1.15][m[1].length - 1];
+        line = m[2];
+    } else if ((m = /^(\s*)[-*+]\s+(.*)$/.exec(line))) {
+        prefix = m[1] + '•  ';
+        line = m[2];
+    } else if ((m = /^>\s?(.*)$/.exec(line))) {
+        kind = 'quote';
+        line = m[1];
     }
-    if (lastIndex < line.length) segments.push({ type: 'text', value: line.slice(lastIndex) });
-    if (segments.length === 0) segments.push({ type: 'text', value: '' });
-    return segments;
+
+    const base = { bold: kind === 'heading', italic: kind === 'quote', code: false, strike: false };
+    const segments = [];
+    if (prefix) segments.push({ type: 'text', value: prefix, ...base, bold: false, italic: false });
+
+    // Math first: its contents are TeX, never markdown.
+    const re = /\$([^$\n]+?)\$/g;
+    let last = 0;
+    while ((m = re.exec(line))) {
+        if (m.index > last) parseInline(line.slice(last, m.index), base, segments);
+        segments.push({ type: 'math', value: unescape(m[1]).trim() });
+        last = re.lastIndex;
+    }
+    if (last < line.length) parseInline(line.slice(last), base, segments);
+    if (segments.length === 0) segments.push({ type: 'text', value: '', ...base });
+    for (const s of segments) if (s.type === 'text') s.value = unescape(s.value);
+    return { kind, scale, segments };
 }
+
+// Inline markers, earliest match wins; ties go to the longer marker.
+const INLINE = [
+    { re: /`([^`]+)`/,                                     style: 'code' },
+    { re: /\*\*(?=\S)(.+?)\*\*/,                           style: 'bold' },
+    { re: /(?<![A-Za-z0-9])__(?=\S)(.+?)__(?![A-Za-z0-9])/, style: 'bold' },
+    { re: /~~(?=\S)(.+?)~~/,                               style: 'strike' },
+    { re: /\*(?=\S)([^*]+?)\*/,                            style: 'italic' },
+    { re: /(?<![A-Za-z0-9])_(?=\S)([^_]+?)_(?![A-Za-z0-9])/, style: 'italic' },
+];
+
+function parseInline(text, style, out) {
+    while (text) {
+        let best = null;
+        for (const rule of INLINE) {
+            const m = rule.re.exec(text);
+            if (m && (!best || m.index < best.m.index)) best = { m, rule };
+        }
+        if (!best) { out.push({ type: 'text', value: text, ...style }); return; }
+        const { m, rule } = best;
+        if (m.index > 0) out.push({ type: 'text', value: text.slice(0, m.index), ...style });
+        if (rule.style === 'code') out.push({ type: 'text', value: m[1], ...style, code: true });
+        else parseInline(m[1], { ...style, [rule.style]: true }, out);
+        text = text.slice(m.index + m[0].length);
+    }
+}
+
+// A box with list or quote lines is laid out flush-left (centred bullets
+// look ragged); anything else stays centred. The live textarea follows the
+// same rule so the text doesn't jump sideways on commit.
+const BLOCK_LINE_RE = /^(\s*[-*+]\s+|>)/m;
+function isFlushLeft(text) { return BLOCK_LINE_RE.test(text || ''); }
+
+const CODE_FONT = 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace';
+const CODE_BG = 'rgba(36, 36, 36, 0.07)';
+const QUOTE_COLOR = '#5b5f66';
+
+function fontFor(seg, sizePx) {
+    if (seg.code) return `${Math.round(sizePx * 0.9)}px ${CODE_FONT}`;
+    return `${seg.italic ? 'italic ' : ''}${seg.bold ? 'bold ' : ''}${sizePx}px ${FONT_FAMILY}`;
+}
+const CODE_PAD = 4;   // px either side of a code span's background
 
 /* ─── matching the textarea's line box exactly ───────────────────────── */
 // A CSS line box puts the baseline at half-leading + ascent from its top:
@@ -191,53 +274,52 @@ async function commitTextAnnotation(cvs, x, y, rawText, size, oldBox, boxWidth) 
         return null;
     }
 
-    const fontSizePx = SIZE_PX[size] || SIZE_PX.regular;
-    const lineHeight = fontSizePx * LINE_HEIGHT_RATIO;
-    const linesSegments = text.split('\n').map(parseLineSegments);
+    const baseSize = SIZE_PX[size] || SIZE_PX.regular;
+    const lines = text.split('\n').map(parseLine);
+    for (const ln of lines) {
+        ln.sizePx = Math.round(baseSize * ln.scale);
+        ln.lineHeight = ln.sizePx * LINE_HEIGHT_RATIO;
+    }
 
     // Pre-render every math segment before touching the canvas — drawImage
     // needs the images decoded, and we don't want a half-drawn box on screen.
-    for (const segs of linesSegments) {
-        for (const seg of segs) {
+    for (const ln of lines) {
+        for (const seg of ln.segments) {
             if (seg.type === 'math' && seg.value) {
-                seg.rendered = await texToImage(seg.value, fontSizePx);
+                seg.rendered = await texToImage(seg.value, ln.sizePx);
             }
         }
     }
 
     ctx.save();
     ctx.textBaseline = 'alphabetic';
-    ctx.font = `${fontSizePx}px ${FONT_FAMILY}`;
+
+    // Width of one segment as it will be drawn.
+    const segWidth = (seg, sizePx) => {
+        if (seg.type === 'math') {
+            if (seg.rendered) return seg.rendered.width + 2;
+            ctx.font = fontFor({}, sizePx);
+            return seg.value ? ctx.measureText(`$${seg.value}$`).width : 0;
+        }
+        if (!seg.value) return 0;
+        ctx.font = fontFor(seg, sizePx);
+        return ctx.measureText(seg.value).width + (seg.code ? CODE_PAD * 2 : 0);
+    };
 
     // Measure each line before drawing anything, so every line can be
     // centered under the widest one instead of all left-aligned to `x`.
-    const lineWidths = linesSegments.map((segs) => {
-        let w = 0;
-        for (const seg of segs) {
-            if (seg.type === 'text') {
-                if (seg.value) w += ctx.measureText(seg.value).width;
-            } else if (seg.rendered) {
-                w += seg.rendered.width + 2;
-            } else if (seg.value) {
-                w += ctx.measureText(`$${seg.value}$`).width;
-            }
-        }
-        return w;
-    });
+    const lineWidths = lines.map(ln => ln.segments.reduce((w, s) => w + segWidth(s, ln.sizePx), 0));
     // Center within the *editor box's* own width — the exact box the user
     // watched their text sit centered inside — rather than a width re-derived
-    // from the rendered content. The two legitimately differ (a math image is
-    // a different width than the "$…$" source that was typed), and centering
-    // in the re-derived one is what visibly slid the text sideways on commit.
+    // from the rendered content (formatted text is narrower than the
+    // markdown that produced it, and a math image differs from its "$…$").
     const layoutWidth = Math.max(1, boxWidth || 0, ...(boxWidth ? [] : lineWidths));
-
-    const metrics = firstBaselineOffset(ctx, fontSizePx, lineHeight);
-    let baselineY = y + metrics.baseline;
+    const flushLeft = isFlushLeft(text);
 
     // Track what was actually painted so the erase/hit rect covers the ink
     // even where it overflows the editor box (wide math, descenders).
     let minX = x, maxX = x + layoutWidth;
-    let minY = y, maxY = y + linesSegments.length * lineHeight;
+    let minY = y, maxY = y;
     const mark = (x0, x1, y0, y1) => {
         if (x0 < minX) minX = x0;
         if (x1 > maxX) maxX = x1;
@@ -245,29 +327,58 @@ async function commitTextAnnotation(cvs, x, y, rawText, size, oldBox, boxWidth) 
         if (y1 > maxY) maxY = y1;
     };
 
-    linesSegments.forEach((segs, i) => {
-        let cursorX = x + (layoutWidth - lineWidths[i]) / 2;
-        for (const seg of segs) {
-            if (seg.type === 'text' || !seg.rendered) {
-                // Plain text, or a math segment MathJax couldn't render — in
-                // that case fall back to the raw markup rather than silently
-                // dropping it.
-                const value = seg.type === 'text' ? seg.value : `$${seg.value}$`;
-                if (!value) continue;
-                ctx.fillStyle = TEXT_COLOR;
-                ctx.fillText(value, cursorX, baselineY);
-                const w = ctx.measureText(value).width;
-                mark(cursorX, cursorX + w, baselineY - metrics.ascent, baselineY + metrics.descent);
-                cursorX += w;
-            } else {
+    let lineTop = y;
+    lines.forEach((ln, i) => {
+        ctx.font = fontFor({}, ln.sizePx);
+        const metrics = firstBaselineOffset(ctx, ln.sizePx, ln.lineHeight);
+        const baselineY = lineTop + metrics.baseline;
+        // Flush-left quotes are indented to leave room for their bar.
+        const startX = flushLeft ? x + (ln.kind === 'quote' ? 12 : 0) : x + (layoutWidth - lineWidths[i]) / 2;
+        let cursorX = startX;
+
+        for (const seg of ln.segments) {
+            if (seg.type === 'math' && seg.rendered) {
                 const { img, width, height, baselineFromTop } = seg.rendered;
                 const top = baselineY - baselineFromTop;
                 ctx.drawImage(img, cursorX, top, width, height);
                 mark(cursorX, cursorX + width, top, top + height);
                 cursorX += width + 2;
+                continue;
             }
+            // Plain/styled text, or a math segment MathJax couldn't render —
+            // in that case fall back to the raw markup rather than dropping it.
+            const value = seg.type === 'math' ? `$${seg.value}$` : seg.value;
+            if (!value) continue;
+            const w = segWidth(seg, ln.sizePx);
+            ctx.font = fontFor(seg.type === 'math' ? {} : seg, ln.sizePx);
+            if (seg.code) {
+                const h = ln.sizePx * 1.15;
+                const top = baselineY - ln.sizePx * 0.85;
+                ctx.fillStyle = CODE_BG;
+                ctx.beginPath();
+                if (ctx.roundRect) ctx.roundRect(cursorX, top, w, h, 4);
+                else ctx.rect(cursorX, top, w, h);
+                ctx.fill();
+            }
+            ctx.fillStyle = ln.kind === 'quote' ? QUOTE_COLOR : TEXT_COLOR;
+            const tx = cursorX + (seg.code ? CODE_PAD : 0);
+            ctx.fillText(value, tx, baselineY);
+            if (seg.strike) {
+                const sy = baselineY - ln.sizePx * 0.3;
+                ctx.fillRect(tx, sy, w - (seg.code ? CODE_PAD * 2 : 0), Math.max(1, ln.sizePx / 14));
+            }
+            mark(cursorX, cursorX + w, baselineY - metrics.ascent, baselineY + metrics.descent);
+            cursorX += w;
         }
-        baselineY += lineHeight;
+
+        // Quote: a short bar to the left of the line.
+        if (ln.kind === 'quote' && cursorX > startX) {
+            ctx.fillStyle = 'rgba(36, 36, 36, 0.25)';
+            ctx.fillRect(startX - 10, lineTop + ln.lineHeight * 0.15, 3, ln.lineHeight * 0.7);
+            mark(startX - 10, startX, lineTop, lineTop + ln.lineHeight);
+        }
+        lineTop += ln.lineHeight;
+        mark(x, x, lineTop, lineTop);
     });
     ctx.restore();
     cvs.commitHistory();
@@ -282,7 +393,7 @@ async function commitTextAnnotation(cvs, x, y, rawText, size, oldBox, boxWidth) 
 }
 
 /* ─── the floating DOM editor ──────────────────────────────────────────── */
-const MOVE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>`;
+const MOVE_ICON = `<svg viewBox="0 0 16 10" fill="currentColor" aria-hidden="true"><circle cx="3" cy="2.5" r="1.3"/><circle cx="8" cy="2.5" r="1.3"/><circle cx="13" cy="2.5" r="1.3"/><circle cx="3" cy="7.5" r="1.3"/><circle cx="8" cy="7.5" r="1.3"/><circle cx="13" cy="7.5" r="1.3"/></svg>`;
 
 function autoGrow(box) {
     const probe = document.createElement('span');
@@ -381,7 +492,7 @@ function openTextEditor(cvs, state, pos) {
     box.className = 'text-annotation-editor';
     box.rows = 1;
     box.spellcheck = false;
-    box.placeholder = 'Type… $x^2$ for math';
+    box.placeholder = 'Type here…';
     box.style.fontSize = `${SIZE_PX[size] || SIZE_PX.regular}px`;
     if (editingBox) box.value = editingBox.text;
 
@@ -404,7 +515,9 @@ function openTextEditor(cvs, state, pos) {
         box.setSelectionRange(len, len);   // cursor at end, ready to append/fix
     }
 
-    box.addEventListener('input', () => autoGrow(box));
+    const syncAlign = () => { box.style.textAlign = isFlushLeft(box.value) ? 'left' : 'center'; };
+    syncAlign();
+    box.addEventListener('input', () => { syncAlign(); autoGrow(box); });
 
     box.addEventListener('keydown', (e) => {
         // Keep typing (including letters that double as tool shortcuts) from

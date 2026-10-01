@@ -1,5 +1,6 @@
 // Help & Settings — the combined modal opened from the single menu button.
-// Bundles the usage guide, a Settings tab, and a "Take a tour" launcher.
+// Bundles the usage guide and a Settings tab. (The guided tour now starts
+// from the welcome page, next to New Session.)
 
 import { buildSettingsPanel } from './settings.js';
 
@@ -26,9 +27,8 @@ function _hbtn(key, label) {
     return `<span class="help-btn-ref" title="${label}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${_HELP_ICONS[key]}</svg></span>`;
 }
 
-const _TOUR_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>`;
 
-export function showHelpModal({ onStartTour = null } = {}) {
+export function showHelpModal() {
     const settings = buildSettingsPanel();
     // The how-to content is grouped into a single Help tab; each entry below is
     // one topic block, joined with dividers.
@@ -37,7 +37,7 @@ export function showHelpModal({ onStartTour = null } = {}) {
             id: 'start', label: 'Getting Started',
             html: `
 <h4 class="help-h">Loading a presentation</h4>
-<p class="help-p">Click the upload button ${_hbtn('upload','Upload')} in the top-right corner. You can load two types of file:</p>
+<p class="help-p">Click the upload button ${_hbtn('upload','Upload')} in the top-right corner, or drag the file anywhere onto the window. You can load two types of file:</p>
 <ul class="help-ul">
   <li>Your bare slide deck (as a PDF). Once loaded you can annotate it and place interactive widgets on any slide.</li>
   <li>A saved Beamer+ presentation (as a ZIP) that bundles the PDF together with all your widgets, overlays, and annotations. To create one, start from a bare slide deck, edit it in Beamer+, then click the download button ${_hbtn('download','Save & download')}. Beamer+ packages everything into a ZIP you can reload later.</li>
@@ -118,6 +118,7 @@ export function showHelpModal({ onStartTour = null } = {}) {
 BeamerWidget.topbar.setTitle('lecture-3.ipynb');
 BeamerWidget.topbar.onReset(() =&gt; clearEverything());</code>
 <p class="help-p">Without an ${_hic('onReset')} handler, reset reloads your widget, which restores it to how the slide first rendered it. The stepper drives ${_hic('--u')}, the presentation scale every content-sized token in the base stylesheet is built on — size your readable text with ${_hic('var(--fs-body)')} and friends and it follows along. A widget whose content it can't reach (a remote page, a video) hides the stepper with ${_hic('"fontSize": false')} in its schema; one that wants no bar at all sets ${_hic('"topbar": false')}.</p>
+<p class="help-p">Placed on part of a slide rather than filling it, a widget drops the bar's title, text-size stepper and reset, keeping only its own controls as a slim strip (and no bar at all if it has none). A widget that only makes sense as the whole slide — a notebook, a workspace — declares ${_hic('"fullSlide": true')}; the editor then locks it to fill the slide.</p>
 <h4 class="help-h">3 · Read configuration</h4>
 <p class="help-p">Beamer+ injects ${_hic('window.WIDGET_CONFIG')} before your widget loads. It contains the field values the presenter set, plus layout info:</p>
 <code class="help-code">const cfg = window.WIDGET_CONFIG || {};
@@ -162,7 +163,7 @@ var(--radius)    /* …and more */</code>
 
     const sections = [
         {
-            id: 'help', label: 'Help', tour: true,
+            id: 'help', label: 'Help',
             html: topics.map(t => t.html).join('<hr class="help-divider">'),
         },
         {
@@ -197,24 +198,6 @@ var(--radius)    /* …and more */</code>
         sec.id = 'help-sec-' + s.id;
         if (s.node) sec.appendChild(s.node);
         else sec.innerHTML = s.html;
-
-        // Guided-tour launcher — a full-width callout at the top of the Help tab.
-        if (s.tour && onStartTour) {
-            const tourBtn = document.createElement('button');
-            tourBtn.className = 'help-tour-cta';
-            tourBtn.type = 'button';
-            tourBtn.innerHTML = `
-                <span class="help-tour-cta-icon">${_TOUR_ICON}</span>
-                <span class="help-tour-cta-text">
-                    <strong>New to Beamer+? Take the guided tour</strong>
-                    <span>A quick walkthrough of the main features</span>
-                </span>
-                <span class="help-tour-cta-arrow" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-                </span>`;
-            tourBtn.addEventListener('click', () => { window.BeamerModal?.close(); onStartTour(); });
-            sec.insertBefore(tourBtn, sec.firstChild);
-        }
 
         pane.appendChild(sec);
     });

@@ -30,6 +30,18 @@ const STEPS = [
         body:  'Thumbnail strip of all your slides. Click any thumbnail to jump directly to it. In edit mode you can drag thumbnails to reorder slides.',
     },
     {
+        sel:   '#add-slide-group',
+        place: 'right',
+        title: 'Add or duplicate slides',
+        body:  'The left half inserts a blank slide after the current one; the right half duplicates the current slide — its widgets, media and ink included — so you can build a variation without touching the original.',
+    },
+    {
+        sel:   '#nav-drawer-hinge',
+        place: 'right',
+        title: 'Hide the navigator',
+        body:  'Click this hinge to slide the navigator away and give the slide more room. Click it again to bring the navigator back.',
+    },
+    {
         sel:   '#bookmark-btn',
         place: 'right',
         title: 'Bookmarks',
@@ -64,12 +76,6 @@ const STEPS = [
         place: 'auto',
         title: 'Save your work',
         body:  'Download the presentation as a Beamer+ ZIP. This bundles your slides together with all widgets, overlays, and annotations so you can reload it later.',
-    },
-    {
-        sel:   '#bottom-controls',
-        place: 'top',
-        title: 'Help & settings',
-        body:  'One place for everything else: the full usage guide, plus a Settings tab to see your session code and rebind keyboard shortcuts. You can relaunch this tour from here too.',
     },
 ];
 
@@ -173,7 +179,10 @@ function _goto(i) {
     n.next.classList.toggle('tour-next-finish', last);
 
     // Resolve target element
-    const target = step.sel ? document.querySelector(step.sel) : null;
+    let target = step.sel ? document.querySelector(step.sel) : null;
+    // A control this layout hides (e.g. the drawer hinge on a narrow screen)
+    // has no box to spotlight — explain it centred instead.
+    if (target && !target.getClientRects().length) target = null;
 
     if (!target || step.place === 'center') {
         // Welcome / no-target: full-screen dim, centered popover

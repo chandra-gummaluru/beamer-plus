@@ -2,69 +2,6 @@
    Keyboard shortcuts help button + modal content
    ============================================================ */
 
-/* ── Bottom controls cluster ───────────────────────────────── */
-#bottom-controls {
-    position: fixed;
-    bottom: var(--sp-3);
-    right: var(--sp-3);
-    z-index: 240;
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: var(--sp-2);
-}
-
-#bottom-controls .btn {
-    width: var(--hit-min);
-    min-height: var(--hit-min);
-    padding: 0;
-}
-
-body.focus-mode #bottom-controls {
-    display: none;
-}
-
-body.split-view-active #bottom-controls {
-    display: none;
-}
-
-@media (max-width: 1024px) {
-    #bottom-controls {
-        /* Sit above the annotation toolbar, which is above the 100px bottom nav */
-        bottom: calc(100px + var(--sp-3) + var(--hit-min) + var(--sp-3));
-        right: var(--sp-2);
-        gap: var(--sp-1);
-    }
-}
-
-@media (max-width: 480px) {
-    #bottom-controls {
-        bottom: calc(100px + var(--sp-2) + var(--hit-min) + var(--sp-2));
-    }
-    #bottom-controls .btn {
-        width: 44px;
-        min-height: 44px;
-    }
-}
-
-/* ── Mobile portrait — combined menu button anchored to the top-right ── */
-@media (max-width: 1024px) and (orientation: portrait) {
-    #bottom-controls {
-        top: var(--sp-2);
-        bottom: auto;
-        right: var(--sp-2);
-    }
-}
-
-/* ── Mobile landscape — no bottom nav bar, so return the menu button to
-   the bottom-right corner (the navigator becomes a left rail; see slides.css) */
-@media (max-width: 1024px) and (orientation: landscape) {
-    body:not(.split-view-active) #bottom-controls {
-        bottom: var(--sp-2);
-        right: var(--sp-2);
-    }
-}
-
 /* ── Settings modal ──────────────────────────────────────── */
 .settings-grid {
     display: flex;

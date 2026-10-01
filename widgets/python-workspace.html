@@ -4,6 +4,7 @@
 <script id="widget-schema" type="application/json">
 {
   "label": "Python Workspace",
+  "fullSlide": true,
   "category": "Computer Science",
   "fields": [
     { "key": "layout", "label": "Layout", "type": "select", "default": "grid-left",
@@ -15,9 +16,9 @@
                    { "v": "grid-top",    "l": "Grid: large pane on top" },
                    { "v": "grid-bottom", "l": "Grid: large pane at the bottom" } ] },
     { "key": "primary", "label": "Main pane", "type": "select", "default": "editor",
-      "options": [ { "v": "editor", "l": "Editor" }, { "v": "shell", "l": "Shell" }, { "v": "memory", "l": "Memory model" } ] },
+      "options": [ { "v": "editor", "l": "Editor" }, { "v": "shell", "l": "Shell" }, { "v": "memory", "l": "Memory model" }, { "v": "debug", "l": "Debugger" } ] },
     { "key": "secondary", "label": "Second pane", "type": "select", "default": "memory",
-      "options": [ { "v": "editor", "l": "Editor" }, { "v": "shell", "l": "Shell" }, { "v": "memory", "l": "Memory model" } ] },
+      "options": [ { "v": "editor", "l": "Editor" }, { "v": "shell", "l": "Shell" }, { "v": "memory", "l": "Memory model" }, { "v": "debug", "l": "Debugger" } ] },
     { "key": "filename", "label": "File name", "type": "text", "placeholder": "main.py" },
     { "key": "code", "label": "Starting code", "type": "textarea", "rows": 8,
       "placeholder": "a = [1, 2]\nb = a\na.append(3)\nprint(b)" },
@@ -64,14 +65,18 @@
   PYTHON WORKSPACE · the Python IDE, Python Shell and Python Memory Model as
   one widget, with a layout you choose.
 
-  Three panes share one program:
+  Four panes share one program:
     Editor   the file, highlighted, with the memory model's line markers
     Shell    real CPython (Pyodide, in a worker): Run executes the file here,
              and the prompt keeps its names afterwards
     Memory   the memory model tracing that same file step by step with its own
              purpose-built interpreter (offline), or a blank canvas to draw on
+    Debugger the same file in real Python, recorded line by line so it can be
+             paused at breakpoints (click a line number), stepped over,
+             into, out of and back through, with the call stack and every
+             variable on show
 
-  Layouts: single, two panes (side by side or stacked), or all three with one
+  Layouts: single, two panes (side by side or stacked), or three with one
   pane taking a whole side. The layout, pane sizes, file, transcript, trace
   position and drawing are the widget state, so they sync to viewers and are
   saved with the deck.
@@ -338,6 +343,158 @@ body.is-viewer .splitter::after { display: none; }
 .line-mark.is-on { display: block; }
 #mark-cur { background: var(--accent-bg); box-shadow: inset 3px 0 0 var(--text); }
 #mark-err { background: var(--err-bg);    box-shadow: inset 3px 0 0 var(--err); }
+
+/* ── Debugger ───────────────────────────────────────────────── */
+/* A line number is a breakpoint switch: click it for a red dot. */
+#gutter { cursor: pointer; }
+body.is-viewer #gutter { cursor: default; }
+#gutter .is-bp::before {
+  content: '';
+  display: inline-block;
+  width: .62em;
+  height: .62em;
+  margin-right: .4em;
+  border-radius: 50%;
+  background: var(--err);
+  vertical-align: .02em;
+}
+#gutter .is-dbg { color: var(--text); font-weight: 600; }
+
+/* Where the paused program is. Amber-on-warn rather than the memory model's
+   grey, so the two markers can share the editor without being confused. */
+#mark-dbg {
+  background: rgba(180, 83, 9, 0.13);
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+  box-shadow: inset 3px 0 0 var(--warn);
+}
+/* A caller's line, when a lower frame of the stack is selected. */
+#mark-dbg.is-caller {
+  background: color-mix(in srgb, var(--warn) 6%, transparent);
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--warn) 45%, transparent);
+}
+#mark-dbg.is-error { background: var(--err-bg); box-shadow: inset 3px 0 0 var(--err); }
+
+#dbg-tools { display: contents; }
+#dbg-tools[hidden] { display: none; }
+
+#dbg-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px 12px 14px;
+  background: var(--bg-output);
+  font-family: var(--font-mono);
+  font-size: calc(9px * var(--u, 1) * var(--ws));
+  line-height: 1.5;
+  color: var(--text);
+}
+#dbg-body::-webkit-scrollbar { width: 8px; height: 8px; }
+#dbg-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+#dbg-body::-webkit-scrollbar-thumb:hover { background: var(--border-med); }
+
+.dbg-sec + .dbg-sec { margin-top: 12px; }
+.dbg-h {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.dbg-h .fname {
+  font-family: var(--font-mono);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  color: var(--text-2);
+}
+.dbg-box {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.dbg-stack { list-style: none; margin: 0; padding: 0; }
+.dbg-stack li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: background var(--dur, .12s);
+}
+.dbg-stack li + li { border-top: 1px solid var(--border); }
+.dbg-stack li:hover { background: var(--bg-subtle); }
+.dbg-stack li.is-sel { background: var(--accent-bg); box-shadow: inset 3px 0 0 var(--warn); }
+.dbg-stack .ln { color: var(--text-3); white-space: nowrap; }
+body.is-viewer .dbg-stack li { cursor: default; }
+
+.dbg-vars { width: 100%; border-collapse: collapse; }
+.dbg-vars td { padding: 2px 8px; vertical-align: top; border-top: 1px solid var(--border); }
+.dbg-vars tr:first-child td { border-top: 0; }
+.dbg-vars .n { white-space: nowrap; width: 1%; }
+.dbg-vars .v { white-space: pre-wrap; word-break: break-word; }
+.dbg-vars .t { white-space: nowrap; width: 1%; text-align: right; color: var(--text-3); font-size: .85em; }
+/* What the step just changed: the memory model's mutation amber. */
+.dbg-vars tr.is-ch td { background: var(--mutate-soft); }
+.dbg-vars tr.is-ch .v { color: var(--mutate); }
+.dbg-vars tr.is-fn td { color: var(--text-3); }
+.dbg-none { padding: 3px 8px; color: var(--text-3); font-style: italic; }
+
+.dbg-ret { margin: 0 0 6px; color: var(--text-2); }
+.dbg-ret b { font-weight: 500; color: var(--mutate); }
+
+.dbg-out {
+  margin: 0;
+  padding: 4px 8px;
+  min-height: 1.5em;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: inherit;
+}
+.dbg-out .fresh { background: var(--mutate-soft); }
+.dbg-out .empty { color: var(--text-3); font-style: italic; }
+.dbg-err {
+  margin: 0;
+  padding: 6px 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: inherit;
+  color: var(--err);
+  background: var(--err-bg);
+  border-left: 3px solid var(--err);
+  border-radius: var(--radius);
+}
+.dbg-note { font-family: var(--font-ui); color: var(--text-2); }
+
+.dbg-empty {
+  font-family: var(--font-ui);
+  font-size: calc(9.5px * var(--u, 1) * var(--ws));
+  color: var(--text-2);
+  max-width: 48ch;
+  line-height: 1.55;
+}
+.dbg-empty p { margin: 0 0 .7em; }
+.dbg-empty b { color: var(--text); font-weight: 600; }
+.dbg-keys {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 14px;
+  margin: 1em 0 0;
+  color: var(--text-3);
+  font-size: .9em;
+}
+.dbg-keys dt { font-family: var(--font-mono); color: var(--text-2); }
+.dbg-keys dd { margin: 0; }
+.dbg-rec { display: flex; align-items: center; gap: 8px; color: var(--text-3); font-family: var(--font-ui); }
+.dbg-rec .bw-spinner { width: 12px; height: 12px; }
+
+#dbg-status[hidden] { display: none; }
+#dbg-status.is-live { color: var(--warn); border-color: var(--warn); }
+#dbg-status.is-done { color: var(--ok);   border-color: var(--ok); }
+#dbg-status.is-err  { color: var(--err);  border-color: var(--err); }
 
 /* Colour only — bold or italic can change glyph advance in some monospace
    fonts and knock the highlight out of step with the caret. */
@@ -787,6 +944,15 @@ html[data-theme="dark"]{
               <div class="bw-sep"></div>
             </span>
           </span>
+          <span id="dbg-tools" class="presenter-only" hidden>
+            <button class="bw-btn bw-btn--icon" id="dbg-back" type="button" title="Step back" aria-label="Step back"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 11A5.5 5.5 0 0 0 3 8.6"/><path d="M2.5 5v3.8h3.8"/></svg></button>
+            <button class="bw-btn bw-btn--icon" id="dbg-cont" type="button" title="Continue to the next breakpoint (F5)" aria-label="Continue"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 3v10"/><path d="M7 3.2 13 8l-6 4.8z"/></svg></button>
+            <button class="bw-btn bw-btn--icon" id="dbg-over" type="button" title="Step over (F10)" aria-label="Step over"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 9.5a5.5 5.5 0 0 1 10.6-2"/><path d="M13.6 3.8v3.9H9.7"/><circle cx="8" cy="13" r="1.3"/></svg></button>
+            <button class="bw-btn bw-btn--icon" id="dbg-into" type="button" title="Step into (F11)" aria-label="Step into"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.5v7.5"/><path d="M5 6.2 8 9.2l3-3"/><circle cx="8" cy="13.2" r="1.3"/></svg></button>
+            <button class="bw-btn bw-btn--icon" id="dbg-out" type="button" title="Step out (Shift+F11)" aria-label="Step out"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 9.5V2"/><path d="M5 4.8 8 1.8l3 3"/><circle cx="8" cy="13.2" r="1.3"/></svg></button>
+            <button class="bw-btn bw-btn--icon" id="dbg-stop" type="button" title="Stop debugging (Shift+F5)" aria-label="Stop debugging"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="9" height="9" rx="1.2"/></svg></button>
+          </span>
+          <button class="bw-btn" id="debug-btn" title="Debug: run, pausing at breakpoints (F6). Click a line number to set one." aria-label="Debug"><svg class="bi" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.8 5.2a2.2 2.2 0 0 1 4.4 0"/><rect x="4.6" y="5.2" width="6.8" height="8.3" rx="3.4"/><path d="M8 8v5.3M1.8 9.2h2.8M11.4 9.2h2.8M2.4 5.6l2.3 1.4M13.6 5.6l-2.3 1.4M2.4 13.2l2.4-1.6M13.6 13.2l-2.4-1.6"/></svg><span class="bl">Debug</span></button>
           <button class="bw-btn bw-btn--primary" id="run-btn" title="Run file in the shell (F5 / Ctrl+Enter)">Run</button>
           <button class="bw-btn bw-btn--icon pane-max" data-pane="editor"></button>
         </div>
@@ -795,6 +961,7 @@ html[data-theme="dark"]{
           <div id="code-wrap">
             <div class="line-mark" id="mark-cur"></div>
             <div class="line-mark" id="mark-err"></div>
+            <div class="line-mark" id="mark-dbg"></div>
             <pre id="code-hl" aria-hidden="true"></pre>
             <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off"
                       autocorrect="off" wrap="off" aria-label="Python source"></textarea>
@@ -857,6 +1024,16 @@ html[data-theme="dark"]{
         </div>
         <pre class="console" id="output"></pre>
         <div id="errorSlot"></div>
+      </section>
+
+      <section class="pane" id="dbg-pane" data-pane="debug">
+        <div class="pane-head" id="dbg-head">
+          <span class="pane-label">Debugger</span>
+          <div class="bw-spacer"></div>
+          <span class="chip" id="dbg-status" hidden></span>
+          <button class="bw-btn bw-btn--icon pane-max" data-pane="debug"></button>
+        </div>
+        <div id="dbg-body"></div>
       </section>
 
       <div class="splitter" id="split-a" role="separator" aria-label="Resize panes"></div>
@@ -5181,8 +5358,8 @@ print(shopping)
 `;
 
   // ── Layouts ─────────────────────────────────────────────────────────────────
-  const PANES   = ['editor', 'shell', 'memory'];
-  const NAMES   = { editor: 'Editor', shell: 'Shell', memory: 'Memory model' };
+  const PANES   = ['editor', 'shell', 'memory', 'debug'];
+  const NAMES   = { editor: 'Editor', shell: 'Shell', memory: 'Memory model', debug: 'Debugger' };
   const LAYOUTS = ['single', 'cols', 'rows', 'grid-left', 'grid-right', 'grid-top', 'grid-bottom'];
   const TITLES  = {
     'single':      'Single pane',
@@ -5228,7 +5405,18 @@ print(shopping)
   const markErr    = $('mark-err');
   const mmPaneEl   = $('mm-pane');
   const mmTools    = $('mm-tools');
-  const paneEls    = { editor: $('editor-pane'), shell: $('shell-pane'), memory: mmPaneEl };
+  const paneEls    = { editor: $('editor-pane'), shell: $('shell-pane'), memory: mmPaneEl, debug: $('dbg-pane') };
+  const markDbg    = $('mark-dbg');
+  const debugBtn   = $('debug-btn');
+  const dbgTools   = $('dbg-tools');
+  const dbgBackBtn = $('dbg-back');
+  const dbgContBtn = $('dbg-cont');
+  const dbgOverBtn = $('dbg-over');
+  const dbgIntoBtn = $('dbg-into');
+  const dbgOutBtn  = $('dbg-out');
+  const dbgStopBtn = $('dbg-stop');
+  const dbgBody    = $('dbg-body');
+  const dbgStatus  = $('dbg-status');
   const maxBtns    = [...document.querySelectorAll('.pane-max')];
 
   // ── State ───────────────────────────────────────────────────────────────────
@@ -5239,12 +5427,16 @@ print(shopping)
     code:     DEFAULT_CODE,
     entries:  [],            // { k: 'in'|'out'|'err'|'sys', s }
     errLine:  null,
-    // kind: one of LAYOUTS. slots: all three panes, in slot order — a layout
+    // kind: one of LAYOUTS. slots: every pane, in slot order — a layout
     // shows the first slotCount(kind). a: the main split's share for slot 0
     // (the big pane). b: the split inside the remaining side.
-    layout:   { kind: 'grid-left', slots: ['editor', 'memory', 'shell'], a: 0.5, b: 0.55 },
+    layout:   { kind: 'grid-left', slots: ['editor', 'memory', 'shell', 'debug'], a: 0.5, b: 0.55 },
     max:      null,          // a pane shown alone for now, without losing the layout
+    breakpoints: [],         // line numbers, sorted
   };
+  // The debugger. `session` is the presenter's recording and position in it;
+  // `view` is what the Debug pane shows, and the only part that travels.
+  const DBG = { session: null, recording: false, view: null, layoutBefore: null };
   let phase       = 'loading';  // loading | ready | running | error | viewer
   let more        = false;      // shell is waiting for a continuation line
   let history     = [];
@@ -5309,10 +5501,14 @@ print(shopping)
     const n      = codeEl.value.split('\n').length;
     const cur    = marks?.current;
     const locked = marks?.locked || 0;
+    const dbg    = dbgLine();
+    const bps    = new Set(S.breakpoints);
     let g = '';
     for (let i = 1; i <= n; i++) {
       const cls = (i === S.errLine || i === marks?.err ? ' is-err' : '')
                 + (i === cur ? ' is-cur' : '')
+                + (i === dbg ? ' is-dbg' : '')
+                + (bps.has(i) ? ' is-bp' : '')
                 + (i <= locked ? ' is-locked' : '');
       g += cls ? `<span class="${cls.trim()}">${i}</span>\n` : i + '\n';
     }
@@ -5345,10 +5541,15 @@ print(shopping)
     const m = lineMetrics();
     placeMark(markCur, marks?.current, m);
     placeMark(markErr, marks?.err, m);
+    const v = DBG.view;
+    placeMark(markDbg, dbgLine(), m);
+    const lower = !!v && !v.recording && !!v.frames && v.sel !== v.frames.length - 1 && (!v.done || v.crashed);
+    markDbg.classList.toggle('is-error', !!v?.done && !lower);
+    markDbg.classList.toggle('is-caller', lower);
   }
 
   function scrollToLine(line) {
-    if (!line) return;
+    if (!line || !codeEl.clientHeight) return;
     const m   = lineMetrics();
     const top = m.top + (line - 1) * m.lh;
     const view = codeEl.clientHeight;
@@ -5471,7 +5672,11 @@ print(shopping)
   }
 
   function onCodeInput() {
+    const before = S.code;
     S.code = codeEl.value;
+    shiftBreakpoints(before, S.code);
+    // The recording is of the program as it was; an edit ends it.
+    if (DBG.session || DBG.recording) stopDebug({ keepLayout: true });
     if (S.errLine) S.errLine = null;
     renderEditor();
     PV.codeEdited(S.code);
@@ -5537,6 +5742,192 @@ print(shopping)
   // Pyodide runs in a worker so a long loop never freezes the slide, and so
   // Restart can simply terminate it — the only reliable way to stop runaway
   // code without cross-origin isolation.
+  // The debugger's recorder, run once when the worker boots. Raw, so the
+  // Python reads exactly as written.
+  const DEBUG_PY = String.raw`# The debugger's recorder. The program runs once, start to finish, under
+# sys.settrace; every line it reaches is photographed (where it is, the call
+# stack, each frame's variables, how much it has printed). The widget then
+# steps through that recording, so stepping back is as cheap as stepping on.
+import sys, io, json, types, reprlib, linecache, traceback, builtins
+
+class _DbgLimit(BaseException):
+    pass
+
+class _DbgRepr(reprlib.Repr):
+    def __init__(self):
+        super().__init__()
+        self.maxstring = 80
+        self.maxother = 80
+        self.maxlist = 12
+        self.maxtuple = 12
+        self.maxdict = 10
+        self.maxset = 10
+        self.maxfrozenset = 10
+        self.maxdeque = 10
+        self.maxlevel = 3
+
+    # Objects without a repr of their own read as Person(name='Chandra')
+    # rather than <__main__.Person object at 0x...>.
+    def repr_instance(self, x, level):
+        t = type(x)
+        if isinstance(x, types.FunctionType):
+            return 'function ' + x.__qualname__
+        if isinstance(x, type):
+            return 'class ' + x.__qualname__
+        if isinstance(x, types.ModuleType):
+            return 'module ' + x.__name__
+        if isinstance(x, types.MethodType):
+            return 'method ' + getattr(x.__func__, '__qualname__', '?')
+        if isinstance(x, types.BuiltinFunctionType):
+            return 'built-in ' + getattr(x, '__name__', '?')
+        if t.__repr__ is object.__repr__ and hasattr(x, '__dict__'):
+            if level <= 0:
+                return t.__name__ + '(...)'
+            parts = []
+            for i, (k, v) in enumerate(list(vars(x).items())):
+                if i >= 6:
+                    parts.append('...')
+                    break
+                parts.append(str(k) + '=' + self.repr1(v, level - 1))
+            return t.__name__ + '(' + ', '.join(parts) + ')'
+        try:
+            s = repr(x)
+        except BaseException:
+            return '<' + t.__name__ + '>'
+        if len(s) > self.maxother:
+            s = s[: self.maxother - 3] + '...'
+        return s
+
+_dbg_repr = _DbgRepr()
+_DBG_FN = (types.FunctionType, type, types.ModuleType, types.BuiltinFunctionType)
+
+def _dbg_vars(d):
+    out = []
+    for k in list(d):
+        # Dunders are machinery; '.0' is a comprehension's hidden iterator.
+        if not isinstance(k, str) or k.startswith('.') or (k.startswith('__') and k.endswith('__')):
+            continue
+        v = d[k]
+        try:
+            r = _dbg_repr.repr(v)
+        except BaseException:
+            r = '<?>'
+        out.append([k, type(v).__name__, r, 1 if isinstance(v, _DBG_FN) else 0])
+    return out
+
+def _dbg_name(f):
+    c = f.f_code
+    n = getattr(c, 'co_qualname', c.co_name)
+    if n == '<module>':
+        return 'main'
+    # A class body runs as a frame of its own; say so.
+    return n if c.co_flags & 0x1 else 'class ' + n
+
+def _debug_file(src, fname, limit):
+    global _ns
+    _buf.clear()
+    _ns = {"__name__": "__main__", "__file__": fname, "__builtins__": builtins}
+    linecache.cache[fname] = (len(src), None, src.splitlines(True), fname)
+    events = []
+    out = io.StringIO()
+    st = {'ret': None, 'exc': None}
+
+    def stack_of(frame):
+        fs = []
+        f = frame
+        while f is not None:
+            if f.f_code.co_filename == fname:
+                fs.append(f)
+            f = f.f_back
+        fs.reverse()
+        return fs
+
+    def record(frame):
+        if len(events) >= limit:
+            raise _DbgLimit()
+        ev = {
+            'line': frame.f_lineno,
+            'out': out.tell(),
+            'stack': [[_dbg_name(f), f.f_lineno, _dbg_vars(f.f_locals)] for f in stack_of(frame)],
+        }
+        if st['ret'] is not None:
+            ev['ret'] = st['ret']
+            st['ret'] = None
+        events.append(ev)
+
+    def local(frame, event, arg):
+        if event == 'line':
+            if st['exc'] is frame:
+                st['exc'] = None
+            record(frame)
+        elif event == 'exception':
+            st['exc'] = frame
+        elif event == 'return':
+            c = frame.f_code
+            # Comprehensions and generators "return" in ways that would only
+            # confuse the reading of a step.
+            if (c.co_flags & 0x1) and not c.co_name.startswith('<') and not (c.co_flags & 0x20):
+                if st['exc'] is frame:
+                    st['ret'] = [_dbg_name(frame), None]
+                else:
+                    try:
+                        r = _dbg_repr.repr(arg)
+                    except BaseException:
+                        r = '<?>'
+                    st['ret'] = [_dbg_name(frame), r]
+            if st['exc'] is frame:
+                st['exc'] = None
+        return local
+
+    def glob(frame, event, arg):
+        # Only the file itself is recorded, never the library code it calls.
+        if frame.f_code.co_filename != fname:
+            return None
+        return local
+
+    err = None
+    err_line = None
+    truncated = False
+    code = None
+    try:
+        code = compile(src, fname, 'exec')
+    except SyntaxError as e:
+        err = ''.join(traceback.format_exception_only(type(e), e))
+        err_line = e.lineno
+    if code is not None:
+        old = (sys.stdout, sys.stderr)
+        sys.stdout = out
+        sys.stderr = out
+        sys.settrace(glob)
+        try:
+            exec(code, _ns)
+        except _DbgLimit:
+            truncated = True
+        except SystemExit:
+            pass
+        except BaseException as e:
+            sys.settrace(None)
+            tb = e.__traceback__.tb_next if e.__traceback__ else None
+            err = ''.join(traceback.format_exception(type(e), e, tb))
+            t = tb
+            while t is not None:
+                if t.tb_frame.f_code.co_filename == fname:
+                    err_line = t.tb_lineno
+                t = t.tb_next
+        finally:
+            sys.settrace(None)
+            sys.stdout, sys.stderr = old
+    return json.dumps({
+        'events': events,
+        'output': out.getvalue(),
+        'error': err,
+        'errLine': err_line,
+        'truncated': truncated,
+        'limit': limit,
+        'final': _dbg_vars(_ns),
+    })
+`;
+
   const WORKER_SRC = `
     importScripts(${JSON.stringify(PYODIDE_URL + 'pyodide.js')});
     let py = null;
@@ -5614,6 +6005,7 @@ print(shopping)
       py.setStdout({ write: b => { postMessage({ t: 'out', s: dec.out.decode(b, { stream: true }) }); return b.length; } });
       py.setStderr({ write: b => { postMessage({ t: 'err', s: dec.err.decode(b, { stream: true }) }); return b.length; } });
       py.runPython(HELPERS);
+      py.runPython(${JSON.stringify(DEBUG_PY)});
       postMessage({ t: 'ready', v: py.runPython('sys.version.split()[0]') });
     }
     const booted = boot().catch(e => postMessage({ t: 'fatal', s: String(e && e.message || e) }));
@@ -5643,6 +6035,11 @@ print(shopping)
             if (m.auto) { try { await py.loadPackagesFromImports(m.src); } catch (_) { /* reported by the import itself */ } }
             const line = py.globals.get('_run_file')(m.src, m.name);
             postMessage({ t: 'done', more: false, errLine: line == null ? null : line });
+          } else if (m.t === 'debug') {
+            if (m.auto) { try { await py.loadPackagesFromImports(m.src); } catch (_) {} }
+            const json = py.globals.get('_debug_file')(m.src, m.name, m.limit || 6000);
+            postMessage({ t: 'trace', json });
+            postMessage({ t: 'done', more: false });
           } else if (m.t === 'push') {
             if (m.auto) { try { await py.loadPackagesFromImports(m.line); } catch (_) {} }
             const more = py.globals.get('_push')(m.line);
@@ -5743,6 +6140,8 @@ print(shopping)
         break;
       case 'done':
         more = !!m.more;
+        // A debug run that ended without a recording (the worker failed).
+        if (DBG.recording) { DBG.recording = false; DBG.view = null; renderDebug(); }
         if ('errLine' in m) { S.errLine = m.errLine; renderEditor(); }
         setPhase('ready');
         if (m.packages) { const st = bootStartup; bootStartup = null; runStartup(st); break; }
@@ -5751,6 +6150,9 @@ print(shopping)
         if (m.pasted && more) { pushLine('', false); break; }
         if (more && lastTyped != null) setInput(nextIndent(lastTyped));
         focusInput();
+        break;
+      case 'trace':
+        onTrace(m.json);
         break;
       case 'completions':
         if (m.id === completeSeq) showCompletions(m.matches || [], m.start || 0);
@@ -5780,6 +6182,7 @@ print(shopping)
   function restart() {
     if (IS_VIEWER) return;
     pending = [];
+    if (DBG.recording) stopDebug({ keepLayout: true });
     if (phase === 'running') append('err', 'KeyboardInterrupt\n');
     // IDLE's marker: the screen stays, the names go.
     append('sys', '=== RESTART ===\n');
@@ -6028,7 +6431,7 @@ print(shopping)
     });
 
     // The memory model's controls follow its pane into and out of view.
-    mmTools.hidden = IS_VIEWER || !shown.includes('memory');
+    mmTools.hidden = IS_VIEWER || !!DBG.session || !shown.includes('memory');
     $('pdf-wrap').hidden = IS_VIEWER || !shown.includes('memory');
     fitToolbar();
     PV.setVisible(shown.includes('memory'));
@@ -6047,7 +6450,7 @@ print(shopping)
   }
 
   // Putting a pane into a slot swaps it with whatever held that pane before,
-  // so the three slots always hold each pane exactly once.
+  // so the slots always hold each pane exactly once.
   function assignSlot(i, name) {
     const slots = S.layout.slots.slice();
     const j = slots.indexOf(name);
@@ -6221,11 +6624,338 @@ print(shopping)
     runBtn.textContent     = phase === 'running' ? 'Running…' : 'Run';
     $('restart-label').textContent = phase === 'running' ? 'Stop' : 'Restart';
 
-    [runBtn, restartBtn, openBtn, clearBtn, layoutBtn].forEach(b => { b.style.display = IS_VIEWER ? 'none' : ''; });
+    [restartBtn, openBtn, clearBtn, layoutBtn].forEach(b => { b.style.display = IS_VIEWER ? 'none' : ''; });
+    renderDebugChrome();
     codeEl.readOnly  = IS_VIEWER || !!cfg.readOnly;
     fileEl.disabled  = IS_VIEWER || !!cfg.readOnly;
     openBtn.disabled = !!cfg.readOnly;
     PV.setReadOnly(IS_VIEWER);
+  }
+
+  // ── Debugger ────────────────────────────────────────────────────────────────
+  // Debug runs the file once in the worker under sys.settrace and brings back
+  // a recording of every line it reached: the call stack, each frame's
+  // variables, how much it had printed. Continue, the three steps and step
+  // back are all moves through that recording, so nothing has to be held
+  // paused inside the worker, and going backwards costs nothing.
+  const DBG_LIMIT = 6000;       // lines recorded before the run is cut short
+  const DBG_OUT_MAX = 4000;     // printed output sent to viewers per step
+
+  function toggleBreakpoint(line) {
+    if (IS_VIEWER || !line) return;
+    const i = S.breakpoints.indexOf(line);
+    if (i >= 0) S.breakpoints.splice(i, 1);
+    else S.breakpoints.push(line);
+    S.breakpoints.sort((a, b) => a - b);
+    renderGutter();
+    emitState();
+  }
+
+  // Edits move the lines under the dots, so the dots move with them: lines
+  // above the edit keep their number, lines below shift by what was added or
+  // removed, and a dot on a deleted line goes with it.
+  function shiftBreakpoints(before, after) {
+    if (!S.breakpoints.length || before === after) return;
+    const a = before.split('\n'), b = after.split('\n');
+    let p = 0;
+    while (p < a.length && p < b.length && a[p] === b[p]) p++;
+    let s = 0;
+    while (s < a.length - p && s < b.length - p && a[a.length - 1 - s] === b[b.length - 1 - s]) s++;
+    const oldEnd = a.length - s, newLen = b.length - s - p, delta = b.length - a.length;
+    const next = [];
+    S.breakpoints.forEach(L => {
+      const i = L - 1;
+      let n = null;
+      if (i < p) n = L;
+      else if (i >= oldEnd) n = L + delta;
+      else if (i - p < newLen) n = L;
+      if (n && n <= b.length && !next.includes(n)) next.push(n);
+    });
+    S.breakpoints = next.sort((x, y) => x - y);
+  }
+
+  function caretLine() {
+    return codeEl.value.slice(0, codeEl.selectionStart).split('\n').length;
+  }
+
+  function onGutterDown(e) {
+    if (IS_VIEWER || e.button !== 0) return;
+    e.preventDefault();                       // keep the caret where it was
+    const r   = gutterEl.getBoundingClientRect();
+    const m   = lineMetrics();
+    const pad = parseFloat(getComputedStyle(gutterEl).paddingTop) || 0;
+    const line = Math.floor((e.clientY - r.top + gutterEl.scrollTop - pad) / m.lh) + 1;
+    if (line >= 1 && line <= codeEl.value.split('\n').length) toggleBreakpoint(line);
+  }
+
+  // ── Session ─────────────────────────────────────────────────────────────────
+  function startDebug() {
+    if (IS_VIEWER || phase !== 'ready') return;
+    if (DBG.session) stopDebug({ keepLayout: true });
+    const name = S.filename || 'main.py';
+    append('sys', `=== DEBUG ${name} ===\n`);
+    S.errLine = null;
+    DBG.recording = true;
+    DBG.view = { recording: true };
+    revealDebugPane();
+    renderEditor();
+    renderDebug();
+    emitState();
+    if (!send({ t: 'debug', src: codeEl.value, name, limit: DBG_LIMIT })) {
+      DBG.recording = false;
+      DBG.view = null;
+      renderDebug();
+    }
+  }
+
+  function onTrace(json) {
+    if (!DBG.recording) return;               // stopped or edited meanwhile
+    DBG.recording = false;
+    let d = null;
+    try { d = JSON.parse(json); } catch (_) { /* reported as an empty session */ }
+    if (!d || !Array.isArray(d.events)) { DBG.view = null; renderDebug(); return; }
+    DBG.session = { ...d, idx: 0, sel: null };
+    // With breakpoints, run to the first one; with none, pause on line one.
+    const first = S.breakpoints.length ? d.events.findIndex(e => S.breakpoints.includes(e.line)) : 0;
+    dbgGo(first >= 0 ? first : d.events.length);
+  }
+
+  function stopDebug(opts = {}) {
+    DBG.session = null;
+    DBG.recording = false;
+    DBG.view = null;
+    const back = DBG.layoutBefore;
+    DBG.layoutBefore = null;
+    // Put the layout back only if it is still the one Debug arranged.
+    if (!opts.keepLayout && back && JSON.stringify(S.layout) === back.set) {
+      S.layout = back.layout;
+      S.max = back.max;
+      renderLayout();
+    }
+    renderDebug();
+    emitState();
+  }
+
+  // The Debug pane comes on screen by itself: it takes the Memory pane's
+  // place if that is showing, otherwise the last slot that isn't the editor.
+  function revealDebugPane() {
+    if (isShown('debug')) return;
+    const before = { layout: { ...S.layout, slots: S.layout.slots.slice() }, max: S.max };
+    const L = { ...S.layout, slots: S.layout.slots.slice() };
+    S.max = null;
+    if (L.kind === 'single') L.kind = 'cols';
+    const n = slotCount(L.kind);
+    let t = L.slots.slice(0, n).indexOf('memory');
+    if (t < 0) for (let k = n - 1; k >= 0; k--) if (L.slots[k] !== 'editor') { t = k; break; }
+    if (t < 0) t = n - 1;
+    const j = L.slots.indexOf('debug');
+    [L.slots[t], L.slots[j]] = [L.slots[j], L.slots[t]];
+    S.layout = L;
+    before.set = JSON.stringify(L);
+    DBG.layoutBefore = before;
+    renderLayout();
+  }
+
+  // ── Moving through the recording ────────────────────────────────────────────
+  function dbgGo(i) {
+    const s = DBG.session;
+    if (!s) return;
+    s.idx = Math.max(0, Math.min(i, s.events.length));
+    s.sel = null;
+    if (s.idx >= s.events.length && s.errLine) { S.errLine = s.errLine; }
+    DBG.view = buildView();
+    renderEditor();
+    renderDebug();
+    scrollToLine(dbgLine());
+    emitState();
+  }
+
+  function dbgNext(pred) {
+    const s = DBG.session, E = s.events;
+    for (let j = s.idx + 1; j < E.length; j++) if (pred(E[j])) return j;
+    return E.length;
+  }
+  const dbgDepth = () => {
+    const s = DBG.session;
+    return s && s.idx < s.events.length ? s.events[s.idx].stack.length : 0;
+  };
+  const dbgLive = () => !!DBG.session && DBG.session.idx < DBG.session.events.length;
+
+  function dbgContinue() { if (dbgLive()) dbgGo(dbgNext(e => S.breakpoints.includes(e.line))); }
+  function dbgInto()     { if (dbgLive()) dbgGo(DBG.session.idx + 1); }
+  function dbgOver()     { if (dbgLive()) { const d = dbgDepth(); dbgGo(dbgNext(e => e.stack.length <= d)); } }
+  function dbgOut()      { if (dbgLive()) { const d = dbgDepth(); dbgGo(dbgNext(e => e.stack.length < d)); } }
+  function dbgBack()     { if (DBG.session && DBG.session.idx > 0) dbgGo(DBG.session.idx - 1); }
+
+  function selectFrame(k) {
+    const s = DBG.session;
+    if (IS_VIEWER || !s || !DBG.view || (DBG.view.done && !DBG.view.crashed)) return;
+    s.sel = k;
+    DBG.view = buildView();
+    renderDebug();
+    scrollToLine(dbgLine());
+    emitState();
+  }
+
+  // What the pane shows for the current step. It is all the viewers get, so
+  // it carries everything the pane needs and nothing it doesn't.
+  function buildView() {
+    const s = DBG.session, E = s.events, n = E.length, i = s.idx;
+    const tail = (text, from) => {
+      const cut = Math.max(0, text.length - DBG_OUT_MAX);
+      return { out: cut ? '…' + text.slice(cut) : text, outNew: Math.max(0, from - cut) + (cut ? 1 : 0) };
+    };
+    const varRow = (v, ch) => ({ n: v[0], t: v[1], r: v[2], fn: !!v[3], ch: !!ch });
+
+    if (i >= n) {
+      const last = n ? E[n - 1].out : 0;
+      // After a crash, the frames as they stood on the failing line are what
+      // explain it; after a clean finish, the globals it ended with.
+      const crashed = s.error && n && !s.truncated;
+      const frames = crashed
+        ? E[n - 1].stack.map(f => ({ name: f[0], line: f[1], vars: f[2].map(v => varRow(v, false)) }))
+        : [{ name: 'main', line: null, vars: (s.final || []).map(v => varRow(v, false)) }];
+      const top = frames.length - 1;
+      return {
+        done: true, crashed: !!crashed, idx: n, n,
+        error: s.error || null, errLine: s.errLine || null,
+        truncated: !!s.truncated, limit: s.limit,
+        frames, sel: s.sel != null && s.sel >= 0 && s.sel <= top ? s.sel : top,
+        ...tail(s.output || '', last),
+      };
+    }
+
+    const e = E[i], prev = i > 0 ? E[i - 1] : null;
+    const frames = e.stack.map((f, k) => {
+      const pf = prev && prev.stack[k] && prev.stack[k][0] === f[0] ? prev.stack[k] : null;
+      const was = pf ? new Map(pf[2].map(v => [v[0], v[2]])) : null;
+      // A frame that has just opened: everything in it is new.
+      const fresh = !pf && !!prev;
+      return { name: f[0], line: f[1], vars: f[2].map(v => varRow(v, was ? was.get(v[0]) !== v[2] : fresh)) };
+    });
+    const top = frames.length - 1;
+    const sel = s.sel != null && s.sel >= 0 && s.sel <= top ? s.sel : top;
+    return {
+      done: false, idx: i, n,
+      line: e.line,
+      frames, sel,
+      ret: e.ret ? { name: e.ret[0], value: e.ret[1] } : null,
+      ...tail((s.output || '').slice(0, e.out), prev ? prev.out : 0),
+    };
+  }
+
+  function dbgLine() {
+    const v = DBG.view;
+    if (!v || v.recording) return null;
+    if (v.done && (!v.crashed || v.sel === v.frames.length - 1)) return v.errLine || null;
+    return v.frames[v.sel]?.line || v.line;
+  }
+
+  // ── Rendering ───────────────────────────────────────────────────────────────
+  // The buttons around the editor: Debug and Run while nothing is being
+  // debugged, the step controls while something is.
+  function renderDebugChrome() {
+    const live = !!DBG.session && !IS_VIEWER;
+    const v = DBG.view;
+    dbgTools.hidden        = !live;
+    debugBtn.style.display = IS_VIEWER || live ? 'none' : '';
+    runBtn.style.display   = IS_VIEWER || live ? 'none' : '';
+    debugBtn.disabled      = phase !== 'ready';
+    const ended = !v || !!v.done;
+    [dbgContBtn, dbgOverBtn, dbgIntoBtn, dbgOutBtn].forEach(b => { b.disabled = ended; });
+    dbgBackBtn.disabled = !v || !v.idx;
+    mmTools.hidden = IS_VIEWER || live || !isShown('memory');
+  }
+
+  function renderDebug() {
+    renderDebugChrome();
+    renderDebugPane();
+    renderGutter();
+    placeMarks();
+    fitToolbar();
+  }
+
+  function varTable(vars) {
+    if (!vars.length) return '<div class="dbg-box"><div class="dbg-none">no variables yet</div></div>';
+    // Data first; functions, classes and modules after it, quietly.
+    const rows = vars.filter(x => !x.fn).concat(vars.filter(x => x.fn)).map(x =>
+      `<tr class="${x.ch ? 'is-ch' : ''}${x.fn ? ' is-fn' : ''}">` +
+      `<td class="n">${escHtml(x.n)}</td><td class="v">${escHtml(x.r)}</td><td class="t">${escHtml(x.t)}</td></tr>`);
+    return `<div class="dbg-box"><table class="dbg-vars">${rows.join('')}</table></div>`;
+  }
+
+  // Innermost call on top, as debuggers list it.
+  function stackList(v) {
+    const items = v.frames.map((f, k) => ({ f, k })).reverse().map(({ f, k }) =>
+      `<li data-k="${k}" class="${k === v.sel ? 'is-sel' : ''}"><span>${escHtml(f.name)}</span><span class="ln">line ${f.line}</span></li>`);
+    return `<div class="dbg-sec"><div class="dbg-h">Call stack</div><ol class="dbg-box dbg-stack">${items.join('')}</ol></div>`;
+  }
+
+  function renderDebugPane() {
+    const v = DBG.view;
+    const chip = dbgStatus;
+    chip.className = 'chip';
+    chip.hidden = !v;
+    if (!v) {
+      dbgBody.innerHTML = IS_VIEWER
+        ? '<div class="dbg-empty"><p>Nothing is being debugged.</p></div>'
+        : `<div class="dbg-empty">
+             <p><b>Click a line number</b> in the editor to set a breakpoint, then press <b>Debug</b>.</p>
+             <p>The program pauses there (or on its first line, if there are no breakpoints) and this pane shows the call stack and every variable. Changed values are highlighted.</p>
+             <dl class="dbg-keys">
+               <dt>F6</dt><dd>Debug</dd>
+               <dt>F5</dt><dd>Continue to the next breakpoint</dd>
+               <dt>F10</dt><dd>Step over</dd>
+               <dt>F11</dt><dd>Step into</dd>
+               <dt>Shift+F11</dt><dd>Step out</dd>
+               <dt>Shift+F5</dt><dd>Stop</dd>
+               <dt>F9</dt><dd>Breakpoint on the caret's line</dd>
+             </dl>
+           </div>`;
+      return;
+    }
+    if (v.recording) {
+      chip.textContent = 'running';
+      chip.classList.add('is-live');
+      dbgBody.innerHTML = '<div class="dbg-rec"><span class="bw-spinner"></span>Running the program under the debugger…</div>';
+      return;
+    }
+
+    let html = '';
+    if (v.done) {
+      chip.textContent = v.error ? 'error' : v.truncated ? 'stopped' : 'finished';
+      chip.classList.add(v.error ? 'is-err' : 'is-done');
+      if (v.error) html += `<div class="dbg-sec"><pre class="dbg-err">${escHtml(v.error)}</pre></div>`;
+      if (v.truncated) {
+        html += `<div class="dbg-sec dbg-note">The debugger stopped recording after ${v.limit} steps. ` +
+                `If a loop never ends, that's why; otherwise try a smaller input.</div>`;
+      }
+      if (v.crashed) {
+        html += stackList(v);
+        html += `<div class="dbg-sec"><div class="dbg-h">Variables <span class="fname">· ${escHtml(v.frames[v.sel].name)}, when it failed</span></div>` +
+                varTable(v.frames[v.sel].vars) + '</div>';
+      } else {
+        html += `<div class="dbg-sec"><div class="dbg-h">Variables <span class="fname">· main, at the end</span></div>` +
+                varTable(v.frames[0].vars) + '</div>';
+      }
+    } else {
+      chip.textContent = `line ${v.line} · step ${v.idx + 1}/${v.n}`;
+      chip.classList.add('is-live');
+      html += stackList(v);
+      const f = v.frames[v.sel];
+      html += `<div class="dbg-sec"><div class="dbg-h">Variables <span class="fname">· ${escHtml(f.name)}</span></div>`;
+      if (v.ret && v.sel === v.frames.length - 1) {
+        html += `<div class="dbg-ret">${escHtml(v.ret.name)}() ` +
+                (v.ret.value == null ? 'ended with an error' : `returned <b>${escHtml(v.ret.value)}</b>`) + '</div>';
+      }
+      html += varTable(f.vars) + '</div>';
+    }
+    const out = v.out || '';
+    const outHtml = out
+      ? escHtml(out.slice(0, v.outNew)) + (out.length > v.outNew ? `<span class="fresh">${escHtml(out.slice(v.outNew))}</span>` : '')
+      : '<span class="empty">nothing printed yet</span>';
+    html += `<div class="dbg-sec"><div class="dbg-h">Output</div><pre class="dbg-box dbg-out">${outHtml}</pre></div>`;
+    dbgBody.innerHTML = html;
   }
 
   // ── Socket.IO sync ──────────────────────────────────────────────────────────
@@ -6270,6 +7000,9 @@ print(shopping)
       entries:  S.entries.slice(-MAX_ENTRIES),
       layout:   { ...S.layout, slots: S.layout.slots.slice() },
       max:      S.max,
+      breakpoints: S.breakpoints.slice(),
+      // Live sync only: a saved deck restores no debug session.
+      debug:    DBG.view,
       mm,
     };
   }
@@ -6278,8 +7011,13 @@ print(shopping)
     const out = { ...S.layout };
     if (!l || typeof l !== 'object') return out;
     if (LAYOUTS.includes(l.kind)) out.kind = l.kind;
-    if (Array.isArray(l.slots) && l.slots.length === 3 && PANES.every(p => l.slots.includes(p))) {
-      out.slots = l.slots.slice();
+    // Decks saved before the Debug pane existed list three panes; it joins
+    // at the end, off screen.
+    if (Array.isArray(l.slots)) {
+      const known = l.slots.filter(p => PANES.includes(p));
+      if (known.length >= 3 && new Set(known).size === known.length) {
+        out.slots = known.concat(PANES.filter(p => !known.includes(p)));
+      }
     }
     if (typeof l.a === 'number') out.a = clampFrac(l.a);
     if (typeof l.b === 'number') out.b = clampFrac(l.b);
@@ -6302,8 +7040,13 @@ print(shopping)
       if (s.layout) S.layout = cleanLayout(s.layout);
       // States saved by the Python IDE used `max: 'editor' | 'shell'` too.
       if ('max' in s) S.max = PANES.includes(s.max) ? s.max : null;
+      if (Array.isArray(s.breakpoints)) {
+        S.breakpoints = [...new Set(s.breakpoints.filter(n => Number.isInteger(n) && n > 0))].sort((a, b) => a - b);
+      }
+      if (IS_VIEWER && 'debug' in s) DBG.view = s.debug && typeof s.debug === 'object' ? s.debug : null;
       renderEditor();
       renderLayout();
+      renderDebug();
       if (s.mm && typeof s.mm === 'object') PV.setWidgetState({ ...s.mm, code: S.code });
     } finally {
       applying = false;
@@ -6352,7 +7095,7 @@ print(shopping)
       const first  = PANES.includes(cfg.primary) ? cfg.primary : L.slots[0];
       let   second = PANES.includes(cfg.secondary) ? cfg.secondary : L.slots[1];
       if (second === first) second = PANES.find(p => p !== first);
-      L.slots = [first, second, PANES.find(p => p !== first && p !== second)];
+      L.slots = [first, second, ...PANES.filter(p => p !== first && p !== second)];
       S.layout = L;
       S.max = null;
     }
@@ -6410,6 +7153,18 @@ print(shopping)
   });
 
   runBtn    .addEventListener('click', runFile);
+  debugBtn  .addEventListener('click', startDebug);
+  dbgBackBtn.addEventListener('click', dbgBack);
+  dbgContBtn.addEventListener('click', dbgContinue);
+  dbgOverBtn.addEventListener('click', dbgOver);
+  dbgIntoBtn.addEventListener('click', dbgInto);
+  dbgOutBtn .addEventListener('click', dbgOut);
+  dbgStopBtn.addEventListener('click', () => stopDebug());
+  gutterEl  .addEventListener('mousedown', onGutterDown);
+  dbgBody   .addEventListener('click', e => {
+    const li = e.target.closest('.dbg-stack li');
+    if (li) selectFrame(+li.dataset.k);
+  });
   restartBtn.addEventListener('click', restart);
   clearBtn  .addEventListener('click', clearShell);
   saveBtn   .addEventListener('click', saveFile);
@@ -6455,6 +7210,25 @@ print(shopping)
     try { inputEl.focus({ preventScroll: true }); } catch (_) { inputEl.focus(); }
   });
 
+  // Debugger keys, as in VS Code. Captured first so the editor's own F5
+  // (Run) doesn't also fire while a session is open.
+  document.addEventListener('keydown', e => {
+    if (IS_VIEWER) return;
+    const k = e.key;
+    let act = null;
+    if (k === 'F9' && e.target === codeEl) act = () => toggleBreakpoint(caretLine());
+    else if (k === 'F6') act = startDebug;
+    else if (DBG.session) {
+      if (k === 'F5') act = e.shiftKey ? () => stopDebug() : dbgContinue;
+      else if (k === 'F10') act = dbgOver;
+      else if (k === 'F11') act = e.shiftKey ? dbgOut : dbgInto;
+    }
+    if (!act) return;
+    e.preventDefault();
+    e.stopPropagation();
+    act();
+  }, true);
+
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && layoutMenu.classList.contains('is-open')) { openMenu(false); layoutBtn.focus(); return; }
     if (e.key === 'Escape' && addMenu.classList.contains('is-open')) { openAddMenu(false); addBtn.focus(); return; }
@@ -6481,6 +7255,7 @@ print(shopping)
   buildLayoutMenu();
   initSocket(CFG0.socketUrl);
   applyConfig(CFG0);
+  renderDebug();
   if (IS_VIEWER) {
     setPhase('viewer');
   } else {

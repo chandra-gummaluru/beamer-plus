@@ -1,6 +1,7 @@
-// Settings — the session code and rebindable keyboard shortcuts. Exposes a
-// settings panel (built into the combined Help & Settings modal) and owns the
-// preferences persisted in localStorage.
+// Settings — the session code and rebindable keyboard shortcuts. Owns the
+// preferences persisted in localStorage. (The Help & Settings button has been
+// removed from the presenter view, so buildSettingsPanel() currently has no
+// caller; shortcuts saved earlier still apply.)
 //
 // There is no theme control: Beamer+ is a light-mode app. A projector washes
 // out a dark palette, so the choice was never worth the switch.

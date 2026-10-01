@@ -42,7 +42,6 @@
 /* ─── Hide other UI when edit mode is active ─────────────────── */
 
 body.edit-mode #top-right-controls      { display: none !important; }
-body.edit-mode #bottom-controls         { display: none !important; }
 body.edit-mode #floating-annotation-toolbar { display: none !important; }
 body.edit-mode #shape-sidebar               { display: none !important; }
 
@@ -334,16 +333,17 @@ body.edit-mode #editor-panel { display: flex; }
     flex-direction: row;
     align-items: center;
     justify-content: center;
-    gap: var(--sp-1);
-    padding: var(--sp-2) var(--sp-3);
+    gap: 4px;
+    padding: var(--sp-2);
     border-top: var(--line-hairline);
     background: var(--surface-cream);
 }
 
+/* Compact: six of these share the panel's width. */
 .editor-icon-btn {
-    width: var(--hit-min);
-    min-width: var(--hit-min);
-    height: var(--hit-min);
+    width: 37px;
+    min-width: 37px;
+    height: 38px;
     padding: 0;
     background: transparent;
     border-color: transparent;
@@ -381,6 +381,8 @@ body.edit-mode #editor-panel { display: flex; }
 }
 
 .edit-overlay:hover { background: oklch(45% 0.005 260 / 0.13); }
+/* Full-slide-only widget: pinned, so no move cursor (a click opens settings). */
+.edit-overlay--locked { cursor: pointer; }
 
 .edit-overlay.selected {
     border-style: solid;
@@ -396,16 +398,18 @@ body.edit-mode #editor-panel { display: flex; }
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background: var(--accent);
+    background: oklch(22% 0.01 260 / 0.86);
     color: var(--ink-on-accent);
-    padding: 3px 9px;
-    font-size: 10px;
+    padding: 6px 14px;
+    font-size: 13px;
+    line-height: 16px;
     font-weight: 600;
     font-family: var(--font-sans);
-    border-radius: var(--r-sm);
+    border-radius: 999px;
+    box-shadow: 0 2px 8px oklch(20% 0.01 260 / 0.18);
     white-space: nowrap;
     pointer-events: none;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.01em;
     max-width: calc(100% - 16px);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1141,4 +1145,31 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
     #editor-panel-body {
         padding: var(--sp-3);
     }
+}
+
+/* Reveal-step box in edit mode: same neutral colours as every other box,
+   hatched so it reads as "hidden area". */
+.edit-overlay--reveal {
+    background: repeating-linear-gradient(-45deg,
+        oklch(45% 0.005 260 / 0.12) 0 8px,
+        oklch(45% 0.005 260 / 0.04) 8px 16px);
+}
+.edit-overlay--reveal:hover { background: repeating-linear-gradient(-45deg,
+        oklch(45% 0.005 260 / 0.18) 0 8px,
+        oklch(45% 0.005 260 / 0.07) 8px 16px); }
+
+/* Slide title field in Slide Properties. */
+.slide-setting--title { cursor: text; }
+.slide-setting--title .slide-setting-name { flex: 0 0 auto; }
+.slide-title-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    text-align: right;
+    font: inherit;
+    font-size: var(--fs-sm);
+    color: var(--ink-1);
+    padding: 0;
 }

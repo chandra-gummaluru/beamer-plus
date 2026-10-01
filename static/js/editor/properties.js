@@ -12,7 +12,7 @@
 // panel stays on the slide's properties throughout.
 import { ctx, getSlideEl, getOrCreateConfig, escAttr, setPanelMode, setPanelTitle,
          resolvePanelMode } from './context.js';
-import { cleanupEditOverlays, renderEditOverlays, positionOverlay, selectOverlayEl } from './overlays.js';
+import { cleanupEditOverlays, renderEditOverlays, positionOverlay, selectOverlayEl, overlayLabel } from './overlays.js';
 import { WIDGET_LABELS } from './widget-picker.js';
 import { getWidgetSchema } from './widget-schema.js';
 import { openWidgetSettings, isWidgetSettingsOpen } from './widget-settings-modal.js';
@@ -32,7 +32,7 @@ export function updatePropertiesPanel() {
     const item = cfg?.[arrKey]?.[index];
     if (!item) return;
 
-    const typeLabels = { videos: 'Video', audios: 'Audio', models: '3D Model' };
+    const typeLabels = { videos: 'Video', audios: 'Audio', models: '3D Model', reveals: 'Reveal' };
     setPanelTitle(`${typeLabels[arrKey] || arrKey} Properties`);
 
     const body = document.getElementById('editor-properties-body');
@@ -73,7 +73,7 @@ function buildPropsHTML(arrKey, item) {
             </div>
         </div>
         <div class="editor-prop-row">
-            <div class="editor-prop-label">Size${lockAR ? '<span class="editor-prop-label-note">locked ratio</span>' : ''}</div>
+            <div class="editor-prop-label">Size</div>
             <div class="editor-prop-row-2col">
                 <div><div class="editor-prop-label">W (%)</div>
                 <input class="editor-prop-input" type="number" min="1" max="100" step="1" id="prop-w" value="${Math.round((item.width  ?? 0.4) * 100)}"></div>
@@ -82,10 +82,33 @@ function buildPropsHTML(arrKey, item) {
             </div>
         </div>
         <div class="editor-prop-row">
-            <div class="editor-prop-label">Z-Index</div>
-            <input class="editor-prop-input" type="number" min="1" max="999" step="1" id="prop-z" value="${item.zIndex ?? 5}">
+            <div class="editor-prop-label">${arrKey === 'reveals' ? 'Layer' : 'Z-Index'}</div>
+            <input class="editor-prop-input" type="number" min="1" max="999" step="1" id="prop-z" value="${item.zIndex ?? (arrKey === 'reveals' ? 4 : 5)}">
         </div>
     `;
+
+    if (arrKey === 'reveals') {
+        html += `
+            <div class="editor-prop-row">
+                <div class="editor-prop-label">Reveal on step</div>
+                <input class="editor-prop-input" type="number" min="1" max="99" step="1" id="prop-step" value="${parseInt(item.step, 10) || 1}">
+            </div>
+            <div class="editor-prop-row">
+                <div class="editor-prop-label">Look while hidden</div>
+                <select class="editor-prop-select" id="prop-revealStyle">
+                    <option value="blend"   ${(item.style ?? 'blend') === 'blend' ? 'selected' : ''}>Blend into slide</option>
+                    <option value="frosted" ${item.style === 'frosted' ? 'selected' : ''}>Frosted panel</option>
+                </select>
+            </div>
+        `;
+    } else {
+        html += `
+            <div class="editor-prop-row">
+                <div class="editor-prop-label">Appear on step</div>
+                <input class="editor-prop-input" type="number" min="1" max="99" step="1" id="prop-step" placeholder="—" value="${parseInt(item.step, 10) > 0 ? parseInt(item.step, 10) : ''}">
+            </div>
+        `;
+    }
 
     if (arrKey === 'videos') {
         html += `
@@ -172,7 +195,14 @@ export function applyPropertiesQuiet() {
     item.y      = num('prop-y') / 100;
     item.width  = num('prop-w') / 100;
     item.height = num('prop-h') / 100;
-    item.zIndex = parseInt(get('prop-z')?.value ?? '5', 10);
+    item.zIndex = parseInt(get('prop-z')?.value ?? (arrKey === 'reveals' ? '4' : '5'), 10);
+
+    const step = parseInt(get('prop-step')?.value ?? '', 10);
+    if (arrKey === 'reveals') {
+        item.step  = step > 0 ? step : 1;
+        item.style = get('prop-revealStyle')?.value || 'blend';
+    } else if (step > 0) item.step = step;
+    else delete item.step;
 
     if (arrKey === 'videos') {
         item.playMode = get('prop-playMode')?.value ?? 'click';
@@ -188,6 +218,9 @@ export function applyPropertiesQuiet() {
     const container = getSlideEl();
     const cr = container?.getBoundingClientRect();
     if (div && cr) positionOverlay(div, item, cr);
+    const label = div?.querySelector('.edit-overlay-label');
+    if (label) label.textContent = overlayLabel(arrKey, item,
+        item.path ? item.path.split('/').pop() : (item.type || arrKey));
 }
 
 export function deleteItem(arrKey, index) {
@@ -199,13 +232,6 @@ export function deleteItem(arrKey, index) {
     cleanupEditOverlays();
     renderEditOverlays();
     updatePropertiesPanel();
-}
-
-function hintRow(text) {
-    const el = document.createElement('div');
-    el.className = 'editor-prop-hint';
-    el.textContent = text;
-    return el;
 }
 
 export function widgetTypeLabel(item) {
@@ -249,7 +275,7 @@ export async function openWidgetSettingsFor(index) {
             document.querySelectorAll('.edit-overlay.is-editing').forEach(el => el.classList.remove('is-editing'));
             if (!ctx.state?.editMode || removed) return;
             const label = document.querySelector(`.edit-overlay[data-arr-key="widgets"][data-item-index="${index}"] .edit-overlay-label`);
-            if (label) label.textContent = item.title || widgetTypeLabel(item);
+            if (label) label.textContent = overlayLabel('widgets', item, item.title || widgetTypeLabel(item));
             refreshSlideItems();                  // names may have changed
         },
     });
@@ -261,9 +287,10 @@ const ITEM_ICONS = {
     widgets: '<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/>',
     videos:  '<polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/>',
     audios:  '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+    reveals: '<rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="3 3"/><path d="M8 12h8"/><path d="M13 9l3 3-3 3"/>',
     models:  '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>',
 };
-const KIND_LABELS = { widgets: 'Widget', videos: 'Video', audios: 'Audio', models: '3D model' };
+const KIND_LABELS = { widgets: 'Widget', videos: 'Video', audios: 'Audio', models: '3D model', reveals: 'Reveal box' };
 const ICON_EDIT  = '<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>';
 const ICON_TRASH = '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>';
 
@@ -289,7 +316,7 @@ export function refreshSlideItems() {
 
     const cfg = getOrCreateConfig();
     const entries = [];
-    for (const arrKey of ['widgets', 'videos', 'audios', 'models']) {
+    for (const arrKey of ['widgets', 'videos', 'audios', 'models', 'reveals']) {
         (cfg?.[arrKey] || []).forEach((item, index) => entries.push({ arrKey, item, index }));
     }
     if (!entries.length) return;
@@ -298,10 +325,13 @@ export function refreshSlideItems() {
     list.className = 'slide-items';
     for (const { arrKey, item, index } of entries) {
         const isWidget = arrKey === 'widgets';
+        const step = parseInt(item.step, 10) > 0 ? parseInt(item.step, 10) : (arrKey === 'reveals' ? 1 : 0);
         const name = isWidget
             ? (item.title || widgetTypeLabel(item))
+            : arrKey === 'reveals' ? `Reveal step ${step}`
             : (item.path ? item.path.split('/').pop() : `${KIND_LABELS[arrKey]} ${index + 1}`);
-        const kind = isWidget && item.title ? widgetTypeLabel(item) : KIND_LABELS[arrKey];
+        const kind = (isWidget && item.title ? widgetTypeLabel(item) : KIND_LABELS[arrKey])
+            + (step && arrKey !== 'reveals' ? ` · step ${step}` : '');
 
         const row = document.createElement('div');
         row.className = 'slide-item';

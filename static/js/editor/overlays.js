@@ -5,6 +5,7 @@
 // functions called after load, so the cycle is harmless.
 import { ctx, getSlideEl, getOrCreateConfig, getConfigItems, arrKeyForType } from './context.js';
 import { updatePropertiesPanel, syncPropertiesPosition, openWidgetSettingsFor, widgetTypeLabel } from './properties.js';
+import { getWidgetSchema } from './widget-schema.js';
 
 let _pendingMediaType = null;
 
@@ -23,7 +24,7 @@ export function renderEditOverlays() {
 
 function buildOverlay(type, arrKey, item, index, container, rect) {
     const div = document.createElement('div');
-    div.className = 'edit-overlay';
+    div.className = 'edit-overlay' + (arrKey === 'reveals' ? ' edit-overlay--reveal' : '');
     div.dataset.arrKey = arrKey;
     div.dataset.itemIndex = String(index);
     positionOverlay(div, item, rect);
@@ -34,7 +35,7 @@ function buildOverlay(type, arrKey, item, index, container, rect) {
     const name = item.path ? item.path.split('/').pop()
                : arrKey === 'widgets' ? (item.title || widgetTypeLabel(item))
                : (item.type || `${type} ${index + 1}`);
-    label.textContent = name;
+    label.textContent = overlayLabel(arrKey, item, name);
     div.appendChild(label);
 
     const handle = document.createElement('div');
@@ -62,7 +63,45 @@ function buildOverlay(type, arrKey, item, index, container, rect) {
             if (isWidget && !moved) openWidgetSettingsFor(index);
         });
     });
+
+    // Full-slide-only widgets (notebook, workspace, circuit simulator): pin
+    // the box to the whole slide and take away the move/resize affordances.
+    // A click still opens the widget's settings.
+    if (isWidget) {
+        getWidgetSchema(item).then(schema => {
+            if (!schema?.fullSlide || !div.isConnected) return;
+            Object.assign(item, { x: 0, y: 0, width: 1, height: 1 });
+            div.dataset.locked = 'true';
+            div.classList.add('edit-overlay--locked');
+            handle.remove();
+            positionOverlay(div, item, container.getBoundingClientRect());
+        });
+    }
     return div;
+}
+
+// What a box on the slide is called, plus its reveal step if it has one.
+export function overlayLabel(arrKey, item, name) {
+    const step = parseInt(item?.step, 10);
+    if (arrKey === 'reveals') return `Reveal · step ${step > 0 ? step : 1}`;
+    return step > 0 ? `${name} · step ${step}` : name;
+}
+
+/* ─── reveal boxes ──────────────────────────────────────────── */
+// A box that hides what's under it until its step is reached while
+// presenting (slides/reveals.js). New boxes take the next step number.
+export function addReveal() {
+    const cfg = getOrCreateConfig();
+    if (!cfg) return;
+    if (!cfg.reveals) cfg.reveals = [];
+    const used = getConfigItems(cfg).map(e => parseInt(e.item.step, 10) || 0);
+    const step = Math.max(0, ...used) + 1;
+    cfg.reveals.push({ id: `reveal_${Date.now()}`, x: 0.25, y: 0.4, width: 0.5, height: 0.25, step, style: 'blend', zIndex: 4 });
+    const index = cfg.reveals.length - 1;
+    cleanupEditOverlays();
+    renderEditOverlays();
+    const overlay = document.querySelector(`.edit-overlay[data-arr-key="reveals"][data-item-index="${index}"]`);
+    if (overlay) selectOverlayEl(overlay, 'reveals', index);
 }
 
 export function positionOverlay(div, item, rect) {
@@ -108,6 +147,7 @@ function startMove(e, div, arrKey, index, container, onEnd) {
     let moved = false;
 
     const onMove = (e) => {
+        if (div.dataset.locked === 'true') return;   // pinned full-slide widget
         if (!moved && Math.hypot(e.clientX - sx, e.clientY - sy) < 4) return;
         moved = true;
         const cr = container.getBoundingClientRect();
@@ -117,7 +157,7 @@ function startMove(e, div, arrKey, index, container, onEnd) {
     const onUp = () => {
         const cr = container.getBoundingClientRect();
         const item = getOrCreateConfig()?.[arrKey]?.[index];
-        if (item) {
+        if (item && moved) {
             item.x = parseFloat(div.style.left) / cr.width;
             item.y = parseFloat(div.style.top)  / cr.height;
         }

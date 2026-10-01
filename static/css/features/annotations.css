@@ -300,38 +300,48 @@ body.text-tool-active #ann-canvas-2 {
     pointer-events: auto;
 }
 
+.text-annotation-editor::placeholder { color: var(--ink-4); }
+
+/* Grip tab on the box's top edge — drag to move the box. */
 .text-annotation-drag-handle {
     position: absolute;
-    top: -24px;
-    left: 0;
-    width: 22px;
-    height: 22px;
+    top: -15px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 30px;
+    height: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border: var(--line-hairline);
-    border-radius: var(--r-sm);
-    background: var(--accent);
-    color: var(--ink-on-accent);
+    border: 1px solid oklch(62% 0.01 260 / 0.45);
+    border-bottom: none;
+    border-radius: 7px 7px 0 0;
+    background: oklch(100% 0 0 / 0.95);
+    color: var(--ink-3);
     cursor: grab;
     touch-action: none;
-    box-shadow: var(--shadow-1);
+    transition: color var(--dur-fast), background var(--dur-fast);
 }
+.text-annotation-drag-handle:hover { color: var(--ink-1); background: var(--surface-cream-2); }
 .text-annotation-drag-handle:active { cursor: grabbing; }
-.text-annotation-drag-handle svg { width: 13px; height: 13px; }
+.text-annotation-drag-handle svg { width: 14px; height: 9px; }
+
 
 .text-annotation-editor {
     display: block;
     min-width: 120px;
     min-height: 1.4em;
     margin: 0;
-    padding: 2px 4px;
+    /* Keep border + padding in step with EDITOR_INSET in text-annotate.js. */
+    padding: 4px 8px;
     box-sizing: content-box;
     resize: none;
     overflow: hidden;
-    border: 1px dashed var(--accent);
-    border-radius: var(--r-sm);
-    background: oklch(99% 0.003 80 / 0.55);
+    border: 1px solid oklch(62% 0.01 260 / 0.45);
+    border-radius: 8px;
+    background: oklch(100% 0 0 / 0.9);
+    box-shadow: 0 0 0 3px oklch(45% 0.005 260 / 0.08), 0 6px 20px oklch(20% 0.01 260 / 0.10);
+    caret-color: var(--accent-strong);
     color: var(--ink-1);
     font-family: Arial, Helvetica, sans-serif;
     line-height: 1.35;

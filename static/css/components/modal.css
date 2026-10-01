@@ -239,20 +239,6 @@
 .modal-loading { pointer-events: auto; }
 .modal-loading .custom-modal-content { pointer-events: auto; }
 
-/* Upload modal options */
-.upload-option-btn {
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    gap: var(--sp-3);
-    padding: var(--sp-4) var(--sp-5);
-    width: 100%;
-    text-align: left;
-    font-size: var(--fs-md);
-    border-radius: var(--r-md);
-}
-.upload-option-btn i { font-size: 20px; color: var(--accent); width: 24px; }
-
 @media (max-width: 768px) {
     .custom-modal-content { max-width: 92%; padding: var(--sp-5); }
     .custom-modal-buttons { flex-direction: column-reverse; }

@@ -192,10 +192,7 @@ export class Canvas {
                     if (this.shapeLockTimer) clearTimeout(this.shapeLockTimer);
                     this.shapeLockTimer = setTimeout(() => this.tryLockShape(), this.shapeLockDelay);
                 }
-                if (this.shapeLock) {
-                    this.drawLockedShape(pt);
-                    continue;
-                }
+                if (this.shapeLock) continue;   // already snapped — ignore the wobble
             }
 
             this.splinePts.push(pt);
@@ -619,6 +616,26 @@ export class Canvas {
             return;
         }
 
+        // Snapped to a shape (draw and hold): it is already drawn — drop the
+        // leftover freehand points and finish.
+        if (this.shapeLock && this.currentStroke) {
+            if (this.shapeLockTimer) { clearTimeout(this.shapeLockTimer); this.shapeLockTimer = null; }
+            this.pointQueue = [];
+            this.splinePts = [];
+            this.drawLockedShape();
+            if (this.currentStroke.mode === 'highlight') {
+                this.strokeBufferCtx.clearRect(0, 0, this.strokeBuffer.width, this.strokeBuffer.height);
+            }
+            this.shapeLock = null;
+            this.currentStroke = null;
+            this.ctx.globalCompositeOperation = "source-over";
+            this.ctx.globalAlpha = 1;
+            this.savedCanvasState = null;
+            this.cachedRect = null;
+            this.commitHistory();
+            return;
+        }
+
         // Only enqueue the final point if the event has valid coordinates
         // (pointercancel can have clientX/clientY of 0 on some devices)
         if (e.clientX !== 0 || e.clientY !== 0) {
@@ -713,6 +730,21 @@ export class Canvas {
         if (this.shapeLock || !this.drawing || !this.currentStroke) return;
         if (Date.now() - this.lastMoveTime < this.shapeLockDelay) return;
 
+        // Draw-and-hold on a closed stroke (end near the start) snaps it to the
+        // shape it looks like: circle/ellipse, triangle or rectangle. Anything
+        // else falls through to the straight-line behaviour below.
+        if (!this.currentStroke.shape && !this.currentStroke.polylineActive
+            && ['draw', 'highlight'].includes(this.currentStroke.mode)) {
+            const fitted = this.fitClosedShape(this.currentStroke.points || []);
+            if (fitted) {
+                this.shapeLock = fitted;
+                this.pointQueue = [];
+                this.splinePts = [];
+                this.drawLockedShape();
+                return;
+            }
+        }
+
         if (!this.currentStroke.shape && ['draw', 'highlight'].includes(this.currentStroke.mode)) {
             const points = this.currentStroke.points || [];
             const endPoint = this.lastMovePoint || this.currentStroke.currentPoint || points[points.length - 1];
@@ -742,6 +774,84 @@ export class Canvas {
             this.savedCanvasState = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
         }
         this.drawLockedShape(lockPoint);
+    }
+
+    /* ── closed-shape recognition (draw and hold) ─────────────────────
+       Returns a shape to draw in place of the stroke, or null. Fitted to
+       where the stroke actually went: an ellipse to its bounds (a true
+       circle when nearly round), a triangle through its three corners, a
+       rectangle to its bounds when square to the page, else through its
+       four corners. */
+    fitClosedShape(points) {
+        if (points.length < 12) return null;
+        const bbox = this.getBoundingBox(points);
+        const w = bbox.maxX - bbox.minX, h = bbox.maxY - bbox.minY;
+        const diag = Math.hypot(w, h);
+        if (diag < 30 || Math.min(w, h) < 12) return null;
+
+        // Closed: the stroke ends near where it began.
+        const closeDist = Math.max(14, diag * 0.18);
+        if (this.distance(points[0], points[points.length - 1]) > closeDist) return null;
+
+        const cx = (bbox.minX + bbox.maxX) / 2, cy = (bbox.minY + bbox.maxY) / 2;
+
+        // Corners: simplify, drop the duplicated closing point and any
+        // near-straight vertices (e.g. where the stroke started mid-edge).
+        const simplified = this.simplifyPath(points, Math.max(5, diag * 0.06));
+        const corners = this.dropFlatVertices(this.closePath(simplified, closeDist));
+
+        if (corners.length === 3 && this.isTriangle(corners, bbox)) {
+            return { type: 'polygon', points: corners };
+        }
+        if (corners.length === 4 && this.isRectangle(corners)) {
+            const square = corners.every((p, i) => {
+                const q = corners[(i + 1) % 4];
+                const a = Math.abs(Math.atan2(q.y - p.y, q.x - p.x)) % (Math.PI / 2);
+                return Math.min(a, Math.PI / 2 - a) < 0.26;   // within ~15° of the axes
+            });
+            return square
+                ? { type: 'rectangle', center: { x: cx, y: cy }, width: w, height: h }
+                : { type: 'polygon', points: corners };
+        }
+
+        // Round: every point about the same normalised distance from the centre.
+        if (this.isEllipse(points, bbox)) {
+            const ratio = w / h;
+            if (ratio > 0.85 && ratio < 1.18) {
+                return { type: 'circle', center: { x: cx, y: cy }, width: (w + h) / 2, height: (w + h) / 2 };
+            }
+            return { type: 'ellipse', center: { x: cx, y: cy }, width: w, height: h };
+        }
+        return null;
+    }
+
+    isEllipse(points, bbox) {
+        const rx = (bbox.maxX - bbox.minX) / 2 || 1, ry = (bbox.maxY - bbox.minY) / 2 || 1;
+        const cx = bbox.minX + rx, cy = bbox.minY + ry;
+        let sum = 0, sq = 0;
+        for (const p of points) {
+            const d = Math.hypot((p.x - cx) / rx, (p.y - cy) / ry);
+            sum += d; sq += d * d;
+        }
+        const mean = sum / points.length;
+        const sd = Math.sqrt(Math.max(0, sq / points.length - mean * mean));
+        return mean > 0.7 && sd / mean < 0.12;
+    }
+
+    // Remove vertices whose two edges are nearly in line (angle > ~155°).
+    dropFlatVertices(pts) {
+        let out = pts.slice();
+        let changed = true;
+        while (changed && out.length > 3) {
+            changed = false;
+            for (let i = 0; i < out.length; i++) {
+                const a = out[(i + out.length - 1) % out.length], b = out[i], c = out[(i + 1) % out.length];
+                const v1 = { x: a.x - b.x, y: a.y - b.y }, v2 = { x: c.x - b.x, y: c.y - b.y };
+                const cos = (v1.x * v2.x + v1.y * v2.y) / ((Math.hypot(v1.x, v1.y) * Math.hypot(v2.x, v2.y)) || 1);
+                if (cos < -0.9) { out.splice(i, 1); changed = true; break; }
+            }
+        }
+        return out;
     }
 
     getLockedShapeData(type, points, center) {
@@ -843,6 +953,11 @@ export class Canvas {
         } else if (type === 'circle') {
             const radius = Math.max(width, height) / 2;
             ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+        } else if (type === 'ellipse') {
+            ctx.ellipse(center.x, center.y, width / 2, height / 2, 0, 0, Math.PI * 2);
+        } else if (type === 'polygon') {
+            shape.points.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+            ctx.closePath();
         } else if (type === 'triangle') {
             const left = center.x - width / 2;
             const right = center.x + width / 2;

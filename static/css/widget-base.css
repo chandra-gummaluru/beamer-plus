@@ -452,6 +452,19 @@ body.bw-has-topbar {
   flex: 0 0 auto;
 }
 
+/* Partial-slide mode (the widget is an inset on part of the slide, set by the
+   kit as body.bw-partial): no title and no shared utilities — only the
+   widget's own controls stay, as a strip, and with none there's no bar. */
+body.bw-partial .bw-topbar-title,
+body.bw-partial .bw-topbar-utils,
+body.bw-partial .bw-topbar-actions > .bw-sep:first-child,
+body.bw-partial .bw-adopted-bar > .bw-topbar-title + .bw-sep {
+  display: none;
+}
+body.bw-partial .bw-topbar.bw-topbar--no-controls {
+  display: none;
+}
+
 /* The widget's own content, below the bar. */
 .bw-topbar-body {
   flex: 1 1 auto;

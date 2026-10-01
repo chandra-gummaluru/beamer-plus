@@ -154,6 +154,46 @@ export function getLoadedWidgetStates() {
     return { ..._savedWidgetStates };
 }
 
+/**
+ * Add states for widgets that haven't been created yet (a duplicated slide's
+ * fresh widget ids); each is handed to its iframe when that first loads.
+ */
+export function seedWidgetStates(states) {
+    if (!states || typeof states !== 'object') return;
+    Object.assign(_savedWidgetStates, states);
+}
+
+/**
+ * The current state of each widget in `ids`: asked live from its iframe if it
+ * has one, else the last state captured when it was parked, else the state it
+ * was loaded with. Widgets that report nothing are simply absent.
+ */
+export function requestWidgetStates(ids, timeoutMs = 800) {
+    const want = new Set((ids || []).map(String));
+    const states = {};
+    for (const id of want) {
+        if (_capturedStates.has(id)) states[id] = _capturedStates.get(id);
+        else if (_savedWidgetStates[id] !== undefined) states[id] = _savedWidgetStates[id];
+    }
+    const iframes = Array.from(document.querySelectorAll('.widget-iframe'))
+        .filter(f => want.has(f.dataset.widgetId));
+    if (!iframes.length) return Promise.resolve(states);
+    const pending = new Set(iframes.map(f => f.dataset.widgetId));
+    return new Promise(resolve => {
+        const done = () => { clearTimeout(timer); window.removeEventListener('message', onMsg); resolve(states); };
+        const timer = setTimeout(done, timeoutMs);
+        function onMsg(e) {
+            const id = e.data?.widgetId != null ? String(e.data.widgetId) : null;
+            if (e.data?.type !== 'widget-state' || !id || !pending.has(id) || e.data.state === undefined) return;
+            states[id] = e.data.state;
+            pending.delete(id);
+            if (!pending.size) done();
+        }
+        window.addEventListener('message', onMsg);
+        iframes.forEach(f => { try { f.contentWindow?.postMessage({ type: 'widget-get-state' }, '*'); } catch (_) {} });
+    });
+}
+
 // ── CSS selector helper ────────────────────────────────────────────────────
 // slideKey values are "L0", "R0", etc. – safe for attribute selectors.
 function _bySlideSel(slideKey) {
@@ -292,7 +332,27 @@ const _NOT_ASSET_KEYS = new Set([
 // was built with. Layout keys are left out: moving or resizing a widget is
 // applied in place, and must not reboot it (a notebook would reload its
 // kernel, a shell would lose its session).
-const _LAYOUT_KEYS = new Set(['x', 'y', 'width', 'height', 'zIndex', 'interactive']);
+const _LAYOUT_KEYS = new Set(['x', 'y', 'width', 'height', 'zIndex', 'interactive', 'step']);
+
+// A widget whose schema declares "fullSlide": true only works as the whole
+// slide; it is always laid out that way, whatever box an older deck saved.
+const _FULL_GEOM = { x: 0, y: 0, width: 1, height: 1 };
+function _declaresFullSlide(html) {
+    const m = /<script\b[^>]*\bid=["']widget-schema["'][^>]*>([\s\S]*?)<\/script>/i.exec(html || '');
+    if (!m) return false;
+    try { return JSON.parse(m[1].trim())?.fullSlide === true; } catch (_) { return false; }
+}
+function _geom(w, iframe) {
+    return iframe?.dataset.widgetFull === 'true' ? _FULL_GEOM
+         : { x: w.x, y: w.y, width: w.width, height: w.height };
+}
+function _place(iframe, g, rect) {
+    Object.assign(iframe.dataset, { widgetX: g.x, widgetY: g.y, widgetWidth: g.width, widgetHeight: g.height });
+    iframe.style.left   = `${g.x * rect.width}px`;
+    iframe.style.top    = `${g.y * rect.height}px`;
+    iframe.style.width  = `${g.width * rect.width}px`;
+    iframe.style.height = `${g.height * rect.height}px`;
+}
 
 function _configSignature(w) {
     const out = {};
@@ -392,15 +452,15 @@ export function renderWidgets(slideConfig, container, zipFile, viewerMode = fals
             // the widget moved in the editor. The dataset is what later
             // resizes read, so it has to follow too.
             Object.assign(existing.dataset, {
-                widgetX: w.x, widgetY: w.y, widgetWidth: w.width, widgetHeight: w.height,
                 widgetZIndex: w.zIndex || 10,
                 widgetInteractive: w.interactive !== false ? 'true' : 'false',
             });
             const rect = container.getBoundingClientRect();
-            existing.style.left          = `${w.x * rect.width}px`;
-            existing.style.top           = `${w.y * rect.height}px`;
-            existing.style.width         = `${w.width * rect.width}px`;
-            existing.style.height        = `${w.height * rect.height}px`;
+            const g = _geom(w, existing);
+            _place(existing, g, rect);
+            // The box may have changed between full slide and part of it —
+            // the widget shows its top bar only when it fills the slide.
+            try { existing.contentWindow?.postMessage({ type: 'widget-layout', ...g }, '*'); } catch (_) {}
             existing.style.zIndex        = w.zIndex || 10;
             existing.style.pointerEvents = w.interactive !== false ? 'auto' : 'none';
             existing.style.opacity       = '1';  // make visible
@@ -507,8 +567,17 @@ export function renderWidgets(slideConfig, container, zipFile, viewerMode = fals
                 }
             }
 
+            // Pin full-slide-only widgets to the whole slide (older decks may
+            // have saved a smaller box for them).
+            const fullOnly = _declaresFullSlide(htmlContent);
+            if (fullOnly) {
+                iframe.dataset.widgetFull = 'true';
+                _place(iframe, _FULL_GEOM, container.getBoundingClientRect());
+            }
+
             const _configPayload = _withPendingAssets({
                 ...w,
+                ...(fullOnly ? _FULL_GEOM : {}),
                 ...widgetSessionConfig(),
                 role: viewerMode ? 'viewer' : 'presenter',
                 ...(notebookContent !== null ? { notebookContent } : {}),

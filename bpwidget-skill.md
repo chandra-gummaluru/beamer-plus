@@ -73,6 +73,12 @@ The first thing in `<head>`. Beamer+ reads it to build the slide's config panel.
 - `category` — one of: `Tools`, `Mathematics`, `Computer Science`, `Audience Response`.
   Add a new one only if none fits.
 - `fontSize: false` — opt out of the host's font-size control (e.g. `map.html`).
+- `fullSlide: true` — the widget only works as the whole slide (a notebook, a
+  workspace, a circuit canvas). The editor locks its box to fill the slide and the
+  host always lays it out full-slide. Leave it off for anything that still works as
+  an inset: placed on part of a slide, such a widget drops the shared bar's title,
+  font-size stepper and reset, keeping only its own controls as a slim strip (no
+  bar at all if it has none) — so it must still be usable without them.
 - `fields: []` — a widget with nothing to configure still declares the empty array.
 
 ### Field types
@@ -244,6 +250,7 @@ origin. Falling back: `cfg.serverUrl || cfg.socketUrl || window.parent.location.
 | `widget-cleanup` | disconnect sockets, cancel timers/rAF, stop media, destroy players |
 | `widget-get-state` | reply `postMessage({ type:'widget-state', widgetId, state }, '*')` |
 | `widget-set-state` | restore from `e.data.state` |
+| `widget-layout` | box moved/resized (`x`, `y`, `width`, `height`); the kit handles it — partial-slide mode |
 
 ### Messages out
 
