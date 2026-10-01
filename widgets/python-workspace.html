@@ -363,9 +363,9 @@ body.is-viewer #gutter { cursor: default; }
 /* Where the paused program is. Amber-on-warn rather than the memory model's
    grey, so the two markers can share the editor without being confused. */
 #mark-dbg {
-  background: rgba(180, 83, 9, 0.13);
-  background: color-mix(in srgb, var(--warn) 14%, transparent);
-  box-shadow: inset 3px 0 0 var(--warn);
+  background: rgba(180, 83, 9, 0.08);
+  background: color-mix(in srgb, var(--warn) 9%, transparent);
+  box-shadow: inset 2px 0 0 var(--warn);
 }
 /* A caller's line, when a lower frame of the stack is selected. */
 #mark-dbg.is-caller {
@@ -392,82 +392,122 @@ body.is-viewer #gutter { cursor: default; }
 #dbg-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 #dbg-body::-webkit-scrollbar-thumb:hover { background: var(--border-med); }
 
-.dbg-sec + .dbg-sec { margin-top: 12px; }
+.dbg-sec + .dbg-sec { margin-top: 16px; }
 .dbg-h {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-family: var(--font-ui);
   font-size: 10px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-3);
   font-weight: 600;
-  margin-bottom: 4px;
+  margin: 0 2px 6px;
 }
-.dbg-h .fname {
+/* Which frame the variables belong to — a small tag, not more heading. */
+.dbg-scope {
   font-family: var(--font-mono);
+  font-size: 10.5px;
   text-transform: none;
   letter-spacing: 0;
   font-weight: 500;
   color: var(--text-2);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 7px;
+  line-height: 16px;
 }
 .dbg-box {
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 8px;
   overflow: hidden;
 }
 
 .dbg-stack { list-style: none; margin: 0; padding: 0; }
 .dbg-stack li {
   display: flex;
+  align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  padding: 2px 8px;
+  padding: 5px 10px;
   cursor: pointer;
   transition: background var(--dur, .12s);
 }
 .dbg-stack li + li { border-top: 1px solid var(--border); }
 .dbg-stack li:hover { background: var(--bg-subtle); }
-.dbg-stack li.is-sel { background: var(--accent-bg); box-shadow: inset 3px 0 0 var(--warn); }
-.dbg-stack .ln { color: var(--text-3); white-space: nowrap; }
+.dbg-stack li.is-sel { background: var(--bg-subtle); box-shadow: inset 2px 0 0 var(--text); }
+.dbg-stack .fn { color: var(--text); }
+.dbg-stack li.is-sel .fn { font-weight: 600; }
+.dbg-stack .ln {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
 body.is-viewer .dbg-stack li { cursor: default; }
 
 .dbg-vars { width: 100%; border-collapse: collapse; }
-.dbg-vars td { padding: 2px 8px; vertical-align: top; border-top: 1px solid var(--border); }
+.dbg-vars td { padding: 5px 10px; vertical-align: baseline; border-top: 1px solid var(--border); }
 .dbg-vars tr:first-child td { border-top: 0; }
-.dbg-vars .n { white-space: nowrap; width: 1%; }
+.dbg-vars .n { white-space: nowrap; width: 1%; color: var(--text-2); }
 .dbg-vars .v { white-space: pre-wrap; word-break: break-word; }
-.dbg-vars .t { white-space: nowrap; width: 1%; text-align: right; color: var(--text-3); font-size: .85em; }
-/* What the step just changed: the memory model's mutation amber. */
+/* Values take the editor's syntax colours by type. */
+.dbg-vars .v.ty-int, .dbg-vars .v.ty-float, .dbg-vars .v.ty-complex { color: var(--code-num); }
+.dbg-vars .v.ty-str  { color: var(--code-str); }
+.dbg-vars .v.ty-bool, .dbg-vars .v.ty-NoneType { color: var(--code-kw); }
+.dbg-vars .t {
+  white-space: nowrap;
+  width: 1%;
+  text-align: right;
+  font-family: var(--font-ui);
+  font-size: 10.5px;
+  color: var(--text-3);
+}
+/* What the step just changed: a quiet amber wash and a bar, not amber text. */
 .dbg-vars tr.is-ch td { background: var(--mutate-soft); }
-.dbg-vars tr.is-ch .v { color: var(--mutate); }
-.dbg-vars tr.is-fn td { color: var(--text-3); }
-.dbg-none { padding: 3px 8px; color: var(--text-3); font-style: italic; }
+.dbg-vars tr.is-ch td:first-child { box-shadow: inset 2px 0 0 var(--mutate); }
+.dbg-vars tr.is-fn td, .dbg-vars tr.is-fn .v { color: var(--text-3); }
+.dbg-none {
+  padding: 7px 10px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--text-3);
+}
 
-.dbg-ret { margin: 0 0 6px; color: var(--text-2); }
-.dbg-ret b { font-weight: 500; color: var(--mutate); }
+.dbg-ret {
+  margin: 0 2px 8px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--text-2);
+}
+.dbg-ret code { font-family: var(--font-mono); color: var(--code-def); }
+.dbg-ret b { font-family: var(--font-mono); font-weight: 500; color: var(--mutate); }
 
 .dbg-out {
   margin: 0;
-  padding: 4px 8px;
+  padding: 6px 10px;
   min-height: 1.5em;
   white-space: pre-wrap;
   word-break: break-word;
   font: inherit;
 }
-.dbg-out .fresh { background: var(--mutate-soft); }
-.dbg-out .empty { color: var(--text-3); font-style: italic; }
+.dbg-out .fresh { background: var(--mutate-soft); border-radius: 3px; }
+.dbg-out .empty { font-family: var(--font-ui); font-size: 12px; color: var(--text-3); }
 .dbg-err {
   margin: 0;
-  padding: 6px 8px;
+  padding: 8px 10px;
   white-space: pre-wrap;
   word-break: break-word;
   font: inherit;
   color: var(--err);
   background: var(--err-bg);
-  border-left: 3px solid var(--err);
-  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--err) 25%, transparent);
+  border-radius: 8px;
 }
-.dbg-note { font-family: var(--font-ui); color: var(--text-2); }
+.dbg-note { font-family: var(--font-ui); font-size: 12px; color: var(--text-2); margin: 0 2px; }
 
 .dbg-empty {
   font-family: var(--font-ui);
@@ -481,7 +521,7 @@ body.is-viewer .dbg-stack li { cursor: default; }
 .dbg-keys {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 2px 14px;
+  gap: 4px 14px;
   margin: 1em 0 0;
   color: var(--text-3);
   font-size: .9em;
@@ -491,10 +531,25 @@ body.is-viewer .dbg-stack li { cursor: default; }
 .dbg-rec { display: flex; align-items: center; gap: 8px; color: var(--text-3); font-family: var(--font-ui); }
 .dbg-rec .bw-spinner { width: 12px; height: 12px; }
 
+/* Status: a neutral pill with a coloured dot for the state. */
 #dbg-status[hidden] { display: none; }
-#dbg-status.is-live { color: var(--warn); border-color: var(--warn); }
-#dbg-status.is-done { color: var(--ok);   border-color: var(--ok); }
-#dbg-status.is-err  { color: var(--err);  border-color: var(--err); }
+#dbg-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-ui);
+  color: var(--text-2);
+  border-color: var(--border);
+}
+#dbg-status::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+#dbg-status.is-live::before { background: var(--warn); }
+#dbg-status.is-done::before { background: var(--ok); }
+#dbg-status.is-err::before  { background: var(--err); }
 
 /* Colour only — bold or italic can change glyph advance in some monospace
    fonts and knock the highlight out of step with the caret. */
@@ -673,9 +728,9 @@ body.is-viewer #btnPdf { display: none !important; }
    `theme` setting's dark palette below still stands on its own because the
    base has no dark tokens to borrow. */
 :root{
-  /* The diagram is drawn in a handwriting face when one is available, so it
-     reads like the board work it is imitating. */
-  --hand: 'Patrick Hand', 'Bradley Hand', 'Segoe Print', 'Comic Sans MS', cursive;
+  /* The diagram's text is set in the code font, so names and values read
+     exactly as they appear in the editor (the strokes stay hand-drawn). */
+  --hand: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
   --grid: rgba(26,26,24,.06);
 
   --paper:      var(--bg-output);
@@ -859,7 +914,7 @@ html[data-theme="dark"]{
 #canvas{ display:block; }
 #cellEditor{
   position:absolute; display:none;
-  font-family: var(--hand); font-size:20px; text-align:center;
+  font-family: var(--hand); font-size:17px; text-align:center;
   border:2px solid var(--text); border-radius:3px;
   padding:2px 4px; outline:none; resize:none; overflow:hidden;
   background: var(--bg); color: var(--text);
@@ -3112,15 +3167,16 @@ function el(tag, cls, html){
    header is the match. That is the CSC108 convention, and it keeps a busy
    diagram free of crossing lines.
 
-   Every stroke is hand-drawn: each edge keeps its true endpoints (give or
-   take a fraction of a pixel) and bows by under a pixel at its midpoint, so
-   the line is straight without being machine-straight. One continuous path
-   per shape means the weight never doubles at a corner.
+   Strokes are clean and straight: the hand-drawn wobble (endpoint jitter
+   and a bow at each edge's midpoint) is switched off below, so boxes and
+   arrows read as ordinary diagram lines. Set HAND_JITTER / HAND_BOW above
+   zero to bring the sketched look back. One continuous path per shape means
+   the weight never doubles at a corner.
 =========================================================================== */
 
 var SVGNS = 'http://www.w3.org/2000/svg';
-var HAND_JITTER = 0.7;   /* how far an endpoint may sit off true, px */
-var HAND_BOW = 0.9;      /* how far an edge bows at its midpoint, px  */
+var HAND_JITTER = 0;     /* how far an endpoint may sit off true, px */
+var HAND_BOW = 0;        /* how far an edge bows at its midpoint, px  */
 
 function rng(seed){
   var t = (seed >>> 0) || 1;
@@ -3154,7 +3210,7 @@ function handPath(pts, closed, seed, cls){
   var el = document.createElementNS(SVGNS, 'path');
   el.setAttribute('d', d);
   el.setAttribute('class', cls || 'hd-ink');
-  el.setAttribute('stroke-width', 2);
+  el.setAttribute('stroke-width', 1.6);
   return el;
 }
 
@@ -3189,14 +3245,15 @@ function textWidth(str, size){
      loose, never too tight, which is the safe direction. */
   if (!measureCtx) return str.length * size * 0.55;
   var face = getComputedStyle(document.documentElement).getPropertyValue('--hand').trim();
-  measureCtx.font = size + 'px ' + (face || 'cursive');
+  measureCtx.font = size + 'px ' + (face || 'monospace');
   return measureCtx.measureText(str).width;
 }
 
 /* --- geometry constants, all in diagram units (scaled by --u at the end) -- */
 var GRID_STEP = 8;   /* how finely a new box searches for a free gap */
 var D = {
-  fs: 20, fsSmall: 15,        /* text sizes                          */
+  fs: 17, fsSmall: 13,        /* text sizes (code font runs wider)   */
+  base: 6,                    /* centre line → text baseline at fs   */
   pad: 14,                    /* inner padding of a container box    */
   hdrH: 34, hdrGap: 18,       /* header boxes: [id] gap [type]       */
   rowH: 34, rowGap: 8,        /* frame variable rows                 */
@@ -3482,7 +3539,7 @@ function renderMemory(state, prev, history){
   }
   function box(x, y, w, h, seed, cls){ ink.appendChild(handRect(x, y, w, h, seed, cls)); }
   function centreText(sl, ox, oy, str, cls){
-    label(ox + sl.x + sl.w / 2, oy + sl.y + sl.h / 2 + 7, str, D.fs, cls);
+    label(ox + sl.x + sl.w / 2, oy + sl.y + sl.h / 2 + D.base, str, D.fs, cls);
   }
 
   var seed = 1;
@@ -3492,7 +3549,7 @@ function renderMemory(state, prev, history){
     box(m.x, m.y, m.w, m.h, seed += 13);
     fill(m.x, m.y, m.headW, D.hdrH);
     box(m.x, m.y, m.headW, D.hdrH, seed += 13);
-    label(m.x + m.headW / 2, m.y + D.hdrH / 2 + 7, m.f.label, D.fs);
+    label(m.x + m.headW / 2, m.y + D.hdrH / 2 + D.base, m.f.label, D.fs);
 
     if (!m.f.vars.length){
       label(m.x + m.w / 2, m.y + D.hdrH + D.pad + 22,
@@ -3501,7 +3558,7 @@ function renderMemory(state, prev, history){
     m.slots.forEach(function(sl){
       var was = wasFrame ? wasFrame.vars.filter(function(v){ return v.name === sl.name; })[0] : null;
       var fresh = prev && (!was || was.ref !== sl.ref);
-      label(m.x + sl.nameX, m.y + sl.y + sl.h / 2 + 7, sl.name, D.fs, null, 'start');
+      label(m.x + sl.nameX, m.y + sl.y + sl.h / 2 + D.base, sl.name, D.fs, null, 'start');
       fill(m.x + sl.x, m.y + sl.y, sl.w, sl.h);
       box(m.x + sl.x, m.y + sl.y, sl.w, sl.h, seed += 13, fresh ? 'hd-mut' : 'hd-ink');
       centreText(sl, m.x, m.y, sl.text, fresh ? 'mut' : null);
@@ -3522,12 +3579,12 @@ function renderMemory(state, prev, history){
 
     fill(m.x, m.y, m.idW, D.hdrH);
     box(m.x, m.y, m.idW, D.hdrH, seed += 13, cls);
-    label(m.x + m.idW / 2, m.y + D.hdrH / 2 + 7, o.idLabel || o.id, D.fs, tcls);
+    label(m.x + m.idW / 2, m.y + D.hdrH / 2 + D.base, o.idLabel || o.id, D.fs, tcls);
 
     var tyX = m.x + m.idW + D.hdrGap;
     fill(tyX, m.y, m.tyW, D.hdrH);
     box(tyX, m.y, m.tyW, D.hdrH, seed += 13, cls);
-    label(tyX + m.tyW / 2, m.y + D.hdrH / 2 + 7, o.type, D.fs, tcls);
+    label(tyX + m.tyW / 2, m.y + D.hdrH / 2 + D.base, o.type, D.fs, tcls);
 
     if (m.body !== undefined){
       label(m.x + m.w / 2, m.y + m.bodyY + 24, m.body, D.fs, m.ghost ? 'ghost' : (mutated ? 'mut' : null));
@@ -4984,7 +5041,7 @@ function renderDraw(){
       var t = document.createElementNS(SVGNS, 'text');
       var start = c.align === 'start';
       t.setAttribute('x', start ? x : x + c.rw / 2);
-      t.setAttribute('y', y + c.rh / 2 + 7);
+      t.setAttribute('y', y + c.rh / 2 + D.base);
       t.setAttribute('text-anchor', start ? 'start' : 'middle');
       t.setAttribute('font-size', D.fs);
       t.setAttribute('class', 'hd-text');
@@ -6898,18 +6955,18 @@ def _debug_file(src, fname, limit):
   }
 
   function varTable(vars) {
-    if (!vars.length) return '<div class="dbg-box"><div class="dbg-none">no variables yet</div></div>';
+    if (!vars.length) return '<div class="dbg-box"><div class="dbg-none">No variables yet</div></div>';
     // Data first; functions, classes and modules after it, quietly.
     const rows = vars.filter(x => !x.fn).concat(vars.filter(x => x.fn)).map(x =>
       `<tr class="${x.ch ? 'is-ch' : ''}${x.fn ? ' is-fn' : ''}">` +
-      `<td class="n">${escHtml(x.n)}</td><td class="v">${escHtml(x.r)}</td><td class="t">${escHtml(x.t)}</td></tr>`);
+      `<td class="n">${escHtml(x.n)}</td><td class="v ty-${escHtml(String(x.t || '').replace(/\W/g, ''))}">${escHtml(x.r)}</td><td class="t">${escHtml(x.t)}</td></tr>`);
     return `<div class="dbg-box"><table class="dbg-vars">${rows.join('')}</table></div>`;
   }
 
   // Innermost call on top, as debuggers list it.
   function stackList(v) {
     const items = v.frames.map((f, k) => ({ f, k })).reverse().map(({ f, k }) =>
-      `<li data-k="${k}" class="${k === v.sel ? 'is-sel' : ''}"><span>${escHtml(f.name)}</span><span class="ln">line ${f.line}</span></li>`);
+      `<li data-k="${k}" class="${k === v.sel ? 'is-sel' : ''}"><span class="fn">${escHtml(f.name)}</span><span class="ln">line ${f.line}</span></li>`);
     return `<div class="dbg-sec"><div class="dbg-h">Call stack</div><ol class="dbg-box dbg-stack">${items.join('')}</ol></div>`;
   }
 
@@ -6937,7 +6994,7 @@ def _debug_file(src, fname, limit):
       return;
     }
     if (v.recording) {
-      chip.textContent = 'running';
+      chip.textContent = 'Running';
       chip.classList.add('is-live');
       dbgBody.innerHTML = '<div class="dbg-rec"><span class="bw-spinner"></span>Running the program under the debugger…</div>';
       return;
@@ -6945,7 +7002,7 @@ def _debug_file(src, fname, limit):
 
     let html = '';
     if (v.done) {
-      chip.textContent = v.error ? 'error' : v.truncated ? 'stopped' : 'finished';
+      chip.textContent = v.error ? 'Error' : v.truncated ? 'Stopped' : 'Finished';
       chip.classList.add(v.error ? 'is-err' : 'is-done');
       if (v.error) html += `<div class="dbg-sec"><pre class="dbg-err">${escHtml(v.error)}</pre></div>`;
       if (v.truncated) {
@@ -6954,20 +7011,20 @@ def _debug_file(src, fname, limit):
       }
       if (v.crashed) {
         html += stackList(v);
-        html += `<div class="dbg-sec"><div class="dbg-h">Variables <span class="fname">· ${escHtml(v.frames[v.sel].name)}, when it failed</span></div>` +
+        html += `<div class="dbg-sec"><div class="dbg-h">Variables <span class="dbg-scope">${escHtml(v.frames[v.sel].name)} · when it failed</span></div>` +
                 varTable(v.frames[v.sel].vars) + '</div>';
       } else {
-        html += `<div class="dbg-sec"><div class="dbg-h">Variables <span class="fname">· main, at the end</span></div>` +
+        html += `<div class="dbg-sec"><div class="dbg-h">Variables <span class="dbg-scope">main · at the end</span></div>` +
                 varTable(v.frames[0].vars) + '</div>';
       }
     } else {
-      chip.textContent = `line ${v.line} · step ${v.idx + 1}/${v.n}`;
+      chip.textContent = `Paused · line ${v.line} · step ${v.idx + 1} of ${v.n}`;
       chip.classList.add('is-live');
       html += stackList(v);
       const f = v.frames[v.sel];
-      html += `<div class="dbg-sec"><div class="dbg-h">Variables <span class="fname">· ${escHtml(f.name)}</span></div>`;
+      html += `<div class="dbg-sec"><div class="dbg-h">Variables <span class="dbg-scope">${escHtml(f.name)}</span></div>`;
       if (v.ret && v.sel === v.frames.length - 1) {
-        html += `<div class="dbg-ret">${escHtml(v.ret.name)}() ` +
+        html += `<div class="dbg-ret"><code>${escHtml(v.ret.name)}()</code> ` +
                 (v.ret.value == null ? 'ended with an error' : `returned <b>${escHtml(v.ret.value)}</b>`) + '</div>';
       }
       html += varTable(f.vars) + '</div>';
@@ -6975,7 +7032,7 @@ def _debug_file(src, fname, limit):
     const out = v.out || '';
     const outHtml = out
       ? escHtml(out.slice(0, v.outNew)) + (out.length > v.outNew ? `<span class="fresh">${escHtml(out.slice(v.outNew))}</span>` : '')
-      : '<span class="empty">nothing printed yet</span>';
+      : '<span class="empty">Nothing printed yet</span>';
     html += `<div class="dbg-sec"><div class="dbg-h">Output</div><pre class="dbg-box dbg-out">${outHtml}</pre></div>`;
     dbgBody.innerHTML = html;
   }
