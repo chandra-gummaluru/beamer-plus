@@ -498,13 +498,13 @@ body.is-viewer .dbg-stack li { cursor: default; }
 
 /* Colour only — bold or italic can change glyph advance in some monospace
    fonts and knock the highlight out of step with the caret. */
-.t-kw  { color: var(--chart-1); }
-.t-str { color: var(--chart-2); }
-.t-num { color: var(--chart-3); }
-.t-bi  { color: var(--chart-4); }
-.t-def { color: var(--accent); }
-.t-dec { color: var(--chart-5); }
-.t-com { color: var(--text-3); }
+.t-kw  { color: var(--code-kw); }
+.t-str { color: var(--code-str); }
+.t-num { color: var(--code-num); }
+.t-bi  { color: var(--code-bi); }
+.t-def { color: var(--code-def); }
+.t-dec { color: var(--code-dec); }
+.t-com { color: var(--code-com); }
 
 /* ── Shell ──────────────────────────────────────────────────── */
 #shell-body {
@@ -709,9 +709,27 @@ body.is-viewer #btnPdf { display: none !important; }
   --mono: var(--font-mono);
   --sans: var(--font-ui);
   --r:    var(--radius);
+
+  /* Syntax colours for the editor. The deck's --chart-* ramp is greyscale,
+     which made every token the same ink — code needs real hues. Matches the
+     PDF export palette (PDF_COL) so the printout looks like the screen. */
+  --code-kw:  #7A3EAD;
+  --code-str: #0E7C6B;
+  --code-num: #2F5DD1;
+  --code-bi:  #A03A82;
+  --code-def: #B4531A;
+  --code-dec: #8A6D00;
+  --code-com: #8A938E;
 }
 
 html[data-theme="dark"]{
+  --code-kw:  #C39BE8;
+  --code-str: #55C4AF;
+  --code-num: #7FA0F5;
+  --code-bi:  #E48AC8;
+  --code-def: #F2A64B;
+  --code-dec: #D9C26A;
+  --code-com: #7C8580;
   --bg:         #1a1a18;
   --bg-subtle:  #212120;
   --bg-output:  #151514;
@@ -5691,7 +5709,11 @@ print(shopping)
       const p = document.createElement('span');
       p.className = 'sh-p';
       p.textContent = entry.p || PS1;
-      el.append(p, document.createTextNode(entry.s));
+      // The code that was run, coloured like the editor (highlight() ends
+      // with a spacer line for the editor's sake — not wanted here).
+      const code = document.createElement('span');
+      code.innerHTML = highlight(entry.s).replace(/\n $/, '');
+      el.append(p, code);
     } else {
       el.textContent = entry.s;
     }
