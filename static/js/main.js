@@ -718,9 +718,16 @@ function showUndefinedPane(isRight, on) {
     if (!card) {
         card = document.createElement('div');
         card.className = 'pane-undefined';
-        card.innerHTML = '<span class="pane-undefined-mark" aria-hidden="true">?</span>' +
-                         '<p class="pane-undefined-title">Undefined</p>' +
-                         '<p class="pane-undefined-hint">This pane\'s slide was deleted or never chosen.</p>';
+        // Same voice as the empty stage: a hand-drawn mark, a serif title,
+        // one quiet line. The mark is an empty slide outline, dashed.
+        card.innerHTML =
+            '<svg class="pane-undefined-icon" viewBox="0 0 72 54" fill="none" aria-hidden="true">' +
+                '<rect class="pane-undefined-outline" x="6" y="6" width="60" height="42" rx="4"/>' +
+                '<path class="pane-undefined-q" d="M30 21 Q 30 15, 36 15 T 42 21 Q 42 25, 36 27 L 36 31"/>' +
+                '<circle class="pane-undefined-dot" cx="36" cy="37.5" r="1.6"/>' +
+            '</svg>' +
+            '<p class="pane-undefined-title">Undefined</p>' +
+            '<p class="pane-undefined-hint">This pane\'s slide was deleted or never chosen.</p>';
         pane.appendChild(card);
     }
     card.hidden = false;

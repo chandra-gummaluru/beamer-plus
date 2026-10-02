@@ -432,11 +432,21 @@ model-viewer { pointer-events: auto !important; }
     color: oklch(38% 0.08 200);
     min-width: 0;
 }
-/* A pane whose slide was deleted (or never chosen): "?" on a dashed wash. */
+/* A pane whose slide was deleted (or never chosen): a quiet "?" on the
+   paper colour, inset with a dashed outline — an empty slot, not an alert. */
 .view-preview-pane.is-missing {
-    color: oklch(50% 0.13 40);
-    background: repeating-linear-gradient(135deg,
-        oklch(60% 0.12 40 / 0.10) 0 4px, transparent 4px 8px);
+    position: relative;
+    color: var(--ink-3);
+    font-weight: 500;
+    background: var(--surface-paper);
+}
+.view-preview-pane.is-missing::after {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    border: 1px dashed var(--ink-4);
+    border-radius: 3px;
+    pointer-events: none;
 }
 .view-preview-sep {
     flex-shrink: 0;
@@ -1248,12 +1258,17 @@ body.edit-mode #slide-nav-slides .slide-nav-item.current-slide { pointer-events:
 /* ============================================================
    Undefined split-view pane
    ============================================================ */
-/* Covers a split-view pane whose slide was deleted or never chosen. Sits
-   over the (blanked) slide card and everything on it, and takes the
-   pointer so nothing can be drawn on a pane that has no slide. Sized to
-   match #pdf-canvas by sizeSlideCanvases(); pinned on-white ink like
-   .stage-empty. */
+/* Stands in for a split-view pane whose slide was deleted or never chosen.
+   Built like the empty-stage placeholder: a blank white slide card with a
+   hand-drawn mark, a serif title and one quiet line. It covers the pane's
+   (blanked) card and takes the pointer, so nothing is drawn on a pane that
+   has no slide. Sized to match #pdf-canvas by sizeSlideCanvases(); the card
+   is white in both themes, so the ink is pinned like .stage-empty's. */
 .pane-undefined {
+    --_ink:      oklch(38% 0.010 260);
+    --_ink-soft: oklch(55% 0.008 260);
+    --_line:     oklch(78% 0.006 260);
+
     position: absolute;
     top: 50%;
     left: 50%;
@@ -1263,26 +1278,63 @@ body.edit-mode #slide-nav-slides .slide-nav-item.current-slide { pointer-events:
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 6px;
     text-align: center;
-    padding: 16px;
+    padding: var(--sp-5);
     box-sizing: border-box;
-    background:
-        repeating-linear-gradient(135deg, oklch(60% 0.12 40 / 0.06) 0 10px, transparent 10px 20px),
-        #ffffff;
-    border: 2px dashed oklch(70% 0.08 40);
+    background: #ffffff;
     border-radius: var(--r-md);
     box-shadow: var(--shadow-3);
-    color: oklch(38% 0.010 260);
-    font-family: var(--font-sans);
     pointer-events: auto;
+    user-select: none;
 }
 .pane-undefined[hidden] { display: none; }
-.pane-undefined-mark {
-    font-size: clamp(40px, 9vmin, 96px);
-    font-weight: 700;
-    line-height: 1;
-    color: oklch(55% 0.13 40);
+
+.pane-undefined-icon {
+    width: 84px;
+    height: 63px;
+    display: block;
+    margin-bottom: var(--sp-4);
 }
-.pane-undefined-title { margin: 0; font-size: var(--fs-lg, 18px); font-weight: 600; }
-.pane-undefined-hint  { margin: 0; font-size: var(--fs-sm, 13px); color: oklch(55% 0.008 260); }
+.pane-undefined-outline {
+    stroke: var(--_line);
+    stroke-width: 1.5;
+    stroke-dasharray: 4 4;
+}
+.pane-undefined-q {
+    stroke: var(--_ink-soft);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 40;
+    stroke-dashoffset: 40;
+    animation: draw-pane-undefined-q 0.9s var(--ease-out, ease-out) 0.15s forwards;
+}
+.pane-undefined-dot { fill: var(--_ink-soft); }
+@keyframes draw-pane-undefined-q { to { stroke-dashoffset: 0; } }
+
+.pane-undefined-title {
+    font-family: var(--font-serif);
+    font-size: var(--fs-xl);
+    font-weight: 500;
+    color: var(--_ink);
+    letter-spacing: -0.01em;
+    margin: 0;
+}
+.pane-undefined-hint {
+    font-family: var(--font-sans);
+    font-size: var(--fs-md);
+    color: var(--_ink-soft);
+    line-height: 1.5;
+    max-width: 24em;
+    margin: var(--sp-2) 0 0;
+}
+
+/* Split panes are often narrow: drop to a smaller mark and type. */
+@media (max-width: 900px), (max-height: 560px) {
+    .pane-undefined-icon { width: 64px; height: 48px; margin-bottom: var(--sp-3); }
+    .pane-undefined-title { font-size: var(--fs-lg); }
+    .pane-undefined-hint { font-size: var(--fs-sm); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .pane-undefined-q { animation: none; stroke-dashoffset: 0; }
+}
