@@ -91,9 +91,12 @@ export function initEditor(state) {
             // A split view is being configured — check if we're still on one of its panes
             // AND split view is still active (if split closed, we've navigated away).
             const viewObj = ctx.state.slideStructure?.[ctx.selectedViewIdx];
+            // currentViewIndex covers a view with an undefined pane, whose
+            // stand-in index may be neither pane (both undefined).
             const onPane  = ctx.state.splitView && viewObj && (
                 ctx.state.currentSlide === (viewObj.left  ?? -1) ||
-                ctx.state.currentSlide === (viewObj.right ?? -1)
+                ctx.state.currentSlide === (viewObj.right ?? -1) ||
+                ctx.state.currentViewIndex === ctx.selectedViewIdx
             );
             if (onPane) {
                 // Stay in split view config mode: don't render overlays or show
@@ -148,11 +151,13 @@ async function enterEditMode() {
     // If we entered edit mode while a split view was active, keep it visible
     // and show the view config panel.  Re-render at 50/50 for the edit preview.
     if (ctx.state.splitView) {
-        const viewIdx = ctx.state.slideStructure?.findIndex(s =>
+        let viewIdx = ctx.state.slideStructure?.findIndex(s =>
             s.type === 'view' &&
             s.left  === ctx.state.currentSlide &&
             s.right === ctx.state.rightSlideIndex
         ) ?? -1;
+        // A view with an undefined pane doesn't match by panes.
+        if (viewIdx === -1 && ctx.state.currentViewIndex != null) viewIdx = ctx.state.currentViewIndex;
         if (viewIdx !== -1) {
             ctx.selectedViewIdx = viewIdx;
             showViewConfig(viewIdx);

@@ -141,6 +141,68 @@ window.addEventListener('message', e => {
 // States loaded from ZIP to restore into freshly-created iframes
 let _savedWidgetStates = {};
 
+// ── One widget, two iframes ────────────────────────────────────────────────
+// A slide's widgets get their own iframes per pane (L:<slide> and R:<slide>),
+// so a slide that has been both full-screen and in a split view has two live
+// copies of each widget. Only one of them is ever on screen; whichever was
+// shown last holds the real state. When the other copy is shown, it takes
+// that state over first — otherwise a change made in the split view's copy
+// vanished on returning to the slide (and vice versa), and a save could
+// pick up the stale copy.
+const _lastShown = new Map();   // String(widgetId) → the iframe last on screen
+
+function _markShown(widgetId, iframe) {
+    _lastShown.set(String(widgetId), iframe);
+}
+
+// The copy that holds a widget's current state, if it is still in the page.
+function _authority(widgetId) {
+    const f = _lastShown.get(String(widgetId));
+    if (f && f.isConnected) return f;
+    _lastShown.delete(String(widgetId));
+    return null;
+}
+
+// One iframe per widget id — the authoritative copy where there are two.
+function _iframesById(filter = null) {
+    const out = new Map();
+    document.querySelectorAll('.widget-iframe').forEach(f => {
+        const wid = f.dataset.widgetId;
+        if (!wid || (filter && !filter.has(wid))) return;
+        const auth = _authority(wid);
+        if (auth) out.set(wid, auth);
+        else if (!out.has(wid)) out.set(wid, f);
+    });
+    return out;
+}
+
+// Ask one iframe for its state. Resolves undefined if it doesn't answer.
+function _askState(iframe, timeoutMs = 700) {
+    const win = iframe?.contentWindow;
+    if (!win) return Promise.resolve(undefined);
+    return new Promise(resolve => {
+        const done = (v) => { clearTimeout(timer); window.removeEventListener('message', onMsg); resolve(v); };
+        const timer = setTimeout(() => done(undefined), timeoutMs);
+        function onMsg(e) {
+            if (e.source !== win || e.data?.type !== 'widget-state' || e.data.state === undefined) return;
+            done(e.data.state);
+        }
+        window.addEventListener('message', onMsg);
+        try { win.postMessage({ type: 'widget-get-state' }, '*'); } catch (_) { done(undefined); }
+    });
+}
+
+// The state to hand a copy of `widgetId` that is about to be shown, taken
+// from the other copy if that one was on screen more recently. undefined
+// when there is nothing newer than what `target` already has — or when the
+// other copy runs older settings (the widget was edited since), whose state
+// a rebuilt widget doesn't take over.
+function _stateFromOtherCopy(widgetId, target, sig) {
+    const auth = _authority(widgetId);
+    if (!auth || auth === target || auth.dataset.widgetSig !== sig) return Promise.resolve(undefined);
+    return _askState(auth);
+}
+
 /**
  * Store widget states to be injected after each widget iframe first loads.
  * Called when a ZIP is loaded that contains config/widget-states.json.
@@ -179,8 +241,7 @@ export function requestWidgetStates(ids, timeoutMs = 800) {
         if (_capturedStates.has(id)) states[id] = _capturedStates.get(id);
         else if (_savedWidgetStates[id] !== undefined) states[id] = _savedWidgetStates[id];
     }
-    const iframes = Array.from(document.querySelectorAll('.widget-iframe'))
-        .filter(f => want.has(f.dataset.widgetId));
+    const iframes = Array.from(_iframesById(want).values());
     if (!iframes.length) return Promise.resolve(states);
     const pending = new Set(iframes.map(f => f.dataset.widgetId));
     return new Promise(resolve => {
@@ -188,6 +249,7 @@ export function requestWidgetStates(ids, timeoutMs = 800) {
         const timer = setTimeout(done, timeoutMs);
         function onMsg(e) {
             if (isPrintWindow(e.source)) return;
+            if (!iframes.some(f => f.contentWindow === e.source)) return;   // not the copy we asked
             const id = e.data?.widgetId != null ? String(e.data.widgetId) : null;
             if (e.data?.type !== 'widget-state' || !id || !pending.has(id) || e.data.state === undefined) return;
             states[id] = e.data.state;
@@ -264,6 +326,7 @@ export function clearAllParked() {
         iframe.remove();
     });
     _capturedStates.clear();
+    _lastShown.clear();
     _savedWidgetStates = {};
     _revokePendingAssetUrls();   // a new deck's files are its own
 }
@@ -275,11 +338,7 @@ export function clearAllParked() {
  * Resolves with a { widgetId: state } map after timeoutMs.
  */
 export async function collectWidgetStates(timeoutMs = 1500) {
-    const allIframes = new Map();
-    document.querySelectorAll('.widget-iframe').forEach(iframe => {
-        const wid = iframe.dataset.widgetId;
-        if (wid) allIframes.set(wid, iframe);
-    });
+    const allIframes = _iframesById();
 
     if (allIframes.size === 0) return {};
 
@@ -297,6 +356,9 @@ export async function collectWidgetStates(timeoutMs = 1500) {
         function handler(e) {
             if (isPrintWindow(e.source)) return;
             if (e.data?.type === 'widget-state' && e.data.widgetId && e.data.state !== undefined) {
+                // Only the copy we asked: the other pane's copy of the same
+                // widget may be stale.
+                if (allIframes.get(String(e.data.widgetId))?.contentWindow !== e.source) return;
                 states[e.data.widgetId] = e.data.state;
                 pending.delete(e.data.widgetId);
                 if (pending.size === 0) done();
@@ -446,6 +508,10 @@ export function renderWidgets(slideConfig, container, zipFile, viewerMode = fals
         if (existing) {
             // ── Reveal parked iframe ───────────────────────────────────────
             existingMap.delete(String(w.id));
+            // The other pane's copy may have moved on since this one was
+            // parked; ask it before this copy becomes the one on screen.
+            const fromOther = _stateFromOtherCopy(w.id, existing, existing.dataset.widgetSig);
+            _markShown(w.id, existing);
 
             // Always key the registry by the string form of the id: parkWidgets
             // and the expand/collapse listener look it up via the iframe's
@@ -474,9 +540,13 @@ export function renderWidgets(slideConfig, container, zipFile, viewerMode = fals
             // After a short delay (browser reflow), fire resize and re-apply
             // captured state so canvas-based widgets redraw correctly.
             const widId = String(w.id);
+            const newer = await fromOther;
+            if (newer !== undefined) _capturedStates.set(widId, newer);
             setTimeout(() => {
                 try { existing.contentWindow?.dispatchEvent(new Event('resize')); } catch (_) {}
-                const captured = _capturedStates.get(widId);
+                // Its own state from when it was parked, or the other copy's
+                // if that one was shown since.
+                const captured = newer !== undefined ? newer : _capturedStates.get(widId);
                 if (captured !== undefined) {
                     try {
                         existing.contentWindow?.postMessage({ type: 'widget-set-state', state: captured }, '*');
@@ -515,7 +585,12 @@ export function renderWidgets(slideConfig, container, zipFile, viewerMode = fals
 
         iframe.allow = 'autoplay; fullscreen; camera; microphone';
 
+        // A copy of this widget may already be running in the other pane
+        // (the slide was shown there first): start from its state, not the
+        // one the deck was loaded with.
+        const fromOther = _stateFromOtherCopy(w.id, iframe, iframe.dataset.widgetSig);
         container.appendChild(iframe);
+        _markShown(w.id, iframe);
         _widgetRegistry.set(String(w.id), { iframe, container, savedStyle: null });
         _ensureExpandListener();
 
@@ -548,11 +623,12 @@ export function renderWidgets(slideConfig, container, zipFile, viewerMode = fals
             await new Promise(resolve => {
                 let settled = false;
                 const finish = () => { if (!settled) { settled = true; resolve(); } };
-                iframe.addEventListener('load', () => {
+                iframe.addEventListener('load', async () => {
                     iframe.contentWindow.postMessage({ type: 'widget-config', config: _configPayload }, '*');
-                    const savedState = _savedWidgetStates[w.id];
+                    const newer = await fromOther;
+                    const savedState = newer !== undefined ? newer : _savedWidgetStates[w.id];
                     if (savedState !== undefined) {
-                        iframe.contentWindow.postMessage({ type: 'widget-set-state', state: savedState }, '*');
+                        iframe.contentWindow?.postMessage({ type: 'widget-set-state', state: savedState }, '*');
                     }
                     finish();
                 }, { once: true });

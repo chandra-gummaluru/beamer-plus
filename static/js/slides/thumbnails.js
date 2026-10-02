@@ -43,6 +43,7 @@ function render(slides, state) {
             const leftPane = document.createElement('div');
             leftPane.className = 'view-preview-pane';
             leftPane.textContent = s.viewLeftLabel ?? '?';
+            leftPane.classList.toggle('is-missing', !!s.viewLeftMissing);
 
             const sep = document.createElement('div');
             sep.className = 'view-preview-sep';
@@ -50,6 +51,7 @@ function render(slides, state) {
             const rightPane = document.createElement('div');
             rightPane.className = 'view-preview-pane';
             rightPane.textContent = s.viewRightLabel ?? '?';
+            rightPane.classList.toggle('is-missing', !!s.viewRightMissing);
 
             preview.appendChild(leftPane);
             preview.appendChild(sep);

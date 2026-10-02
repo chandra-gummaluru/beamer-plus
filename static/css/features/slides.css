@@ -432,6 +432,12 @@ model-viewer { pointer-events: auto !important; }
     color: oklch(38% 0.08 200);
     min-width: 0;
 }
+/* A pane whose slide was deleted (or never chosen): "?" on a dashed wash. */
+.view-preview-pane.is-missing {
+    color: oklch(50% 0.13 40);
+    background: repeating-linear-gradient(135deg,
+        oklch(60% 0.12 40 / 0.10) 0 4px, transparent 4px 8px);
+}
 .view-preview-sep {
     flex-shrink: 0;
     width: 2px;
@@ -1238,3 +1244,45 @@ body.edit-mode #slide-nav-slides .slide-nav-item.current-slide { pointer-events:
     .add-page-styles { grid-template-columns: repeat(2, 1fr); }
     .add-page-detail { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ============================================================
+   Undefined split-view pane
+   ============================================================ */
+/* Covers a split-view pane whose slide was deleted or never chosen. Sits
+   over the (blanked) slide card and everything on it, and takes the
+   pointer so nothing can be drawn on a pane that has no slide. Sized to
+   match #pdf-canvas by sizeSlideCanvases(); pinned on-white ink like
+   .stage-empty. */
+.pane-undefined {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 9;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    text-align: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background:
+        repeating-linear-gradient(135deg, oklch(60% 0.12 40 / 0.06) 0 10px, transparent 10px 20px),
+        #ffffff;
+    border: 2px dashed oklch(70% 0.08 40);
+    border-radius: var(--r-md);
+    box-shadow: var(--shadow-3);
+    color: oklch(38% 0.010 260);
+    font-family: var(--font-sans);
+    pointer-events: auto;
+}
+.pane-undefined[hidden] { display: none; }
+.pane-undefined-mark {
+    font-size: clamp(40px, 9vmin, 96px);
+    font-weight: 700;
+    line-height: 1;
+    color: oklch(55% 0.13 40);
+}
+.pane-undefined-title { margin: 0; font-size: var(--fs-lg, 18px); font-weight: 600; }
+.pane-undefined-hint  { margin: 0; font-size: var(--fs-sm, 13px); color: oklch(55% 0.008 260); }

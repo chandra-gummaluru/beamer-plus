@@ -90,9 +90,12 @@ export function slideUid(obj) {
 //
 //   · keyed data (annotations, bookmarks, text boxes) follows its slide, and
 //     is dropped with it if the slide was removed
-//   · pointers (view panes, current slide, right pane) follow their slide;
-//     one that pointed at a removed slide falls back to whatever now sits in
-//     that position, clamped to the deck
+//   · view panes follow their slide; a pane whose slide was removed becomes
+//     null — undefined, shown as "?" in the navigator and as an "Undefined"
+//     card on stage — rather than silently pointing at some other slide
+//   · pointers (current slide, right pane) follow their slide; one that
+//     pointed at a removed slide falls back to whatever now sits in that
+//     position, clamped to the deck
 //   · the active view index follows its view, or clears if it was removed
 //
 // Editor-side state (the view slide being configured) listens for
@@ -118,10 +121,11 @@ export function remapSlideIndices(oldToNew) {
     s.bookmarks   = moveKeys(s.bookmarks);
     if (s.textBoxes) s.textBoxes = moveKeys(s.textBoxes);
 
+    const movePane = (i) => (i == null ? i : oldToNew(i));   // null: its slide is gone
     for (const obj of s.slideStructure) {
         if (obj.type !== 'view') continue;
-        if (obj.left  !== undefined) obj.left  = movePtr(obj.left);
-        if (obj.right !== undefined) obj.right = movePtr(obj.right);
+        if (obj.left  !== undefined) obj.left  = movePane(obj.left);
+        if (obj.right !== undefined) obj.right = movePane(obj.right);
     }
     s.currentSlide    = movePtr(s.currentSlide);
     s.rightSlideIndex = movePtr(s.rightSlideIndex);
@@ -263,26 +267,39 @@ function insertBlankAfterCurrent(paper = null) {
     bus.emit('slide:goto', ins);
 }
 
+// The two slides a new split view pairs: the last two before it — the slide
+// on stage on the right, the one before it on the left (on slide 8: 7 | 8).
+// View slides are skipped. On the first slide there is nothing before it, so
+// it pairs with the one after instead.
+export function defaultViewPanes(structure, current) {
+    const real = (i) => structure[i] && structure[i].type !== 'view';
+    const prevReal = (i) => { for (let j = i - 1; j >= 0; j--) if (real(j)) return j; return null; };
+    const nextReal = (i) => { for (let j = i + 1; j < structure.length; j++) if (real(j)) return j; return null; };
+    let right = real(current) ? current : prevReal(current);
+    if (right == null) right = nextReal(current);
+    if (right == null) return null;
+    const left = prevReal(right);
+    if (left != null) return { left, right };
+    const after = nextReal(right);
+    return after != null ? { left: right, right: after } : null;
+}
+
 function insertViewAfterCurrent() {
     if (realSlideCount(_state.slideStructure) < 2) return;   // nothing to pair
+    const panes = defaultViewPanes(_state.slideStructure, _state.currentSlide);
+    if (!panes) return;
     const ins    = _state.currentSlide + 1;
     const viewId = `v${Date.now()}`;
 
-    // Splice first so we can compute post-splice indices correctly. The new
-    // view has no panes yet, so the remap leaves it alone.
+    // The panes are worked out before the splice; the view goes in right
+    // after the current slide, so anything at or past `ins` moves up one.
+    // The new view has no panes yet, so the remap leaves it alone.
     _state.slideStructure.splice(ins, 0, { type: 'view', viewId, ratio: 50 });
     remapSlideIndices(shiftedFrom(ins));
+    const shift = shiftedFrom(ins);
 
-    // Left pane: current slide (unchanged after splice).
-    // Right pane: the slide immediately after the view slide (ins+1), i.e. the
-    // old "next slide" which is now labelled e.g. 7b after the view slide 7a.
-    const leftDef  = _state.currentSlide;
-    const len      = _state.slideStructure.length;
-    const rightDef = ins + 1 < len ? ins + 1
-                   : Math.max(0, leftDef - 1);
-
-    _state.slideStructure[ins].left  = leftDef;
-    _state.slideStructure[ins].right = rightDef;
+    _state.slideStructure[ins].left  = shift(panes.left);
+    _state.slideStructure[ins].right = shift(panes.right);
 
     bus.emit('nav:refresh');
     if (_state.editMode) bus.emit('view:select', ins);

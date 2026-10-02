@@ -27,8 +27,9 @@ export function hideViewConfig() {
 }
 
 function buildViewConfigHTML(obj, viewIdx) {
-    const leftVal  = obj.left  !== undefined ? obj.left  : '';
-    const rightVal = obj.right !== undefined ? obj.right : '';
+    // null: the pane's slide was deleted — shown as unselected.
+    const leftVal  = obj.left  ?? '';
+    const rightVal = obj.right ?? '';
     const ratio    = obj.ratio !== undefined ? obj.ratio : 50;
 
     // Each dropdown excludes the view slide itself and the OTHER pane's choice.
@@ -77,8 +78,9 @@ function wireViewConfigHandlers(i, obj) {
     }
 
     // When either pane changes, re-render the panel so exclusions update.
-    get('view-left')?.addEventListener('change',  () => { saveAndRefresh(); showViewConfig(i); });
-    get('view-right')?.addEventListener('change', () => { saveAndRefresh(); showViewConfig(i); });
+    // ...and show the new pair on stage (it may fill an Undefined pane).
+    get('view-left')?.addEventListener('change',  () => { saveAndRefresh(); showViewConfig(i); bus.emit('slide:goto', i); });
+    get('view-right')?.addEventListener('change', () => { saveAndRefresh(); showViewConfig(i); bus.emit('slide:goto', i); });
 
     const ratioEl  = get('view-ratio');
     const ratioLbl = get('view-ratio-val');

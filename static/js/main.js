@@ -695,6 +695,99 @@ function applySplitRatio(ratioPercent) {
     return clamped;
 }
 
+/* ─── undefined split-view panes ──────────────────────────────── */
+// A view slide's pane is undefined when its slide was deleted (the remap
+// sets it to null), was never picked, or points at something that isn't a
+// real slide. The navigator shows such a pane as "?" and the stage shows an
+// "Undefined" card in its place; state.missingPanes says which pane(s) of
+// the split on stage are standing in like that.
+function validPane(p) {
+    const obj = Number.isInteger(p) ? state.slideStructure[p] : null;
+    return obj && obj.type !== 'view' ? p : null;
+}
+
+function paneContainer(isRight) {
+    return document.getElementById(isRight ? 'pdf-container-2' : 'pdf-container');
+}
+
+function showUndefinedPane(isRight, on) {
+    const pane = paneContainer(isRight);
+    if (!pane) return;
+    let card = pane.querySelector('.pane-undefined');
+    if (!on) { if (card) card.hidden = true; return; }
+    if (!card) {
+        card = document.createElement('div');
+        card.className = 'pane-undefined';
+        card.innerHTML = '<span class="pane-undefined-mark" aria-hidden="true">?</span>' +
+                         '<p class="pane-undefined-title">Undefined</p>' +
+                         '<p class="pane-undefined-hint">This pane\'s slide was deleted or never chosen.</p>';
+        pane.appendChild(card);
+    }
+    card.hidden = false;
+    sizeSlideCanvases();
+}
+
+function clearMissingPanes() {
+    state.missingPanes = null;
+    showUndefinedPane(false, false);
+    showUndefinedPane(true, false);
+}
+
+// Empty a pane that has no slide to show: its widgets are parked (not
+// destroyed — they belong to a real slide that may come back) and its media,
+// slide image and ink are cleared. The Undefined card covers whatever is left.
+function blankPane(isRight) {
+    const paneKey = isRight ? 'R' : 'L';
+    ++_renderGen[paneKey];   // a render still in flight for this pane is stale now
+    const slideContainer = document.getElementById(isRight ? 'pdf-canvas-2' : 'pdf-canvas');
+    const prevKey = slideContainer?.dataset?.slideKey;
+    if (slideContainer && prevKey != null) {
+        parkWidgets(slideContainer, prevKey);
+        slideContainer.querySelectorAll('video,audio,model-viewer').forEach(el => el.remove());
+        delete slideContainer.dataset.slideKey;
+    }
+    if (slideContainer) applyPaper(slideContainer, null);
+    const cvs    = isRight ? state.pdfCvs2 : state.pdfCvs;
+    const annCvs = isRight ? state.annCvs2 : state.annCvs;
+    if (cvs?.canvas) cvs.canvas.style.visibility = 'hidden';
+    annCvs?.clear?.();
+    annCvs?.resetHistory?.();
+    _slideOverlay(isRight)?.classList.remove('visible');
+    showUndefinedPane(isRight, true);
+}
+
+// Show a view slide with one or both panes undefined. The real pane renders
+// as usual; the other gets the Undefined card. With one pane real, both
+// currentSlide and rightSlideIndex point at it (the split code needs real
+// indices) and state.missingPanes keeps anything from treating the undefined
+// pane as a second copy of that slide — nothing renders, saves ink or
+// widgets for it. With neither, both point at the view slide itself.
+async function showViewWithUndefinedPane(viewIdx, L, R, direction) {
+    const obj = state.slideStructure[viewIdx];
+    saveCurrentAnnotations();                      // the panes being left, first
+    const anchor = L ?? R ?? viewIdx;
+    if (L != null || R != null) resetRevealsOnArrival(state.slideStructure[anchor], direction);
+    state.missingPanes = { left: L == null, right: R == null };
+    const ratio = state.editMode ? 50 : (obj?.ratio ?? null);
+    // setSplitActive renders the right pane itself unless the split was
+    // already up with this right index.
+    const rightRendered = !(state.splitView && state.rightSlideIndex === anchor);
+    await setSplitActive(true, anchor, ratio);
+    if (state.rightSlideIndex !== anchor) state.rightSlideIndex = anchor;
+    state.currentViewIndex = viewIdx;
+    state.currentSlide = anchor;
+
+    if (L != null) { showUndefinedPane(false, false); await renderLogicalSlide(L, false); }
+    else blankPane(false);
+    if (R != null) { showUndefinedPane(true, false); if (!rightRendered) await renderLogicalSlide(R, true); }
+    else blankPane(true);
+
+    updateSlideNavigator();
+    updateBlankSlideButtons();
+    updateStepBadge();
+    bus.emit('slide:changed', state.currentSlide);
+}
+
 /* ─── slide navigation ────────────────────────────────────────── */
 bus.on('slide:goto', (i) => goToSlide(i));
 bus.on('slide:next', () => navStep(+1));
@@ -704,6 +797,7 @@ bus.on('slide:goto-right', (i) => queueNav(async () => {
     await commitOpenTextEditor(state);
     saveCurrentAnnotations();
     _slideOverlay(true)?.classList.add('visible');
+    if (state.missingPanes?.right) { state.missingPanes.right = false; showUndefinedPane(true, false); }
     state.rightSlideIndex = i;
     resetRevealsOnArrival(state.slideStructure[i], null);
     await renderLogicalSlide(i, true);
@@ -723,7 +817,10 @@ async function _goToSlide(i, direction = null, isSplitPaneNav = false) {
     // it's enforced regardless of caller. Sequential nav (direction set) and
     // internal split-pane navigation (isSplitPaneNav) have their own handling
     // above/below and are exempt.
-    if (direction === null && !isSplitPaneNav && state.splitView && i === state.rightSlideIndex) return;
+    // (A view slide is never really in the right pane — with both its panes
+    // undefined, rightSlideIndex only stands in at its index.)
+    if (direction === null && !isSplitPaneNav && state.splitView && i === state.rightSlideIndex &&
+        state.slideStructure[i]?.type !== 'view') return;
 
     hideSpotlight(true);
 
@@ -742,9 +839,16 @@ async function _goToSlide(i, direction = null, isSplitPaneNav = false) {
         // slide instead so navigation continues through the deck.
         const viewIdx = state.currentViewIndex;
         if (direction === 'forward' && viewIdx != null &&
-            (state.slideStructure[targetIdx]?.hidden || targetIdx <= viewIdx)) {
+            (state.slideStructure[targetIdx]?.hidden || targetIdx <= viewIdx || state.missingPanes?.right)) {
             targetIdx = viewIdx + 1;
         }
+        // An undefined left pane has no slide to fall back to: step back
+        // past the view slide instead.
+        if (direction === 'back' && viewIdx != null && state.missingPanes?.left) {
+            targetIdx = viewIdx - 1;
+        }
+        // Nothing beyond the view in that direction: stay in the split.
+        if (targetIdx < 0 || targetIdx >= state.slideStructure.length) return;
         await setSplitActive(false);
         // Pass direction so the hidden-slide while loop runs in the recursive call.
         // Forward: skips right-pane if hidden, continues to next visible slide.
@@ -772,8 +876,10 @@ async function _goToSlide(i, direction = null, isSplitPaneNav = false) {
     // Works in both presentation mode and edit mode (edit mode also shows the split for preview).
     const prelimObj = state.slideStructure[i];
     if (prelimObj?.type === 'view') {
-        const leftIdx  = Math.max(0, Math.min(state.slideStructure.length - 1, prelimObj.left  ?? 0));
-        const rightIdx = Math.max(0, Math.min(state.slideStructure.length - 1, prelimObj.right ?? 0));
+        const L = validPane(prelimObj.left), R = validPane(prelimObj.right);
+        if (L == null || R == null) { await showViewWithUndefinedPane(i, L, R, direction); return; }
+        clearMissingPanes();
+        const leftIdx = L, rightIdx = R;
         saveCurrentAnnotations();
         // Both panes start with their reveal steps hidden (all shown when
         // arriving backwards); the left pane's goToSlide below won't reset.
@@ -809,6 +915,7 @@ async function _goToSlide(i, direction = null, isSplitPaneNav = false) {
 
     if (!isSplitPaneNav && i !== state.currentSlide) resetRevealsOnArrival(state.slideStructure[i], direction);
     state.currentSlide = i;
+    if (state.missingPanes?.left) { state.missingPanes.left = false; showUndefinedPane(false, false); }
 
     if (state.splitView) {
         const rightChanged = state.rightSlideIndex !== prevRightIndex;
@@ -838,6 +945,7 @@ async function setSplitActive(active, rightIndex = null, splitRatio = null) {
 
     state.splitView = active;
     if (!active) {
+        clearMissingPanes();
         state.currentViewIndex = null;   // split closed — no view slide drives it anymore
         state.activeAnnCvs = state.annCvs; // shared controls (undo/clear) go back to the sole pane
     }
@@ -884,7 +992,10 @@ async function setSplitActive(active, rightIndex = null, splitRatio = null) {
     // Render right pane AFTER the canvas resize — resizeOnly() clears canvas
     // dimensions so any render done before it would be wiped. This is the reason
     // the right slide sometimes appeared blank on first load.
-    if (active) await renderLogicalSlide(state.rightSlideIndex, true);
+    // An undefined right pane renders nothing (showViewWithUndefinedPane
+    // blanks it) — rendering its stand-in index would start a second copy of
+    // the left slide's widgets.
+    if (active && !state.missingPanes?.right) await renderLogicalSlide(state.rightSlideIndex, true);
 
     updateHistoryBtns();   // reflect the pane the shared undo/redo now targets
     populateSlideNavigator();
@@ -901,15 +1012,16 @@ function updateSlideNavigator() {
         el.classList.toggle('current-slide',   idx === state.currentSlide);
         el.classList.toggle('bookmarked',      !!state.bookmarks[idx]);
         el.classList.toggle('type-view',        state.slideStructure[idx]?.type === 'view');
-        el.classList.toggle('is-right-slide',  state.splitView && idx === state.rightSlideIndex);
+        el.classList.toggle('is-right-slide',  state.splitView && !state.missingPanes?.right && idx === state.rightSlideIndex);
         el.classList.toggle('is-hidden-slide', !!state.slideStructure[idx]?.hidden);
 
         const leftZone  = el.querySelector('.slide-split-zone--left');
         const rightZone = el.querySelector('.slide-split-zone--right');
         if (leftZone && rightZone) {
             // Active = this slide is currently assigned to that pane
-            leftZone.classList.toggle('is-active',   state.splitView && idx === state.currentSlide);
-            rightZone.classList.toggle('is-active',  state.splitView && idx === state.rightSlideIndex);
+            const miss = state.splitView ? state.missingPanes : null;
+            leftZone.classList.toggle('is-active',   state.splitView && !miss?.left  && idx === state.currentSlide);
+            rightZone.classList.toggle('is-active',  state.splitView && !miss?.right && idx === state.rightSlideIndex);
             // Disabled = placing this slide on that pane would duplicate across both panes
             leftZone.classList.toggle('is-disabled',  state.splitView && idx === state.rightSlideIndex && idx !== state.currentSlide);
             rightZone.classList.toggle('is-disabled', state.splitView && idx === state.currentSlide   && idx !== state.rightSlideIndex);
@@ -939,14 +1051,23 @@ function _slideOverlay(isRight) {
     return document.getElementById(id)?.querySelector('.slide-loading-overlay') ?? null;
 }
 
+// renderLogicalSlide for one pane of the split on stage, unless that pane is
+// undefined (see showViewWithUndefinedPane) — then it stays blank under its
+// card instead of showing a second copy of the other pane's slide.
+function renderPane(idx, isRight, suppressOverlay = false, forceRefresh = false) {
+    const miss = state.splitView ? state.missingPanes : null;
+    if (isRight ? miss?.right : miss?.left) { blankPane(isRight); return Promise.resolve(); }
+    return renderLogicalSlide(idx, isRight, suppressOverlay, forceRefresh);
+}
+
 async function renderSplitSlides(leftIdx, rightIdx) {
     const lo = _slideOverlay(false);
     const ro = _slideOverlay(true);
     lo?.classList.add('visible');
     ro?.classList.add('visible');
     await Promise.all([
-        renderLogicalSlide(leftIdx,  false, true),
-        renderLogicalSlide(rightIdx, true,  true),
+        renderPane(leftIdx,  false, true),
+        renderPane(rightIdx, true,  true),
     ]);
     lo?.classList.remove('visible');
     ro?.classList.remove('visible');
@@ -1144,9 +1265,12 @@ function saveCurrentAnnotations() {
     // re-render reloads it. Reading the live canvas in that window would persist
     // a blank over the real annotation (this is what made annotations vanish
     // when entering/leaving an auto split-view).
-    state.annotations[state.currentSlide] = state.annCvs.getCommittedSnapshot();
+    // An undefined pane has no slide of its own: its (blank) canvas must not
+    // be written over the real slide its index stands in for.
+    const missing = state.splitView ? state.missingPanes : null;
+    if (!missing?.left) state.annotations[state.currentSlide] = state.annCvs.getCommittedSnapshot();
     // Also save the right pane when in split view
-    if (state.splitView && state.annCvs2) {
+    if (state.splitView && state.annCvs2 && !missing?.right) {
         state.annotations[state.rightSlideIndex] = state.annCvs2.getCommittedSnapshot();
     }
 }
@@ -1230,11 +1354,15 @@ function populateSlideNavigator() {
             thumbUrl: obj.type === 'pdf'   ? (state.slideThumbnailCache[obj.pdfIndex] ?? null) : null,
         };
         if (obj.type === 'view') {
-            base.viewLeft      = obj.left  ?? 0;
-            base.viewRight     = obj.right ?? 0;
+            const L = validPane(obj.left), R = validPane(obj.right);
+            base.viewLeft      = L;
+            base.viewRight     = R;
             base.viewRatio     = obj.ratio ?? 50;
-            base.viewLeftLabel  = labels[obj.left]  ?? String((obj.left  ?? 0) + 1);
-            base.viewRightLabel = labels[obj.right] ?? String((obj.right ?? 0) + 1);
+            // "?" for a pane whose slide was deleted (or never chosen).
+            base.viewLeftLabel  = L != null ? labels[L] : '?';
+            base.viewRightLabel = R != null ? labels[R] : '?';
+            base.viewLeftMissing  = L == null;
+            base.viewRightMissing = R == null;
         }
         return base;
     }));
@@ -1356,6 +1484,8 @@ function sizeSlideCanvases() {
         if (overlay) { overlay.style.width = `${w}px`; overlay.style.height = `${h}px`; }
         const empty = pane.querySelector('.stage-empty');
         if (empty) { empty.style.width = `${w}px`; empty.style.height = `${h}px`; }
+        const undef = pane.querySelector('.pane-undefined');
+        if (undef) { undef.style.width = `${w}px`; undef.style.height = `${h}px`; }
     }
 }
 
@@ -1394,7 +1524,7 @@ function wireResizeAndFullscreen() {
 
 /* ─── editor: exit → re-render so added media appears immediately */
 bus.on('editor:exited', async () => {
-    await renderLogicalSlide(state.currentSlide, false, false, true);
+    await renderPane(state.currentSlide, false, false, true);
     updateStepBadge();   // reveal steps may have been added or removed
 });
 
@@ -1415,8 +1545,8 @@ bus.on('slides:reordered', async () => {
     populateSlideNavigator();
     if (state.splitView) {
         await Promise.all([
-            renderLogicalSlide(state.currentSlide,    false, true),
-            renderLogicalSlide(state.rightSlideIndex, true,  true),
+            renderPane(state.currentSlide,    false, true),
+            renderPane(state.rightSlideIndex, true,  true),
         ]);
     } else {
         await renderLogicalSlide(state.currentSlide, false, true);

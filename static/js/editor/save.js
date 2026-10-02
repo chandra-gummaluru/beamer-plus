@@ -41,10 +41,13 @@ export async function savePresentation() {
         // arrive while we copy the rest of the ZIP below.
         requestWidgetFileFlush();
         // Flush the current canvas so the latest strokes are captured.
-        if (ctx.state.annCvs?.canvas) {
+        // A split-view pane standing in for a deleted slide has no strokes
+        // of its own — and must not write its blank canvas over a real slide.
+        const missing = ctx.state.splitView ? ctx.state.missingPanes : null;
+        if (ctx.state.annCvs?.canvas && !missing?.left) {
             ctx.state.annotations[ctx.state.currentSlide] = ctx.state.annCvs.canvas.toDataURL('image/png');
         }
-        if (ctx.state.splitView && ctx.state.annCvs2?.canvas) {
+        if (ctx.state.splitView && ctx.state.annCvs2?.canvas && !missing?.right) {
             ctx.state.annotations[ctx.state.rightSlideIndex] = ctx.state.annCvs2.canvas.toDataURL('image/png');
         }
 
