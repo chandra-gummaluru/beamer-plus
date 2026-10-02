@@ -10,8 +10,8 @@
 //     renderer), set to the live widget's current state. A widget answers
 //     with an image for its box and, optionally, extra pages that go right
 //     after its slide. A widget that doesn't answer gets a placeholder box.
-//   · Hidden slides and split-view slides (which only repeat two others) are
-//     left out.
+//   · Hidden slides are left out. A split-view slide prints its two panes,
+//     each slide at most once in the whole PDF (see notesSlideOrder).
 import { ctx } from './context.js';
 import { bus } from '../core/events.js';
 import { configKeyOf, getSlideLabels } from '../slides/structure.js';
@@ -226,6 +226,9 @@ async function modelSnapshot(url, m, box) {
     }
 }
 
+// The name the deck was uploaded with, without its extension.
+const deckBaseName = () => ctx.state.deckName || 'presentation';
+
 const baseName = (p) => String(p || '').split('/').pop() || 'file';
 
 /* ─── the exporter ─────────────────────────────────────────────── */
@@ -272,9 +275,7 @@ export async function downloadNotes() {
         const refH = stageRect?.height > 50 ? stageRect.height : refW * 0.75;
 
         const labels = getSlideLabels(s.slideStructure);
-        const slides = s.slideStructure
-            .map((obj, i) => ({ obj, i, label: labels[i] }))
-            .filter(({ obj }) => obj && obj.type !== 'view' && !obj.hidden);
+        const slides = notesSlideOrder(s.slideStructure, labels);
 
         // Every slide's config, and the current state of every widget on them.
         const configs = new Map();
@@ -387,7 +388,7 @@ export async function downloadNotes() {
         const bytes = await out.save();
         const blob = new Blob([bytes], { type: 'application/pdf' });
         const url  = URL.createObjectURL(blob);
-        const a    = Object.assign(document.createElement('a'), { href: url, download: 'presentation-notes.pdf' });
+        const a    = Object.assign(document.createElement('a'), { href: url, download: `${deckBaseName()}-notes.pdf` });
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -400,6 +401,32 @@ export async function downloadNotes() {
     } finally {
         _busy = false;
     }
+}
+
+// Which slides go in the notes, in order. Visible PDF pages and blanks appear
+// where they sit. A visible split-view slide stands for its two panes: each
+// pane not already in the notes is printed there, in the view's place (so a
+// pane that is hidden on its own, used only in the split, still makes it
+// in). Every slide appears at most once — a pane printed at its view is not
+// printed again at its own position.
+export function notesSlideOrder(structure, labels = getSlideLabels(structure)) {
+    const n = structure.length;
+    const out = [];
+    const done = new Set();
+    const add = (i) => {
+        const obj = structure[i];
+        if (!obj || obj.type === 'view' || done.has(i)) return;
+        done.add(i);
+        out.push({ obj, i, label: labels[i] });
+    };
+    structure.forEach((obj, i) => {
+        if (!obj || obj.hidden) return;
+        if (obj.type !== 'view') { add(i); return; }
+        for (const p of [obj.left, obj.right]) {
+            if (Number.isInteger(p) && p >= 0 && p < n) add(p);
+        }
+    });
+    return out;
 }
 
 // Whether an annotation snapshot has anything on it. The canvas is saved

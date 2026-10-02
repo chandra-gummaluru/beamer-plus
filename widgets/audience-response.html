@@ -1127,7 +1127,9 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     const from = el._v ?? 0;
     el._v = to;
     cancelAnimationFrame(el._raf);
-    if (REDUCED || from === to) { el.textContent = to + suffix; return; }
+    // A print copy snaps too: the snapshot is taken a frame or two after
+    // render and would catch the count part-way.
+    if (REDUCED || window.BEAMER_PRINT || from === to) { el.textContent = to + suffix; return; }
     const t0 = performance.now(), dur = 650;
     const step = t => {
       const k = Math.min(1, (t - t0) / dur);

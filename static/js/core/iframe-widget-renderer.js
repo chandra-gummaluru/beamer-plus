@@ -682,8 +682,33 @@ const _PRINT_PRELUDE = `<script id="bw-print-sandbox">
   try { Object.defineProperty(window, 'io', { get: function () { return io; }, set: function () {}, configurable: false }); }
   catch (_) { window.io = io; }
   window.BEAMER_PRINT = true;
+  // Paper shows the end state. Widgets animate into it — bars growing,
+  // numbers counting up, new items fading in — and a snapshot taken a frame
+  // or two after a render caught them part-way (short bars, low counts,
+  // half-transparent answers). So: report reduced motion to scripts that ask,
+  // and switch CSS transitions and animations off (the style below).
+  try {
+    var mm = window.matchMedia && window.matchMedia.bind(window);
+    if (mm) window.matchMedia = function (q) {
+      var r = mm(q);
+      if (String(q).replace(/ /g, '').toLowerCase().indexOf('prefers-reduced-motion:reduce') < 0) return r;
+      return { matches: true, media: r.media, onchange: null,
+               addListener: function () {}, removeListener: function () {},
+               addEventListener: function () {}, removeEventListener: function () {},
+               dispatchEvent: function () { return false; } };
+    };
+  } catch (_) {}
 })();
-<\/script>`;
+<\/script>
+<style id="bw-print-still">
+*, *::before, *::after {
+  transition: none !important;
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+}
+</style>`;
 
 // Windows of print copies — their messages must not be taken for the live
 // widget's (they share its widget id).

@@ -94,6 +94,12 @@ async function readUserFileBytes(file) {
     }
 }
 
+// The uploaded file's name without its extension — what Save names the ZIP.
+function deckNameOf(file) {
+    const n = String(file?.name || '').replace(/\.(zip|pdf)$/i, '').trim();
+    return n || 'presentation';
+}
+
 /* ─── bootstrap ───────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
     const sessionId = getSessionId();
@@ -185,7 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const data = await readUserFileBytes(file);
             const zip  = await JSZip.loadAsync(data);
-            await uploadZipToServer(zip, modal);
+            await uploadZipToServer(zip, modal, file.name);
         } catch (err) {
             modal?.close();
             window.BeamerModal?.show({ kind: 'error', title: 'Upload failed', message: err.message });
@@ -199,7 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
     bus.emit('app:ready');
 });
 
-async function uploadZipToServer(zip, modal) {
+async function uploadZipToServer(zip, modal, name = 'presentation.zip') {
     modal?.show({ kind: 'loading', title: 'Uploading…', message: 'Sending to server…' });
     const blob  = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
     const form  = new FormData();
@@ -209,7 +215,7 @@ async function uploadZipToServer(zip, modal) {
         const err = await resp.json().catch(() => ({ error: 'Server error' }));
         throw new Error(err.error || `HTTP ${resp.status}`);
     }
-    const file = new File([blob], 'presentation.zip', { type: 'application/zip' });
+    const file = new File([blob], name, { type: 'application/zip' });
     await loadZipPresentation(file);
 }
 
@@ -1469,6 +1475,7 @@ export async function loadZipPresentation(file) {
         if (rightCvs) delete rightCvs.dataset.slideKey;
 
         state.zipFile        = zip;
+        state.deckName       = deckNameOf(file);
         // Free the previous PDF's worker memory, then reuse the document we
         // just parsed instead of decoding it again on first render.
         state._pdfDocPromise?.then(d => d?.destroy?.()).catch(() => {});
@@ -1537,6 +1544,7 @@ export async function loadPdfPresentation(file) {
         }
 
         state.zipFile = zip;
+        state.deckName = deckNameOf(file);
         // Free the previous PDF's worker memory, then reuse the document we
         // just parsed instead of decoding it again on first render.
         state._pdfDocPromise?.then(d => d?.destroy?.()).catch(() => {});

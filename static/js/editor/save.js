@@ -134,7 +134,9 @@ export async function savePresentation() {
 
         const blob = await newZip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
         const url  = URL.createObjectURL(blob);
-        const a    = Object.assign(document.createElement('a'), { href: url, download: 'presentation-edited.zip' });
+        // Same name the deck was uploaded with (a PDF upload saves as
+        // <name>.zip), so re-saving overwrites rather than piling up copies.
+        const a    = Object.assign(document.createElement('a'), { href: url, download: `${ctx.state.deckName || 'presentation'}.zip` });
         a.click();
         URL.revokeObjectURL(url);
         modal?.close();
