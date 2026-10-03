@@ -16,6 +16,7 @@ const _HELP_ICONS = {
     bookmark:  `<path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>`,
     hand:      `<path d="M18 11V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2"/><path d="M14 10V4a2 2 0 0 0-2-2 2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2v8"/><path d="M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>`,
     spotlight: `<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>`,
+    magnify:   `<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16" y2="16"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>`,
     pen:       `<path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/>`,
     eraser:    `<path d="M7 21h10"/><path d="m5 11 9-9 6 6-9 9H5z"/>`,
     video:     `<polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>`,
@@ -60,6 +61,7 @@ export function showHelpModal() {
 <ul class="help-ul">
   <li>${_hbtn('hand','Hand')} <strong>Hand</strong>: default mode, no drawing.</li>
   <li>${_hbtn('spotlight','Spotlight')} <strong>Spotlight</strong>: dims the slide and highlights your cursor position.</li>
+  <li>${_hbtn('magnify','Magnifier')} <strong>Magnifier</strong>: a lens that enlarges the part of the slide under your cursor. Scroll to zoom in or out; click to put it away.</li>
   <li>${_hbtn('pen','Pen')} <strong>Pen</strong>: freehand drawing. Click the pen icon again to change colour and size.</li>
   <li>${_hbtn('eraser','Eraser')} <strong>Eraser</strong>: erase individual strokes.</li>
 </ul>`,

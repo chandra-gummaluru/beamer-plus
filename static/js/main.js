@@ -24,6 +24,7 @@ import { initReveals, renderReveals, resetRevealsOnArrival, stepReveal, updateSt
 import { applyPaper } from './slides/paper.js';
 import { initSpotlight, hideSpotlight, renderSpotlight,
          setWidgetInteractivityForSpotlight } from './slides/spotlight.js';
+import { initMagnifier, hideMagnifier } from './slides/magnifier.js';
 import { initMedia, renderMedia, updateMediaPositions, resetMediaCache } from './slides/media.js';
 
 import { initSettings, loadShortcuts } from './app/settings.js';
@@ -159,6 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // spotlight.js's own 'tool:change' handler dereferences state that only
     // exists once initSpotlight(state) has run.
     initSpotlight(state);
+    initMagnifier(state);
 
     // pen + hand defaults
     applyDefaultPen();
@@ -333,13 +335,16 @@ bus.on('tool:change', (tool) => {
     if (tool !== 'text') commitOpenTextEditor(state);
     state.annotationTool = tool;
     // Map toolbar tool names to canvas pointer modes
-    const modeMap = { eraser: 'erase', laser: 'hand', select: 'hand', shape: 'shape', hand: 'hand', spotlight: 'hand', text: 'text' };
+    const modeMap = { eraser: 'erase', laser: 'hand', select: 'hand', shape: 'shape', hand: 'hand', spotlight: 'hand', magnify: 'hand', text: 'text' };
     const mode = modeMap[tool] || 'hand';
     forEachAnnCvs(c => c.setPointerMode(mode));
     if (tool !== 'shape') setShapeSidebarVisible(false);
     setTextToolActive(tool === 'text');
-    setWidgetInteractivityForSpotlight(tool === 'spotlight');
+    // The magnifier needs the same thing the spotlight does: widgets that
+    // don't swallow pointer moves, or the lens freezes over them.
+    setWidgetInteractivityForSpotlight(tool === 'spotlight' || tool === 'magnify');
     if (tool !== 'spotlight') hideSpotlight(true);
+    if (tool !== 'magnify') hideMagnifier();
 });
 
 bus.on('shape:select', (shape) => {
@@ -424,6 +429,7 @@ function wireKeyboardNav() {
         if (e.key === sc.hand)             document.querySelector('[data-tool="hand"], #hand-btn')?.click();
         if (e.key === sc.eraser)           document.querySelector('[data-tool="eraser"]')?.click();
         if (e.key === sc.spotlight)        document.querySelector('[data-tool="spotlight"], #spotlight-btn')?.click();
+        if (e.key === sc.magnify)          document.querySelector('[data-tool="magnify"], #magnify-btn')?.click();
         if (e.key === sc.bookmark && state.slideStructure.length) toggleBookmark(state.currentSlide);
         if (e.key === sc.clearAnnotations) document.getElementById('annotation-clear-btn')?.click();
         if (e.key === sc.splitView)        document.getElementById('split-toggle')?.click();
@@ -830,6 +836,7 @@ async function _goToSlide(i, direction = null, isSplitPaneNav = false) {
         state.slideStructure[i]?.type !== 'view') return;
 
     hideSpotlight(true);
+    hideMagnifier();
 
     // Presentation-mode sequential nav from within split view:
     //   forward → exit split, show right pane slide full-screen

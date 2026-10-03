@@ -375,6 +375,46 @@ body.text-tool-active #ann-canvas-2 {
 }
 
 /* ============================================================
+   Magnifier lens (slides/magnifier.js)
+   ============================================================ */
+.magnifier-lens {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 240px;
+    height: 240px;
+    border-radius: 50%;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 60;
+    opacity: 0;
+    transition: opacity 120ms ease;
+    border: 2px solid oklch(100% 0 0 / 0.95);
+    box-shadow:
+        0 0 0 1px oklch(30% 0.01 260 / 0.35),
+        0 10px 32px oklch(20% 0.01 260 / 0.28);
+}
+.magnifier-lens.visible { opacity: 1; }
+.magnifier-lens canvas { display: block; }
+/* Zoom read-out, shown briefly while scrolling. */
+.magnifier-zoom {
+    position: absolute;
+    left: 50%;
+    bottom: 14px;
+    transform: translateX(-50%);
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: oklch(20% 0.01 260 / 0.72);
+    color: #fff;
+    font: 600 11px/1.4 ui-monospace, Menlo, Consolas, monospace;
+    opacity: 0;
+    transition: opacity 150ms ease;
+}
+.magnifier-zoom.visible { opacity: 1; }
+/* The lens marks the spot; an arrow on top of it only gets in the way. */
+body.magnify-lens-on #main-content { cursor: none; }
+
+/* ============================================================
    Mobile / tablet — bottom toolbar bar
    ============================================================ */
 @media (max-width: 1024px) {
