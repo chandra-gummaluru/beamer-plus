@@ -17,7 +17,9 @@
       "note": "this deck only" },
     { "key": "hop",     "label": "Seconds per hop", "type": "select", "default": 1,
       "options": [ {"v": 0.25, "l": "¼s"}, {"v": 0.5, "l": "½s"}, {"v": 1, "l": "1s"}, {"v": 2, "l": "2s"} ] },
-    { "key": "running", "label": "Start running", "type": "checkbox", "default": true }
+    { "key": "running", "label": "Start running", "type": "checkbox", "default": true },
+    { "key": "showParts",  "label": "Show the parts panel", "type": "checkbox", "default": true },
+    { "key": "showTiming", "label": "Show the timing diagram", "type": "checkbox", "default": false }
   ]
 }
 </script>
@@ -118,14 +120,30 @@ button { font-family:inherit; }
   border-right:1px solid var(--border-md);
   display:flex; flex-direction:column; min-height:0;
 }
-.pal-search { padding:9px 9px 6px; position:relative; flex:0 0 auto; }
+.pal-search { padding:9px 9px 6px; position:relative; flex:0 0 auto; display:flex; align-items:center; gap:5px; }
+.pal-search input { flex:1; min-width:0; }
+/* Collapse / expand. Closed, the panel shrinks to a rail that still says
+   what it is, so the board gets the width without the parts going missing. */
+.pal-toggle {
+  width:24px; height:27px; padding:0; flex:0 0 auto; border-radius:var(--r);
+  display:grid; place-items:center; cursor:pointer;
+  background:transparent; border:1px solid transparent; color:var(--ink-3);
+  transition:background .1s, border-color .1s, color .1s;
+}
+.pal-toggle:hover { background:var(--bg); border-color:var(--border); color:var(--ink); }
+.palette.is-closed { width:36px; align-items:center; padding-top:9px; gap:10px; cursor:pointer; }
+.palette.is-closed:hover { background:var(--bg-subtle); }
+.pal-rail-label {
+  writing-mode:vertical-rl; transform:rotate(180deg);
+  font-size:9.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3);
+}
 .pal-search input {
   width:100%; height:27px; padding:0 8px 0 26px; font:inherit; font-size:12px;
   border:1px solid var(--border); border-radius:var(--r); background:var(--bg);
   color:var(--ink); outline:none; transition:border-color .12s, box-shadow .12s;
 }
 .pal-search input:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
-.pal-search svg { position:absolute; left:17px; top:16px; color:var(--ink-3); pointer-events:none; }
+.pal-search > svg { position:absolute; left:17px; top:17px; color:var(--ink-3); pointer-events:none; }
 .pal-scroll { flex:1; overflow-y:auto; padding:2px 9px 18px; scrollbar-width:thin; scrollbar-color:var(--border-md) transparent; }
 .pal-scroll::-webkit-scrollbar { width:5px; }
 .pal-scroll::-webkit-scrollbar-thumb { background:var(--border-md); border-radius:4px; }
@@ -163,7 +181,9 @@ button { font-family:inherit; }
 .pal-del-btn svg { display:block; pointer-events:none; }
 
 /* ───────────────────────── canvas ───────────────────────── */
-.canvas-wrap { flex:1; position:relative; min-width:0; background:var(--bg); }
+/* Board above, timing diagram (when open) below. */
+.stage { flex:1; display:flex; flex-direction:column; min-width:0; min-height:0; }
+.canvas-wrap { flex:1; position:relative; min-width:0; min-height:0; background:var(--bg); }
 .canvas-wrap::after {
   content:''; position:absolute; inset:0; pointer-events:none;
   box-shadow:inset 0 1px 0 rgba(26,26,24,.05), inset 0 0 60px rgba(26,26,24,.02);
@@ -277,6 +297,7 @@ kbd.key {
 .btn.subtle:hover { background:var(--panel-2); color:var(--ink); border-color:var(--border-hi); }
 .btn.warn    { background:var(--bg); color:var(--danger); border-color:#fecaca; flex:1; }
 .btn.warn:hover { background:var(--danger-soft); border-color:var(--danger); }
+.bw-btn.tb-toggle.on { background:var(--panel-2); border-color:var(--border-hi); color:var(--ink); }
 
 .import-choices { display:flex; flex-direction:column; gap:8px; }
 .import-choice {
@@ -287,6 +308,47 @@ kbd.key {
 .import-choice:hover { background:var(--panel); border-color:var(--border-hi); transform:translateY(-1px); box-shadow:var(--shadow); }
 .import-choice-title { font-weight:600; font-size:13px; }
 .import-choice-sub { font-size:11.5px; color:var(--ink-2); margin-top:2px; }
+
+/* ───────────────────────── timing diagram ─────────────────────────
+   A strip under the board. The header is DOM (signal picker, window,
+   close); the traces are one canvas redrawn every frame so they scroll
+   with simulation time and stop dead when the sim is halted. */
+.timing {
+  flex:0 0 auto; max-height:46%; min-height:0;
+  display:flex; flex-direction:column;
+  background:var(--bg); border-top:1px solid var(--border-md);
+}
+.tm-head {
+  flex:0 0 auto; display:flex; align-items:center; gap:6px;
+  padding:5px 8px 5px 10px; border-bottom:1px solid var(--border);
+  overflow-x:auto; scrollbar-width:none;
+}
+.tm-head::-webkit-scrollbar { display:none; }
+.tm-title { font-size:9.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); flex:0 0 auto; margin-right:4px; }
+.tm-group { display:flex; align-items:center; gap:4px; flex:0 0 auto; }
+.tm-group-key { font-size:9px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-3); margin-right:1px; }
+.tm-chip {
+  height:22px; padding:0 8px; border-radius:999px; cursor:pointer; flex:0 0 auto;
+  font-family:var(--font-mono); font-size:11px; color:var(--ink-3);
+  background:transparent; border:1px solid var(--border);
+  display:inline-flex; align-items:center; gap:5px;
+  transition:background .1s, border-color .1s, color .1s;
+}
+.tm-chip:hover { border-color:var(--border-hi); color:var(--ink-2); }
+.tm-chip i { width:6px; height:6px; border-radius:50%; border:1px solid currentColor; flex:0 0 auto; }
+.tm-chip.on { background:var(--panel-2); border-color:var(--border-hi); color:var(--ink); }
+.tm-chip.on i { background:var(--high); border-color:var(--high-2); }
+.tm-link {
+  background:none; border:none; padding:0 3px; cursor:pointer; flex:0 0 auto;
+  font-size:10.5px; color:var(--ink-3); text-decoration:underline; text-underline-offset:2px;
+}
+.tm-link:hover { color:var(--ink); }
+.tm-body { flex:1 1 auto; min-height:0; overflow-y:auto; position:relative;
+  scrollbar-width:thin; scrollbar-color:var(--border-md) transparent; }
+.tm-body::-webkit-scrollbar { width:5px; }
+.tm-body::-webkit-scrollbar-thumb { background:var(--border-md); border-radius:4px; }
+.tm-body canvas { display:block; cursor:crosshair; }
+.tm-empty { padding:14px 12px 16px; font-size:11.5px; color:var(--ink-3); }
 
 /* ───────────────────────── narrow layouts ─────────────────────────
    Widgets get embedded at all sorts of sizes, so the chrome sheds its
@@ -3088,7 +3150,11 @@ function Thumb({ kind }) {
 const Chev = ()=><svg className="chev" width="9" height="9" viewBox="0 0 9 9">
   <path d="M1.5 3L4.5 6L7.5 3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>;
 
-function Palette({ onDragStart, onPlace, onImportClick, onDeleteCustom, customKinds=[] }) {
+const SideChev = ({ dir })=><svg width="10" height="10" viewBox="0 0 10 10">
+  <path d={dir==='left' ? 'M6.5 1.5L3 5l3.5 3.5' : 'M3.5 1.5L7 5 3.5 8.5'} fill="none" stroke="currentColor"
+        strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+
+function Palette({ open=true, onToggle, onDragStart, onPlace, onImportClick, onDeleteCustom, customKinds=[] }) {
   const [query, setQuery] = useState('');
   const [closed, setClosed] = useState({});
   const q = query.trim().toLowerCase();
@@ -3099,6 +3165,14 @@ function Palette({ onDragStart, onPlace, onImportClick, onDeleteCustom, customKi
     return hay.includes(q);
   };
 
+  // Closed: the whole rail is the "open" button, so it's an easy target.
+  if (!open) return <div className="palette is-closed" onClick={onToggle} title="Show parts (P)">
+    <button className="pal-toggle" onClick={e=>{ e.stopPropagation(); onToggle?.(); }} title="Show parts (P)">
+      <SideChev dir="right"/>
+    </button>
+    <span className="pal-rail-label">Parts</span>
+  </div>;
+
   return <div className="palette">
     <div className="pal-search">
       <svg width="11" height="11" viewBox="0 0 12 12">
@@ -3107,6 +3181,9 @@ function Palette({ onDragStart, onPlace, onImportClick, onDeleteCustom, customKi
       </svg>
       <input value={query} placeholder="Search parts…" onChange={e=>setQuery(e.target.value)}
              onKeyDown={e=>{ if (e.key==='Escape') setQuery(''); }}/>
+      {onToggle && <button className="pal-toggle" onClick={onToggle} title="Hide parts (P)">
+        <SideChev dir="left"/>
+      </button>}
     </div>
     <div className="pal-scroll">
       {GROUPS.map(g=>{
@@ -3158,14 +3235,330 @@ return { Palette };
 </script>
 
 <script type="text/babel">
+/* ═══ TIMING DIAGRAM ═══════════════════════════════════════════════════════
+   Waveforms for the board's INs, CLKs and OUTs against simulation time.
+
+   The recorder runs every frame whether or not the panel is open, so
+   opening it mid-lecture shows what already happened rather than starting
+   blank. It stores transitions only, never per-frame samples, and stamps
+   each one with the engine's exact scheduled instant where it has one —
+   so an OUT three hops behind its IN lands exactly 3 × hopMs to the right
+   on the diagram, not three frames' worth of jitter later. */
+defineModule('timing', ['state', 'engine'], (state, engine) => {
+'use strict';
+const { useEffect, useRef } = React;
+const { formatBits } = engine;
+
+const TRACE_KINDS = { INPUT:'in', CLOCK:'in', OUTPUT:'out' };
+const KIND_TAG    = { INPUT:'IN', CLOCK:'CLK', OUTPUT:'OUT' };
+const KEEP_MS     = 90000;   // a little past the widest window
+const MAX_PTS     = 6000;    // per trace — a 1/16s clock for 90s is ~2900 edges
+const WINDOW_CHOICES = [
+  { ms:5000,  label:'5s'  },
+  { ms:10000, label:'10s' },
+  { ms:20000, label:'20s' },
+  { ms:40000, label:'40s' },
+];
+
+// Lane geometry, in CSS px.
+const LABEL_W = 74, LANE_H = 32, PAD_T = 6, AXIS_H = 20, PAD_R = 14;
+
+function traceable(circuit) {
+  const ins = [], outs = [];
+  for (const c of circuit.components.values()) {
+    const side = TRACE_KINDS[c.kind];
+    if (side === 'in') ins.push(c); else if (side === 'out') outs.push(c);
+  }
+  // Clocks first (they're the reference everything else is read against),
+  // then by label so A, B, C come out in the order students expect.
+  const order = (a, b) => (a.kind === 'CLOCK' ? 0 : 1) - (b.kind === 'CLOCK' ? 0 : 1)
+    || String(a.label || '').localeCompare(String(b.label || ''), undefined, { numeric:true })
+    || a.id.localeCompare(b.id);
+  ins.sort(order); outs.sort(order);
+  return { ins, outs };
+}
+const nameOf = (c) => (c.label && String(c.label).trim()) || KIND_TAG[c.kind] || c.kind;
+
+// What the part shows, plus the engine's exact time it became that value.
+function readNow(circuit, c) {
+  if (c.kind === 'OUTPUT') {
+    const w = circuit.wireIntoInput(c.id, 0);
+    const sig = w && circuit.signalOfWire(w);
+    return { v: c.inputVals[0] || 0, t: sig ? sig.lastChange : null };
+  }
+  return { v: c.outputVals[0] || 0, t: c.outputChangeTime ? c.outputChangeTime[0] : null };
+}
+
+function createRecorder() {
+  const traces = new Map();   // compId → [{ t, v }]  (transitions, oldest first)
+  let lastNow = -1;
+
+  function sample(circuit, now) {
+    // Time only runs backwards on a reset — the old history is meaningless.
+    if (now < lastNow) traces.clear();
+    lastNow = now;
+    for (const c of circuit.components.values()) {
+      if (!TRACE_KINDS[c.kind]) continue;
+      const { v, t } = readNow(circuit, c);
+      const pts = traces.get(c.id);
+      if (!pts) { traces.set(c.id, [{ t: now, v }]); continue; }
+      const last = pts[pts.length - 1];
+      if (last.v === v) continue;
+      const at = (typeof t === 'number' && t <= now && t >= last.t) ? t : now;
+      pts.push({ t: at, v });
+      if (pts.length > MAX_PTS) pts.splice(0, pts.length - MAX_PTS);
+    }
+    const cut = now - KEEP_MS;
+    for (const [id, pts] of traces) {
+      if (!circuit.components.has(id)) { traces.delete(id); continue; }
+      // Keep the last point before the cut: it's the value the window opens on.
+      let k = 0;
+      while (k < pts.length - 1 && pts[k + 1].t <= cut) k++;
+      if (k) pts.splice(0, k);
+    }
+  }
+  function clear() { traces.clear(); lastNow = -1; }
+  return { sample, clear, get: (id) => traces.get(id) };
+}
+
+// Round-number tick spacing that leaves at least ~60px between labels.
+function tickStep(windowMs, plotW) {
+  for (const s of [125, 250, 500, 1000, 2000, 5000, 10000, 20000]) {
+    if (s / windowMs * plotW >= 60) return s;
+  }
+  return 20000;
+}
+const fmtSec = (ms) => (+(ms / 1000).toFixed(3)) + 's';
+
+const XIcon = ()=><svg width="9" height="9" viewBox="0 0 9 9">
+  <path d="M1.5 1.5l6 6M7.5 1.5l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>;
+
+function TimingPanel({ circuit, recorder, hidden, windowMs, onToggleSignal, onShowAll, onHideAll, onWindow, onClose }) {
+  const bodyRef = useRef(null);
+  const cvRef   = useRef(null);
+  const hoverX  = useRef(null);
+  const { ins, outs } = traceable(circuit);
+  const all   = [...ins, ...outs];
+  const shown = all.filter(c => !hidden[c.id]);
+
+  // The canvas repaints from a rAF loop of its own; it reads the latest
+  // props through this ref rather than restarting the loop on every render.
+  const live = useRef(null);
+  live.current = { shown, windowMs };
+
+  useEffect(()=>{
+    let raf;
+    const paint = ()=>{
+      raf = requestAnimationFrame(paint);
+      const cv = cvRef.current, body = bodyRef.current;
+      if (!cv || !body) return;
+      const { shown, windowMs } = live.current;
+      const W = body.clientWidth, H = PAD_T + shown.length * LANE_H + AXIS_H;
+      const dpr = window.devicePixelRatio || 1;
+      if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) {
+        cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+        cv.style.width = W + 'px'; cv.style.height = H + 'px';
+      }
+      const ctx = cv.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+
+      // Tokens are read at draw time so the canvas follows the deck's theme.
+      const css  = getComputedStyle(document.documentElement);
+      const tok  = (n, fb) => css.getPropertyValue(n).trim() || fb;
+      const ink  = tok('--text', '#1a1a18'), ink2 = tok('--text-2', '#5f5e5a'), ink3 = tok('--text-3', '#8a897f');
+      const line = tok('--border', '#e4e3df'), grid = tok('--grid', '#e6e6e1');
+      const high = tok('--high', '#f59e0b'), high2 = tok('--high-2', '#d97706');
+      const bg   = tok('--bg', '#ffffff'), panel = tok('--bg-subtle', '#fafaf8');
+      const mono = tok('--font-mono', 'ui-monospace, Menlo, Consolas, monospace');
+      const fmt  = state.widgetState.numFormat, signed = state.widgetState.numSigned;
+
+      const now = state.widgetState.now;
+      const t0 = Math.max(0, now - windowMs);
+      const X0 = LABEL_W, X1 = W - PAD_R, PW = Math.max(10, X1 - X0);
+      const xOf = (t) => X0 + (t - t0) / windowMs * PW;
+      const yB  = H - AXIS_H;
+
+      // Label column
+      ctx.fillStyle = panel; ctx.fillRect(0, 0, LABEL_W, H);
+      ctx.fillStyle = line;  ctx.fillRect(LABEL_W - 1, 0, 1, H);
+
+      // Time grid + axis
+      const step = tickStep(windowMs, PW);
+      ctx.font = `10px ${mono}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      for (let t = Math.ceil(t0 / step) * step; t <= t0 + windowMs + 1e-6; t += step) {
+        const x = Math.round(xOf(t)) + .5;
+        ctx.fillStyle = grid; ctx.fillRect(x - .5, PAD_T, 1, yB - PAD_T);
+        ctx.fillStyle = ink3; ctx.fillText(fmtSec(t), x, yB + AXIS_H / 2);
+      }
+      ctx.fillStyle = line; ctx.fillRect(LABEL_W, yB, W - LABEL_W, 1);
+
+      // Lanes
+      shown.forEach((c, i) => {
+        const y = PAD_T + i * LANE_H, hi = y + 7, lo = y + LANE_H - 7, mid = (hi + lo) / 2;
+        const bits = c.bits || 1;
+        if (i) { ctx.fillStyle = line; ctx.globalAlpha = .6; ctx.fillRect(0, y, W, 1); ctx.globalAlpha = 1; }
+
+        ctx.textBaseline = 'middle';
+        ctx.font = `600 12px ${mono}`; ctx.textAlign = 'left'; ctx.fillStyle = ink;
+        let name = nameOf(c);
+        while (name.length > 1 && ctx.measureText(name).width > LABEL_W - 40) name = name.slice(0, -1);
+        ctx.fillText(name, 10, mid);
+        ctx.font = `9px ${mono}`; ctx.textAlign = 'right'; ctx.fillStyle = ink3;
+        ctx.fillText(bits > 1 ? `${KIND_TAG[c.kind]}·${bits}` : KIND_TAG[c.kind], LABEL_W - 8, mid);
+
+        const pts = recorder.get(c.id);
+        if (!pts || !pts.length) return;
+        ctx.save();
+        ctx.beginPath(); ctx.rect(X0, y, PW + 2, LANE_H); ctx.clip();
+
+        // First segment that's still on screen.
+        let k = 0;
+        while (k < pts.length - 1 && pts[k + 1].t <= t0) k++;
+
+        if (bits <= 1) {
+          const yv = (v) => v ? hi : lo;
+          ctx.fillStyle = high; ctx.globalAlpha = .18;
+          for (let j = k; j < pts.length; j++) {
+            if (!pts[j].v) continue;
+            const a = xOf(Math.max(t0, pts[j].t)), b = xOf(j + 1 < pts.length ? pts[j + 1].t : now);
+            ctx.fillRect(a, hi, b - a, lo - hi);
+          }
+          ctx.globalAlpha = 1;
+          ctx.beginPath();
+          ctx.moveTo(xOf(Math.max(t0, pts[k].t)), yv(pts[k].v));
+          for (let j = k + 1; j < pts.length; j++) {
+            const x = xOf(pts[j].t);
+            ctx.lineTo(x, yv(pts[j - 1].v));
+            ctx.lineTo(x, yv(pts[j].v));
+          }
+          ctx.lineTo(xOf(now), yv(pts[pts.length - 1].v));
+          ctx.strokeStyle = high2; ctx.lineWidth = 1.6; ctx.lineJoin = 'miter';
+          ctx.stroke();
+        } else {
+          // Bus lane: the classic hexagon per value, with the value written in.
+          ctx.font = `10.5px ${mono}`; ctx.textAlign = 'center';
+          for (let j = k; j < pts.length; j++) {
+            const isLast = j === pts.length - 1;
+            const ta = pts[j].t, tb = isLast ? now : pts[j + 1].t;
+            const xa = xOf(ta), xb = xOf(tb);
+            const s  = Math.min(4, Math.max(0, (xb - xa) / 2));
+            const sr = isLast ? 0 : s;
+            // The segment still being written has a flat, open right end.
+            ctx.beginPath();
+            ctx.moveTo(xa, mid); ctx.lineTo(xa + s, hi); ctx.lineTo(xb - sr, hi);
+            if (isLast) ctx.lineTo(xb, lo); else ctx.lineTo(xb, mid);
+            ctx.lineTo(xb - sr, lo); ctx.lineTo(xa + s, lo); ctx.closePath();
+            if (pts[j].v) { ctx.fillStyle = high; ctx.globalAlpha = .12; ctx.fill(); ctx.globalAlpha = 1; }
+            if (isLast) {
+              ctx.beginPath();
+              ctx.moveTo(xb, hi); ctx.lineTo(xa + s, hi); ctx.lineTo(xa, mid); ctx.lineTo(xa + s, lo); ctx.lineTo(xb, lo);
+            }
+            ctx.strokeStyle = ink2; ctx.lineWidth = 1.2; ctx.stroke();
+            const va = Math.max(xa, X0) + s, vb = Math.min(xb, X1) - sr;
+            const txt = formatBits(pts[j].v, bits, fmt, signed);
+            if (vb - va > ctx.measureText(txt).width + 6) {
+              ctx.fillStyle = ink; ctx.fillText(txt, (va + vb) / 2, mid + .5);
+            }
+          }
+        }
+        ctx.restore();
+      });
+
+      // "Now" — where the traces are being written.
+      const xn = Math.round(xOf(now)) + .5;
+      ctx.strokeStyle = ink3; ctx.lineWidth = 1; ctx.setLineDash([2, 3]);
+      ctx.beginPath(); ctx.moveTo(xn, PAD_T); ctx.lineTo(xn, yB); ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Hover cursor: read every lane at one instant, which is how you
+      // measure a delay off the diagram.
+      const hx = hoverX.current;
+      if (hx != null && hx >= X0 && hx <= X1) {
+        const t = t0 + (hx - X0) / PW * windowMs;
+        if (t <= now) {
+          const x = Math.round(hx) + .5;
+          ctx.strokeStyle = ink2; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(x, PAD_T); ctx.lineTo(x, yB); ctx.stroke();
+          ctx.font = `600 10px ${mono}`; ctx.textBaseline = 'middle';
+          const flip = x > X1 - 70;
+          shown.forEach((c, i) => {
+            const pts = recorder.get(c.id);
+            if (!pts || !pts.length || t < pts[0].t) return;
+            let j = pts.length - 1;
+            while (j > 0 && pts[j].t > t) j--;
+            const txt = (c.bits || 1) > 1 ? formatBits(pts[j].v, c.bits, fmt, signed) : String(pts[j].v ? 1 : 0);
+            const w = ctx.measureText(txt).width + 8, y = PAD_T + i * LANE_H + LANE_H / 2;
+            const bx = flip ? x - 5 - w : x + 5;
+            ctx.fillStyle = bg; ctx.strokeStyle = line;
+            ctx.fillRect(bx, y - 8, w, 16); ctx.strokeRect(bx + .5, y - 7.5, w - 1, 15);
+            ctx.fillStyle = ink; ctx.textAlign = 'center'; ctx.fillText(txt, bx + w / 2, y + .5);
+          });
+          const tl = fmtSec(Math.round(t / 6.25) * 6.25);
+          ctx.font = `600 10px ${mono}`;
+          const tw = ctx.measureText(tl).width + 10;
+          const tx = Math.min(Math.max(x - tw / 2, X0), X1 - tw);
+          ctx.fillStyle = ink; ctx.fillRect(tx, yB + 2, tw, AXIS_H - 4);
+          ctx.fillStyle = bg; ctx.textAlign = 'center'; ctx.fillText(tl, tx + tw / 2, yB + AXIS_H / 2);
+        }
+      }
+    };
+    raf = requestAnimationFrame(paint);
+    return ()=>cancelAnimationFrame(raf);
+  },[recorder]);
+
+  const chip = (c)=>{
+    const on = !hidden[c.id];
+    return <button key={c.id} className={'tm-chip'+(on?' on':'')} onClick={()=>onToggleSignal(c.id)}
+                   title={(on ? 'Hide ' : 'Show ') + nameOf(c) + ' on the timing diagram'}>
+      <i/>{nameOf(c)}
+    </button>;
+  };
+
+  return <div className="timing">
+    <div className="tm-head">
+      <span className="tm-title">Timing</span>
+      {ins.length > 0 && <div className="tm-group"><span className="tm-group-key">In</span>{ins.map(chip)}</div>}
+      {ins.length > 0 && outs.length > 0 && <div className="bw-sep"/>}
+      {outs.length > 0 && <div className="tm-group"><span className="tm-group-key">Out</span>{outs.map(chip)}</div>}
+      {all.length > 1 && <>
+        <button className="tm-link" onClick={onShowAll}>all</button>
+        <button className="tm-link" onClick={onHideAll}>none</button>
+      </>}
+      <div className="bw-spacer"/>
+      <div className="seg" title="How much time the diagram spans">
+        {WINDOW_CHOICES.map(w=>(
+          <button key={w.ms} className={'seg-btn'+(windowMs===w.ms?' on':'')} onClick={()=>onWindow(w.ms)}>{w.label}</button>
+        ))}
+      </div>
+      <button className="sel-close" onClick={onClose} title="Close timing diagram (T)"><XIcon/></button>
+    </div>
+    <div className="tm-body" ref={bodyRef}>
+      {!all.length
+        ? <div className="tm-empty">Place an IN, CLK or OUT on the board to trace it here.</div>
+        : !shown.length
+          ? <div className="tm-empty">Pick a signal above to trace it.</div>
+          : <canvas ref={cvRef}
+                    onMouseMove={e=>{ hoverX.current = e.nativeEvent.offsetX; }}
+                    onMouseLeave={()=>{ hoverX.current = null; }}/>}
+    </div>
+  </div>;
+}
+
+return { TimingPanel, createRecorder, WINDOW_CHOICES };
+});
+</script>
+
+<script type="text/babel">
 /* ═══ APP ══════════════════════════════════════════════════════════════════ */
-defineModule('app', ['state','engine','gates','canvas','palette'],
-             (state, engine, gates, canvas, palette) => {
+defineModule('app', ['state','engine','gates','canvas','palette','timing'],
+             (state, engine, gates, canvas, palette, timing) => {
 'use strict';
 const { useState, useEffect, useRef, useCallback } = React;
 const { createCircuit } = engine;
 const { Canvas, SelectionPanel } = canvas;
 const { Palette } = palette;
+const { TimingPanel, createRecorder } = timing;
 
 const HOP_CHOICES = [
   { ms:250,  label:'¼s' },
@@ -3265,6 +3658,7 @@ function describeDanglingInputs(circuit) {
 /* ── toolbar icons ─────────────────────────────────────────────────────── */
 const I = {
   reset: <svg width="13" height="13" viewBox="0 0 14 14"><path d="M11.5 7a4.5 4.5 0 1 1-1.6-3.45" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M11.6 1.2v3h-3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  wave:  <svg width="14" height="14" viewBox="0 0 14 14"><path d="M1 9.5h2.5V4.5h3.5v5h3V4.5H13" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
   fit:   <svg width="14" height="14" viewBox="0 0 14 14"><path d="M2 5V2.6h3M12 5V2.6H9M2 9v2.4h3M12 9v2.4H9" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
   save:  <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 1.8v6.4M4.4 6l2.6 2.6L9.6 6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M2.4 10.4v1.2h9.2v-1.2" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>,
   load:  <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 8.2V1.8M4.4 4l2.6-2.6L9.6 4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M2.4 10.4v1.2h9.2v-1.2" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>,
@@ -3284,6 +3678,16 @@ function App() {
   const [simTime, setSimTime] = useState(0);
   const [numFormat, setNumFormat] = useState('bin');
   const [numSigned, setNumSigned] = useState(false);
+
+  // Panels. Which ones start open is the slide config's call; which signals
+  // the diagram traces, and over what span, travel with the saved state.
+  const [partsOpen, setPartsOpen]   = useState(true);
+  const [timingOpen, setTimingOpen] = useState(false);
+  const [hiddenSig, setHiddenSig]   = useState({});      // compId → true when left off the diagram
+  const [timingWin, setTimingWin]   = useState(10000);
+  const [recorder] = useState(()=>createRecorder());
+  const viewSave = useRef({});
+  viewSave.current = { hidden: hiddenSig, windowMs: timingWin };
 
   const [showHelp, setShowHelp] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -3340,6 +3744,7 @@ function App() {
       last = t;
       if (runningRef.current) state.widgetState.now += dt;
       circuit.step(state.widgetState.now, hopRef.current);
+      recorder.sample(circuit, state.widgetState.now);
       r = requestAnimationFrame(loop);
     };
     r = requestAnimationFrame(loop);
@@ -3356,10 +3761,12 @@ function App() {
     // walked through gate by gate.
     state.widgetState.now += hopRef.current;
     circuit.step(state.widgetState.now, hopRef.current);
+    recorder.sample(circuit, state.widgetState.now);
     refresh();
   },[circuit, refresh]);
   const resetSim = useCallback(()=>{
     circuit.resetSim();
+    recorder.clear();
     state.widgetState.now = 0;
     setSimTime(0); refresh();
   },[circuit, refresh]);
@@ -3386,6 +3793,8 @@ function App() {
       if (e.key === '.') { e.preventDefault(); stepOnce(); return; }
       // The shortcut reference has no button any more; "?" still summons it.
       if (e.key === '?') { e.preventDefault(); setShowHelp(true); return; }
+      if (!mod && !e.altKey && (e.key === 'p' || e.key === 'P')) { setPartsOpen(v=>!v); return; }
+      if (!mod && !e.altKey && (e.key === 't' || e.key === 'T')) { setTimingOpen(v=>!v); return; }
       if ((e.key === 'r' || e.key === 'R') && selection) {
         const c = circuit.components.get(selection);
         if (c) {
@@ -3439,6 +3848,9 @@ function App() {
     };
 
     if (cfg.running === false) setRunning(false);
+    const flag = (v)=> v === true || v === 'true' ? true : v === false || v === 'false' ? false : null;
+    if (flag(cfg.showParts)  !== null) setPartsOpen(flag(cfg.showParts));
+    if (flag(cfg.showTiming) !== null) setTimingOpen(flag(cfg.showTiming));
     const hopSec = typeof cfg.hop === 'string' ? parseFloat(cfg.hop) : cfg.hop;
     const wanted = typeof cfg.hopMs === 'number' ? cfg.hopMs
                  : (Number.isFinite(hopSec) ? hopSec*1000 : null);
@@ -3489,8 +3901,18 @@ function App() {
       if (e.data.type === 'widget-config') {
         applyConfig(e.data.config);
       } else if (e.data.type === 'widget-get-state') {
-        window.parent.postMessage({ type:'widget-state', widgetId:wid, state:circuit.serialize() }, '*');
+        // `timing` rides alongside the circuit; load() ignores keys it
+        // doesn't know, and Export still writes the bare circuit.
+        const v = viewSave.current;
+        const hidden = Object.keys(v.hidden).filter(id => v.hidden[id] && circuit.components.has(id));
+        window.parent.postMessage({ type:'widget-state', widgetId:wid,
+          state:{ ...circuit.serialize(), timing:{ hidden, windowMs:v.windowMs } } }, '*');
       } else if (e.data.type === 'widget-set-state' && e.data.state) {
+        const tm = e.data.state.timing;
+        if (tm && typeof tm === 'object') {
+          if (Array.isArray(tm.hidden)) setHiddenSig(Object.fromEntries(tm.hidden.slice(0, 200).map(id=>[String(id), true])));
+          if (timing.WINDOW_CHOICES.some(w=>w.ms === tm.windowMs)) setTimingWin(tm.windowMs);
+        }
         circuit.load(e.data.state);
         circuit.resetSim();
         hist.current = { stack:[JSON.stringify(circuit.serialize())], idx:0 };
@@ -3738,6 +4160,8 @@ function App() {
       </>}
       <div className="bw-spacer"/>
       <div className="tb-group">
+        <button className={'bw-btn tb-toggle'+(timingOpen?' on':'')} onClick={()=>setTimingOpen(v=>!v)}
+                title={(timingOpen ? 'Hide' : 'Show') + ' the timing diagram (T)'}>{I.wave}<span className="bl">Timing</span></button>
         <button className="bw-btn bw-btn--icon" onClick={()=>viewApi.current?.fit()} title="Fit circuit to view">{I.fit}</button>
       </div>
       <div className="bw-sep"/>
@@ -3770,11 +4194,14 @@ function App() {
 
     {/* ── body ── */}
     <div className="main">
-      <Palette onDragStart={kind=>setPalDrag({kind})}
+      <Palette open={partsOpen}
+               onToggle={()=>setPartsOpen(v=>!v)}
+               onDragStart={kind=>setPalDrag({kind})}
                onPlace={placeFromPalette}
                onImportClick={()=>setShowImport(true)}
                onDeleteCustom={onDeleteCustom}
                customKinds={customKinds}/>
+      <div className="stage">
       <div className="canvas-wrap">
         <Canvas circuit={circuit}
                 selection={selection}
@@ -3789,6 +4216,15 @@ function App() {
           <p>Drag a part in from the left — or click it to drop one in the middle.
              Then click one pin and the next to wire them together.</p>
         </div></div>}
+      </div>
+      {timingOpen && <TimingPanel circuit={circuit} recorder={recorder}
+          hidden={hiddenSig} windowMs={timingWin}
+          onToggleSignal={id=>setHiddenSig(h=>({ ...h, [id]: !h[id] }))}
+          onShowAll={()=>setHiddenSig({})}
+          onHideAll={()=>setHiddenSig(Object.fromEntries([...circuit.components.values()]
+            .filter(c=>c.kind==='INPUT'||c.kind==='CLOCK'||c.kind==='OUTPUT').map(c=>[c.id, true])))}
+          onWindow={setTimingWin}
+          onClose={()=>setTimingOpen(false)}/>}
       </div>
     </div>
 
@@ -3814,6 +4250,8 @@ function App() {
         <ul className="hint-list">
           <li><kbd className="key">Del</kbd><span>delete</span></li>
           <li><kbd className="key">⌘Z</kbd><span>undo</span></li>
+          <li><kbd className="key">P</kbd><span>parts panel</span></li>
+          <li><kbd className="key">T</kbd><span>timing diagram</span></li>
           <li><kbd className="key">?</kbd><span>this list</span></li>
         </ul>
       </div>
