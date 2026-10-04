@@ -273,6 +273,8 @@ kbd.key {
    "something is happening here", on the board and in the chrome alike. */
 .tb-clock i { width:5px; height:5px; border-radius:50%; background:var(--ink-3); flex:0 0 auto; }
 .tb-clock.paused i { background:var(--high); }
+/* Amber while halted, same as the clock read-out: "time is stopped here". */
+.bw-btn.tb-run.paused { background:var(--high-soft); border-color:#f3d590; color:#7c4a03; }
 
 /* ───────────────────────── modal ───────────────────────── */
 .modal-bg { position:fixed; inset:0; background:rgba(26,26,24,.34); backdrop-filter:blur(3px); display:grid; place-items:center; z-index:100; }
@@ -3658,6 +3660,8 @@ function describeDanglingInputs(circuit) {
 /* ── toolbar icons ─────────────────────────────────────────────────────── */
 const I = {
   reset: <svg width="13" height="13" viewBox="0 0 14 14"><path d="M11.5 7a4.5 4.5 0 1 1-1.6-3.45" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M11.6 1.2v3h-3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  pause: <svg width="13" height="13" viewBox="0 0 14 14"><rect x="3.2" y="2.5" width="2.6" height="9" rx=".8" fill="currentColor"/><rect x="8.2" y="2.5" width="2.6" height="9" rx=".8" fill="currentColor"/></svg>,
+  play:  <svg width="13" height="13" viewBox="0 0 14 14"><path d="M4 2.6v8.8a.6.6 0 0 0 .9.5l7-4.4a.6.6 0 0 0 0-1L4.9 2.1a.6.6 0 0 0-.9.5z" fill="currentColor"/></svg>,
   wave:  <svg width="14" height="14" viewBox="0 0 14 14"><path d="M1 9.5h2.5V4.5h3.5v5h3V4.5H13" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
   fit:   <svg width="14" height="14" viewBox="0 0 14 14"><path d="M2 5V2.6h3M12 5V2.6H9M2 9v2.4h3M12 9v2.4H9" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
   save:  <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 1.8v6.4M4.4 6l2.6 2.6L9.6 6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M2.4 10.4v1.2h9.2v-1.2" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>,
@@ -4147,8 +4151,12 @@ function App() {
           ))}
         </div>
       </div>
-      {/* The clock read-out doubles as the run/halt control, so pausing stays
-          reachable without a dedicated transport button. */}
+      {/* A dedicated pause/run button that never hides; the clock read-out
+          beside it still toggles too, but it drops out on narrow slides. */}
+      <button className={'bw-btn bw-btn--icon tb-run'+(running?'':' paused')} onClick={()=>setRunning(v=>!v)}
+              title={running ? 'Pause (Space)' : 'Run (Space)'} aria-label={running ? 'Pause' : 'Run'}>
+        {running ? I.pause : I.play}
+      </button>
       <button className={'tb-clock'+(running?'':' paused')} onClick={()=>setRunning(v=>!v)}
               title={running ? 'Halt (Space) · time advances while running' : 'Run (Space) · halted'}>
         <i/><span>t</span><b>{(simTime/1000).toFixed(2)}s</b>
