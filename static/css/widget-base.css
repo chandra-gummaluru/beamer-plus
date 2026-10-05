@@ -467,15 +467,8 @@ body.bw-partial .bw-topbar.bw-topbar--no-controls {
 
 /* Overlay mode (body.bw-overlay — the widget's display is "overlay"): a
    small tool laid over part of a slide. No bar at all; the widget shows its
-   own simplified view. It reads as a card floating on the slide — rounded,
-   one hairline — with the iframe's corners left transparent. */
+   own simplified view, straight on the slide: no frame around it. */
 body.bw-overlay .bw-topbar { display: none !important; }
-html[data-bw-display="overlay"] { background: transparent; }
-body.bw-overlay {
-  border: 1px solid var(--border-med);
-  border-radius: calc(var(--radius) * 2);
-  overflow: hidden;
-}
 
 /* Show a piece of UI in one display only. */
 body:not(.bw-overlay) .bw-overlay-only { display: none !important; }

@@ -275,10 +275,10 @@ kit, which reads the placed widget's `display` (`"full"` or `"overlay"`, a layou
 key like `x` — never a field) and keeps it current as the presenter switches:
 
 - `body.bw-overlay` is set. The shared bar (and the widget's own adopted bar with
-  it) is hidden, and the body becomes a rounded card with a hairline border. Restyle
-  for it in CSS — drop secondary panes, tighten padding, keep the one thing the
-  overlay is for. Nothing else in the widget changes, so state, sync and printing
-  just work.
+  it) is hidden, and there is no frame: the widget sits straight on the slide.
+  Restyle for it in CSS — drop secondary panes, tighten padding, keep the one thing
+  the overlay is for. Nothing else in the widget changes, so state, sync and
+  printing just work.
 - `.bw-overlay-only` / `.bw-full-only` show an element in one display only.
 - `.bw-overlay-controls` is a small cluster of icon buttons pinned bottom-right
   that appears while the pointer is over the widget (always on touch). With no bar,

@@ -58,13 +58,26 @@ export function openWidgetSettings(item, schema, { title, onChange, onLayout, on
     const layout = schema.fullSlide     ? buildFullSlideCard(item, () => onLayout?.())
                  : schema.modesDeclared ? buildDisplayCard(item, schema, () => onLayout?.())
                  : buildLayoutCard(item, () => onLayout?.());
-    let side = form.node.querySelector(':scope > .wf-col--side');
-    if (!side) {
-        side = document.createElement('div');
-        side.className = 'wf-col wf-col--side';
-        form.node.appendChild(side);
+    // Long content (a question, an answer list) gets the wide left column and
+    // the short settings stack with Layout on the right. A widget with only
+    // short settings gets a narrower dialog instead: Settings and Layout as
+    // two equal cards side by side, so no control is stretched wider than
+    // its values need.
+    if (form.node.querySelector(':scope > .wf-col--main')) {
+        let side = form.node.querySelector(':scope > .wf-col--side');
+        if (!side) {
+            side = document.createElement('div');
+            side.className = 'wf-col wf-col--side';
+            form.node.appendChild(side);
+        }
+        side.appendChild(layout);
+    } else {
+        overlay.querySelector('.wsm-dialog').classList.add('is-compact');
+        const col = document.createElement('div');
+        col.className = 'wf-col wf-col--layout';
+        col.appendChild(layout);
+        form.node.appendChild(col);
     }
-    side.appendChild(layout);
     form.syncVisibility();
 
     const apply = (e) => {
@@ -167,7 +180,7 @@ function buildLayoutCard(item, onLayout) {
                 <label class="editor-prop-row"><span class="editor-prop-label">Height (%)</span>
                     <input class="editor-prop-input" type="number" min="1" max="100" step="1" data-k="height"></label>
             </div>
-            <label class="editor-prop-row"><span class="editor-prop-label">Layer</span>
+            <label class="editor-prop-row editor-prop-row--inline"><span class="editor-prop-label">Layer</span>
                 <input class="editor-prop-input" type="number" min="1" max="999" step="1" data-k="zIndex"></label>
             ${STEP_ROW}
 
@@ -258,7 +271,6 @@ function buildDisplayCard(item, schema, onLayout) {
                     ${ICON(BOX(12.5, 12, 6, 5))} Overlay
                 </button>
             </div>
-            <p class="wsm-display-hint"></p>
             <div class="wsm-overlay-box">
                 <div class="wsm-places" role="group" aria-label="Place on the slide">
                     ${PLACES.map(p => `<button type="button" class="wsm-preset wsm-place" data-place="${p.key}" title="${p.title}" aria-label="${p.title}">${ICON(p.icon)}</button>`).join('')}
@@ -273,14 +285,13 @@ function buildDisplayCard(item, schema, onLayout) {
                     <label class="editor-prop-row"><span class="editor-prop-label">Height (%)</span>
                         <input class="editor-prop-input" type="number" min="5" max="100" step="1" data-k="height"></label>
                 </div>
-                <label class="editor-prop-row"><span class="editor-prop-label">Layer</span>
+                <label class="editor-prop-row editor-prop-row--inline"><span class="editor-prop-label">Layer</span>
                     <input class="editor-prop-input" type="number" min="1" max="999" step="1" data-k="zIndex"></label>
             </div>
             ${STEP_ROW}
         </div>`;
     const inputs = Object.fromEntries(Array.from(card.querySelectorAll('input[data-k]')).map(i => [i.dataset.k, i]));
     const boxEl  = card.querySelector('.wsm-overlay-box');
-    const hint   = card.querySelector('.wsm-display-hint');
 
     // Settle on a display now, so the saved deck says what it is and an old
     // deck's box is brought in line (full pins it to the slide).
@@ -291,9 +302,6 @@ function buildDisplayCard(item, schema, onLayout) {
         const d = widgetDisplay(item, schema);
         card.querySelectorAll('[data-display]').forEach(b => b.classList.toggle('is-active', b.dataset.display === d));
         boxEl.hidden = d !== 'overlay';
-        hint.textContent = d === 'full'
-            ? 'Fills the slide, with the widget’s bar.'
-            : 'Sits over part of the slide — no bar, just the widget.';
         inputs.x.value = pct(item.x, 0);           inputs.y.value = pct(item.y, 0);
         inputs.width.value = pct(item.width, 0.34); inputs.height.value = pct(item.height, 0.34);
         inputs.zIndex.value = item.zIndex ?? 10;
@@ -328,7 +336,7 @@ function buildDisplayCard(item, schema, onLayout) {
 // "Appear on step N" — the widget stays hidden while presenting until that
 // reveal step (slides/reveals.js). Blank means always shown.
 const STEP_ROW = `
-            <label class="editor-prop-row"><span class="editor-prop-label">Appear on step</span>
+            <label class="editor-prop-row editor-prop-row--inline"><span class="editor-prop-label">Appear on step</span>
                 <input class="editor-prop-input" type="number" min="1" max="99" step="1" placeholder="—" data-k="step"></label>`;
 function wireStepField(card, item, onLayout) {
     const input = card.querySelector('input[data-k="step"]');

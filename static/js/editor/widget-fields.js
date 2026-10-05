@@ -137,10 +137,12 @@ export function buildWidgetForm(schema, item, variant = 'panel') {
 function makeGroup(title, variant) {
     const node = document.createElement(variant === 'modal' ? 'section' : 'div');
     node.className = 'wf-group';
-    if (title) {
+    // In the dialog every card has a heading, so the first, unnamed group
+    // (Name, Text size, …) reads as "Settings" beside "Layout".
+    if (title || variant === 'modal') {
         const h = document.createElement('div');
         h.className = 'wf-group-title';
-        h.textContent = title;
+        h.textContent = title || 'Settings';
         node.appendChild(h);
     }
     const body = document.createElement('div');
@@ -174,6 +176,8 @@ function fieldLabel(field) {
     // to the label alone, without grey asides.
     return lab;
 }
+
+const INLINE_TYPES = new Set(['select', 'ai-model', 'number', 'number-nullable', 'duration']);
 
 const isListField     = (f) => f?.type === 'textarea-lines' && f.editor === 'list';
 const isTemplateField = (f) => f?.type === 'textarea' && f.blanks && typeof f.blanks === 'object';
@@ -337,6 +341,10 @@ function buildFieldRow(field, item, variant) {
         input.value = eff == null ? '' : String(eff);
         row.appendChild(input);
     }
+
+    // Short controls sit on the label's line, at the width their values
+    // need, instead of stretching under it across the whole card.
+    if (INLINE_TYPES.has(field.type)) row.classList.add('editor-prop-row--inline');
 
     return {
         key: field.key,
