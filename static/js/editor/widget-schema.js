@@ -93,8 +93,74 @@ async function loadSchema(item) {
         // Only works as the whole slide (a notebook, a workspace, a circuit
         // canvas): the editor locks its box to fill the slide.
         fullSlide: schema?.fullSlide === true,
+        // How it can be shown — see widgetModes() below.
+        modes: widgetModes(schema),
+        modesDeclared: !schema?.fullSlide && Array.isArray(schema?.modes) && widgetModes(schema).length > 0,
+        overlaySize: overlaySize(schema),
         fields,
     };
+}
+
+/* ─── display: full or overlay ───────────────────────────────────────── */
+// A widget declares how it can be shown with "modes" (first is the default):
+//   "full"     the slide's content — the whole slide, with the shared bar
+//   "overlay"  a small tool over part of a slide — no bar, a simplified view
+// "fullSlide": true is shorthand for ["full"], and so is declaring nothing.
+// Keep these in step with declaredModes() / displayMode() in
+// widget-settings-kit.js, which makes the same call inside the iframe.
+
+const DISPLAY_MODES = ['full', 'overlay'];
+
+/** The modes a schema supports, in its order. Never empty. */
+export function widgetModes(schema) {
+    if (!schema || schema.fullSlide === true) return ['full'];
+    const m = Array.isArray(schema.modes) ? schema.modes.filter(x => DISPLAY_MODES.includes(x)) : [];
+    return m.length ? [...new Set(m)] : ['full'];
+}
+
+const _near = (a, b) => Math.abs((+a || 0) - b) < 0.005;
+export function boxIsFull(item) {
+    return _near(item?.x, 0) && _near(item?.y, 0)
+        && _near(item?.width ?? 1, 1) && _near(item?.height ?? 1, 1);
+}
+
+/** How a placed widget is shown: its saved `display`, else its default. */
+export function widgetDisplay(item, schema) {
+    const modes = schema?.modes || widgetModes(schema);
+    if (modes.includes(item?.display)) return item.display;
+    if (modes.length === 1) return modes[0];
+    // Saved before modes existed: placed on part of the slide, it was being
+    // used as an overlay.
+    return boxIsFull(item) ? 'full' : 'overlay';
+}
+
+/** Does the editor pin this widget's box to the whole slide? */
+export function isPinnedFull(item, schema) {
+    if (!schema) return false;
+    if (schema.fullSlide) return true;
+    return !!schema.modesDeclared && widgetDisplay(item, schema) === 'full';
+}
+
+/** The box an overlay starts at: the schema's "overlaySize", else a third of the slide. */
+function overlaySize(schema) {
+    const o = schema?.overlaySize;
+    const ok = v => typeof v === 'number' && v > 0.05 && v <= 1;
+    return { width: ok(o?.width) ? o.width : 0.34, height: ok(o?.height) ? o.height : 0.34 };
+}
+
+/**
+ * Switch a placed widget between full and overlay, giving it the matching
+ * box: the whole slide, or an overlay-sized box in the middle (an overlay
+ * that already has a box of its own keeps it).
+ */
+export function setWidgetDisplay(item, schema, display) {
+    item.display = display;
+    if (display === 'full') {
+        Object.assign(item, { x: 0, y: 0, width: 1, height: 1 });
+    } else if (boxIsFull(item)) {
+        const { width, height } = schema?.overlaySize || overlaySize(schema);
+        Object.assign(item, { width, height, x: (1 - width) / 2, y: (1 - height) / 2 });
+    }
 }
 
 /** The steps of the top bar's text-size stepper (SCALE_STEPS in widget-settings-kit.js). */

@@ -65,7 +65,7 @@ export function getOrCreateConfig() {
    but never these: they are Beamer+'s to set, and a widget that could
    rewrite its own src or geometry could move or re-point itself. */
 export const WIDGET_RESERVED = new Set([
-    'id', 'type', 'x', 'y', 'width', 'height', 'zIndex', 'step',
+    'id', 'type', 'x', 'y', 'width', 'height', 'zIndex', 'step', 'display',
     'builtin', 'src', 'interactive',
     'notebookContent', 'role', 'socketUrl',
     'sessionId', 'serverUrl', 'publicBaseUrl',

@@ -28,7 +28,7 @@
     // Keys the layout system owns — a widget never edits these about itself.
     // The parent enforces the same list; this copy just keeps them out of the UI.
     var RESERVED = [
-        'id', 'type', 'x', 'y', 'width', 'height', 'zIndex', 'step',
+        'id', 'type', 'x', 'y', 'width', 'height', 'zIndex', 'step', 'display',
         'builtin', 'src', 'interactive',
         'notebookContent', 'role', 'socketUrl',
         'sessionId', 'serverUrl', 'publicBaseUrl',
@@ -194,6 +194,10 @@
             '.bws-btn:hover{background:var(--accent-bg,#f0f0ee)}',
             '.bws-btn[disabled]{opacity:.55;cursor:default}',
             '.bws-empty{font-size:13px;color:var(--text-2,#6b6b65);line-height:1.5}',
+            '.bws-dur{display:flex;gap:8px}',
+            '.bws-dur-part{flex:1 1 0;min-width:0;display:flex;align-items:center;gap:6px}',
+            '.bws-dur-part .bws-input{flex:1 1 auto;min-width:0}',
+            '.bws-dur-unit{flex:0 0 auto;font-size:12px;color:var(--text-3,#9a9a94)}',
         ].join('');
         document.head.appendChild(st);
     }
@@ -301,6 +305,44 @@
             fileRow.appendChild(btn);
             row.appendChild(fileRow);
 
+        } else if (field.type === 'duration') {
+            // Stored as whole seconds, typed as minutes and seconds. Keep in
+            // step with the editor's copy in editor/widget-fields.js.
+            row.appendChild(labelFor(field));
+            var dur = el('div', 'bws-dur');
+            var part = function (unit) {
+                var pl = el('label', 'bws-dur-part');
+                var pi = el('input', 'bws-input');
+                pi.type = 'number'; pi.min = '0'; pi.step = '1'; pi.inputMode = 'numeric';
+                pi.setAttribute('aria-label', (field.label || field.key) + ' — ' + (unit === 'min' ? 'minutes' : 'seconds'));
+                var pu = el('span', 'bws-dur-unit');
+                pu.textContent = unit;
+                pl.appendChild(pi); pl.appendChild(pu);
+                dur.appendChild(pl);
+                return pi;
+            };
+            var dMin = part('min'), dSec = part('sec');
+            var showDur = function (t) {
+                t = Math.max(0, Math.round(Number(t)));
+                dMin.value = String(Math.floor(t / 60));
+                dSec.value = String(t % 60);
+            };
+            if (eff != null && eff !== '' && isFinite(Number(eff))) showDur(eff);
+            else if (field.default != null && isFinite(Number(field.default))) {
+                var dt = Math.round(Number(field.default));
+                dMin.placeholder = String(Math.floor(dt / 60));
+                dSec.placeholder = String(dt % 60);
+            }
+            dur.addEventListener('change', function () {
+                var t = durationTotal(dMin, dSec);
+                if (t != null) showDur(t);
+            });
+            row.appendChild(dur);
+            input = { mins: dMin, secs: dSec,
+                      addEventListener: function (ev, fn) {
+                          dMin.addEventListener(ev, fn); dSec.addEventListener(ev, fn);
+                      } };
+
         } else {
             row.appendChild(labelFor(field));
             input = el('input', 'bws-input');
@@ -323,6 +365,12 @@
             node: row,
             read: function () {
                 if (field.type === 'checkbox') return { value: input.checked };
+                if (field.type === 'duration') {
+                    var total = durationTotal(input.mins, input.secs);
+                    if (total == null) return { remove: true };
+                    var lo = field.min !== undefined ? Number(field.min) : 1;
+                    return { value: Math.max(lo, total) };
+                }
                 if (field.type === 'number' || field.type === 'number-nullable') {
                     var raw = input.value.trim();
                     if (raw === '') return { remove: true };
@@ -337,6 +385,14 @@
                 return input.value === '' ? { remove: true } : { value: input.value };
             },
         };
+    }
+
+    // Minutes + seconds boxes → whole seconds, or null when both are empty.
+    function durationTotal(mins, secs) {
+        var m = mins.value.trim(), sv = secs.value.trim();
+        if (m === '' && sv === '') return null;
+        var t = (parseFloat(m) || 0) * 60 + (parseFloat(sv) || 0);
+        return Math.max(0, Math.round(t));
     }
 
     /* ─── ai-model options ──────────────────────────────────────── */
@@ -812,22 +868,53 @@
         actionsEl.appendChild(own);
     }
 
-    /* ─── partial-slide mode ────────────────────────────────────── */
-    // A widget that fills the slide carries the full bar. One placed on part
-    // of a slide is an inset, not a window: it drops the title and the shared
-    // utilities (font size, reset), and keeps its own controls as a slim strip
-    // — or no bar at all when it has none. Widgets that declare
-    // "fullSlide": true are always laid out full-slide by the host, so they
-    // never get here.
+    /* ─── display: full, overlay, inset ────────────────────────── */
+    // A widget is shown one of two ways, and declares which it supports with
+    // "modes" in its schema (first one is the default):
+    //
+    //   full     the slide's content: the whole slide, with the shared bar.
+    //   overlay  a small tool laid over part of a slide (a timer in the
+    //            corner, a calculator beside a worked example): no bar at
+    //            all, just the widget's own simplified view (body.bw-overlay).
+    //
+    // "fullSlide": true is shorthand for ["full"]; no "modes" also means
+    // ["full"]. Which one a placed widget uses is its config item's `display`.
+    //
+    // A full-only widget can still be placed on part of a slide (older decks
+    // do this): that is an inset, not a window — it drops the title and the
+    // shared utilities and keeps its own controls as a slim strip, or no bar
+    // at all when it has none (body.bw-partial).
 
     function near(a, b) { return Math.abs((+a || 0) - b) < 0.005; }
+
+    function boxIsFull() {
+        var c = cfg();
+        var w = c.width == null ? 1 : c.width, h = c.height == null ? 1 : c.height;
+        return near(c.x, 0) && near(c.y, 0) && near(w, 1) && near(h, 1);
+    }
+
+    // Keep in step with widgetModes() / widgetDisplay() in editor/widget-schema.js.
+    function declaredModes() {
+        if (!readSchema() || !schema || schema.fullSlide === true) return ['full'];
+        var m = Array.isArray(schema.modes)
+            ? schema.modes.filter(function (x) { return x === 'full' || x === 'overlay'; })
+            : [];
+        return m.length ? m : ['full'];
+    }
+
+    function displayMode() {
+        var m = declaredModes(), d = cfg().display;
+        if (m.indexOf(d) >= 0) return d;
+        if (m.length === 1) return m[0];
+        // Saved before modes existed: a widget that could be an overlay and
+        // was placed on part of the slide was being used as one.
+        return boxIsFull() ? 'full' : 'overlay';
+    }
 
     function isPartial() {
         if (!readSchema()) return false;
         if (schema && schema.fullSlide === true) return false;
-        var c = cfg();
-        var w = c.width == null ? 1 : c.width, h = c.height == null ? 1 : c.height;
-        return !(near(c.x, 0) && near(c.y, 0) && near(w, 1) && near(h, 1));
+        return displayMode() === 'full' && !boxIsFull();
     }
 
     var CONTROL_SEL = 'button, input, select, textarea, a[href], [role="button"]';
@@ -854,10 +941,23 @@
         (window.requestAnimationFrame || setTimeout)(syncBarControls);
     }
 
+    var lastDisplay = null;
     function syncLayoutMode() {
-        if (!document.body) return;
+        if (!document.body || !readSchema()) return;
+        var d = displayMode();
+        document.body.classList.toggle('bw-overlay', d === 'overlay');
         document.body.classList.toggle('bw-partial', isPartial());
+        document.documentElement.setAttribute('data-bw-display', d);
         syncBarControls();
+        // Most widgets restyle with CSS alone; one that has to re-measure or
+        // re-render listens for this.
+        if (d !== lastDisplay) {
+            var first = lastDisplay === null;
+            lastDisplay = d;
+            if (!first) {
+                try { window.dispatchEvent(new CustomEvent('bw-display', { detail: { display: d } })); } catch (e) {}
+            }
+        }
     }
 
     var controlsWatched = false;
@@ -1109,6 +1209,8 @@
             ['x', 'y', 'width', 'height'].forEach(function (k) {
                 if (typeof d[k] === 'number') c[k] = d[k];
             });
+            if (typeof d.display === 'string') c.display = d.display;
+            else if ('display' in d) delete c.display;
             syncLayoutMode();
         }
     });
@@ -1128,6 +1230,9 @@
         name:          function (fallback) { readSchema(); return name(fallback); },
         fileName:      function (fallback, ext) { readSchema(); return fileName(fallback, ext); },
         print:         printApi,
+        // 'full' or 'overlay' — how this widget is being shown. Listen for
+        // the window's 'bw-display' event to hear about a change.
+        display:       function () { readSchema(); return displayMode(); },
     };
 
     function init() {

@@ -312,6 +312,28 @@ body.edit-mode #editor-panel { display: flex; }
     font-size: var(--fs-xs);
 }
 
+/* Duration: minutes and seconds side by side, each with its unit after it. */
+.wf-duration {
+    display: flex;
+    gap: var(--sp-2);
+}
+.wf-duration-part {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.wf-duration-part .editor-prop-input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.wf-duration-unit {
+    flex: 0 0 auto;
+    font-size: var(--fs-xs);
+    color: var(--text-3);
+}
+
 .editor-delete-btn {
     margin-top: var(--sp-2);
     width: 100%;
@@ -418,6 +440,7 @@ body.edit-mode #editor-panel { display: flex; }
     text-overflow: ellipsis;
 }
 
+.edit-resize-handle[hidden] { display: none; }
 .edit-resize-handle {
     position: absolute;
     width: 11px; height: 11px;
@@ -850,6 +873,12 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 }
 .wsm-preset:hover { color: var(--ink-1); border-color: var(--accent); background: var(--surface-paper); }
 .wsm-preset.is-active { color: var(--ink-1); border-color: var(--ink-1); background: var(--surface-paper); box-shadow: inset 0 0 0 1px var(--ink-1); }
+/* Full / Overlay, then where an overlay sits: five small place buttons. */
+.wsm-layout-presets[hidden], .wsm-overlay-box[hidden] { display: none; }
+.wsm-display-hint { margin: 0; font-size: var(--fs-xs); color: var(--ink-3); line-height: 1.4; }
+.wsm-overlay-box { display: flex; flex-direction: column; gap: var(--sp-3); }
+.wsm-places { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--sp-1); }
+.wsm-place { padding: 0; min-height: 30px; }
 .wsm-empty { padding: 0 var(--sp-1); }
 .wsm-done {
     min-height: 34px;

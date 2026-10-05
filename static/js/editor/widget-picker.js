@@ -10,6 +10,7 @@
 import { ctx, getOrCreateConfig, escHtml } from './context.js';
 import { renderEditOverlays, cleanupEditOverlays } from './overlays.js';
 import { openWidgetSettingsFor } from './properties.js';
+import { getWidgetSchema, setWidgetDisplay } from './widget-schema.js';
 
 const WIDGET_ICONS = {
     'audience-response':`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`,
@@ -218,11 +219,11 @@ function _pickCustomWidget() {
     input.click();
 }
 
-function _doAddWidget(type) {
+async function _doAddWidget(type) {
     const cfg = getOrCreateConfig();
     if (!cfg) return;
     if (!cfg.widgets) cfg.widgets = [];
-    cfg.widgets.push({
+    const item = {
         id: `widget_${Date.now()}`,
         type,
         src: '',
@@ -232,7 +233,12 @@ function _doAddWidget(type) {
         width: 1, height: 1,
         zIndex: 10,
         builtin: true,
-    });
+    };
+    // …unless it says otherwise: a widget that declares "modes" starts in
+    // the first one it lists (an overlay-only widget starts as an overlay).
+    const schema = await getWidgetSchema(item);
+    if (schema?.modesDeclared) setWidgetDisplay(item, schema, schema.modes[0]);
+    cfg.widgets.push(item);
     const newIndex = cfg.widgets.length - 1;
     cleanupEditOverlays();
     renderEditOverlays();

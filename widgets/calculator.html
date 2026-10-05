@@ -5,6 +5,8 @@
 {
   "label": "Calculator",
   "category": "Mathematics",
+  "modes": ["full", "overlay"],
+  "overlaySize": { "width": 0.3, "height": 0.6 },
   "fields": []
 }
 </script>
@@ -237,6 +239,21 @@ body.splitting, body.splitting * { cursor: col-resize !important; user-select: n
 
 /* The audience sees the numbers, not a notice about them. */
 #viewer-toast, #viewer-badge { display: none !important; }
+
+/* ── Overlay ─────────────────────────────────────────── */
+/* Beside a worked example: the display and a plain keypad — digits,
+   operators, clear, back, equals. No functions and no history. The three
+   function rows are exactly the .fn keys plus %, so the grid stays five
+   across with nothing out of place. */
+body.bw-overlay #history-panel,
+body.bw-overlay .split-handle,
+body.bw-overlay #buttons .cbtn.fn,
+body.bw-overlay #buttons [data-insert="%"] { display: none; }
+body.bw-overlay #calc-panel { padding: 8px; gap: 8px; }
+body.bw-overlay #display { padding: min(2.6cqh, 10px) 12px; }
+body.bw-overlay #expr-input { font-size: clamp(13px, min(6cqw, 8cqh), 34px); }
+body.bw-overlay #result { font-size: clamp(18px, min(11cqw, 13cqh), 72px); }
+body.bw-overlay .cbtn { font-size: clamp(12px, min(5.4cqw, 6cqh), 30px); }
 
 /* A narrow slide region keeps the keypad and drops the rest. */
 @media (max-width: 620px) { #history-panel, .split-handle { display: none; } }

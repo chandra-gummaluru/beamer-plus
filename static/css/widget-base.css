@@ -465,6 +465,53 @@ body.bw-partial .bw-topbar.bw-topbar--no-controls {
   display: none;
 }
 
+/* Overlay mode (body.bw-overlay — the widget's display is "overlay"): a
+   small tool laid over part of a slide. No bar at all; the widget shows its
+   own simplified view. It reads as a card floating on the slide — rounded,
+   one hairline — with the iframe's corners left transparent. */
+body.bw-overlay .bw-topbar { display: none !important; }
+html[data-bw-display="overlay"] { background: transparent; }
+body.bw-overlay {
+  border: 1px solid var(--border-med);
+  border-radius: calc(var(--radius) * 2);
+  overflow: hidden;
+}
+
+/* Show a piece of UI in one display only. */
+body:not(.bw-overlay) .bw-overlay-only { display: none !important; }
+body.bw-overlay .bw-full-only { display: none !important; }
+
+/* Overlay controls: a small cluster of icon buttons that appears while the
+   pointer is over the widget (or one of them has focus), so the overlay is
+   just its content the rest of the time. */
+.bw-overlay-controls {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 5;
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+body.bw-overlay:hover .bw-overlay-controls,
+.bw-overlay-controls:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+.bw-overlay-controls[hidden] { display: none !important; }
+.bw-overlay-controls .bw-btn { height: 26px; min-width: 26px; padding: 0 6px; }
+.bw-overlay-controls .bw-btn--icon { width: 26px; padding: 0; }
+@media (hover: none) {
+  .bw-overlay-controls { opacity: 1; pointer-events: auto; }
+}
+
 /* The widget's own content, below the bar. */
 .bw-topbar-body {
   flex: 1 1 auto;

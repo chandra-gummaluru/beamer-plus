@@ -12,7 +12,7 @@
 // panel stays on the slide's properties throughout.
 import { ctx, getSlideEl, getOrCreateConfig, escAttr, setPanelMode, setPanelTitle,
          resolvePanelMode } from './context.js';
-import { cleanupEditOverlays, renderEditOverlays, positionOverlay, selectOverlayEl, overlayLabel } from './overlays.js';
+import { cleanupEditOverlays, renderEditOverlays, positionOverlay, selectOverlayEl, overlayLabel, syncWidgetLock } from './overlays.js';
 import { WIDGET_LABELS } from './widget-picker.js';
 import { getWidgetSchema } from './widget-schema.js';
 import { openWidgetSettings, isWidgetSettingsOpen } from './widget-settings-modal.js';
@@ -267,8 +267,11 @@ export async function openWidgetSettingsFor(index) {
         // Keep the box on the slide in step with the dialog's Layout card.
         onLayout: () => {
             const div = document.querySelector(`.edit-overlay[data-arr-key="widgets"][data-item-index="${index}"]`);
+            if (!div) return;
+            // Full ↔ overlay pins or frees the box, as well as moving it.
+            if (schema) { syncWidgetLock(div, item, schema); return; }
             const cr = getSlideEl()?.getBoundingClientRect();
-            if (div && cr) positionOverlay(div, item, cr);
+            if (cr) positionOverlay(div, item, cr);
         },
         onRemove: () => deleteItem('widgets', index),
         onClose: (removed) => {

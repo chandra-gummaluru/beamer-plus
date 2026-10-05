@@ -103,7 +103,10 @@ def summarize(responses: list[str], n: int, api_key: str | None = None):
 Widgets are standalone HTML files in `widgets/`, rendered in iframes on
 slides. Built-ins include a browser, calculator, camera, circuit sandbox,
 function plotter, Jupyter-notebook runner, map, an audience-response panel (multiple choice, true/false, rating, numeric estimate, word cloud, open-ended),
-PDF textbook viewer, Python REPL, shell, timer, and YouTube player.
+PDF textbook viewer, Python workspace, Python shell, terminal, timer, and YouTube player.
+A widget is shown either full (the whole slide) or, if it supports it, as an
+overlay — a small box over part of a content slide, with no bar (the timer,
+calculator and Python shell do).
 
 To add your own, drop an `.html` file in `widgets/`. A `<script
 id="widget-schema" type="application/json">` block in the file describes the

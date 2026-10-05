@@ -279,6 +279,50 @@ function buildFieldRow(field, item, variant) {
         fileRow.appendChild(btn);
         row.appendChild(fileRow);
 
+    } else if (field.type === 'duration') {
+        // A length of time, stored as whole seconds but typed as minutes and
+        // seconds — nobody wants to work out that 7½ minutes is 450.
+        row.appendChild(fieldLabel(field));
+        const wrap = document.createElement('div');
+        wrap.className = 'wf-duration';
+        const part = (unit, aria) => {
+            const lab = document.createElement('label');
+            lab.className = 'wf-duration-part';
+            const i = document.createElement('input');
+            i.className = 'editor-prop-input';
+            i.type = 'number';
+            i.min = '0';
+            i.step = '1';
+            i.inputMode = 'numeric';
+            i.setAttribute('aria-label', aria);
+            const u = document.createElement('span');
+            u.className = 'wf-duration-unit';
+            u.textContent = unit;
+            lab.append(i, u);
+            wrap.appendChild(lab);
+            return i;
+        };
+        const mins = part('min', `${field.label || field.key} — minutes`);
+        const secs = part('sec', `${field.label || field.key} — seconds`);
+        const show = (total, into) => {
+            const t = Math.max(0, Math.round(Number(total)));
+            into[0].value = String(Math.floor(t / 60));
+            into[1].value = String(t % 60);
+        };
+        if (eff != null && eff !== '' && isFinite(Number(eff))) show(eff, [mins, secs]);
+        else if (field.default != null && isFinite(Number(field.default))) {
+            const t = Math.round(Number(field.default));
+            mins.placeholder = String(Math.floor(t / 60));
+            secs.placeholder = String(t % 60);
+        }
+        // 90 seconds typed into the seconds box reads back as 1 min 30 sec.
+        wrap.addEventListener('change', () => {
+            const total = durationTotal(mins, secs);
+            if (total != null) show(total, [mins, secs]);
+        });
+        row.appendChild(wrap);
+        input = { mins, secs };
+
     } else {
         row.appendChild(fieldLabel(field));
         input = document.createElement('input');
@@ -300,6 +344,12 @@ function buildFieldRow(field, item, variant) {
         wide,
         read() {
             if (field.type === 'checkbox') return { value: input.checked };
+            if (field.type === 'duration') {
+                const total = durationTotal(input.mins, input.secs);
+                if (total == null) return { remove: true };
+                const min = field.min !== undefined ? Number(field.min) : 1;
+                return { value: Math.max(min, total) };
+            }
             if (field.type === 'number' || field.type === 'number-nullable') {
                 const raw = input.value.trim();
                 if (raw === '') return { remove: true };
@@ -313,6 +363,14 @@ function buildFieldRow(field, item, variant) {
             return input.value === '' ? { remove: true } : { value: input.value };
         },
     };
+}
+
+// Minutes + seconds boxes → whole seconds, or null when both are empty.
+function durationTotal(mins, secs) {
+    const m = mins.value.trim(), s = secs.value.trim();
+    if (m === '' && s === '') return null;
+    const total = (parseFloat(m) || 0) * 60 + (parseFloat(s) || 0);
+    return Math.max(0, Math.round(total));
 }
 
 // Grow a textarea with its content (between its `rows` and a cap), so a long

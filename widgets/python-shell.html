@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script id="widget-schema" type="application/json">
+{
+  "label": "Python Shell",
+  "category": "Computer Science",
+  "modes": ["overlay", "full"],
+  "overlaySize": { "width": 0.46, "height": 0.42 },
+  "fields": [
+    { "key": "startup",  "label": "Run at start", "type": "textarea", "rows": 4, "mono": true,
+      "placeholder": "import math\nxs = [3, 1, 2]" },
+    { "key": "packages", "label": "Packages", "type": "textarea-lines", "rows": 2,
+      "placeholder": "numpy" }
+  ]
+}
+</script>
+<!-- Standalone fallback. Inside Beamer+ the host injects the shared widget
+     base (tokens, fonts, toolbar, buttons) ahead of everything else. Opened
+     directly (a file in Edge, a plain web server) nothing does, so load the
+     same stylesheet from the repo, relative to this file, at the same point in
+     the cascade. Beamer+ is unaffected: its link is already present. -->
+<script id="bw-standalone">
+(function () {
+  if (document.querySelector('link[href*="widget-base.css"]')) return;
+  var head = document.head || document.getElementsByTagName('head')[0];
+  [['preconnect', 'https://fonts.googleapis.com'],
+   ['stylesheet', 'https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@400;500;600&display=swap'],
+   ['stylesheet', '../static/css/widget-base.css']].forEach(function (l) {
+    var el = document.createElement('link');
+    el.rel = l[0]; el.href = l[1];
+    head.appendChild(el);
+  });
+  document.documentElement.setAttribute('data-bw-standalone', '');
+})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Python Shell — Beamer+</title>
+
+<!-- Vendored by the Beamer+ server. Never call io() bare. -->
+<script src="/static/vendor/socket.io.min.js"></script>
+
+<style>
+/* Tokens, reset, toolbar and buttons come from the shared widget base
+   (static/css/widget-base.css). What's left here is the console itself: one
+   transcript, the prompt at the bottom of it, in type sized for the room.
+
+   Made to sit over part of a slide (an overlay beside the code it tries
+   out), so the transcript is the whole widget there; shown full, it gets the
+   shared bar with Clear and Restart. Python runs in a worker, so a runaway
+   loop never freezes the slide — Ctrl+C stops it by restarting Python. */
+
+html, body { height: 100%; overflow: hidden; }
+
+#main {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+  background: var(--bg-output);
+}
+
+#term {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 10px 14px 12px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-code);
+  line-height: 1.5;
+  color: var(--text);
+  cursor: text;
+}
+#term::-webkit-scrollbar { width: 6px; }
+#term::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+#term::-webkit-scrollbar-thumb:hover { background: var(--border-med); }
+
+/* Transcript lines keep their own whitespace and wrap long output. */
+.ln { white-space: pre-wrap; word-break: break-word; }
+.ln.in   { color: var(--text); }
+.ln.in .pr { color: var(--text-3); user-select: none; }
+.ln.out  { color: var(--text-2); }
+.ln.err  { color: var(--err); }
+.ln.sys  { color: var(--text-3); font-style: italic; }
+
+/* The live prompt: the last line of the transcript, not a separate box. */
+#inline { display: flex; align-items: baseline; gap: 0; }
+#inline[hidden] { display: none; }
+#prompt { color: var(--text-3); white-space: pre; user-select: none; flex: 0 0 auto; }
+#input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  color: var(--text);
+  caret-color: var(--text);
+  padding: 0;
+}
+#input::placeholder { color: var(--text-3); opacity: 0.7; }
+
+/* While Python works: a quiet blinking block where the prompt will return. */
+#busy { color: var(--text-3); animation: bw-blink 1s step-end infinite; }
+#busy[hidden] { display: none; }
+
+body.bw-overlay #term { padding: 8px 12px 10px; }
+.bw-overlay-controls svg { width: 14px; height: 14px; }
+
+/* The audience sees the transcript, not a notice about it. */
+#shell.is-viewer #inline, #shell.is-viewer .bw-overlay-controls { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) { #busy { animation: none; } }
+</style>
+</head>
+<body>
+<div id="shell" class="bw-shell">
+
+  <div id="toolbar" class="bw-toolbar" data-bw-topbar>
+    <span class="bw-toolbar-title">Python Shell</span>
+    <div class="bw-sep"></div>
+    <span class="bw-status" id="status">starting</span>
+    <div class="bw-spacer"></div>
+    <button class="bw-btn" id="btn-clear" title="Clear the transcript (Ctrl+L)">Clear</button>
+    <button class="bw-btn" id="btn-restart" title="Restart Python — forgets every variable">Restart</button>
+  </div>
+
+  <div id="main">
+    <div id="term" aria-live="polite">
+      <div id="out"></div>
+      <div id="inline">
+        <span id="prompt">&gt;&gt;&gt; </span>
+        <input id="input" type="text" spellcheck="false" autocomplete="off"
+               autocorrect="off" autocapitalize="off" aria-label="Python input">
+      </div>
+      <span id="busy" hidden>▍</span>
+    </div>
+
+    <div class="bw-overlay-controls bw-overlay-only" id="ov-controls" data-bw-print-hide>
+      <button class="bw-btn bw-btn--icon" id="ov-clear" title="Clear (Ctrl+L)" aria-label="Clear">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/></svg>
+      </button>
+      <button class="bw-btn bw-btn--icon" id="ov-restart" title="Restart Python" aria-label="Restart Python">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.5 15a9 9 0 1 0 2.1-9.4L1 10"/></svg>
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ── Config ──────────────────────────────────────────────────────────────────
+  const _qs       = new URLSearchParams(location.search);
+  const CFG0      = window.WIDGET_CONFIG || {};
+  let   cfg       = { ...CFG0 };
+  let   WIDGET_ID = CFG0.id || CFG0.widgetId || 'python-shell';
+  let   IS_VIEWER = CFG0.role === 'viewer' || _qs.get('viewer') === '1';
+
+  // Same pinned Pyodide as the notebook and the workspace, so a deck that
+  // uses more than one downloads it once.
+  const PYODIDE_URL = 'https://cdn.jsdelivr.net/pyodide/v0.25.0/full/';
+  const MAX_ENTRIES = 400;
+  const MAX_HISTORY = 200;
+
+  // ── DOM ─────────────────────────────────────────────────────────────────────
+  const $ = id => document.getElementById(id);
+  const shell    = $('shell');
+  const term     = $('term');
+  const outEl    = $('out');
+  const inline   = $('inline');
+  const promptEl = $('prompt');
+  const input    = $('input');
+  const busyEl   = $('busy');
+  const statusEl = $('status');
+
+  // ── State ───────────────────────────────────────────────────────────────────
+  // The transcript is the state: what was typed and what came back. The
+  // namespace is never saved — a restored slide shows the session, and
+  // Python starts fresh behind it.
+  const S = {
+    entries: [],      // { k: 'in' | 'out' | 'err' | 'sys', s: string }
+    more:    false,   // inside a block: the prompt is "... "
+    phase:   'idle',  // idle | loading | ready | busy | error
+  };
+  const history = [];
+  let histPos = 0, draft = '';
+  let pending = [];   // lines still to push (a paste, the startup lines)
+
+  // ── Transcript ──────────────────────────────────────────────────────────────
+  // Output arrives in pieces (a print can be split across messages), so
+  // consecutive output of one kind is merged into one entry.
+  function append(k, s) {
+    if (!s) return;
+    const last = S.entries[S.entries.length - 1];
+    if (last && last.k === k && k !== 'in') last.s += s;
+    else S.entries.push({ k, s });
+    if (S.entries.length > MAX_ENTRIES) S.entries.splice(0, S.entries.length - MAX_ENTRIES);
+    renderTranscript();
+    emitState();
+  }
+
+  function renderTranscript() {
+    const atBottom = term.scrollHeight - term.scrollTop - term.clientHeight < 40;
+    outEl.textContent = '';
+    for (const e of S.entries) {
+      const div = document.createElement('div');
+      div.className = 'ln ' + e.k;
+      if (e.k === 'in') {
+        const pr = document.createElement('span');
+        pr.className = 'pr';
+        pr.textContent = e.more ? '... ' : '>>> ';
+        div.appendChild(pr);
+        div.appendChild(document.createTextNode(e.s));
+      } else {
+        // A trailing newline would leave an empty line under every print.
+        div.textContent = e.s.replace(/\n$/, '');
+      }
+      outEl.appendChild(div);
+    }
+    if (atBottom || IS_VIEWER) term.scrollTop = term.scrollHeight;
+  }
+
+  function renderPrompt() {
+    promptEl.textContent = S.more ? '... ' : '>>> ';
+    const canType = !IS_VIEWER && (S.phase === 'ready');
+    inline.hidden = IS_VIEWER || (S.phase !== 'ready' && S.phase !== 'loading');
+    input.disabled = !canType;
+    input.placeholder = S.phase === 'loading' ? 'Starting Python…' : '';
+    busyEl.hidden = S.phase !== 'busy';
+    statusEl.textContent = IS_VIEWER ? 'view only'
+      : ({ idle: 'idle', loading: 'starting', ready: 'ready', busy: 'running', error: 'error' })[S.phase];
+    shell.classList.toggle('is-viewer', IS_VIEWER);
+    term.scrollTop = term.scrollHeight;
+  }
+
+  function setPhase(p) { S.phase = p; renderPrompt(); }
+
+  // ── Python, in a worker ─────────────────────────────────────────────────────
+  // A real console: each line is pushed to code.compile_command, which says
+  // whether the statement is complete (run it) or needs more (prompt "...").
+  const WORKER_SRC = `
+    importScripts(${JSON.stringify(PYODIDE_URL + 'pyodide.js')});
+    let py = null;
+    const dec = { out: new TextDecoder(), err: new TextDecoder() };
+    const HELPERS = [
+      'import sys, code, traceback, builtins',
+      '_ns = {"__name__": "__main__", "__builtins__": builtins}',
+      '_buf = []',
+      'def _input(prompt=""):',
+      '    raise RuntimeError("input() is not available in this shell - set values in code instead")',
+      'builtins.input = _input',
+      'def _push(line):',
+      '    _buf.append(line)',
+      '    src = "\\\\n".join(_buf)',
+      '    try:',
+      '        c = code.compile_command(src, "<console>", "single")',
+      '    except (SyntaxError, OverflowError, ValueError):',
+      '        _buf.clear()',
+      '        et, ev = sys.exc_info()[:2]',
+      '        sys.stderr.write("".join(traceback.format_exception_only(et, ev)))',
+      '        return False',
+      '    if c is None:',
+      '        return True',
+      '    _buf.clear()',
+      '    try:',
+      '        exec(c, _ns)',
+      '    except SystemExit:',
+      '        pass',
+      '    except BaseException:',
+      '        et, ev, tb = sys.exc_info()',
+      '        sys.stderr.write("".join(traceback.format_exception(et, ev, tb.tb_next)))',
+      '    return False',
+    ].join('\\n');
+
+    async function boot() {
+      py = await loadPyodide({ indexURL: ${JSON.stringify(PYODIDE_URL)} });
+      py.setStdout({ write: b => { postMessage({ t: 'out', s: dec.out.decode(b, { stream: true }) }); return b.length; } });
+      py.setStderr({ write: b => { postMessage({ t: 'err', s: dec.err.decode(b, { stream: true }) }); return b.length; } });
+      py.runPython(HELPERS);
+      postMessage({ t: 'ready', v: py.runPython('sys.version.split()[0]') });
+    }
+    const booted = boot().catch(e => postMessage({ t: 'fatal', s: String(e && e.message || e) }));
+
+    // A package ships inside the Pyodide distribution or as a wheel on PyPI:
+    // try the local one first, then micropip.
+    async function loadPackages(names) {
+      let mp = null;
+      for (const name of names) {
+        try { await py.loadPackage(name); continue; } catch (_) {}
+        try {
+          if (!mp) { await py.loadPackage('micropip'); mp = py.pyimport('micropip'); }
+          await mp.install(name);
+        } catch (_) {
+          postMessage({ t: 'err', s: 'Could not load package: ' + name + '\\n' });
+        }
+      }
+    }
+
+    let chain = booted;
+    onmessage = ev => {
+      const m = ev.data;
+      chain = chain.then(async () => {
+        if (!py) return;
+        try {
+          if (m.t === 'push') {
+            try { await py.loadPackagesFromImports(m.line); } catch (_) { /* the import reports it */ }
+            const more = py.globals.get('_push')(m.line);
+            postMessage({ t: 'done', more: !!more });
+          } else if (m.t === 'packages') {
+            await loadPackages(m.names);
+            postMessage({ t: 'done', more: false, packages: true });
+          } else if (m.t === 'cancel') {
+            py.runPython('_buf.clear()');
+            postMessage({ t: 'done', more: false });
+          }
+        } catch (e) {
+          postMessage({ t: 'err', s: String(e && e.message || e) + '\\n' });
+          postMessage({ t: 'done', more: false });
+        }
+      });
+    };
+  `;
+
+  let worker = null, workerUrl = null, bootLines = null;
+
+  function startWorker() {
+    stopWorker();
+    S.more = false;
+    pending = [];
+    setPhase('loading');
+    try {
+      workerUrl = URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' }));
+      worker    = new Worker(workerUrl);
+    } catch (err) {
+      console.warn('[python-shell] worker failed:', err);
+      failed();
+      return;
+    }
+    worker.onmessage = onWorkerMessage;
+    worker.onerror   = ev => {
+      if (ev.message) console.warn('[python-shell] load failed:', ev.message);
+      failed();
+    };
+  }
+
+  function failed() {
+    setPhase('error');
+    append('err', 'Python failed to load. Check the network connection, then press Restart.\n');
+  }
+
+  function stopWorker() {
+    if (worker) worker.terminate();
+    if (workerUrl) URL.revokeObjectURL(workerUrl);
+    worker = null; workerUrl = null;
+  }
+
+  function send(msg) { if (worker) worker.postMessage(msg); }
+
+  function onWorkerMessage(ev) {
+    const m = ev.data || {};
+    if (m.t === 'out') append('out', m.s);
+    else if (m.t === 'err') append('err', m.s);
+    else if (m.t === 'fatal') failed();
+    else if (m.t === 'ready') {
+      append('sys', `Python ${m.v}\n`);
+      setPhase('ready');
+      afterBoot();
+    } else if (m.t === 'done') {
+      S.more = !!m.more;
+      if (m.packages) { runLines(bootLines || []); bootLines = null; return; }
+      if (pending.length) { pushLine(pending.shift()); return; }
+      setPhase('ready');
+      focusInput();
+    }
+  }
+
+  function asList(v) {
+    if (Array.isArray(v)) return v.map(s => String(s).trim()).filter(Boolean);
+    if (typeof v === 'string') return v.split('\n').map(s => s.trim()).filter(Boolean);
+    return [];
+  }
+
+  // After boot: the packages, then the startup lines, echoed as if typed.
+  function afterBoot() {
+    const lines = typeof cfg.startup === 'string' ? cfg.startup.split('\n') : [];
+    while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+    // A block at the very end needs its closing blank line to run.
+    if (lines.length && /^\s/.test(lines[lines.length - 1])) lines.push('');
+    const pkgs = asList(cfg.packages);
+    if (pkgs.length) {
+      bootLines = lines;
+      append('sys', `Loading ${pkgs.join(', ')}…\n`);
+      setPhase('busy');
+      send({ t: 'packages', names: pkgs });
+      return;
+    }
+    runLines(lines);
+  }
+
+  function runLines(lines) {
+    if (!lines.length) { setPhase('ready'); focusInput(); return; }
+    pending = lines.slice(1);
+    pushLine(lines[0]);
+  }
+
+  function pushLine(line) {
+    S.entries.push({ k: 'in', s: line, more: S.more });
+    if (S.entries.length > MAX_ENTRIES) S.entries.shift();
+    renderTranscript();
+    emitState();
+    setPhase('busy');
+    send({ t: 'push', line });
+  }
+
+  // ── Actions ─────────────────────────────────────────────────────────────────
+  function submit() {
+    if (IS_VIEWER || S.phase !== 'ready') return;
+    const line = input.value;
+    input.value = '';
+    if (line.trim() && history[history.length - 1] !== line) {
+      history.push(line);
+      if (history.length > MAX_HISTORY) history.shift();
+    }
+    histPos = history.length; draft = '';
+    pushLine(line);
+  }
+
+  function clearTranscript() {
+    if (IS_VIEWER) return;
+    S.entries = [];
+    renderTranscript();
+    emitState();
+    focusInput();
+  }
+
+  function restart(reason) {
+    if (IS_VIEWER) return;
+    append('sys', (reason || 'Restarted') + ' — every variable is forgotten.\n');
+    startWorker();
+  }
+
+  // Ctrl+C: a statement still running can only be stopped by stopping
+  // Python; a half-typed block is just dropped.
+  function interrupt() {
+    if (IS_VIEWER) return;
+    if (S.phase === 'busy') { pending = []; restart('KeyboardInterrupt: Python restarted'); return; }
+    if (S.more || input.value) {
+      S.entries.push({ k: 'in', s: input.value + '^C', more: S.more });
+      input.value = '';
+      S.more = false;
+      send({ t: 'cancel' });
+      setPhase('busy');
+      renderTranscript();
+    }
+  }
+
+  function focusInput() {
+    if (IS_VIEWER || S.phase !== 'ready') return;
+    // Not while the presenter is selecting text to copy.
+    if (String(window.getSelection?.() || '')) return;
+    try { input.focus({ preventScroll: true }); } catch (_) {}
+  }
+
+  // ── Events ──────────────────────────────────────────────────────────────────
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); submit(); return; }
+    if (e.key === 'Tab') {
+      // Indent, as a console does; there is no completion here.
+      e.preventDefault();
+      const at = input.selectionStart;
+      input.setRangeText('    ', at, input.selectionEnd, 'end');
+      return;
+    }
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      if (!history.length) return;
+      e.preventDefault();
+      if (histPos === history.length) draft = input.value;
+      histPos = Math.max(0, Math.min(history.length, histPos + (e.key === 'ArrowUp' ? -1 : 1)));
+      input.value = histPos === history.length ? draft : history[histPos];
+      input.setSelectionRange(input.value.length, input.value.length);
+      return;
+    }
+    if (e.ctrlKey && (e.key === 'l' || e.key === 'L')) { e.preventDefault(); clearTranscript(); return; }
+    if (e.ctrlKey && (e.key === 'c' || e.key === 'C') && input.selectionStart === input.selectionEnd) {
+      e.preventDefault(); interrupt();
+    }
+  });
+
+  // Ctrl+C while Python is busy (the input is disabled, so it can't hear it).
+  document.addEventListener('keydown', e => {
+    if (e.target === input) return;
+    if (e.ctrlKey && (e.key === 'c' || e.key === 'C') && S.phase === 'busy') { e.preventDefault(); interrupt(); }
+  });
+
+  // A pasted block runs line by line, as if typed.
+  input.addEventListener('paste', e => {
+    const text = e.clipboardData?.getData('text') || '';
+    if (!text.includes('\n') || S.phase !== 'ready') return;
+    e.preventDefault();
+    const lines = (input.value.slice(0, input.selectionStart) + text + input.value.slice(input.selectionEnd))
+      .replace(/\r\n?/g, '\n').split('\n');
+    while (lines.length > 1 && !lines[lines.length - 1].trim()) lines.pop();
+    if (/^\s/.test(lines[lines.length - 1])) lines.push('');
+    input.value = '';
+    for (const l of lines) if (l.trim() && history[history.length - 1] !== l) history.push(l);
+    histPos = history.length;
+    runLines(lines);
+  });
+
+  term.addEventListener('mouseup', focusInput);
+  $('btn-clear')  .addEventListener('click', clearTranscript);
+  $('btn-restart').addEventListener('click', () => restart());
+  $('ov-clear')   .addEventListener('click', clearTranscript);
+  $('ov-restart') .addEventListener('click', () => restart());
+
+  // ── Sync ────────────────────────────────────────────────────────────────────
+  // Presenter emits the transcript, viewers show it. Viewers never start
+  // Python — the room watches, it doesn't run.
+  let socket = null, syncTimer = null;
+
+  function initSocket(url) {
+    if (typeof io === 'undefined') { socket = { emit() {}, on() {} }; return; }
+    try {
+      const prev = socket;
+      socket = io(url || (window.BeamerWidget ? BeamerWidget.serverOrigin() : ''),
+                  { transports: ['websocket', 'polling'] });
+      if (prev && prev.disconnect) prev.disconnect();
+      socket.on('widget_state', data => {
+        if (!IS_VIEWER || data?.widgetId !== WIDGET_ID) return;
+        applyState(data.state || {});
+      });
+    } catch (_) {
+      socket = { emit() {}, on() {} };
+    }
+  }
+
+  function emitState() {
+    if (!socket || IS_VIEWER) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => {
+      socket.emit('widget_state', { widgetId: WIDGET_ID, state: getState() });
+    }, 150);
+  }
+
+  function getState() {
+    return { entries: S.entries.slice(-MAX_ENTRIES).map(e => ({ ...e })) };
+  }
+
+  function applyState(s) {
+    if (!s || !Array.isArray(s.entries)) return;
+    S.entries = s.entries
+      .filter(e => e && typeof e.s === 'string' && ['in', 'out', 'err', 'sys'].includes(e.k))
+      .slice(-MAX_ENTRIES)
+      .map(e => ({ k: e.k, s: e.s, more: !!e.more }));
+    renderTranscript();
+  }
+
+  // ── Config ──────────────────────────────────────────────────────────────────
+  let started = false, lastSetup = null;
+  function applyConfig(c) {
+    if (!c) return;
+    const prevUrl = cfg.socketUrl;
+    cfg = { ...cfg, ...c };
+    WIDGET_ID = cfg.id || cfg.widgetId || WIDGET_ID;
+    IS_VIEWER = cfg.role === 'viewer' || IS_VIEWER;
+    if (cfg.socketUrl && cfg.socketUrl !== prevUrl) initSocket(cfg.socketUrl);
+
+    // Changed startup code or packages only take effect from a fresh
+    // Python — restart for them, not for every re-sent config.
+    const setup = JSON.stringify([cfg.startup || '', asList(cfg.packages)]);
+    if (!IS_VIEWER && !cfg.printMode) {
+      if (!started) { started = true; lastSetup = setup; startWorker(); }
+      else if (setup !== lastSetup) { lastSetup = setup; restart('Setup changed'); }
+    }
+    renderPrompt();
+  }
+
+  function destroy() {
+    stopWorker();
+    clearTimeout(syncTimer);
+    if (socket && socket.disconnect) socket.disconnect();
+    socket = null;
+  }
+
+  window.addEventListener('message', e => {
+    const d = e.data || {};
+    if (d.type === 'widget-config')  applyConfig(d.config);
+    if (d.type === 'widget-cleanup') destroy();
+    if (d.type === 'widget-get-state') {
+      window.parent.postMessage({ type: 'widget-state', widgetId: WIDGET_ID, state: getState() }, '*');
+    }
+    if (d.type === 'widget-set-state' && d.state) applyState(d.state);
+  });
+
+  // On paper: the transcript as it stands, in its box.
+  if (window.BeamerWidget?.print) {
+    BeamerWidget.print.register(async () => {
+      if (!S.entries.length) return { image: null };
+      return { image: await BeamerWidget.print.snapshot('#main', { ignore: '#inline, #busy' }) };
+    });
+  }
+
+  // The shared bar's reset clears the transcript rather than reloading.
+  (function wireReset(tries) {
+    if (window.BeamerWidget && BeamerWidget.topbar) { BeamerWidget.topbar.onReset(clearTranscript); return; }
+    if (tries > 0) setTimeout(() => wireReset(tries - 1), 120);
+  })(20);
+
+  // ── Boot ────────────────────────────────────────────────────────────────────
+  initSocket(CFG0.socketUrl);
+  renderTranscript();
+  applyConfig(CFG0);
+})();
+</script>
+</body>
+</html>

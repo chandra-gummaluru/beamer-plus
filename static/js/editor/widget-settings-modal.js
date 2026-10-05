@@ -7,6 +7,7 @@
 // columns), a Layout card for its box on the slide, and Remove. Every change
 // is applied to the config item live, so there is nothing to save or cancel.
 import { buildWidgetForm } from './widget-fields.js';
+import { widgetDisplay, setWidgetDisplay } from './widget-schema.js';
 
 let _open = null;   // { overlay, onKey, restoreFocus, onClose }
 
@@ -54,9 +55,9 @@ export function openWidgetSettings(item, schema, { title, onChange, onLayout, on
 
     // The box on the slide, as a card under the short settings (or on its
     // own, for a widget with nothing else to configure).
-    const layout = schema.fullSlide
-        ? buildFullSlideCard(item, () => onLayout?.())
-        : buildLayoutCard(item, () => onLayout?.());
+    const layout = schema.fullSlide     ? buildFullSlideCard(item, () => onLayout?.())
+                 : schema.modesDeclared ? buildDisplayCard(item, schema, () => onLayout?.())
+                 : buildLayoutCard(item, () => onLayout?.());
     let side = form.node.querySelector(':scope > .wf-col--side');
     if (!side) {
         side = document.createElement('div');
@@ -207,6 +208,118 @@ function buildLayoutCard(item, onLayout) {
             item.x = Math.max(0, (1 - (item.width ?? 0.4)) / 2);
             item.y = Math.max(0, (1 - (item.height ?? 0.3)) / 2);
         }
+        show(); onLayout();
+    });
+    return card;
+}
+
+// A widget that declares "modes" is shown one of two ways, picked here:
+// Full (the whole slide, with the widget's bar — the box is pinned) or
+// Overlay (a small box over part of the slide, no bar). Only the modes the
+// widget declares are offered; with one, there is nothing to pick.
+const ICON = (inner) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/>${inner}</svg>`;
+const BOX = (x, y, w, h) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="1" fill="currentColor" fill-opacity=".22"/>`;
+const PLACES = [
+    { key: 'tl', title: 'Top left',     icon: BOX(5, 6, 6, 5) },
+    { key: 'tr', title: 'Top right',    icon: BOX(13, 6, 6, 5) },
+    { key: 'c',  title: 'Center',       icon: BOX(9, 9.5, 6, 5) },
+    { key: 'bl', title: 'Bottom left',  icon: BOX(5, 13, 6, 5) },
+    { key: 'br', title: 'Bottom right', icon: BOX(13, 13, 6, 5) },
+];
+const EDGE = 0.03;   // overlay inset from the slide's edge, as a fraction
+
+function placeBox(item, key) {
+    const w = item.width ?? 0.34, h = item.height ?? 0.34;
+    const lo = (n) => Math.max(0, Math.min(EDGE, 1 - n));
+    const hi = (n) => Math.max(0, 1 - n - EDGE);
+    const mid = (n) => Math.max(0, (1 - n) / 2);
+    item.x = key === 'c' ? mid(w) : key.endsWith('l') ? lo(w) : hi(w);
+    item.y = key === 'c' ? mid(h) : key.startsWith('t') ? lo(h) : hi(h);
+}
+function placeOf(item) {
+    const near = (a, b) => Math.abs((a ?? 0) - b) < 0.005;
+    const fit = (k) => { const t = { ...item }; placeBox(t, k); return near(item.x, t.x) && near(item.y, t.y); };
+    return PLACES.find(p => fit(p.key))?.key || null;
+}
+
+function buildDisplayCard(item, schema, onLayout) {
+    const modes = schema.modes;
+    const card = document.createElement('section');
+    card.className = 'wf-group wsm-layout';
+    const pct = (v, d) => Math.round((v ?? d) * 100);
+    card.innerHTML = `
+        <div class="wf-group-title">Layout</div>
+        <div class="wf-group-body">
+            <div class="wsm-layout-presets wsm-display" ${modes.length > 1 ? '' : 'hidden'}>
+                <button type="button" class="wsm-preset" data-display="full" title="The whole slide, with the widget's bar">
+                    ${ICON(BOX(6, 7, 12, 10))} Full slide
+                </button>
+                <button type="button" class="wsm-preset" data-display="overlay" title="A small box over part of the slide — no bar, just the widget">
+                    ${ICON(BOX(12.5, 12, 6, 5))} Overlay
+                </button>
+            </div>
+            <p class="wsm-display-hint"></p>
+            <div class="wsm-overlay-box">
+                <div class="wsm-places" role="group" aria-label="Place on the slide">
+                    ${PLACES.map(p => `<button type="button" class="wsm-preset wsm-place" data-place="${p.key}" title="${p.title}" aria-label="${p.title}">${ICON(p.icon)}</button>`).join('')}
+                </div>
+                <div class="editor-prop-row-2col">
+                    <label class="editor-prop-row"><span class="editor-prop-label">X (%)</span>
+                        <input class="editor-prop-input" type="number" min="0" max="100" step="1" data-k="x"></label>
+                    <label class="editor-prop-row"><span class="editor-prop-label">Y (%)</span>
+                        <input class="editor-prop-input" type="number" min="0" max="100" step="1" data-k="y"></label>
+                    <label class="editor-prop-row"><span class="editor-prop-label">Width (%)</span>
+                        <input class="editor-prop-input" type="number" min="5" max="100" step="1" data-k="width"></label>
+                    <label class="editor-prop-row"><span class="editor-prop-label">Height (%)</span>
+                        <input class="editor-prop-input" type="number" min="5" max="100" step="1" data-k="height"></label>
+                </div>
+                <label class="editor-prop-row"><span class="editor-prop-label">Layer</span>
+                    <input class="editor-prop-input" type="number" min="1" max="999" step="1" data-k="zIndex"></label>
+            </div>
+            ${STEP_ROW}
+        </div>`;
+    const inputs = Object.fromEntries(Array.from(card.querySelectorAll('input[data-k]')).map(i => [i.dataset.k, i]));
+    const boxEl  = card.querySelector('.wsm-overlay-box');
+    const hint   = card.querySelector('.wsm-display-hint');
+
+    // Settle on a display now, so the saved deck says what it is and an old
+    // deck's box is brought in line (full pins it to the slide).
+    const initial = widgetDisplay(item, schema);
+    if (item.display !== initial || initial === 'full') { setWidgetDisplay(item, schema, initial); onLayout(); }
+
+    const show = () => {
+        const d = widgetDisplay(item, schema);
+        card.querySelectorAll('[data-display]').forEach(b => b.classList.toggle('is-active', b.dataset.display === d));
+        boxEl.hidden = d !== 'overlay';
+        hint.textContent = d === 'full'
+            ? 'Fills the slide, with the widget’s bar.'
+            : 'Sits over part of the slide — no bar, just the widget.';
+        inputs.x.value = pct(item.x, 0);           inputs.y.value = pct(item.y, 0);
+        inputs.width.value = pct(item.width, 0.34); inputs.height.value = pct(item.height, 0.34);
+        inputs.zIndex.value = item.zIndex ?? 10;
+        const at = placeOf(item);
+        card.querySelectorAll('[data-place]').forEach(b => b.classList.toggle('is-active', b.dataset.place === at));
+    };
+    show();
+    wireStepField(card, item, onLayout);
+
+    card.addEventListener('input', (e) => {
+        const k = e.target.dataset?.k;
+        if (!k || k === 'step') return;   // step: wireStepField
+        const n = parseFloat(e.target.value);
+        if (isNaN(n)) return;
+        if (k === 'zIndex') item.zIndex = Math.round(n);
+        else item[k] = Math.max(0, Math.min(100, n)) / 100;
+        const active = document.activeElement;
+        show();
+        if (active?.isConnected) active.focus();
+        onLayout();
+    });
+    card.addEventListener('click', (e) => {
+        const btn = e.target.closest?.('[data-display], [data-place]');
+        if (!btn) return;
+        if (btn.dataset.display) setWidgetDisplay(item, schema, btn.dataset.display);
+        else placeBox(item, btn.dataset.place);
         show(); onLayout();
     });
     return card;

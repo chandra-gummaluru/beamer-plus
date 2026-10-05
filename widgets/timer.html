@@ -5,10 +5,12 @@
 {
   "label": "Timer",
   "category": "Tools",
+  "modes": ["full", "overlay"],
+  "overlaySize": { "width": 0.26, "height": 0.2 },
   "fields": [
-    { "key": "mode",      "label": "Mode",               "type": "select", "options": [{"v":"countdown","l":"Countdown"},{"v":"stopwatch","l":"Stopwatch"}], "default": "countdown" },
-    { "key": "duration",  "label": "Duration (seconds)", "type": "number", "min": 1, "step": 1, "placeholder": "60" },
-    { "key": "autoStart", "label": "Auto-start",         "type": "checkbox", "default": false }
+    { "key": "mode",      "label": "Mode",       "type": "select", "options": [{"v":"countdown","l":"Countdown"},{"v":"stopwatch","l":"Stopwatch"}], "default": "countdown" },
+    { "key": "duration",  "label": "Duration",   "type": "duration", "min": 5, "default": 300, "showIf": { "mode": "countdown" } },
+    { "key": "autoStart", "label": "Auto-start", "type": "checkbox", "default": false }
   ]
 }
 </script>
@@ -155,6 +157,18 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 @media (prefers-reduced-motion: reduce) {
   #clock.is-expired.is-pulsing { animation: none; }
 }
+
+/* ── Overlay ────────────────────────────────────────────── */
+/* A clock in the corner of a content slide: just the digits and the
+   hairline, edge to edge. Click the clock to start or pause; reset and
+   start/pause also sit in the small hover cluster. */
+body.bw-overlay #app { padding: 6% 6% 7%; position: relative; }
+body.bw-overlay #clock       { font-size: min(24cqw, 66cqh); }
+body.bw-overlay #clock.is-long { font-size: min(17cqw, 62cqh); }
+body.bw-overlay #bar { width: 84cqw; height: max(3px, 2.4cqh); margin-top: 6cqh; }
+body.bw-overlay.is-presenter #app { cursor: pointer; }
+body.bw-overlay.is-presenter #clock.is-editable .unit { cursor: ns-resize; }
+.bw-overlay-controls svg { width: 14px; height: 14px; }
 </style>
 </head>
 <body>
@@ -182,6 +196,14 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   <div id="app">
     <div id="clock" aria-live="off"></div>
     <div id="bar" hidden><div id="bar-fill"></div></div>
+    <div class="bw-overlay-controls bw-overlay-only" id="ov-controls">
+      <button class="bw-btn bw-btn--icon" id="ov-reset" title="Reset (R)" aria-label="Reset">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.5 15a9 9 0 1 0 2.1-9.4L1 10"/></svg>
+      </button>
+      <button class="bw-btn bw-btn--icon bw-btn--primary" id="ov-start" title="Start / pause (Space)" aria-label="Start">
+        <svg viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><polygon points="7 4 20 12 7 20 7 4"/></svg>
+      </button>
+    </div>
   </div>
 
 </div>
@@ -210,6 +232,13 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   const tbWatch   = $('tb-stopwatch');
   const presets   = $('presets');
   const modeSeg   = $('mode-seg');
+  const app       = $('app');
+  const ovCtl     = $('ov-controls');
+  const ovStart   = $('ov-start');
+  const ovReset   = $('ov-reset');
+
+  const ICON_PLAY  = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><polygon points="7 4 20 12 7 20 7 4"/></svg>';
+  const ICON_PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>';
 
   // ── State ───────────────────────────────────────────────────────────────────
   const S = {
@@ -284,6 +313,13 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     btnReset.disabled = isIdle();
     // The audience sees the clock and nothing else.
     [modeSeg, presets, btnStart, btnReset].forEach(el => { el.style.display = IS_VIEWER ? 'none' : ''; });
+    ovCtl.hidden = IS_VIEWER;
+    document.body.classList.toggle('is-presenter', !IS_VIEWER);
+    const label = S.running ? 'Pause' : (S.elapsed > 0 && !S.expired ? 'Resume' : 'Start');
+    ovStart.innerHTML = S.running ? ICON_PAUSE : ICON_PLAY;
+    ovStart.setAttribute('aria-label', label);
+    ovStart.disabled = S.expired;
+    ovReset.disabled = isIdle();
     presets.querySelectorAll('[data-min]').forEach(b =>
       b.classList.toggle('is-active', S.duration === Number(b.dataset.min) * 60000));
   }
@@ -414,6 +450,20 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   // ── Events ──────────────────────────────────────────────────────────────────
   btnStart.addEventListener('click', () => (S.running ? pause() : start()));
   btnReset.addEventListener('click', reset);
+  ovStart .addEventListener('click', () => (S.running ? pause() : start()));
+  ovReset .addEventListener('click', reset);
+
+  // As an overlay there is no bar, so the clock is the button: a click
+  // anywhere on it starts or pauses (an expired countdown resets). A click on
+  // a digit being set before the start is left to edit it.
+  app.addEventListener('click', e => {
+    if (IS_VIEWER || !document.body.classList.contains('bw-overlay')) return;
+    if (e.target.closest('.bw-overlay-controls')) return;
+    if (editable() && e.target.closest('.unit')) return;
+    if (S.expired) reset();
+    else if (S.running) pause();
+    else start();
+  });
   tbCount .addEventListener('click', () => setMode('countdown'));
   tbWatch .addEventListener('click', () => setMode('stopwatch'));
   presets .addEventListener('click', e => {

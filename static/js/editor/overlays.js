@@ -5,7 +5,7 @@
 // functions called after load, so the cycle is harmless.
 import { ctx, getSlideEl, getOrCreateConfig, getConfigItems, arrKeyForType } from './context.js';
 import { updatePropertiesPanel, syncPropertiesPosition, openWidgetSettingsFor, widgetTypeLabel } from './properties.js';
-import { getWidgetSchema } from './widget-schema.js';
+import { getWidgetSchema, isPinnedFull } from './widget-schema.js';
 
 let _pendingMediaType = null;
 
@@ -64,20 +64,27 @@ function buildOverlay(type, arrKey, item, index, container, rect) {
         });
     });
 
-    // Full-slide-only widgets (notebook, workspace, circuit simulator): pin
-    // the box to the whole slide and take away the move/resize affordances.
-    // A click still opens the widget's settings.
+    // A widget shown full (and every full-slide-only one: notebook,
+    // workspace, circuit simulator) is pinned to the whole slide, without the
+    // move/resize affordances. A click still opens the widget's settings.
     if (isWidget) {
         getWidgetSchema(item).then(schema => {
-            if (!schema?.fullSlide || !div.isConnected) return;
-            Object.assign(item, { x: 0, y: 0, width: 1, height: 1 });
-            div.dataset.locked = 'true';
-            div.classList.add('edit-overlay--locked');
-            handle.remove();
-            positionOverlay(div, item, container.getBoundingClientRect());
+            if (div.isConnected) syncWidgetLock(div, item, schema, container);
         });
     }
     return div;
+}
+
+/** Pin or free a widget's box for how it is shown now (full or overlay). */
+export function syncWidgetLock(div, item, schema, container = getSlideEl()) {
+    const pinned = isPinnedFull(item, schema);
+    if (pinned) Object.assign(item, { x: 0, y: 0, width: 1, height: 1 });
+    div.dataset.locked = pinned ? 'true' : 'false';
+    div.classList.toggle('edit-overlay--locked', pinned);
+    const handle = div.querySelector('.edit-resize-handle');
+    if (handle) handle.hidden = pinned;
+    const cr = container?.getBoundingClientRect();
+    if (cr) positionOverlay(div, item, cr);
 }
 
 // What a box on the slide is called, plus its reveal step if it has one.

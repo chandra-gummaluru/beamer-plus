@@ -390,7 +390,7 @@ const _pendingAssetUrls = new Map();   // deck-relative path → blob: URL
 // Layout keys belong to Beamer+ and are never file paths — `src` in particular
 // already carries a blob URL for a custom widget's own HTML.
 const _NOT_ASSET_KEYS = new Set([
-    'id', 'type', 'x', 'y', 'width', 'height', 'zIndex',
+    'id', 'type', 'x', 'y', 'width', 'height', 'zIndex', 'display',
     'builtin', 'src', 'interactive', 'role',
     'sessionId', 'socketUrl', 'serverUrl', 'publicBaseUrl',
 ]);
@@ -400,7 +400,8 @@ const _NOT_ASSET_KEYS = new Set([
 // was built with. Layout keys are left out: moving or resizing a widget is
 // applied in place, and must not reboot it (a notebook would reload its
 // kernel, a shell would lose its session).
-const _LAYOUT_KEYS = new Set(['x', 'y', 'width', 'height', 'zIndex', 'interactive', 'step']);
+// Full / overlay (`display`) is applied in place the same way.
+const _LAYOUT_KEYS = new Set(['x', 'y', 'width', 'height', 'zIndex', 'interactive', 'step', 'display']);
 
 // A widget whose schema declares "fullSlide": true only works as the whole
 // slide; it is always laid out that way, whatever box an older deck saved.
@@ -530,9 +531,9 @@ export function renderWidgets(slideConfig, container, zipFile, viewerMode = fals
             const rect = container.getBoundingClientRect();
             const g = _geom(w, existing);
             _place(existing, g, rect);
-            // The box may have changed between full slide and part of it —
-            // the widget shows its top bar only when it fills the slide.
-            try { existing.contentWindow?.postMessage({ type: 'widget-layout', ...g }, '*'); } catch (_) {}
+            // The box may have changed between full slide and part of it, or
+            // the widget between full and overlay — the kit restyles for both.
+            try { existing.contentWindow?.postMessage({ type: 'widget-layout', ...g, display: w.display ?? null }, '*'); } catch (_) {}
             existing.style.zIndex        = w.zIndex || 10;
             existing.style.pointerEvents = w.interactive !== false ? 'auto' : 'none';
             existing.style.opacity       = '1';  // make visible

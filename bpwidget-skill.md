@@ -73,12 +73,26 @@ The first thing in `<head>`. Beamer+ reads it to build the slide's config panel.
 - `category` — one of: `Tools`, `Mathematics`, `Computer Science`, `Audience Response`.
   Add a new one only if none fits.
 - `fontSize: false` — opt out of the host's font-size control (e.g. `map.html`).
-- `fullSlide: true` — the widget only works as the whole slide (a notebook, a
-  workspace, a circuit canvas). The editor locks its box to fill the slide and the
-  host always lays it out full-slide. Leave it off for anything that still works as
-  an inset: placed on part of a slide, such a widget drops the shared bar's title,
-  font-size stepper and reset, keeping only its own controls as a slim strip (no
-  bar at all if it has none) — so it must still be usable without them.
+- `modes: ["full", "overlay"]` — how the widget can be shown; the first is the
+  default when it's added. **Full** is the slide's content: the box is pinned to the
+  whole slide and the widget has the shared bar. **Overlay** is a small tool laid over
+  part of a content slide (a timer in the corner, a calculator beside a worked
+  example): the presenter places and sizes the box, and the widget has **no bar at
+  all** — it shows its own simplified view. Declare `"overlay"` only if the widget
+  has one (see *Overlay mode* below). Examples: `timer.html` and `calculator.html`
+  (`["full", "overlay"]`), `python-shell.html` (`["overlay", "full"]`). A widget
+  whose full and overlay forms are different UIs is two widgets, each declaring
+  its one mode — the notebook (full) and the Python Shell (overlay).
+- `overlaySize: { "width": 0.3, "height": 0.4 }` — the box, as fractions of the
+  slide, an overlay starts at (default about a third of the slide each way).
+- `fullSlide: true` — shorthand for `"modes": ["full"]` that also pins older
+  decks: the widget only works as the whole slide (a notebook, a workspace, a
+  circuit canvas), and the host always lays it out full-slide.
+- No `modes` at all means `["full"]`, without pinning: such a widget can still be
+  placed on part of a slide as an **inset** (older decks do this). An inset drops
+  the shared bar's title, font-size stepper and reset, keeping only its own
+  controls as a slim strip (no bar at all if it has none) — so it must still be
+  usable without them.
 - `fields: []` — a widget with nothing to configure still declares the empty array.
 
 ### Field types
@@ -90,6 +104,7 @@ The first thing in `<head>`. Beamer+ reads it to build the slide's config panel.
 | `textarea-lines`  | `rows`, `placeholder`             | string (split it yourself) or array |
 | `number`          | `min`, `max`, `step`, `default`   | number |
 | `number-nullable` | `min`, `step`                     | number or null |
+| `duration`        | `min` (seconds, default 1), `default` (seconds) | number of whole seconds — the presenter types minutes and seconds |
 | `checkbox`        | `default`                         | boolean |
 | `select`          | `options`, `default`              | `["1","1.4"]` or `[{ "v": 500, "l": "Normal" }]` |
 | `file`            | `accept`, `folder` (`"assets"`)   | relative path — resolve via `/api/zip-asset/` |
@@ -250,8 +265,30 @@ origin. Falling back: `cfg.serverUrl || cfg.socketUrl || window.parent.location.
 | `widget-cleanup` | disconnect sockets, cancel timers/rAF, stop media, destroy players |
 | `widget-get-state` | reply `postMessage({ type:'widget-state', widgetId, state }, '*')` |
 | `widget-set-state` | restore from `e.data.state` |
-| `widget-layout` | box moved/resized (`x`, `y`, `width`, `height`); the kit handles it — partial-slide mode |
+| `widget-layout` | box moved/resized (`x`, `y`, `width`, `height`) or switched full ↔ overlay (`display`); the kit handles it — sets `body.bw-overlay` / `body.bw-partial` |
 | `widget-print` | the kit answers it — register a handler with `BeamerWidget.print.register` (§5, Printing) |
+
+### Overlay mode
+
+A widget that declares `"overlay"` in `modes` is told how it is being shown by the
+kit, which reads the placed widget's `display` (`"full"` or `"overlay"`, a layout
+key like `x` — never a field) and keeps it current as the presenter switches:
+
+- `body.bw-overlay` is set. The shared bar (and the widget's own adopted bar with
+  it) is hidden, and the body becomes a rounded card with a hairline border. Restyle
+  for it in CSS — drop secondary panes, tighten padding, keep the one thing the
+  overlay is for. Nothing else in the widget changes, so state, sync and printing
+  just work.
+- `.bw-overlay-only` / `.bw-full-only` show an element in one display only.
+- `.bw-overlay-controls` is a small cluster of icon buttons pinned bottom-right
+  that appears while the pointer is over the widget (always on touch). With no bar,
+  that is where an overlay's few controls go (`timer.html`: reset, start/pause).
+  Give it `position: relative` content to sit in, and mark it `data-bw-print-hide`.
+- `BeamerWidget.display()` returns `'full'` or `'overlay'`; the window gets a
+  `bw-display` event (`e.detail.display`) when it changes, for a widget that has to
+  re-measure rather than restyle.
+- Keyboard shortcuts keep working, and an overlay should be usable with a click or
+  two: the timer's clock starts and pauses on a click.
 
 ### Messages out
 
