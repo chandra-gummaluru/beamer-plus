@@ -4,27 +4,27 @@
 // change is applied to the in-memory config immediately. Also builds the
 // slide properties' item list (refreshSlideItems).
 //
-// Widgets have no panel here. A widget is configured entirely in its
-// settings dialog (widget-settings-modal.js; form from widget-fields.js,
-// fields read from the widget's own `widget-schema` block — see
-// widget-schema.js), which opens when the widget is clicked on the slide,
-// from Edit in the slide's item list, and straight after one is added. The
-// panel stays on the slide's properties throughout.
+// A selected widget shows its settings in the same panel (widget-panel.js;
+// form from widget-fields.js, fields read from the widget's own
+// `widget-schema` block — see widget-schema.js): selected by clicking it on
+// the slide, by Edit in the slide's item list, and straight after adding it.
 import { ctx, getSlideEl, getOrCreateConfig, escAttr, setPanelMode, setPanelTitle,
          resolvePanelMode } from './context.js';
 import { cleanupEditOverlays, renderEditOverlays, positionOverlay, selectOverlayEl, overlayLabel, syncWidgetLock } from './overlays.js';
 import { WIDGET_LABELS } from './widget-picker.js';
 import { getWidgetSchema } from './widget-schema.js';
-import { openWidgetSettings, isWidgetSettingsOpen } from './widget-settings-modal.js';
+import { renderWidgetPanel } from './widget-panel.js';
 
 export function updatePropertiesPanel() {
     const panel = document.getElementById('editor-properties');
     if (!panel) return;
-    // Nothing (or a widget, which never gets a panel) selected — hand the
-    // panel back to the slide (or view) section.
-    if (!ctx.selectedOverlay || ctx.selectedOverlay.arrKey === 'widgets') {
+    // Nothing selected — hand the panel back to the slide (or view) section.
+    if (!ctx.selectedOverlay) {
+        _widgetShown = null;
         setPanelMode(resolvePanelMode()); refreshSlideItems(); return;
     }
+    if (ctx.selectedOverlay.arrKey === 'widgets') { showWidgetPanel(ctx.selectedOverlay.index); return; }
+    _widgetShown = null;
     setPanelMode('item');
 
     const { arrKey, index } = ctx.selectedOverlay;
@@ -80,10 +80,6 @@ function buildPropsHTML(arrKey, item) {
                 <div><div class="editor-prop-label">H (%)</div>
                 <input class="editor-prop-input" type="number" min="1" max="100" step="1" id="prop-h" value="${Math.round((item.height ?? 0.3) * 100)}"${lockAR ? ' readonly' : ''}></div>
             </div>
-        </div>
-        <div class="editor-prop-row">
-            <div class="editor-prop-label">${arrKey === 'reveals' ? 'Layer' : 'Z-Index'}</div>
-            <input class="editor-prop-input" type="number" min="1" max="999" step="1" id="prop-z" value="${item.zIndex ?? (arrKey === 'reveals' ? 4 : 5)}">
         </div>
     `;
 
@@ -172,6 +168,7 @@ function buildPropsHTML(arrKey, item) {
 export function syncPropertiesPosition() {
     const { arrKey, index } = ctx.selectedOverlay || {};
     if (!arrKey) return;
+    if (arrKey === 'widgets') { _widgetShown?.panel?.refresh?.(); return; }
     const item = getOrCreateConfig()?.[arrKey]?.[index];
     if (!item) return;
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
@@ -195,7 +192,7 @@ export function applyPropertiesQuiet() {
     item.y      = num('prop-y') / 100;
     item.width  = num('prop-w') / 100;
     item.height = num('prop-h') / 100;
-    item.zIndex = parseInt(get('prop-z')?.value ?? (arrKey === 'reveals' ? '4' : '5'), 10);
+    // Layering is the order of the slide's item list (drag to reorder), not a field.
 
     const step = parseInt(get('prop-step')?.value ?? '', 10);
     if (arrKey === 'reveals') {
@@ -240,46 +237,49 @@ export function widgetTypeLabel(item) {
         || 'Custom Widget';
 }
 
-/* ─── the widget settings dialog ──────────────────────────────────── */
+/* ─── a widget's settings, in the panel ───────────────────────────── */
+
+let _widgetShown = null;   // { item, panel } — what the panel is showing now
+let _widgetToken = 0;      // the schema read is async; only the latest wins
 
 /**
- * Open the settings dialog for widget #index on the current slide. The panel
- * stays on the slide's properties; the widget's box is only marked on the
- * slide while its settings are open.
+ * Select widget #index on the current slide: its box is marked on the slide
+ * and the panel shows its settings.
  */
-export async function openWidgetSettingsFor(index) {
-    if (isWidgetSettingsOpen()) return;
+export function openWidgetSettingsFor(index) {
+    const div = document.querySelector(`.edit-overlay[data-arr-key="widgets"][data-item-index="${index}"]`);
+    if (div) { selectOverlayEl(div, 'widgets', index); return; }
+    ctx.selectedOverlay = { div: null, arrKey: 'widgets', index };
+    updatePropertiesPanel();
+}
+
+async function showWidgetPanel(index) {
     const item = getOrCreateConfig()?.widgets?.[index];
     if (!item) return;
+    setPanelMode('widget', item.title || widgetTypeLabel(item));
+    // Pressing on the same widget again (to drag it) keeps what's typed.
+    if (_widgetShown?.item === item) return;
+    const token = ++_widgetToken;
+    _widgetShown = { item, panel: null };
     const schema = await getWidgetSchema(item);
-
-    const overlay = document.querySelector(`.edit-overlay[data-arr-key="widgets"][data-item-index="${index}"]`);
-    // Whatever media item was selected, the dialog is now what's being edited.
-    if (ctx.selectedOverlay) {
-        document.querySelectorAll('.edit-overlay.selected').forEach(el => el.classList.remove('selected'));
-        ctx.selectedOverlay = null;
-        updatePropertiesPanel();
-    }
-    overlay?.classList.add('is-editing');
-
-    openWidgetSettings(item, schema || { label: null, fields: [] }, {
-        title: item.title || schema?.label || widgetTypeLabel(item),
-        // Keep the box on the slide in step with the dialog's Layout card.
+    if (token !== _widgetToken) return;
+    const host = document.getElementById('editor-widget-body');
+    if (!host) return;
+    const box = () => document.querySelector(`.edit-overlay[data-arr-key="widgets"][data-item-index="${index}"]`);
+    _widgetShown.panel = renderWidgetPanel(host, item, schema || { label: null, fields: [], modes: ['full'] }, {
+        // Keep the box on the slide in step with the Layout card.
         onLayout: () => {
-            const div = document.querySelector(`.edit-overlay[data-arr-key="widgets"][data-item-index="${index}"]`);
+            const div = box();
             if (!div) return;
-            // Full ↔ overlay pins or frees the box, as well as moving it.
             if (schema) { syncWidgetLock(div, item, schema); return; }
             const cr = getSlideEl()?.getBoundingClientRect();
             if (cr) positionOverlay(div, item, cr);
         },
-        onRemove: () => deleteItem('widgets', index),
-        onClose: (removed) => {
-            document.querySelectorAll('.edit-overlay.is-editing').forEach(el => el.classList.remove('is-editing'));
-            if (!ctx.state?.editMode || removed) return;
-            const label = document.querySelector(`.edit-overlay[data-arr-key="widgets"][data-item-index="${index}"] .edit-overlay-label`);
-            if (label) label.textContent = overlayLabel('widgets', item, item.title || widgetTypeLabel(item));
-            refreshSlideItems();                  // names may have changed
+        onName: () => {
+            const name = item.title || widgetTypeLabel(item);
+            setPanelTitle(name);
+            const label = box()?.querySelector('.edit-overlay-label');
+            if (label) label.textContent = overlayLabel('widgets', item, name);
         },
     });
 }
@@ -323,6 +323,13 @@ export function refreshSlideItems() {
         (cfg?.[arrKey] || []).forEach((item, index) => entries.push({ arrKey, item, index }));
     }
     if (!entries.length) return;
+    // Front to back: the list's order is the slide's stacking order.
+    entries.sort((a, b) => layerOf(b) - layerOf(a));
+
+    const head = document.createElement('div');
+    head.className = 'slide-items-head';
+    head.innerHTML = `<span>On this slide</span>${entries.length > 1 ? '<span class="slide-items-hint">Front to back · drag to reorder</span>' : ''}`;
+    host.appendChild(head);
 
     const list = document.createElement('div');
     list.className = 'slide-items';
@@ -339,6 +346,7 @@ export function refreshSlideItems() {
         const row = document.createElement('div');
         row.className = 'slide-item';
         row.innerHTML = `
+            ${entries.length > 1 ? `<span class="slide-item-grip" aria-hidden="true"><svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor"><circle cx="2.5" cy="2.5" r="1.3"/><circle cx="7.5" cy="2.5" r="1.3"/><circle cx="2.5" cy="7" r="1.3"/><circle cx="7.5" cy="7" r="1.3"/><circle cx="2.5" cy="11.5" r="1.3"/><circle cx="7.5" cy="11.5" r="1.3"/></svg></span>` : ''}
             <svg class="slide-item-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ITEM_ICONS[arrKey]}</svg>
             <span class="slide-item-text">
                 <span class="slide-item-name"></span>
@@ -380,7 +388,78 @@ export function refreshSlideItems() {
             box()?.classList.remove('is-hinted');
             deleteItem(arrKey, index);
         });
+        row._entry = { arrKey, item, index };
         list.appendChild(row);
     }
     host.appendChild(list);
+    if (entries.length > 1) wireReorder(list);
+}
+
+/* ─── layering by list order ──────────────────────────────────────── */
+// What sits in front is whatever is higher in the list. Stacking is each
+// item's zIndex, so a reorder renumbers them all: the bottom of the list
+// gets LAYER_BASE, each row above it one more. The defaults it replaces
+// (reveal 4, media 5, widget 10) were all small, so the range stays well
+// below the editor's own boxes and the slide's annotation layers.
+const LAYER_BASE = 4;
+const DEFAULT_LAYER = { widgets: 10, videos: 5, audios: 5, models: 5, reveals: 4 };
+// Equal layers draw in DOM order: reveals, then media, then widgets on top.
+const KIND_ORDER = { reveals: 0, videos: 1, audios: 2, models: 3, widgets: 4 };
+function layerOf({ arrKey, item, index }) {
+    const z = parseInt(item.zIndex, 10);
+    const base = Number.isFinite(z) ? z : DEFAULT_LAYER[arrKey];
+    return base + KIND_ORDER[arrKey] / 10 + index / 1000;
+}
+
+function wireReorder(list) {
+    let dragged = null;
+    const rows = () => Array.from(list.querySelectorAll('.slide-item'));
+    const clearMarks = () => rows().forEach(r => r.classList.remove('drop-before', 'drop-after'));
+
+    for (const row of rows()) {
+        row.draggable = true;
+        row.addEventListener('dragstart', (e) => {
+            // Not from the Edit / Delete buttons.
+            if (e.target.closest?.('.slide-item-btn')) { e.preventDefault(); return; }
+            dragged = row;
+            row.classList.add('is-dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            try { e.dataTransfer.setData('text/plain', ''); } catch (_) { /* Firefox needs some data */ }
+        });
+        row.addEventListener('dragend', () => {
+            row.classList.remove('is-dragging');
+            clearMarks();
+            dragged = null;
+        });
+        row.addEventListener('dragover', (e) => {
+            if (!dragged || row === dragged) return;
+            e.preventDefault();
+            const r = row.getBoundingClientRect();
+            const before = e.clientY < r.top + r.height / 2;
+            clearMarks();
+            row.classList.add(before ? 'drop-before' : 'drop-after');
+        });
+        row.addEventListener('drop', (e) => {
+            if (!dragged || row === dragged) return;
+            e.preventDefault();
+            const r = row.getBoundingClientRect();
+            const before = e.clientY < r.top + r.height / 2;
+            row.parentNode.insertBefore(dragged, before ? row : row.nextSibling);
+            clearMarks();
+            applyListOrder(list);
+        });
+    }
+}
+
+function applyListOrder(list) {
+    const ordered = Array.from(list.querySelectorAll('.slide-item')).map(r => r._entry);
+    const n = ordered.length;
+    ordered.forEach(({ item }, i) => { item.zIndex = LAYER_BASE + (n - 1 - i); });
+    // Keep the boxes on the slide stacked the same way, so the one in front
+    // is the one a click lands on.
+    for (const { arrKey, item, index } of ordered) {
+        const div = document.querySelector(`.edit-overlay[data-arr-key="${arrKey}"][data-item-index="${index}"]`);
+        if (div) div.style.zIndex = String(50 + item.zIndex);
+    }
+    refreshSlideItems();
 }

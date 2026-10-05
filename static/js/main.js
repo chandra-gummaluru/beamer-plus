@@ -612,6 +612,15 @@ function wireSplitViewButton(annContainer2, pdfContainer2) {
         const wasDragging = isDragging;
         isDragging = false;
         divider.classList.remove('active');
+        // Editing a view slide: dragging the divider on stage sets its ratio
+        // (the view panel's split picker follows).
+        if (wasDragging && state.editMode && state.currentViewIndex != null) {
+            const view = state.slideStructure[state.currentViewIndex];
+            if (view?.type === 'view') {
+                view.ratio = Math.round(state.splitRatio);
+                bus.emit('view:ratio-dragged', view.ratio);
+            }
+        }
         // Re-render both panes after divider resize — only if we were actually dragging
         if (wasDragging && state.splitView) {
             setTimeout(async () => {
@@ -623,6 +632,7 @@ function wireSplitViewButton(annContainer2, pdfContainer2) {
                 updateMediaPositions(document.getElementById('pdf-canvas'));
                 updateMediaPositions(document.getElementById('pdf-canvas-2'));
                 await renderSplitSlides(state.currentSlide, state.rightSlideIndex);
+                bus.emit('split:resized');
             }, 50);
         }
     }
@@ -781,7 +791,8 @@ async function showViewWithUndefinedPane(viewIdx, L, R, direction) {
     const anchor = L ?? R ?? viewIdx;
     if (L != null || R != null) resetRevealsOnArrival(state.slideStructure[anchor], direction);
     state.missingPanes = { left: L == null, right: R == null };
-    const ratio = state.editMode ? 50 : (obj?.ratio ?? null);
+    // Edit mode previews the view as it will present: at its own ratio.
+    const ratio = obj?.ratio ?? (state.editMode ? 50 : null);
     // setSplitActive renders the right pane itself unless the split was
     // already up with this right index.
     const rightRendered = !(state.splitView && state.rightSlideIndex === anchor);
@@ -819,7 +830,11 @@ bus.on('slide:goto-right', (i) => queueNav(async () => {
 }));
 
 async function _goToSlide(i, direction = null, isSplitPaneNav = false) {
-    if (i < 0 || i >= state.slideStructure.length) return;
+    // Sequential nav out of a split works from the view, not from `i` (the
+    // left pane ± 1), so `i` may be off either end — e.g. the left pane is the
+    // deck's first page. Only bounds-check where `i` is the destination.
+    const leavingSplit = !isSplitPaneNav && !state.editMode && state.splitView && direction !== null;
+    if (!leavingSplit && (i < 0 || i >= state.slideStructure.length)) return;
     await commitOpenTextEditor(state);
 
     // A direct jump (bookmark, thumbnail click, tour, etc.) that targets the
@@ -856,13 +871,23 @@ async function _goToSlide(i, direction = null, isSplitPaneNav = false) {
             (state.slideStructure[targetIdx]?.hidden || targetIdx <= viewIdx || state.missingPanes?.right)) {
             targetIdx = viewIdx + 1;
         }
-        // An undefined left pane has no slide to fall back to: step back
-        // past the view slide instead.
-        if (direction === 'back' && viewIdx != null && state.missingPanes?.left) {
+        // Back normally collapses to the left pane — but the same trap exists
+        // the other way: a left pane that's hidden (a deck built only from
+        // view slides hides the pages they show) or that sits after the view
+        // would skip straight back to this view, or off the start of the deck.
+        // Step back past the view slide instead. An undefined left pane has
+        // no slide to fall back to either.
+        if (direction === 'back' && viewIdx != null &&
+            (state.slideStructure[targetIdx]?.hidden || targetIdx >= viewIdx || state.missingPanes?.left)) {
             targetIdx = viewIdx - 1;
         }
-        // Nothing beyond the view in that direction: stay in the split.
-        if (targetIdx < 0 || targetIdx >= state.slideStructure.length) return;
+        // Where that lands once hidden slides are skipped. Nothing there —
+        // the view is the first (or last) thing showing: stay in the split
+        // rather than closing it and going nowhere.
+        const step = direction === 'forward' ? 1 : -1;
+        let landing = targetIdx;
+        while (state.slideStructure[landing]?.hidden) landing += step;
+        if (landing < 0 || landing >= state.slideStructure.length) return;
         await setSplitActive(false);
         // Pass direction so the hidden-slide while loop runs in the recursive call.
         // Forward: skips right-pane if hidden, continues to next visible slide.
@@ -899,7 +924,7 @@ async function _goToSlide(i, direction = null, isSplitPaneNav = false) {
         // arriving backwards); the left pane's goToSlide below won't reset.
         resetRevealsOnArrival(state.slideStructure[leftIdx], direction);
         resetRevealsOnArrival(state.slideStructure[rightIdx], direction);
-        const previewRatio = state.editMode ? 50 : (prelimObj.ratio ?? null);
+        const previewRatio = prelimObj.ratio ?? (state.editMode ? 50 : null);
         if (leftIdx !== rightIdx) await setSplitActive(true, rightIdx, previewRatio);
         state.currentViewIndex = i;   // remember which view slide drives this split
         await _goToSlide(leftIdx, null, true);  // isSplitPaneNav — skip auto-close
@@ -1426,6 +1451,7 @@ bus.on('view:ratio-commit', async (ratio) => {
     updateWidgetPositions(document.getElementById('pdf-canvas-2'));
     updateMediaPositions(document.getElementById('pdf-canvas'));
     updateMediaPositions(document.getElementById('pdf-canvas-2'));
+    bus.emit('split:resized');
 });
 
 function populateBookmarkPins() {

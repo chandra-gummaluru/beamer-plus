@@ -563,6 +563,35 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 #editor-slide-items { display: flex; flex-direction: column; gap: var(--sp-2); }
 #editor-slide-items:empty { display: none; }   /* no stray gap under the settings */
 .slide-items { display: flex; flex-direction: column; gap: 6px; }
+.slide-items-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-2);
+    padding: var(--sp-2) 2px 0;
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    color: var(--ink-2);
+}
+.slide-items-hint { font-weight: 400; color: var(--ink-3); }
+/* Rows reorder by dragging: a grip on the left, a line where it will land. */
+.slide-item[draggable="true"] { cursor: grab; position: relative; }
+.slide-item.is-dragging { opacity: 0.45; }
+.slide-item-grip { flex: 0 0 auto; display: flex; color: oklch(72% 0.006 260); margin-right: -2px; }
+.slide-item:hover .slide-item-grip { color: var(--ink-3); }
+.slide-item.drop-before::before,
+.slide-item.drop-after::after {
+    content: '';
+    position: absolute;
+    left: 6px;
+    right: 6px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--ink-1);
+}
+.slide-item.drop-before::before { top: -5px; }
+.slide-item.drop-after::after { bottom: -5px; }
 .slide-item {
     display: flex;
     align-items: center;
@@ -764,199 +793,134 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
     outline: none;
 }
 
-/* ─── Expanded widget settings dialog (editor/widget-settings-modal.js) ─ */
+/* ─── Widget settings, in the panel (editor/widget-panel.js) ───── */
 
-.wsm-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 1200;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--sp-6);
-    background: oklch(20% 0.01 260 / 0.28);
-    opacity: 0;
-    transition: opacity 140ms var(--ease);
-}
-.wsm-overlay.is-open { opacity: 1; }
-.wsm-dialog {
-    width: min(1000px, 100%);
-    max-height: min(880px, 100%);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    background: var(--surface-cream);
-    border-radius: var(--r-lg);
-    box-shadow: var(--shadow-pop);
-    font-family: var(--font-sans);
-    font-size: var(--fs-sm);
-    color: var(--ink-1);
-    transform: translateY(8px) scale(0.99);
-    transition: transform 160ms var(--ease);
-}
-.wsm-overlay.is-open .wsm-dialog { transform: none; }
-.wsm-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-4);
-    padding: var(--sp-4) var(--sp-6);
-    border-bottom: var(--line-hairline);
-}
-.wsm-kicker {
-    font-size: var(--fs-xs);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--ink-3);
-}
-.wsm-title {
-    margin: 2px 0 0;
+#editor-panel[data-mode="widget"] #editor-widget { display: flex; }
+#editor-panel[data-mode="widget"] .editor-props-back { display: flex; }
+#editor-widget { display: none; flex-direction: column; gap: var(--sp-4); }
+#editor-widget-body { display: flex; flex-direction: column; gap: var(--sp-4); }
+
+/* The panel title is the widget's name — keep a long one to one line. */
+#editor-panel-title { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* No add-media buttons while a widget is shown — they're for the slide. */
+#editor-panel[data-mode="widget"] #editor-add-row { display: none; }
+
+/* Sections, not cards: the widget's own groups, then Layout, straight on
+   the panel, each under its heading. */
+#editor-widget .wf { gap: var(--sp-5); }
+#editor-widget .wf-group { padding: 0; background: none; border: none; border-radius: 0; }
+/* Section headings: a clear step up from the field labels, in the panel
+   title's serif, so General / Layout / Settings read as separate parts. */
+#editor-widget .wf-group-title {
     font-family: var(--font-serif);
-    font-size: var(--fs-xl);
+    font-size: var(--fs-lg);
     font-weight: 500;
     letter-spacing: -0.01em;
-    line-height: 1.2;
+    color: var(--ink-1);
+    padding-bottom: var(--sp-2);
+    margin-bottom: 2px;
 }
-.wsm-close {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    padding: 0;
-    background: none;
-    border: none;
-    border-radius: var(--r-sm);
-    color: var(--ink-3);
-    cursor: pointer;
-}
-.wsm-close:hover { color: var(--ink-1); background: var(--surface-cream-2); }
-.wsm-footer {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    padding: var(--sp-3) var(--sp-6);
-    border-top: var(--line-hairline);
-}
-/* Remove on the left, Done on the right. */
-.wsm-footer .wsm-done { margin-left: auto; }
-.wsm-remove {
-    gap: 6px;
-    min-height: 34px;
-    background: none;
-    border-color: transparent;
-    color: oklch(45% 0.15 25);
-    font-family: var(--font-sans);
-    font-size: var(--fs-sm);
-}
-.wsm-remove:hover { background: oklch(from var(--danger) l c h / 0.08); }
-.wsm-remove.is-armed { background: var(--danger); border-color: var(--danger); color: #fff; }
-.wsm-remove[hidden] { display: none; }
-/* Layout presets: two equal buttons, each with a picture of what it does. */
-.wsm-layout-presets { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); }
-.wsm-preset {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    min-height: 34px;
-    padding: 0 var(--sp-2);
-    background: var(--surface-cream);
-    border: 1px solid oklch(86% 0.005 260);
-    border-radius: var(--r-sm);
-    color: var(--ink-2);
-    font-family: var(--font-sans);
-    font-size: var(--fs-sm);
-    cursor: pointer;
-    transition: color var(--dur-fast), background var(--dur-fast), border-color var(--dur-fast);
-}
-.wsm-preset:hover { color: var(--ink-1); border-color: var(--accent); background: var(--surface-paper); }
-.wsm-preset.is-active { color: var(--ink-1); border-color: var(--ink-1); background: var(--surface-paper); box-shadow: inset 0 0 0 1px var(--ink-1); }
-/* Full / Overlay, then where an overlay sits: five small place buttons. */
-.wsm-layout-presets[hidden], .wsm-overlay-box[hidden] { display: none; }
-.wsm-overlay-box { display: flex; flex-direction: column; gap: var(--sp-3); }
-.wsm-places { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--sp-1); }
-.wsm-place { padding: 0; min-height: 30px; }
-.wsm-empty { padding: 0 var(--sp-1); }
-.wsm-done {
-    min-height: 34px;
-    padding: 0 var(--sp-5);
-    background: var(--ink-1);
-    border-color: var(--ink-1);
-    color: var(--ink-on-accent);
-}
-.wsm-done:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
-.wsm-body { overflow-y: auto; padding: var(--sp-5) var(--sp-6) var(--sp-6); }
+#editor-widget .wf-group + .wf-group { padding-top: var(--sp-1); }
 
-/* Two columns of cards: long content (question, answer list, template) on
-   the left, short settings on the right (see buildWidgetForm). */
-.wf--modal {
-    display: grid;
-    grid-template-columns: minmax(0, 1.75fr) minmax(250px, 1fr);
-    align-items: start;
-    gap: var(--sp-4);
-}
-.wf--modal.is-single { grid-template-columns: minmax(0, 1fr); }
-.wf-col { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
-.wf--modal .wf-group {
-    padding: var(--sp-4);
-    background: var(--surface-paper);
-    border: var(--line-soft);
-    border-radius: var(--r-md);
-}
-.wf--modal .wf-group[hidden],
-.wf-col[hidden] { display: none; }
-@media (max-width: 820px) {
-    .wf--modal { grid-template-columns: minmax(0, 1fr); }
-}
-.wf--modal .editor-prop-input,
-.wf--modal .editor-prop-select { min-height: 34px; font-size: var(--fs-base); }
-.wf--modal .wf-mono,
-.wf--modal .wf-code-mirror,
-.wf--modal .wf-code-input { font-size: 13.5px; }
-.wf--modal .wf-code-mirror,
-.wf--modal .wf-code-input { padding: 10px 12px; }
-
-/* Only short settings: a narrower dialog, Settings and Layout side by side. */
-.wsm-dialog.is-compact { width: min(780px, 100%); }
-.wsm-dialog.is-compact .wf--modal { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-@media (max-width: 820px) {
-    .wsm-dialog.is-compact .wf--modal { grid-template-columns: minmax(0, 1fr); }
-}
-
-/* Labels in the dialog read as sentences, not the sidebar's small caps. */
-.wsm-dialog .editor-prop-label {
+/* Text boxes keep their size — no drag handle. Long ones grow with their
+   text, and a field with "expand" opens in the large editor. */
+#editor-widget textarea { resize: none; }
+/* Labels read as sentences (here and in the view slide's panel). */
+#editor-view .editor-prop-label,
+#editor-widget .editor-prop-label {
     font-size: var(--fs-sm);
     font-weight: 500;
     text-transform: none;
     letter-spacing: 0;
     color: var(--ink-2);
 }
-.wsm-dialog .wf-group-body { gap: var(--sp-3); }
-.wsm-dialog .editor-prop-row { gap: 6px; }
+#editor-widget .wf-group-body { gap: var(--sp-3); }
+#editor-widget .editor-prop-row { gap: 6px; }
+#editor-widget .editor-prop-select[hidden] { display: none; }
+#editor-widget .editor-prop-input,
+#editor-widget .editor-prop-select { min-height: 32px; }
 
-/* Inline rows: label on the left, a control as wide as its values on the
-   right — a select, a number, minutes + seconds. */
-.wsm-dialog .editor-prop-row--inline {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-3);
-    min-height: 34px;
+/* Every control sits under its label, full width — dropdowns and numbers
+   included. Only an on/off switch sits beside its label. */
+#editor-widget .editor-prop-row--inline { flex-direction: column; align-items: stretch; }
+#editor-widget .editor-prop-row--inline > .editor-prop-select,
+#editor-widget .editor-prop-row--inline > .editor-prop-input { width: 100%; }
+#editor-widget .editor-prop-select { width: 100%; max-width: none; align-self: stretch; }
+
+/* Two or three choices: a segmented control, every option in view. */
+.wf-seg {
+    display: flex;
+    padding: 3px;
+    gap: 3px;
+    background: var(--surface-cream-2);
+    border-radius: var(--r-sm);
 }
-.wsm-dialog .editor-prop-row--inline > .editor-prop-label { flex: 1 1 auto; min-width: 0; }
-/* A select is as wide as its longest option (never under a short minimum,
-   never past most of the line), so nothing is cut off and nothing sprawls. */
-.wsm-dialog .editor-prop-row--inline > .editor-prop-select { flex: 0 1 auto; width: auto; min-width: 128px; max-width: 68%; }
-.wsm-dialog .editor-prop-row--inline > .editor-prop-input { flex: 0 0 84px; width: 84px; }
-.wsm-dialog .editor-prop-row--inline > .wf-duration { flex: 0 0 auto; gap: var(--sp-2); }
-.wsm-dialog .editor-prop-row--inline .wf-duration-part { flex: 0 0 auto; }
-.wsm-dialog .editor-prop-row--inline .wf-duration-part .editor-prop-input { flex: 0 0 58px; width: 58px; }
+.wf-seg-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 28px;
+    padding: 0 6px;
+    background: none;
+    border: none;
+    border-radius: 4px;
+    font-family: var(--font-sans);
+    font-size: var(--fs-sm);
+    font-weight: 500;
+    color: var(--ink-2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    transition: background var(--dur-fast), color var(--dur-fast), box-shadow var(--dur-fast);
+}
+.wf-seg-btn:hover { color: var(--ink-1); }
+.wf-seg-btn.is-active {
+    background: var(--surface-paper);
+    color: var(--ink-1);
+    box-shadow: 0 1px 2px oklch(20% 0.01 260 / 0.12), 0 0 0 1px oklch(20% 0.01 260 / 0.06);
+}
+
+/* Text size: A, A, A … growing — pick the one that looks right. */
+.wf-sizes {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    padding: 3px;
+    background: var(--surface-cream-2);
+    border-radius: var(--r-sm);
+}
+.wf-size-btn {
+    flex: 1 1 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    min-width: 0;
+    height: 32px;
+    padding: 0 0 6px;
+    background: none;
+    border: none;
+    border-radius: 4px;
+    font-family: var(--font-sans);
+    font-weight: 600;
+    line-height: 1;
+    color: var(--ink-3);
+    cursor: pointer;
+    transition: color var(--dur-fast), background var(--dur-fast), box-shadow var(--dur-fast);
+}
+.wf-size-btn:hover { color: var(--ink-1); }
+.wf-size-btn.is-active {
+    color: var(--ink-1);
+    background: var(--surface-paper);
+    box-shadow: 0 1px 2px oklch(20% 0.01 260 / 0.12), 0 0 0 1px oklch(20% 0.01 260 / 0.06);
+}
+
+/* Minutes and seconds share the line evenly. */
+#editor-widget .wf-duration-part { flex: 1 1 0; }
 
 /* On/off: the same line as every other short setting, no box around it. */
-.wsm-dialog .editor-prop-checkbox-row {
-    min-height: 34px;
+#editor-widget .editor-prop-checkbox-row {
+    min-height: 32px;
     padding: 0;
     border: none;
     background: none;
@@ -965,11 +929,19 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
     color: var(--ink-2);
 }
 
-/* X / Y / Width / Height: a tidy 2×2 of short inputs. */
-.wsm-dialog .wsm-layout .editor-prop-row-2col { gap: var(--sp-3) var(--sp-3); }
-
-@media (prefers-reduced-motion: reduce) {
-    .wsm-overlay, .wsm-dialog { transition: none; }
+/* ── Layout card ── a Full slide switch over X / Y / Width / Height. */
+.wp-geom { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
+.wp-num { position: relative; display: block; }
+.wp-num .editor-prop-input { padding-right: 24px; }
+.wp-num i {
+    position: absolute;
+    right: 9px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-style: normal;
+    font-size: var(--fs-xs);
+    color: var(--ink-3);
+    pointer-events: none;
 }
 
 /* ─── Widget picker modal ────────────────────────────────────── */
@@ -1283,3 +1255,176 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 }
 .slide-setting-select:hover { background-color: var(--surface-cream-2); }
 .slide-setting-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* The % sits where the spinner would — no spinner in these. */
+.wp-num input::-webkit-outer-spin-button,
+.wp-num input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.wp-num input { -moz-appearance: textfield; appearance: textfield; }
+
+
+/* ─── Expand: a long text field in a large editor (widget-fields.js) ── */
+.wf-expand-wrap { position: relative; }
+.wf-expand-wrap > textarea { padding-right: 34px; }
+.wf-expand-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    background: var(--surface-paper);
+    border: 1px solid transparent;
+    border-radius: var(--r-sm);
+    color: var(--ink-3);
+    cursor: pointer;
+    transition: color var(--dur-fast), border-color var(--dur-fast), background var(--dur-fast);
+}
+.wf-expand-btn:hover { color: var(--ink-1); border-color: oklch(82% 0.005 260); background: var(--surface-cream-2); }
+
+.wf-xe-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--sp-6);
+    background: oklch(20% 0.01 260 / 0.28);
+    opacity: 0;
+    transition: opacity 140ms var(--ease);
+}
+.wf-xe-overlay.is-open { opacity: 1; }
+.wf-xe {
+    width: min(960px, 100%);
+    height: min(720px, 100%);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--surface-cream);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-pop);
+    font-family: var(--font-sans);
+}
+.wf-xe-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-5);
+    border-bottom: var(--line-hairline);
+}
+.wf-xe-title { font-family: var(--font-serif); font-size: var(--fs-lg); font-weight: 500; color: var(--ink-1); }
+.wf-xe-done {
+    min-height: 32px;
+    padding: 0 var(--sp-5);
+    background: var(--ink-1);
+    border-color: var(--ink-1);
+    color: var(--ink-on-accent);
+}
+.wf-xe-done:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
+.wf-xe-input {
+    flex: 1 1 auto;
+    width: 100%;
+    margin: 0;
+    padding: var(--sp-4) var(--sp-5);
+    border: none;
+    outline: none;
+    resize: none;
+    background: var(--surface-paper);
+    color: var(--ink-1);
+    font-family: var(--font-sans);
+    font-size: var(--fs-base);
+    line-height: 1.55;
+    tab-size: 4;
+}
+.wf-xe-input.is-mono { font-family: var(--wf-mono, ui-monospace, monospace); font-size: 14px; }
+@media (prefers-reduced-motion: reduce) { .wf-xe-overlay { transition: none; } }
+
+
+/* ─── View slide: the split picker (editor/view-config.js) ──────── */
+/* The two panes drawn to scale; drag anywhere on it to move the line. */
+.vs-split {
+    --vs-ratio: 50%;
+    position: relative;
+    display: flex;
+    gap: 0;
+    height: 64px;
+    margin-top: var(--sp-1);
+    border: 1px solid oklch(84% 0.005 260);
+    border-radius: var(--r-sm);
+    overflow: hidden;
+    cursor: ew-resize;
+    touch-action: none;
+    user-select: none;
+    background: var(--surface-paper);
+}
+.vs-pane {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-2);
+}
+.vs-pane--l { flex: 0 0 var(--vs-ratio); background: oklch(95% 0.006 260); }
+.vs-pane--r { flex: 1 1 auto; background: oklch(97.5% 0.004 260); }
+.vs-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: var(--vs-ratio);
+    width: 14px;
+    margin-left: -7px;
+    display: flex;
+    justify-content: center;
+    outline: none;
+}
+.vs-handle::before {
+    content: '';
+    width: 2px;
+    height: 100%;
+    background: var(--ink-1);
+    transition: width var(--dur-fast);
+}
+.vs-handle::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 10px;
+    height: 22px;
+    transform: translate(-50%, -50%);
+    background: var(--surface-paper);
+    border: 2px solid var(--ink-1);
+    border-radius: 4px;
+}
+.vs-split:hover .vs-handle::before, .vs-split.is-dragging .vs-handle::before { width: 3px; }
+.vs-handle:focus-visible::after { box-shadow: 0 0 0 3px oklch(45% 0.005 260 / 0.25); }
+
+.vs-presets { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-top: var(--sp-2); }
+.vs-preset {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 2px 5px;
+    background: var(--surface-cream);
+    border: 1px solid oklch(88% 0.005 260);
+    border-radius: var(--r-sm);
+    font-family: var(--font-sans);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ink-3);
+    cursor: pointer;
+    transition: color var(--dur-fast), border-color var(--dur-fast), background var(--dur-fast);
+}
+.vs-mini { display: flex; gap: 2px; width: 28px; height: 14px; }
+.vs-mini i { display: block; background: oklch(80% 0.006 260); border-radius: 2px; transition: background var(--dur-fast); }
+.vs-preset:hover { color: var(--ink-1); border-color: oklch(76% 0.006 260); }
+.vs-preset.is-active { color: var(--ink-1); background: var(--surface-paper); border-color: var(--ink-1); }
+.vs-preset.is-active .vs-mini i { background: var(--ink-1); }

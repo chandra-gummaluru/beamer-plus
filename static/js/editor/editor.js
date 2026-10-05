@@ -4,6 +4,7 @@
 // - context.js       shared editor state + config helpers
 // - overlays.js      draggable/resizable overlay boxes, add-media picking
 // - properties.js    properties panel (position/size + per-type fields)
+// - widget-panel.js  a selected widget's settings, in the same panel
 // - widget-settings.js  parent half of the widget-owned settings protocol
 // - widget-picker.js "Add Widget" modal
 // - view-config.js   view-slide (saved split view) configuration panel
@@ -67,6 +68,16 @@ export function initEditor(state) {
 
     initWidgetSettings();
     wireDeselect();
+    // The split's divider moved (the view panel's picker, or a drag on
+    // stage): the slide under the edit boxes changed size — redraw them.
+    bus.on('split:resized', () => {
+        if (!ctx.state?.editMode) return;
+        cleanupEditOverlays();
+        renderEditOverlays();
+        const sel = ctx.selectedOverlay;
+        const div = sel && document.querySelector(`.edit-overlay[data-arr-key="${sel.arrKey}"][data-item-index="${sel.index}"]`);
+        if (div) { div.classList.add('selected'); sel.div = div; }
+    });
 
     bus.on('slides:loaded', () => { if (ctx.state?.editMode) applySlideReorder(); });
 
@@ -149,7 +160,8 @@ async function enterEditMode() {
     if (ctx.state.annCvs?.canvas) ctx.state.annCvs.canvas.style.pointerEvents = 'none';
 
     // If we entered edit mode while a split view was active, keep it visible
-    // and show the view config panel.  Re-render at 50/50 for the edit preview.
+    // and show the view config panel, previewed at the view's own ratio
+    // (50/50 for a split that isn't a saved view).
     if (ctx.state.splitView) {
         let viewIdx = ctx.state.slideStructure?.findIndex(s =>
             s.type === 'view' &&
@@ -162,7 +174,7 @@ async function enterEditMode() {
             ctx.selectedViewIdx = viewIdx;
             showViewConfig(viewIdx);
         }
-        bus.emit('view:ratio-commit', 50);
+        bus.emit('view:ratio-commit', viewIdx !== -1 ? (ctx.state.slideStructure[viewIdx].ratio ?? 50) : 50);
         await new Promise(r => setTimeout(r, 350));
     }
 

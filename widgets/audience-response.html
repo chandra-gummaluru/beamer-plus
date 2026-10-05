@@ -7,7 +7,7 @@
   "category": "Audience Response",
   "fields": [
     {"key": "responseType", "label": "Question type", "type": "select", "default": "choice", "options": [{"v": "choice", "l": "Multiple choice"}, {"v": "truefalse", "l": "True / False"}, {"v": "rating", "l": "Rating scale"}, {"v": "numeric", "l": "Numeric estimate"}, {"v": "exact", "l": "Numerical answer"}, {"v": "wordcloud", "l": "Word cloud"}, {"v": "fill", "l": "Fill in the blanks"}, {"v": "open", "l": "Open-ended"}], "section": "Question"},
-    {"key": "question", "label": "Question text", "type": "textarea", "rows": 4, "placeholder": "Consider the following code:\n\n```python\nx = 5\nif x > 2:\n    x = -3\n```\n\nWhat is `x`?", "note": "Markdown & $LaTeX$"},
+    {"key": "question", "expand": true, "label": "Question text", "type": "textarea", "rows": 4, "placeholder": "Consider the following code:\n\n```python\nx = 5\nif x > 2:\n    x = -3\n```\n\nWhat is `x`?", "note": "Markdown & $LaTeX$"},
     {"key": "template", "label": "Template", "type": "textarea", "rows": 6, "placeholder": ">>> f(BLANK, BLANK)\nTrue\n>>> f(BLANK, BLANK)\nFalse", "showIf": {"responseType": "fill"}, "note": "each blank is one answer", "mono": true, "blanks": {"pattern": "\\bBLANK\\b|_{3,}", "insert": "BLANK"}},
     {"key": "options", "label": "Options", "type": "textarea-lines", "rows": 4, "placeholder": "Option A\nOption B\nOption C", "showIf": {"responseType": "choice"}, "section": "Answers", "editor": "list", "itemLabel": "option", "itemPlaceholder": "Option", "correct": {"key": "correctAnswer", "base": 1}},
     {"key": "correctAnswer", "label": "Correct option (1-based, blank = none)", "type": "number-nullable", "min": 1, "step": 1, "showIf": {"responseType": "choice"}},

@@ -15,6 +15,7 @@ export function getSlideEl() { return document.getElementById('pdf-canvas'); }
    which one:
      'slide' — the current slide's own properties (the default)
      'item'  — the selected overlay's properties
+     'widget' — the selected widget's settings (editor/widget-panel.js)
      'view'  — the split-view configuration for a view slide
    CSS keys off #editor-panel[data-mode], so switching modes is a single
    attribute write; nothing sets inline display styles. */
@@ -22,6 +23,7 @@ export function getSlideEl() { return document.getElementById('pdf-canvas'); }
 const PANEL_TITLES = {
     slide: 'Slide Properties',
     item:  'Properties',        // replaced with the item's own type by properties.js
+    widget: 'Widget',           // replaced with the widget's name
     view:  'View Configuration',
 };
 
@@ -40,7 +42,7 @@ export function setPanelTitle(title) {
 // dismisses itself and control returns to whatever is still selected.
 export function resolvePanelMode() {
     if (ctx.selectedViewIdx !== null)  return 'view';
-    if (ctx.selectedOverlay)           return 'item';
+    if (ctx.selectedOverlay)           return ctx.selectedOverlay.arrKey === 'widgets' ? 'widget' : 'item';
     return 'slide';
 }
 

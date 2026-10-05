@@ -1,9 +1,10 @@
 // Widget settings form — the controls for a widget's own declared fields,
 // built from its `widget-schema` block (see editor/widget-schema.js).
 //
-// One builder serves both places a widget is configured from: the narrow
-// properties sidebar and the roomy settings dialog (widget-settings-modal.js).
-// Both edit the same config item, so switching between them loses nothing.
+// Shown in the editor's right panel when a widget is selected
+// (widget-panel.js); the panel can be widened, and then the groups flow in
+// two columns. A choice of two or three short options is drawn as a
+// segmented control and Text size as a row of growing A's.
 //
 // Beyond the basic field types, a schema can opt into richer editing with
 // hints that the in-widget settings kit simply ignores — so the kit keeps
@@ -14,6 +15,8 @@
 //                             hidden (showIf) hide too.
 //   note: "Markdown · $…$"    A short aside shown next to the label.
 //   mono: true                Monospace textarea, for code.
+//   expand: true              On a textarea: an Expand button that opens it
+//                             in a large editor (code, a long question).
 //   editor: "list"            On a textarea-lines field: one input per line,
 //                             with add / remove, Enter for a new row, and
 //                             multi-line paste split into rows.
@@ -52,8 +55,25 @@ export function buildWidgetForm(schema, item, variant = 'panel') {
     const rows = [];
     const groups = [];
     let group = null;
+    // In the panel, what every widget has (Name, Text size) comes first under
+    // "General"; the widget's own settings follow, after whatever the panel
+    // puts between (its Layout section).
+    let common = null;
     for (const field of schema.fields) {
         if (claimed.has(field.key)) continue;
+        if (variant === 'panel' && (field.key === 'title' || field.key === 'scale')) {
+            if (!common) {
+                common = makeGroup('General', variant);
+                groups.push(common);
+                root.insertBefore(common.node, root.firstChild);
+            }
+            const row = buildFieldRow(field, item, variant);
+            row.field = field;
+            row.group = common;
+            rows.push(row);
+            common.body.appendChild(row.node);
+            continue;
+        }
         if (!group || (field.section && field.section !== group.title)) {
             group = makeGroup(field.section || '', variant);
             groups.push(group);
@@ -129,7 +149,7 @@ export function buildWidgetForm(schema, item, variant = 'panel') {
     }
 
     syncVisibility();
-    return { node: root, apply, syncVisibility, focusFirst };
+    return { node: root, apply, syncVisibility, focusFirst, commonNode: common?.node || null };
 }
 
 /* ─── groups ─────────────────────────────────────────────────────────── */
@@ -139,7 +159,7 @@ function makeGroup(title, variant) {
     node.className = 'wf-group';
     // In the dialog every card has a heading, so the first, unnamed group
     // (Name, Text size, …) reads as "Settings" beside "Layout".
-    if (title || variant === 'modal') {
+    if (title || variant === 'modal' || variant === 'panel') {
         const h = document.createElement('div');
         h.className = 'wf-group-title';
         h.textContent = title || 'Settings';
@@ -177,7 +197,7 @@ function fieldLabel(field) {
     return lab;
 }
 
-const INLINE_TYPES = new Set(['select', 'ai-model', 'number', 'number-nullable', 'duration']);
+const INLINE_TYPES = new Set(['select', 'ai-model', 'number', 'number-nullable']);
 
 const isListField     = (f) => f?.type === 'textarea-lines' && f.editor === 'list';
 const isTemplateField = (f) => f?.type === 'textarea' && f.blanks && typeof f.blanks === 'object';
@@ -193,7 +213,7 @@ function buildFieldRow(field, item, variant) {
     const eff = fieldValue(item, field);
     const row = document.createElement('div');
     row.className = 'editor-prop-row';
-    let input, wide = false;
+    let input, wide = false, skipInline = false;
 
     if (field.type === 'checkbox') {
         // An on/off setting is the same switch row as the slide's own
@@ -243,6 +263,21 @@ function buildFieldRow(field, item, variant) {
             }
         }
         row.appendChild(input);
+        // In the dialog, a choice of two or three is a row of buttons you can
+        // see all of at once, and Text size is a row of A's growing in size.
+        // The select stays (hidden) as the value everything else reads.
+        if (variant === 'modal' || variant === 'panel') {
+            const seg = field.key === 'scale' ? buildSizePicker(input)
+                      : input.options.length >= 2 && input.options.length <= 3
+                        && Array.from(input.options).every(o => o.textContent.length <= 14) ? buildSegmented(input)
+                      : null;
+            if (seg) {
+                input.hidden = true;
+                row.appendChild(seg);
+                row.classList.add('editor-prop-row--seg');
+                skipInline = true;
+            }
+        }
 
     } else if (field.type === 'ai-model') {
         row.appendChild(fieldLabel(field));
@@ -252,7 +287,8 @@ function buildFieldRow(field, item, variant) {
         row.appendChild(input);
 
     } else if (field.type === 'textarea' || field.type === 'textarea-lines') {
-        row.appendChild(fieldLabel(field));
+        const lab = fieldLabel(field);
+        row.appendChild(lab);
         input = document.createElement('textarea');
         input.className = 'editor-prop-input editor-prop-area' + (field.mono ? ' wf-mono' : '');
         input.rows = field.rows || (field.type === 'textarea-lines' ? 4 : 3);
@@ -262,6 +298,16 @@ function buildFieldRow(field, item, variant) {
         row.appendChild(input);
         autoGrow(input, variant);
         wide = true;
+        // A field the widget marks "expand": true — code, a long question —
+        // gets a small icon in its top-right corner that opens it in a roomy
+        // editor over the page.
+        if (field.expand) {
+            const wrap = document.createElement('div');
+            wrap.className = 'wf-expand-wrap';
+            input.replaceWith(wrap);
+            wrap.appendChild(input);
+            wrap.appendChild(expandButton(field, input));
+        }
 
     } else if (field.type === 'file') {
         row.appendChild(fieldLabel(field));
@@ -344,7 +390,7 @@ function buildFieldRow(field, item, variant) {
 
     // Short controls sit on the label's line, at the width their values
     // need, instead of stretching under it across the whole card.
-    if (INLINE_TYPES.has(field.type)) row.classList.add('editor-prop-row--inline');
+    if (INLINE_TYPES.has(field.type) && !skipInline) row.classList.add('editor-prop-row--inline');
 
     return {
         key: field.key,
@@ -371,6 +417,141 @@ function buildFieldRow(field, item, variant) {
             return input.value === '' ? { remove: true } : { value: input.value };
         },
     };
+}
+
+/* ─── expand: a long text field in a roomy editor ───────────────────── */
+// The panel is narrow, and some fields are a page of code. A field that
+// declares "expand": true gets an Expand button by its label; the editor it
+// opens is a second view of the same textarea — every keystroke is written
+// back to it (and fires its input event), so the widget updates as you
+// type and closing loses nothing.
+
+const ICON_EXPAND = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
+
+function expandButton(field, source) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'wf-expand-btn';
+    b.title = 'Expand';
+    b.setAttribute('aria-label', `Expand ${field.label || field.key}`);
+    b.innerHTML = ICON_EXPAND;
+    b.addEventListener('click', (e) => {
+        e.preventDefault();
+        openTextEditor(field, source);
+    });
+    return b;
+}
+
+function openTextEditor(field, source) {
+    const overlay = document.createElement('div');
+    overlay.className = 'wf-xe-overlay';
+    overlay.innerHTML = `
+        <div class="wf-xe" role="dialog" aria-modal="true">
+            <header class="wf-xe-head">
+                <span class="wf-xe-title"></span>
+                <button type="button" class="btn wf-xe-done">Done</button>
+            </header>
+            <textarea class="wf-xe-input${field.mono ? ' is-mono' : ''}" spellcheck="false"></textarea>
+        </div>`;
+    overlay.querySelector('.wf-xe-title').textContent = field.label || field.key;
+    const ta = overlay.querySelector('.wf-xe-input');
+    ta.value = source.value;
+    ta.placeholder = source.placeholder || '';
+
+    const sync = () => {
+        source.value = ta.value;
+        source.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    ta.addEventListener('input', sync);
+
+    const close = () => {
+        window.removeEventListener('keydown', onKey, true);
+        overlay.remove();
+        source.dispatchEvent(new Event('change', { bubbles: true }));
+        try { source.focus({ preventScroll: true }); } catch (_) {}
+    };
+    // Capture phase: Escape closes this editor and nothing else (the editor
+    // would otherwise deselect the widget), and no key typed here reaches
+    // the slide's shortcuts. Tab indents, as in any code editor.
+    const onKey = (e) => {
+        if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); close(); return; }
+        if (e.target === ta && e.key === 'Tab' && !e.shiftKey) {
+            e.preventDefault();
+            ta.setRangeText('    ', ta.selectionStart, ta.selectionEnd, 'end');
+            sync();
+        }
+        if (overlay.contains(e.target)) e.stopPropagation();
+    };
+    window.addEventListener('keydown', onKey, true);
+    overlay.querySelector('.wf-xe-done').addEventListener('click', close);
+    let downOnBackdrop = false;
+    overlay.addEventListener('pointerdown', (e) => { downOnBackdrop = e.target === overlay; });
+    overlay.addEventListener('click', (e) => { if (downOnBackdrop && e.target === overlay) close(); });
+
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => {
+        overlay.classList.add('is-open');
+        ta.focus();
+        ta.setSelectionRange(ta.value.length, ta.value.length);
+    });
+}
+
+/* ─── visual pickers over a <select> ─────────────────────────────────── */
+// Each button sets the hidden select and fires the change the dialog
+// listens for, so reading, showIf and saving work exactly as for a select.
+
+function pickerButton(select, opt, inner, cls) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = cls;
+    b.dataset.v = opt.value;
+    b.title = opt.textContent;
+    b.setAttribute('aria-label', opt.textContent);
+    b.innerHTML = inner;
+    b.addEventListener('click', () => {
+        if (select.value === opt.value) return;
+        select.value = opt.value;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    return b;
+}
+
+function syncPicker(wrap, select) {
+    const mark = () => wrap.querySelectorAll('button').forEach(b => {
+        const on = b.dataset.v === select.value;
+        b.classList.toggle('is-active', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    select.addEventListener('change', mark);
+    mark();
+}
+
+function buildSegmented(select) {
+    const wrap = document.createElement('div');
+    wrap.className = 'wf-seg';
+    wrap.setAttribute('role', 'group');
+    for (const opt of select.options) {
+        const b = pickerButton(select, opt, '', 'wf-seg-btn');
+        b.textContent = opt.textContent;
+        b.removeAttribute('aria-label');
+        wrap.appendChild(b);
+    }
+    syncPicker(wrap, select);
+    return wrap;
+}
+
+function buildSizePicker(select) {
+    const wrap = document.createElement('div');
+    wrap.className = 'wf-sizes';
+    wrap.setAttribute('role', 'group');
+    const opts = Array.from(select.options);
+    opts.forEach((opt, i) => {
+        // 11px → 21px across the steps: the size you pick, drawn.
+        const px = Math.round(11 + (10 * i) / Math.max(1, opts.length - 1));
+        wrap.appendChild(pickerButton(select, opt, `<span style="font-size:${px}px">A</span>`, 'wf-size-btn'));
+    });
+    syncPicker(wrap, select);
+    return wrap;
 }
 
 // Minutes + seconds boxes → whole seconds, or null when both are empty.

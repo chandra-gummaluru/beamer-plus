@@ -4,7 +4,7 @@
 // (select → update panel; delete → re-render overlays). Both only export
 // functions called after load, so the cycle is harmless.
 import { ctx, getSlideEl, getOrCreateConfig, getConfigItems, arrKeyForType } from './context.js';
-import { updatePropertiesPanel, syncPropertiesPosition, openWidgetSettingsFor, widgetTypeLabel } from './properties.js';
+import { updatePropertiesPanel, syncPropertiesPosition, widgetTypeLabel } from './properties.js';
 import { getWidgetSchema, isPinnedFull } from './widget-schema.js';
 
 let _pendingMediaType = null;
@@ -27,6 +27,9 @@ function buildOverlay(type, arrKey, item, index, container, rect) {
     div.className = 'edit-overlay' + (arrKey === 'reveals' ? ' edit-overlay--reveal' : '');
     div.dataset.arrKey = arrKey;
     div.dataset.itemIndex = String(index);
+    // Stacked as on stage, so where boxes overlap the front one takes the click.
+    const z = parseInt(item.zIndex, 10);
+    if (Number.isFinite(z)) div.style.zIndex = String(50 + z);
     positionOverlay(div, item, rect);
 
     const label = document.createElement('div');
@@ -47,10 +50,7 @@ function buildOverlay(type, arrKey, item, index, container, rect) {
     // without selecting it, so the panel stays on the slide. Media items are
     // selected as before and edited in the panel.
     const isWidget = arrKey === 'widgets';
-    const grab = () => {
-        if (!isWidget) { selectOverlayEl(div, arrKey, index); return; }
-        if (ctx.selectedOverlay) deselectOverlay();
-    };
+    const grab = () => selectOverlayEl(div, arrKey, index);
     handle.addEventListener('pointerdown', (e) => {
         e.stopPropagation();
         grab();
@@ -59,9 +59,7 @@ function buildOverlay(type, arrKey, item, index, container, rect) {
     div.addEventListener('pointerdown', (e) => {
         if (e.target === handle) return;
         grab();
-        startMove(e, div, arrKey, index, container, (moved) => {
-            if (isWidget && !moved) openWidgetSettingsFor(index);
-        });
+        startMove(e, div, arrKey, index, container);
     });
 
     // A widget shown full (and every full-slide-only one: notebook,
@@ -109,6 +107,18 @@ export function addReveal() {
     renderEditOverlays();
     const overlay = document.querySelector(`.edit-overlay[data-arr-key="reveals"][data-item-index="${index}"]`);
     if (overlay) selectOverlayEl(overlay, 'reveals', index);
+}
+
+/** Move every edit box to its item's place — after the stage changed size. */
+export function repositionEditOverlays() {
+    const container = getSlideEl();
+    const cfg = getOrCreateConfig();
+    const rect = container?.getBoundingClientRect();
+    if (!cfg || !rect?.width) return;
+    document.querySelectorAll('.edit-overlay').forEach(div => {
+        const item = cfg[div.dataset.arrKey]?.[parseInt(div.dataset.itemIndex, 10)];
+        if (item) positionOverlay(div, item, rect);
+    });
 }
 
 export function positionOverlay(div, item, rect) {
