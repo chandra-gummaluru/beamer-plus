@@ -188,6 +188,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Upload bus handlers
     bus.on('upload:zip', async (file) => {
+        // A new deck replaces this one: close any split first.
+        if (state.splitView) await setSplitActive(false);
         const modal = window.BeamerModal;
         modal?.show({ kind: 'loading', title: 'Uploading…', message: 'Parsing ZIP…' });
         try {
@@ -201,6 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     bus.on('upload:pdf', async (file) => {
+        if (state.splitView) await setSplitActive(false);
         await loadPdfPresentation(file);
     });
 
@@ -853,34 +856,18 @@ async function _goToSlide(i, direction = null, isSplitPaneNav = false) {
     hideSpotlight(true);
     hideMagnifier();
 
-    // Presentation-mode sequential nav from within split view:
-    //   forward → exit split, show right pane slide full-screen
-    //   backward → exit split, show left pane slide (currentSlide) full-screen
-    // This gives the reversible flow: A → [split A|B] → B → [back] → [split A|B] → A
+    // Presentation-mode sequential nav from within split view.
+    //   A view slide's split is a slide of its own: forward / back go to
+    //   the next / previous slide in the deck from the view's position,
+    //   skipping hidden ones — whatever its panes happen to be (a pane can
+    //   be any slide, hidden, or before or after the view).
+    //   A manual split (no view slide): forward → the right pane full-screen,
+    //   back → the left pane — the reversible A → [A|B] → B → [A|B] → A.
     if (!isSplitPaneNav && !state.editMode && state.splitView && direction !== null) {
-        let targetIdx = direction === 'forward' ? state.rightSlideIndex : state.currentSlide;
-        // Forward normally collapses to the right pane (which, for auto-inserted
-        // view slides, sits immediately after the view slide — a real, visible
-        // slide). But a hand-edited view can reference a right pane that's hidden
-        // or positioned before the view slide. Landing on it would skip forward
-        // through hidden slides straight back to the view slide and re-open the
-        // same split — trapping the user. In that case, advance past the view
-        // slide instead so navigation continues through the deck.
         const viewIdx = state.currentViewIndex;
-        if (direction === 'forward' && viewIdx != null &&
-            (state.slideStructure[targetIdx]?.hidden || targetIdx <= viewIdx || state.missingPanes?.right)) {
-            targetIdx = viewIdx + 1;
-        }
-        // Back normally collapses to the left pane — but the same trap exists
-        // the other way: a left pane that's hidden (a deck built only from
-        // view slides hides the pages they show) or that sits after the view
-        // would skip straight back to this view, or off the start of the deck.
-        // Step back past the view slide instead. An undefined left pane has
-        // no slide to fall back to either.
-        if (direction === 'back' && viewIdx != null &&
-            (state.slideStructure[targetIdx]?.hidden || targetIdx >= viewIdx || state.missingPanes?.left)) {
-            targetIdx = viewIdx - 1;
-        }
+        let targetIdx;
+        if (viewIdx != null) targetIdx = direction === 'forward' ? viewIdx + 1 : viewIdx - 1;
+        else targetIdx = direction === 'forward' ? state.rightSlideIndex : state.currentSlide;
         // Where that lands once hidden slides are skipped. Nothing there —
         // the view is the first (or last) thing showing: stay in the split
         // rather than closing it and going nowhere.
@@ -991,16 +978,9 @@ async function setSplitActive(active, rightIndex = null, splitRatio = null) {
     document.body.classList.toggle('split-view-active', active);
     if (btn) btn.classList.toggle('btn_selected', active);
 
-    // Block edit-mode, save, and upload while split view is active so the user
-    // can't enter edit mode or change the presentation mid-split.
-    // edit-mode-btn is exempted when already in edit mode — it becomes the close
-    // button and must stay enabled so the user can exit edit mode.
-    for (const id of ['edit-save-btn', 'upload-presentation-btn']) {
-        const el = document.getElementById(id);
-        if (el) el.disabled = active;
-    }
-    const editBtn = document.getElementById('edit-mode-btn');
-    if (editBtn && !state.editMode) editBtn.disabled = active;
+    // Edit, download and upload all work in split view too: entering edit
+    // mode shows the view slide's configuration, saving keeps both panes'
+    // ink, and an upload closes the split before loading the new deck.
 
     if (active) {
         if (!state.annCvs2) {
@@ -1046,12 +1026,17 @@ function updateSlideNavigator() {
     // structure. Querying unscoped would shift every idx below by the pin
     // count, since pins sit earlier in the DOM — e.g. with one bookmark,
     // clicking "slide 3" would highlight/enable "slide 2" instead.
+    // On a view slide's split, the view slide is the one you're on — mark it,
+    // not its left pane.
+    const viewIdx = state.splitView && state.currentViewIndex != null &&
+                    state.slideStructure[state.currentViewIndex]?.type === 'view' ? state.currentViewIndex : null;
+    const here = viewIdx ?? state.currentSlide;
     document.querySelectorAll('#slide-nav-slides .slide-nav-item').forEach((el, idx) => {
-        el.classList.toggle('active',          idx === state.currentSlide);
-        el.classList.toggle('current-slide',   idx === state.currentSlide);
+        el.classList.toggle('active',          idx === here);
+        el.classList.toggle('current-slide',   idx === here);
         el.classList.toggle('bookmarked',      !!state.bookmarks[idx]);
         el.classList.toggle('type-view',        state.slideStructure[idx]?.type === 'view');
-        el.classList.toggle('is-right-slide',  state.splitView && !state.missingPanes?.right && idx === state.rightSlideIndex);
+        el.classList.toggle('is-right-slide',  viewIdx == null && state.splitView && !state.missingPanes?.right && idx === state.rightSlideIndex);
         el.classList.toggle('is-hidden-slide', !!state.slideStructure[idx]?.hidden);
 
         const leftZone  = el.querySelector('.slide-split-zone--left');
@@ -1070,6 +1055,10 @@ function updateSlideNavigator() {
         el.style.pointerEvents = '';
         el.style.opacity = '';
     });
+    if (viewIdx != null) {
+        document.querySelector(`#slide-nav-slides .slide-nav-item[data-index="${viewIdx}"]`)
+            ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
 }
 
 function updateBlankSlideButtons() {
@@ -1338,9 +1327,9 @@ function setStageControlsEnabled(enabled) {
     // Edit mode is handled apart from the list above because the same button
     // doubles as "exit edit mode": disabling it while edit mode is on — say the
     // user deletes the last slide from inside the editor — would trap them
-    // there. Split view blocks it too, so fold that rule in as well.
+    // there.
     const editBtn = document.getElementById('edit-mode-btn');
-    if (editBtn && !state.editMode) editBtn.disabled = !enabled || state.splitView;
+    if (editBtn && !state.editMode) editBtn.disabled = !enabled;
 
     if (!enabled) return;
     // Split view needs two real slides to show side by side. Leaving split
@@ -1351,10 +1340,6 @@ function setStageControlsEnabled(enabled) {
         splitBtn.disabled = tooFew;
         splitBtn.title = tooFew ? 'Split view needs at least two slides' : 'Split view';
     }
-    // Split view independently blocks save/download (see setSplitActive) —
-    // re-apply that rule so re-enabling here can't quietly override it.
-    const saveBtn = document.getElementById('edit-save-btn');
-    if (saveBtn) saveBtn.disabled = state.splitView;
     // Undo/redo have their own enabled rule (does the active canvas have
     // history?) — hand them back to it rather than force-enabling them.
     updateHistoryBtns();

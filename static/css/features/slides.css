@@ -54,14 +54,6 @@ body.split-view-active #main-content {
 body.split-view-active #pdf-container { padding: var(--sp-3); }
 body.split-view-active #pdf-container-2 { display: flex; padding: var(--sp-3); }
 
-/* While split view is active (outside edit mode), hide edit mode, save, and upload controls.
-   The :not(.edit-mode) guard keeps the close button visible when edit mode is active
-   on a split-view slide. */
-body.split-view-active:not(.edit-mode) #edit-mode-btn,
-body.split-view-active #edit-save-btn,
-body.split-view-active #upload-presentation-btn {
-    display: none;
-}
 
 #split-view-divider {
     display: none;
