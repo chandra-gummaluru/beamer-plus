@@ -629,7 +629,11 @@ export function renderWidgets(slideConfig, container, zipFile, viewerMode = fals
                     const newer = await fromOther;
                     const savedState = newer !== undefined ? newer : _savedWidgetStates[w.id];
                     if (savedState !== undefined) {
-                        iframe.contentWindow?.postMessage({ type: 'widget-set-state', state: savedState }, '*');
+                        // fromFile: the deck's saved state, not this session's
+                        // other copy — a widget may treat reopening differently
+                        // (the timer restarts an Auto-start clock).
+                        iframe.contentWindow?.postMessage({ type: 'widget-set-state', state: savedState,
+                                                            fromFile: newer === undefined }, '*');
                     }
                     finish();
                 }, { once: true });
