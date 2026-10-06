@@ -836,7 +836,10 @@ async function _goToSlide(i, direction = null, isSplitPaneNav = false) {
     // Sequential nav out of a split works from the view, not from `i` (the
     // left pane ± 1), so `i` may be off either end — e.g. the left pane is the
     // deck's first page. Only bounds-check where `i` is the destination.
-    const leavingSplit = !isSplitPaneNav && !state.editMode && state.splitView && direction !== null;
+    // (Edit mode steps the same way through a view slide — the split there
+    // is the view's preview.)
+    const viewSplit = state.splitView && state.currentViewIndex != null;
+    const leavingSplit = !isSplitPaneNav && state.splitView && direction !== null && (viewSplit || !state.editMode);
     if (!leavingSplit && (i < 0 || i >= state.slideStructure.length)) return;
     await commitOpenTextEditor(state);
 
@@ -850,6 +853,12 @@ async function _goToSlide(i, direction = null, isSplitPaneNav = false) {
     // above/below and are exempt.
     // (A view slide is never really in the right pane — with both its panes
     // undefined, rightSlideIndex only stands in at its index.)
+    // In edit mode a split is only ever a view slide's preview: picking any
+    // other slide (in the navigator, say) leaves it and shows that slide.
+    if (direction === null && !isSplitPaneNav && state.editMode && state.splitView &&
+        state.slideStructure[i]?.type !== 'view') {
+        await setSplitActive(false);
+    }
     if (direction === null && !isSplitPaneNav && state.splitView && i === state.rightSlideIndex &&
         state.slideStructure[i]?.type !== 'view') return;
 
@@ -863,7 +872,7 @@ async function _goToSlide(i, direction = null, isSplitPaneNav = false) {
     //   be any slide, hidden, or before or after the view).
     //   A manual split (no view slide): forward → the right pane full-screen,
     //   back → the left pane — the reversible A → [A|B] → B → [A|B] → A.
-    if (!isSplitPaneNav && !state.editMode && state.splitView && direction !== null) {
+    if (leavingSplit) {
         const viewIdx = state.currentViewIndex;
         let targetIdx;
         if (viewIdx != null) targetIdx = direction === 'forward' ? viewIdx + 1 : viewIdx - 1;
@@ -913,6 +922,9 @@ async function _goToSlide(i, direction = null, isSplitPaneNav = false) {
     // Works in both presentation mode and edit mode (edit mode also shows the split for preview).
     const prelimObj = state.slideStructure[i];
     if (prelimObj?.type === 'view') {
+        // Arrowing onto a view slide in edit mode opens its configuration,
+        // as clicking it in the navigator does.
+        if (state.editMode && direction !== null) bus.emit('view:select', i);
         // Where the presenter stepped in from — Back returns there when no
         // visible slide comes before the view (see above).
         // (Kept when stepping back into a view; a direct jump forgets it.)

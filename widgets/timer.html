@@ -196,7 +196,13 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 /* Digits sized to sit inside the circle. */
 #app.is-ring #clock            { font-size: min(21cqw, 21cqh); position: relative; }
 #app.is-ring #clock.is-long    { font-size: min(15cqw, 15cqh); }
-#app.is-ring #clock.is-minutes { font-size: min(20cqw, 20cqh); }
+#app.is-ring #clock.is-minutes {
+  font-size: min(26cqw, 26cqh);
+  flex-direction: column;
+  align-items: center;
+}
+/* In the ring, "mins" sits under the number. */
+#app.is-ring #clock.is-minutes .word { margin: 0.12em 0 0; font-size: 0.34em; line-height: 1; }
 
 /* ── Overlay ────────────────────────────────────────────── */
 /* A clock in the corner of a content slide: just the digits and the
@@ -317,7 +323,10 @@ body.bw-overlay.is-presenter #clock.is-editable .unit { cursor: ns-resize; }
   }
 
   const isIdle = () => !S.running && S.elapsed === 0 && !S.expired;
-  const editable = () => !IS_VIEWER && S.mode === 'countdown' && isIdle();
+  // Setting the digits in place is for the full timer. As an overlay a
+  // click on the clock starts it, and the arrow keys stay with the slides.
+  const editable = () => !IS_VIEWER && S.mode === 'countdown' && isIdle()
+    && !document.body.classList.contains('bw-overlay');
 
   // ── Render ──────────────────────────────────────────────────────────────────
   // The digits are rebuilt only when their shape changes, so a unit being
@@ -659,6 +668,10 @@ body.bw-overlay.is-presenter #clock.is-editable .unit { cursor: ns-resize; }
     }
     if (d.type === 'widget-set-state' && d.state) applyState(d.state, false);
   });
+
+  // Shown as an overlay or full: whether the digits can be set in place
+  // depends on it, so redraw when it changes.
+  window.addEventListener('bw-display', () => { shapeKey = ''; render(); });
 
   // ── Boot ────────────────────────────────────────────────────────────────────
   initSocket(CFG0.socketUrl);

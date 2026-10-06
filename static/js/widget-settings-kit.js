@@ -951,12 +951,11 @@
         syncBarControls();
         // Most widgets restyle with CSS alone; one that has to re-measure or
         // re-render listens for this.
+        // Also on the first sync: a widget may have drawn before the kit
+        // could tell it how it's shown.
         if (d !== lastDisplay) {
-            var first = lastDisplay === null;
             lastDisplay = d;
-            if (!first) {
-                try { window.dispatchEvent(new CustomEvent('bw-display', { detail: { display: d } })); } catch (e) {}
-            }
+            try { window.dispatchEvent(new CustomEvent('bw-display', { detail: { display: d } })); } catch (e) {}
         }
     }
 
