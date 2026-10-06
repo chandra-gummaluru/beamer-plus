@@ -474,13 +474,15 @@ body.bw-overlay .bw-topbar { display: none !important; }
 body:not(.bw-overlay) .bw-overlay-only { display: none !important; }
 body.bw-overlay .bw-full-only { display: none !important; }
 
-/* Overlay controls: a small cluster of icon buttons that appears while the
+/* Overlay controls: a small cluster of icon buttons, centred along the
+   bottom, that appears while the
    pointer is over the widget (or one of them has focus), so the overlay is
    just its content the rest of the time. */
 .bw-overlay-controls {
   position: absolute;
-  right: 8px;
+  left: 50%;
   bottom: 8px;
+  transform: translateX(-50%);
   z-index: 5;
   display: flex;
   gap: 4px;

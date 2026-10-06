@@ -874,7 +874,18 @@ async function _goToSlide(i, direction = null, isSplitPaneNav = false) {
         const step = direction === 'forward' ? 1 : -1;
         let landing = targetIdx;
         while (state.slideStructure[landing]?.hidden) landing += step;
-        if (landing < 0 || landing >= state.slideStructure.length) return;
+        if (landing < 0 || landing >= state.slideStructure.length) {
+            // Nothing visible before this view — but the deck may have been
+            // opened on a hidden slide and stepped forward from it into the
+            // view. Back returns to where you came from, as you'd expect.
+            const from = state.viewCameFrom;
+            if (direction === 'back' && viewIdx != null && from != null && from < viewIdx &&
+                state.slideStructure[from] && state.slideStructure[from].type !== 'view') {
+                await setSplitActive(false);
+                await _goToSlide(from, null, false);
+            }
+            return;
+        }
         await setSplitActive(false);
         // Pass direction so the hidden-slide while loop runs in the recursive call.
         // Forward: skips right-pane if hidden, continues to next visible slide.
@@ -902,6 +913,11 @@ async function _goToSlide(i, direction = null, isSplitPaneNav = false) {
     // Works in both presentation mode and edit mode (edit mode also shows the split for preview).
     const prelimObj = state.slideStructure[i];
     if (prelimObj?.type === 'view') {
+        // Where the presenter stepped in from — Back returns there when no
+        // visible slide comes before the view (see above).
+        // (Kept when stepping back into a view; a direct jump forgets it.)
+        if (!state.splitView && direction === 'forward') state.viewCameFrom = state.currentSlide;
+        else if (direction === null) state.viewCameFrom = null;
         const L = validPane(prelimObj.left), R = validPane(prelimObj.right);
         if (L == null || R == null) { await showViewWithUndefinedPane(i, L, R, direction); return; }
         clearMissingPanes();
