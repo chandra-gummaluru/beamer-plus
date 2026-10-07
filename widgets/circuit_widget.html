@@ -16,7 +16,7 @@
       "placeholder": "[{\"name\":\"Majority\",\"equation\":\"Y = A B + B C + A C\"}]",
       "note": "this deck only" },
     { "key": "hop",     "label": "Seconds per hop", "type": "select", "default": 1,
-      "options": [ {"v": 0.25, "l": "¼s"}, {"v": 0.5, "l": "½s"}, {"v": 1, "l": "1s"}, {"v": 2, "l": "2s"} ] },
+      "options": [ {"v": 1, "l": "1s"}, {"v": 2, "l": "2s"}, {"v": 4, "l": "4s"}, {"v": 8, "l": "8s"} ] },
     { "key": "running", "label": "Start running", "type": "checkbox", "default": true },
     { "key": "showParts",  "label": "Show the parts panel", "type": "checkbox", "default": true },
     { "key": "showTiming", "label": "Show the timing diagram", "type": "checkbox", "default": false }
@@ -701,7 +701,7 @@ defineModule('engine', ['state'], (state) => {
      same grid as a running clock instead of marching to its own arbitrary
      offset. 6.25ms is the GCD of every fixed interval in the app: the
      fastest clock half-period (1/16s → 31.25ms) and every selectable hop
-     time (250/500/1000/2000ms). Anything built by adding those intervals to
+     time (1000/2000/4000/8000ms). Anything built by adding those intervals to
      an already-snapped time lands back on the grid automatically. */
   const GLOBAL_TICK_MS = 6.25;
   const snapToGlobalTick = (t) => Math.round(t / GLOBAL_TICK_MS) * GLOBAL_TICK_MS;
@@ -3253,13 +3253,14 @@ const { formatBits } = engine;
 
 const TRACE_KINDS = { INPUT:'in', CLOCK:'in', OUTPUT:'out' };
 const KIND_TAG    = { INPUT:'IN', CLOCK:'CLK', OUTPUT:'OUT' };
-const KEEP_MS     = 90000;   // a little past the widest window
-const MAX_PTS     = 6000;    // per trace — a 1/16s clock for 90s is ~2900 edges
+const KEEP_MS     = 180000;  // a little past the widest window
+const MAX_PTS     = 12000;   // per trace — a 1/16s clock for 180s is ~5800 edges
+// Wide enough to hold a few 8s hops.
 const WINDOW_CHOICES = [
-  { ms:5000,  label:'5s'  },
   { ms:10000, label:'10s' },
   { ms:20000, label:'20s' },
   { ms:40000, label:'40s' },
+  { ms:80000, label:'80s' },
 ];
 
 // Lane geometry, in CSS px.
@@ -3325,10 +3326,10 @@ function createRecorder() {
 
 // Round-number tick spacing that leaves at least ~60px between labels.
 function tickStep(windowMs, plotW) {
-  for (const s of [125, 250, 500, 1000, 2000, 5000, 10000, 20000]) {
+  for (const s of [125, 250, 500, 1000, 2000, 5000, 10000, 20000, 40000]) {
     if (s / windowMs * plotW >= 60) return s;
   }
-  return 20000;
+  return 40000;
 }
 const fmtSec = (ms) => (+(ms / 1000).toFixed(3)) + 's';
 
@@ -3562,11 +3563,13 @@ const { Canvas, SelectionPanel } = canvas;
 const { Palette } = palette;
 const { TimingPanel, createRecorder } = timing;
 
+// Slow on purpose: on a slide the point is to watch a signal travel, so
+// the choices run from 1s a hop up to 8s.
 const HOP_CHOICES = [
-  { ms:250,  label:'¼s' },
-  { ms:500,  label:'½s' },
   { ms:1000, label:'1s' },
   { ms:2000, label:'2s' },
+  { ms:4000, label:'4s' },
+  { ms:8000, label:'8s' },
 ];
 
 /* ── custom-gate registry ──────────────────────────────────────────────────
@@ -3688,7 +3691,7 @@ function App() {
   const [partsOpen, setPartsOpen]   = useState(true);
   const [timingOpen, setTimingOpen] = useState(false);
   const [hiddenSig, setHiddenSig]   = useState({});      // compId → true when left off the diagram
-  const [timingWin, setTimingWin]   = useState(10000);
+  const [timingWin, setTimingWin]   = useState(20000);
   const [recorder] = useState(()=>createRecorder());
   const viewSave = useRef({});
   viewSave.current = { hidden: hiddenSig, windowMs: timingWin };
@@ -3831,7 +3834,7 @@ function App() {
 
        parts    [{name, equation}] or [{name, data}]  → palette parts
        circuit  serialized circuit                    → what's on the board
-       hop      seconds per gate-to-gate hop          → 0.25 | 0.5 | 1 | 2
+       hop      seconds per gate-to-gate hop          → 1 | 2 | 4 | 8
        running  false to start halted
 
      Objects may also be given as JSON strings, so the same keys work whether
@@ -4237,7 +4240,7 @@ function App() {
     </div>
 
     {showHelp && <Dialog title="Wiring & shortcuts"
-        sub={`Every gate-to-gate hop costs the same ${(hopMs/1000).toFixed(2)}s, however the wires are drawn — a three-gate chain lands three hops after its source.`}
+        sub={`Every gate-to-gate hop costs the same ${hopMs/1000}s, however the wires are drawn — a three-gate chain lands three hops after its source.`}
         onClose={()=>setShowHelp(false)}>
       <div className="dialog-section-title">Drawing wires</div>
       <ul className="hint-list">

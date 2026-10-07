@@ -129,6 +129,17 @@ function _ensureExpandListener() {
 // widget rendering (e.g. canvas redraws) when the slide is revisited.
 const _capturedStates = new Map(); // String(widgetId) → state
 
+// When each widget last went off screen. Handed back with its state when it
+// returns (`hiddenFor`, ms), so a widget can tell "the presenter left my
+// slide and came back" from "I moved straight into a split view" (a few
+// hundred ms of re-rendering) — the timer pauses or starts over only for
+// the first.
+const _hiddenAt = new Map();         // String(widgetId) → Date.now()
+function _hiddenFor(widgetId) {
+    const t = _hiddenAt.get(String(widgetId));
+    return t == null ? null : Date.now() - t;
+}
+
 window.addEventListener('message', e => {
     // A print copy (see printWidget) shares the live widget's id; what it
     // reports must never stand in for the live widget's state.
@@ -288,6 +299,9 @@ export function parkWidgets(container, slideKey) {
     if (iframes.length === 0) return;
 
     iframes.forEach(iframe => {
+        // Already parked (the same pane parked twice): it went off screen
+        // back then, not now.
+        const wasShown = iframe.style.opacity !== '0';
         iframe.style.opacity       = '0';
         iframe.style.pointerEvents = 'none';
         iframe.style.zIndex        = '-1';  // ensure hidden behind visible iframes
@@ -296,6 +310,7 @@ export function parkWidgets(container, slideKey) {
             _widgetRegistry.delete(wid);
             // Capture state now; will be re-applied when the slide is revisited.
             try { iframe.contentWindow?.postMessage({ type: 'widget-get-state' }, '*'); } catch (_) {}
+            if (wasShown) _hiddenAt.set(String(wid), Date.now());
         }
     });
 }
@@ -550,7 +565,8 @@ export function renderWidgets(slideConfig, container, zipFile, viewerMode = fals
                 const captured = newer !== undefined ? newer : _capturedStates.get(widId);
                 if (captured !== undefined) {
                     try {
-                        existing.contentWindow?.postMessage({ type: 'widget-set-state', state: captured }, '*');
+                        existing.contentWindow?.postMessage({ type: 'widget-set-state', state: captured,
+                                                              hiddenFor: _hiddenFor(widId) }, '*');
                     } catch (_) {}
                 }
             }, 50);
@@ -633,7 +649,8 @@ export function renderWidgets(slideConfig, container, zipFile, viewerMode = fals
                         // other copy — a widget may treat reopening differently
                         // (the timer restarts an Auto-start clock).
                         iframe.contentWindow?.postMessage({ type: 'widget-set-state', state: savedState,
-                                                            fromFile: newer === undefined }, '*');
+                                                            fromFile: newer === undefined,
+                                                            hiddenFor: _hiddenFor(w.id) }, '*');
                     }
                     finish();
                 }, { once: true });

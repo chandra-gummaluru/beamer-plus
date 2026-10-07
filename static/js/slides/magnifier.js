@@ -5,11 +5,12 @@
 // setWidgetInteractivityForSpotlight for that).
 //
 // The lens is a canvas that redraws every frame from what's already painted
-// on the stage: the slide canvas, any image/video overlays, and the ink
-// canvas on top — so fresh annotations and playing video stay live inside
-// it. Widget iframes can't be drawn into a canvas (the browser won't hand
-// their pixels over), so inside the lens a widget shows whatever the slide
-// has beneath it.
+// on the stage: the slide canvas, any image/video overlays, widgets, and the
+// ink canvas on top — so fresh annotations and playing video stay live
+// inside it. A widget's iframe can't be drawn into a canvas directly, so
+// while the lens is over one it asks the widget for a picture of itself
+// (widget-lens, answered by the settings kit) a few times a second and
+// draws the latest.
 //
 // Scroll while it's active to change the zoom (1.5× – 5×). The zoom level is
 // remembered for the session.
@@ -36,6 +37,33 @@ bus.on('tool:change', (tool) => {
 });
 
 const active = () => _state && _state.annotationTool === 'magnify';
+
+// ── Widgets in the lens ────────────────────────────────────────────────
+const SHOT_EVERY_MS = 300;
+const _shots = new WeakMap();    // iframe → { bitmap, pending, at }
+let _reqSeq = 0;
+
+window.addEventListener('message', (e) => {
+    if (e.data?.type !== 'widget-lens-shot' || !e.data.bitmap) return;
+    const iframe = Array.from(document.querySelectorAll('.widget-iframe'))
+        .find(f => f.contentWindow === e.source);
+    if (!iframe) { e.data.bitmap.close?.(); return; }
+    const rec = _shots.get(iframe) || {};
+    rec.bitmap?.close?.();
+    _shots.set(iframe, { bitmap: e.data.bitmap, pending: false, at: rec.at || 0 });
+});
+
+function requestShot(iframe) {
+    const now = performance.now();
+    const rec = _shots.get(iframe) || { bitmap: null, pending: false, at: 0 };
+    // Re-ask after a while even if an answer never came (a widget without
+    // the kit, or one still loading).
+    if ((rec.pending && now - rec.at < 2000) || now - rec.at < SHOT_EVERY_MS) return;
+    rec.pending = true; rec.at = now;
+    _shots.set(iframe, rec);
+    const scale = Math.min(4, (window.devicePixelRatio || 1) * _zoom);
+    try { iframe.contentWindow?.postMessage({ type: 'widget-lens', requestId: ++_reqSeq, scale }, '*'); } catch (_) {}
+}
 
 export function initMagnifier(state) {
     _state = state;
@@ -175,5 +203,18 @@ function paint() {
     pane?.querySelectorAll('img, video').forEach(el => {
         if (!el.closest('#ann-canvas, #ann-canvas-2, .magnifier-lens')) draw(el);
     });
+    // Widgets on this slide that the lens is over, bottom layer first.
+    const reach = LENS_R / _zoom;
+    Array.from(slideHost?.querySelectorAll('.widget-iframe') || [])
+        .filter(f => f.style.opacity !== '0' && getComputedStyle(f).display !== 'none')
+        .sort((a, b) => (parseInt(a.style.zIndex, 10) || 0) - (parseInt(b.style.zIndex, 10) || 0))
+        .forEach(f => {
+            const r = f.getBoundingClientRect();
+            if (!r.width || r.right < _pos.x - reach || r.left > _pos.x + reach ||
+                r.bottom < _pos.y - reach || r.top > _pos.y + reach) return;
+            requestShot(f);
+            const bmp = _shots.get(f)?.bitmap;
+            if (bmp) { try { ctx.drawImage(bmp, r.left, r.top, r.width, r.height); } catch (_) {} }
+        });
     inkHost?.querySelectorAll('canvas').forEach(draw);
 }

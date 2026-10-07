@@ -999,6 +999,11 @@ async function setSplitActive(active, rightIndex = null, splitRatio = null) {
 
     state.splitView = active;
     if (!active) {
+        // The right pane's widgets go off screen with it: park them like any
+        // slide being left (state captured, and they're told how long they
+        // were away when the pane opens again).
+        const right = document.getElementById('pdf-canvas-2');
+        if (right?.dataset?.slideKey != null) parkWidgets(right, right.dataset.slideKey);
         clearMissingPanes();
         state.currentViewIndex = null;   // split closed — no view slide drives it anymore
         state.activeAnnCvs = state.annCvs; // shared controls (undo/clear) go back to the sole pane

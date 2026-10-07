@@ -1097,6 +1097,38 @@
         }).filter(Boolean);
     }
 
+    /* ─── magnifier ─────────────────────────────────────────────── */
+    // The host's magnifying lens draws the slide from canvases, but it can't
+    // read an iframe's pixels. While the lens is over a widget the host asks
+    // for a picture of it every few hundred ms; this answers with one (the
+    // whole widget, bar included, as seen) as an ImageBitmap.
+    var _lensBusy = false;
+    function handleLens(d, source) {
+        if (_lensBusy || !document.body) return;
+        _lensBusy = true;
+        var scale = Math.max(1, Math.min(4, +d.scale || 2));
+        loadHtml2Canvas().then(function (h2c) {
+            return h2c(document.body, {
+                scale: scale,
+                backgroundColor: null,
+                logging: false,
+                useCORS: true,
+                width: window.innerWidth,
+                height: window.innerHeight,
+                ignoreElements: function (n) {
+                    try { return n.matches && n.matches('.bws-root'); } catch (e) { return false; }
+                },
+            });
+        }).then(function (canvas) {
+            return (window.createImageBitmap ? createImageBitmap(canvas) : Promise.resolve(null))
+                .then(function (bmp) {
+                    var msg = { type: 'widget-lens-shot', requestId: d.requestId, bitmap: bmp };
+                    try { (source || parent).postMessage(msg, '*', bmp ? [bmp] : []); } catch (e) {}
+                });
+        }).catch(function () { /* nothing to show — the lens keeps the slide */ })
+          .then(function () { _lensBusy = false; });
+    }
+
     var _printScale = 2;
     // A print copy is asked as soon as its iframe loads, but a widget whose
     // scripts come from a slow CDN may not have run yet: its handler isn't
@@ -1188,6 +1220,7 @@
         if (d.type === 'widget-close-settings') { closePanel(true); return; }
         if (d.type === 'widget-asset-saved')    { onAssetSaved(d); return; }
         if (d.type === 'widget-print')          { handlePrint(d); return; }
+        if (d.type === 'widget-lens')           { handleLens(d, e.source); return; }
         if (d.type === 'widget-flush-files') {
             if (_flushHandler) { try { _flushHandler(); } catch (err) { console.warn('[widget] flush failed', err); } }
             return;

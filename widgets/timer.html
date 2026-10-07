@@ -12,6 +12,7 @@
     { "key": "duration",  "label": "Duration",   "type": "duration", "min": 5, "default": 300, "showIf": { "mode": "countdown" } },
     { "key": "format",    "label": "Display",    "type": "select", "options": [{"v":"clock","l":"3:00"},{"v":"minutes","l":"3 mins"}], "default": "clock" },
     { "key": "progress",  "label": "Progress",   "type": "select", "options": [{"v":"line","l":"Line"},{"v":"ring","l":"Ring"}], "default": "line" },
+    { "key": "onLeave",   "label": "When you leave its slide", "type": "select", "options": [{"v":"keep","l":"Keep running"},{"v":"pause","l":"Pause"},{"v":"restart","l":"Start over"}], "default": "keep" },
     { "key": "autoStart", "label": "Auto-start", "type": "checkbox", "default": false }
   ]
 }
@@ -613,18 +614,27 @@ body.bw-overlay.is-presenter #clock.is-editable .unit { cursor: ns-resize; }
     beat = S.running ? setInterval(send, 1000) : null;
   }
 
-  // live:     a viewer following the presenter — run when they run.
-  // fromFile: state saved with the deck, being reopened.
-  // Otherwise the same timer is coming back on screen in this session (its
-  // slide revisited, or shown in a split view): a running clock carries on
-  // from where it has got to, and an Auto-start one is running.
-  function applyState(s, live, fromFile) {
+  // live:      a viewer following the presenter — run when they run.
+  // fromFile:  state saved with the deck, being reopened.
+  // Otherwise the same timer is coming back on screen in this session.
+  // hiddenFor (ms off screen) tells moving straight into a split view
+  // (still on screen, give or take a re-render) from leaving the slide and
+  // coming back — for which the "When you leave its slide" setting decides:
+  //   keep     a running clock carries on from where it has got to by now
+  //   pause    it stops where it was when you left
+  //   restart  it starts over from the full time
+  // Auto-start then (re)starts it.
+  const LEFT_AFTER_MS = 1500;
+  function applyState(s, live, fromFile, hiddenFor) {
     if (!s) return;
     const wasExpired = S.expired;
     if (s.mode === 'countdown' || s.mode === 'stopwatch') S.mode = s.mode;
     if (typeof s.duration === 'number' && s.duration > 0) S.duration = s.duration;
     if (typeof s.elapsed === 'number') S.elapsed = s.elapsed;
-    const carryOn = !live && !fromFile && !!s.running && typeof s.at === 'number';
+    const left = !live && !fromFile && typeof hiddenFor === 'number' && hiddenFor >= LEFT_AFTER_MS;
+    const onLeave = left ? (cfg.onLeave || 'keep') : 'keep';
+    if (onLeave === 'restart') { S.elapsed = 0; s = { ...s, expired: false, running: false }; }
+    const carryOn = !live && !fromFile && onLeave === 'keep' && !!s.running && typeof s.at === 'number';
     if (carryOn) S.elapsed += Math.max(0, Date.now() - s.at);
     if (S.mode === 'countdown' && S.elapsed >= S.duration) S.elapsed = S.duration;
     S.expired = !!s.expired || (S.mode === 'countdown' && S.elapsed >= S.duration && S.elapsed > 0);
@@ -681,7 +691,7 @@ body.bw-overlay.is-presenter #clock.is-editable .unit { cursor: ns-resize; }
     if (d.type === 'widget-get-state') {
       window.parent.postMessage({ type: 'widget-state', widgetId: WIDGET_ID, state: getState() }, '*');
     }
-    if (d.type === 'widget-set-state' && d.state) applyState(d.state, false, !!d.fromFile);
+    if (d.type === 'widget-set-state' && d.state) applyState(d.state, false, !!d.fromFile, d.hiddenFor);
   });
 
   // Shown as an overlay or full: whether the digits can be set in place
