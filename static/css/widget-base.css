@@ -420,7 +420,15 @@ body.bw-has-topbar {
   background: var(--bg);
   font-size: var(--fs-chrome);
   user-select: none;
+  /* A widget with more controls than its box is wide scrolls its bar
+     sideways (trackpad, or the mouse wheel — the kit maps it) rather than
+     squashing or clipping them. No scrollbar: it would eat the bar. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
 }
+.bw-topbar::-webkit-scrollbar { display: none; }
+.bw-topbar > * { flex-shrink: 0; }
 
 .bw-topbar-title {
   font-size: var(--fs-title);
@@ -439,10 +447,9 @@ body.bw-has-topbar {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
+  flex: 1 0 auto;
 }
+.bw-topbar-actions > * { flex-shrink: 0; }
 
 /* Shared utilities — same controls, same place, in every widget. */
 .bw-topbar-utils {

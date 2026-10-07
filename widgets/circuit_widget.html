@@ -326,6 +326,11 @@ kbd.key {
   overflow-x:auto; scrollbar-width:none;
 }
 .tm-head::-webkit-scrollbar { display:none; }
+.timing.is-closed {
+  flex-direction:row; align-items:center; gap:8px; padding:4px 9px;
+  cursor:pointer; background:var(--panel);
+}
+.timing.is-closed:hover { background:var(--bg-subtle); }
 .tm-title { font-size:9.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); flex:0 0 auto; margin-right:4px; }
 .tm-group { display:flex; align-items:center; gap:4px; flex:0 0 auto; }
 .tm-group-key { font-size:9px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-3); margin-right:1px; }
@@ -2178,9 +2183,19 @@ function nearestClockPeriodIndex(ms) {
 /* ── net geometry ────────────────────────────────────────────────────────
    A net's pulse animation is laid out by *distance travelled through the
    tree*, not per wire: every wire knows how far along the net it starts
-   (`d0`) and how long it is, and the net's longest path sets the pace. A
-   branch therefore lights up when the pulse actually reaches its junction,
-   and every sink on the net still lands at exactly one hop. */
+   (`d0`) and how long it is. A branch lights up when the pulse reaches its
+   junction, and every sink on the net lands at exactly one hop.
+
+   The pulse's pace isn't one speed for the whole net, though — that let it
+   reach a short branch's end early and sit there until the longest branch
+   finished, so a nearby output looked stuck. Instead it travels each stretch
+   at the pace that would reach the farthest end still ahead of it exactly
+   at one hop. Where a branch splits off toward a nearer end, that branch
+   (and the rest of the trunk, once the farthest end is behind it) slows to
+   arrive on time. Every end is reached exactly when its sink updates.
+
+   Each wire gets `sched`: [distance along the wire, fraction of the hop]
+   knots, piecewise linear from where the pulse enters it to 1 at its end. */
 function buildNetGeometry(circuit) {
   const paths = new Map();   // wireId -> resolved polyline
   const geom  = new Map();   // wireId -> {d0, len, root}
@@ -2196,23 +2211,76 @@ function buildNetGeometry(circuit) {
       childrenOf.get(w.from.wireId).push(w);
     } else if (circuit.isPin(w.from)) roots.push(w);
   }
-  const walk = (w, d0, rootKey, net, depth) => {
+  // Where each branch leaves its parent, and the longest run from a wire's
+  // start to any end beyond it.
+  const lenOf = new Map(), tapsOf = new Map(), remMemo = new Map();
+  const wireLen = (w) => {
+    if (!lenOf.has(w.id)) lenOf.set(w.id, polyLength(paths.get(w.id) || []));
+    return lenOf.get(w.id);
+  };
+  const taps = (w) => {
+    if (!tapsOf.has(w.id)) {
+      tapsOf.set(w.id, (childrenOf.get(w.id) || []).map(c => ({
+        c, at: projectOnPoly(paths.get(w.id) || [], c.from.x, c.from.y).along,
+      })).sort((a, b) => a.at - b.at));
+    }
+    return tapsOf.get(w.id);
+  };
+  const remFrom = (w, depth = 0) => {
+    if (remMemo.has(w.id)) return remMemo.get(w.id);
+    remMemo.set(w.id, wireLen(w));             // guards a (malformed) loop
+    let r = wireLen(w);
+    if (depth < 24) for (const t of taps(w)) r = Math.max(r, t.at + remFrom(t.c, depth + 1));
+    remMemo.set(w.id, r);
+    return r;
+  };
+  // Farthest end ahead of distance `s` on wire w (branches at `s` included
+  // when `incl`).
+  const remAt = (w, s, incl) => {
+    let r = wireLen(w) - s;
+    for (const t of taps(w)) if (incl ? t.at >= s : t.at > s) r = Math.max(r, t.at - s + remFrom(t.c));
+    return r;
+  };
+
+  const walk = (w, d0, f0, rootKey, net, depth) => {
     if (geom.has(w.id) || depth > 24) return;
-    const len = polyLength(paths.get(w.id) || []);
-    geom.set(w.id, { d0, len, root: rootKey });
+    const len = wireLen(w);
+    // The pulse's schedule along this wire, from fraction f0 at its start.
+    const sched = [[0, f0]];
+    const childAt = [];
+    let s = 0, f = f0;
+    const stops = [...new Set([...taps(w).map(t => t.at), len])].filter(x => x >= 0 && x <= len).sort((a, b) => a - b);
+    for (const b of stops) {
+      const rem = remAt(w, s, s === 0);
+      const slope = rem > 0 ? (1 - f) / rem : 0;
+      f = Math.min(1, f + slope * (b - s));
+      s = b;
+      sched.push([s, f]);
+      for (const t of taps(w)) if (t.at === b) childAt.push([t.c, t.at, f]);
+    }
+    geom.set(w.id, { d0, len, root: rootKey, sched });
     net.wireIds.push(w.id);
     net.total = Math.max(net.total, d0 + len);
-    for (const child of (childrenOf.get(w.id) || [])) {
-      const along = projectOnPoly(paths.get(w.id) || [], child.from.x, child.from.y).along;
-      walk(child, d0 + along, rootKey, net, depth+1);
-    }
+    for (const [child, along, fc] of childAt) walk(child, d0 + along, fc, rootKey, net, depth+1);
   };
   for (const w of roots) {
     const key = circuit.sigKey(w.from.compId, w.from.pin);
     if (!nets.has(key)) nets.set(key, { total:0, wireIds:[] });
-    walk(w, 0, key, nets.get(key), 0);
+    walk(w, 0, 0, key, nets.get(key), 0);
   }
   return { paths, geom, nets };
+}
+
+// How far along a wire (0–1) the pulse is, `frac` of the way through its hop.
+function pulseAlong(g, frac) {
+  const k = g.sched;
+  if (!k || !g.len) return 0;
+  if (frac <= k[0][1]) return 0;
+  for (let i = 1; i < k.length; i++) {
+    const [s1, f1] = k[i], [s0, f0] = k[i - 1];
+    if (frac <= f1) return (f1 > f0 ? s0 + (s1 - s0) * (frac - f0) / (f1 - f0) : s1) / g.len;
+  }
+  return 1;
 }
 
 function Canvas({
@@ -2710,8 +2778,7 @@ function Canvas({
           const inFlight = [];
           if (sig && net && g && g.len > 0 && net.total > 0) {
             for (const ev of sig.queue) {
-              const travelled = ((now - ev.time)/hopMs) * net.total;
-              const local = (travelled - g.d0)/g.len;
+              const local = pulseAlong(g, (now - ev.time)/hopMs);
               if (local > 0) inFlight.push({ value:ev.value, t:Math.min(1,local) });
             }
           }
@@ -3336,7 +3403,25 @@ const fmtSec = (ms) => (+(ms / 1000).toFixed(3)) + 's';
 const XIcon = ()=><svg width="9" height="9" viewBox="0 0 9 9">
   <path d="M1.5 1.5l6 6M7.5 1.5l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>;
 
-function TimingPanel({ circuit, recorder, hidden, windowMs, onToggleSignal, onShowAll, onHideAll, onWindow, onClose }) {
+// Up / down chevron for the timing strip's open / close toggle.
+const VChev = ({ dir })=><svg width="10" height="10" viewBox="0 0 10 10">
+  <path d={dir==='up' ? 'M1.5 6.5L5 3l3.5 3.5' : 'M1.5 3.5L5 7l3.5-3.5'} fill="none" stroke="currentColor"
+        strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+
+// Closed, the timing diagram shrinks to a strip along the bottom that still
+// says what it is — the same as the parts panel's rail on the left. The
+// whole strip opens it.
+function TimingPanel(props) {
+  if (!props.open) return <div className="timing is-closed" onClick={props.onToggle} title="Show the timing diagram (T)">
+    <button className="pal-toggle" onClick={e=>{ e.stopPropagation(); props.onToggle?.(); }} title="Show the timing diagram (T)">
+      <VChev dir="up"/>
+    </button>
+    <span className="tm-title">Timing</span>
+  </div>;
+  return <TimingOpen {...props}/>;
+}
+
+function TimingOpen({ circuit, recorder, hidden, windowMs, onToggleSignal, onShowAll, onHideAll, onWindow, onToggle }) {
   const bodyRef = useRef(null);
   const cvRef   = useRef(null);
   const hoverX  = useRef(null);
@@ -3534,7 +3619,7 @@ function TimingPanel({ circuit, recorder, hidden, windowMs, onToggleSignal, onSh
           <button key={w.ms} className={'seg-btn'+(windowMs===w.ms?' on':'')} onClick={()=>onWindow(w.ms)}>{w.label}</button>
         ))}
       </div>
-      <button className="sel-close" onClick={onClose} title="Close timing diagram (T)"><XIcon/></button>
+      <button className="pal-toggle" onClick={onToggle} title="Hide the timing diagram (T)"><VChev dir="down"/></button>
     </div>
     <div className="tm-body" ref={bodyRef}>
       {!all.length
@@ -4171,8 +4256,6 @@ function App() {
       </>}
       <div className="bw-spacer"/>
       <div className="tb-group">
-        <button className={'bw-btn tb-toggle'+(timingOpen?' on':'')} onClick={()=>setTimingOpen(v=>!v)}
-                title={(timingOpen ? 'Hide' : 'Show') + ' the timing diagram (T)'}>{I.wave}<span className="bl">Timing</span></button>
         <button className="bw-btn bw-btn--icon" onClick={()=>viewApi.current?.fit()} title="Fit circuit to view">{I.fit}</button>
       </div>
       <div className="bw-sep"/>
@@ -4228,14 +4311,14 @@ function App() {
              Then click one pin and the next to wire them together.</p>
         </div></div>}
       </div>
-      {timingOpen && <TimingPanel circuit={circuit} recorder={recorder}
+      <TimingPanel open={timingOpen} onToggle={()=>setTimingOpen(v=>!v)}
+          circuit={circuit} recorder={recorder}
           hidden={hiddenSig} windowMs={timingWin}
           onToggleSignal={id=>setHiddenSig(h=>({ ...h, [id]: !h[id] }))}
           onShowAll={()=>setHiddenSig({})}
           onHideAll={()=>setHiddenSig(Object.fromEntries([...circuit.components.values()]
             .filter(c=>c.kind==='INPUT'||c.kind==='CLOCK'||c.kind==='OUTPUT').map(c=>[c.id, true])))}
-          onWindow={setTimingWin}
-          onClose={()=>setTimingOpen(false)}/>}
+          onWindow={setTimingWin}/>
       </div>
     </div>
 

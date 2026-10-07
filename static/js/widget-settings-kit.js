@@ -731,6 +731,14 @@
     function buildBar() {
         var bar = el('div', 'bw-topbar');
         bar.id = 'bw-topbar';
+        // A bar wider than the widget scrolls sideways. A mouse wheel only
+        // scrolls up and down, so turn that into sideways here.
+        bar.addEventListener('wheel', function (e) {
+            if (bar.scrollWidth <= bar.clientWidth + 1) return;
+            if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+            bar.scrollLeft += e.deltaY;
+            e.preventDefault();
+        }, { passive: false });
 
         titleEl = el('div', 'bw-topbar-title');
         titleEl.textContent = barTitle();
