@@ -126,12 +126,30 @@
 
     <!-- Top-right cluster -->
     <div id="top-right-controls">
+        <div id="record-container">
+            <button class="btn" id="record-btn" title="Record screen and audio"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/></svg></button>
+        </div>
         <div id="upload-container">
             <button class="btn" id="upload-presentation-btn" title="Upload presentation"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></button>
         </div>
         <div id="save-container">
             <button class="btn" id="edit-save-btn" title="Download presentation or notes"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
         </div>
+    </div>
+
+    <!-- Recording bar — top centre while a take is in progress
+         (app/recorder.js). Stays up in edit and focus mode. -->
+    <div id="recorder-bar" role="group" aria-label="Recording" hidden>
+        <span class="recorder-dot" aria-hidden="true"></span>
+        <span class="recorder-state">Rec</span>
+        <span class="recorder-time" aria-live="off">0:00</span>
+        <button class="btn" id="recorder-pause-btn" title="Pause recording" aria-label="Pause recording">
+            <svg class="recorder-icon-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+            <svg class="recorder-icon-resume" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="6"/></svg>
+        </button>
+        <button class="btn" id="recorder-stop-btn" title="Stop recording" aria-label="Stop recording">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+        </button>
     </div>
 
     <!-- Mute — bottom-right corner: blanks the stage until pressed again

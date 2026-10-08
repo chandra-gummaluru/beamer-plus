@@ -1,0 +1,231 @@
+/* ============================================================
+   Recorder — record button, recording bar, start dialog, toast
+   (app/recorder.js)
+   ============================================================ */
+
+/* Record button: the inner dot turns red while a take is running. */
+#record-btn svg circle[fill] { color: var(--recording); }
+body.is-recording #record-btn { --_bd: var(--recording); }
+
+/* ── Recording bar — top centre ──────────────────────────────── */
+#recorder-bar {
+    position: fixed;
+    top: var(--sp-3);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9000;                  /* above the editor, below modals */
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: 4px 4px 4px var(--sp-3);
+    background: var(--glass-bg);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid oklch(85% 0.005 260);
+    border-radius: var(--r-pill);
+    box-shadow: var(--shadow-2);
+    font-family: var(--font-sans);
+    color: var(--ink-1);
+    user-select: none;
+    transition: opacity var(--dur-base);
+}
+#recorder-bar[hidden] { display: none; }
+
+.recorder-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--recording);
+    animation: recorder-pulse 1.4s ease-in-out infinite;
+}
+@keyframes recorder-pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.35; }
+}
+#recorder-bar.is-paused .recorder-dot,
+#recorder-bar.is-stopping .recorder-dot {
+    animation: none;
+    background: var(--ink-3);
+}
+
+.recorder-state {
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--recording);
+    min-width: 4.2em;
+}
+#recorder-bar.is-paused .recorder-state,
+#recorder-bar.is-stopping .recorder-state { color: var(--ink-3); }
+
+.recorder-time {
+    font-variant-numeric: tabular-nums;
+    font-size: var(--fs-md);
+    font-weight: 600;
+    min-width: 3.2em;
+    text-align: right;
+    margin-right: var(--sp-1);
+}
+
+#recorder-bar .btn {
+    width: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    height: 32px;
+    padding: 0;
+    border-radius: 50%;
+}
+#recorder-bar .btn svg { width: 14px; height: 14px; }
+#recorder-stop-btn { color: var(--recording); }
+#recorder-pause-btn .recorder-icon-resume { display: none; color: var(--recording); }
+#recorder-pause-btn.is-resume .recorder-icon-pause { display: none; }
+#recorder-pause-btn.is-resume .recorder-icon-resume { display: block; }
+
+/* Focus mode hides all chrome: keep the bar, but out of the way. */
+body.focus-mode #recorder-bar { opacity: 0.3; }
+body.focus-mode #recorder-bar:hover,
+body.focus-mode #recorder-bar:focus-within { opacity: 1; }
+
+/* ── Toast ───────────────────────────────────────────────────── */
+#recorder-toast {
+    position: fixed;
+    top: calc(var(--sp-3) + 52px);
+    left: 50%;
+    transform: translate(-50%, -6px);
+    z-index: 9000;
+    max-width: min(460px, 90vw);
+    padding: var(--sp-2) var(--sp-4);
+    background: var(--ink-1);
+    color: var(--ink-on-accent);
+    border-radius: var(--r-md);
+    box-shadow: var(--shadow-3);
+    font-family: var(--font-sans);
+    font-size: var(--fs-sm);
+    line-height: 1.4;
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-base), transform var(--dur-base) var(--ease-out);
+}
+#recorder-toast.is-visible { opacity: 1; transform: translate(-50%, 0); }
+
+/* ── Start dialog ────────────────────────────────────────────── */
+.recorder-options {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    text-align: left;
+}
+.recorder-source {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-1);
+}
+.recorder-source-opt {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 12px;
+    border: 1px solid oklch(88% 0.005 260);
+    border-radius: var(--r-md);
+    background: var(--surface-paper);
+    cursor: pointer;
+    font-family: var(--font-sans);
+    transition: border-color var(--dur-fast), background var(--dur-fast);
+}
+.recorder-source-opt:hover { border-color: var(--ink-4); }
+.recorder-source-opt input { position: absolute; opacity: 0; pointer-events: none; }
+.recorder-source-opt:has(input:checked) {
+    border-color: var(--ink-1);
+    background: var(--surface-cream);
+    box-shadow: inset 0 0 0 1px var(--ink-1);
+}
+.recorder-source-opt:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.recorder-source-title { font-size: var(--fs-sm); font-weight: 600; color: var(--ink-1); }
+.recorder-source-desc { font-size: var(--fs-xs); color: var(--ink-3); }
+.recorder-hint {
+    margin: var(--sp-1) 0 0;
+    font-size: var(--fs-xs);
+    color: var(--ink-3);
+    line-height: 1.45;
+}
+
+/* ── Recordings list in the Download menu ────────────────────── */
+.download-recordings {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    margin-top: var(--sp-3);
+    padding-top: var(--sp-3);
+    border-top: var(--line-soft);
+}
+.download-recordings-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-1);
+}
+.download-recordings-title {
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+}
+.download-recordings-all {
+    border: none;
+    background: none;
+    padding: 2px 4px;
+    font: inherit;
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--ink-1);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+}
+.download-recordings-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    max-height: 260px;
+    overflow-y: auto;
+}
+.download-recording {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: 6px 6px 6px var(--sp-3);
+    border: 1px solid oklch(90% 0.005 260);
+    border-radius: var(--r-md);
+    background: var(--surface-paper);
+}
+.download-recording-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--ink-4);
+}
+.download-recording.is-live .download-recording-dot {
+    background: var(--recording);
+    animation: recorder-pulse 1.4s ease-in-out infinite;
+}
+.download-recording-text { display: flex; flex-direction: column; min-width: 0; }
+.download-recording-name {
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--ink-1);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.download-recording-meta { font-size: var(--fs-xs); color: var(--ink-3); }
+.download-recording .btn {
+    width: 32px; min-width: 32px; height: 32px; min-height: 32px;
+    padding: 0;
+}
+.download-recording .btn svg { width: 15px; height: 15px; }
+.download-recording .btn.is-delete:hover { color: var(--danger); }

@@ -62,7 +62,8 @@ presentation.zip
 
 ## Downloading
 
-The download button (top-right) offers two files:
+The download button (top-right) offers two files, plus any screen recordings
+(see Recording below):
 
 - **Presentation (ZIP)** — everything above, to reopen and keep presenting.
 - **Notes (PDF)** — one flat PDF to hand out. Every visible slide (hidden and
@@ -74,6 +75,20 @@ The download button (top-right) offers two files:
   lists every answer). Widgets that don't describe how to print appear as a labelled
   placeholder box. Built in the browser with pdf-lib; PDF slides are copied as
   vector pages, so their text stays selectable.
+
+## Recording
+
+The record button (top-right) records the lecture as a video: either this tab
+(slides, ink, widgets) or any screen or window, with your microphone and/or
+computer sound (tab audio, or system audio when sharing a screen). While
+recording, a bar at the top centre shows the time and lets you pause, resume
+and stop. Stop and start again as often as you like — every take is kept and
+listed under the download button, where each can be downloaded (MP4 in
+Chrome/Edge, WebM elsewhere) or deleted.
+
+Takes are saved to the browser's storage (IndexedDB) a second at a time, so a
+reload or crash doesn't lose them; they stay until you delete them. Recording
+needs a secure context (the `https://` address, or `localhost`).
 
 ## Surveys
 

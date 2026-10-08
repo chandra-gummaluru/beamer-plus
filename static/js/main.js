@@ -31,6 +31,7 @@ import { initSettings, loadShortcuts } from './app/settings.js';
 import { initUploader } from './app/uploader.js';
 import { startTour } from './app/tour.js';
 import { initEditor } from './editor/editor.js';
+import { initRecorder } from './app/recorder.js';
 import { getSessionId, sessionUrl, saveLastSession } from './app/session.js';
 
 /* ─── Render generation counters ─────────────────────────────── */
@@ -154,6 +155,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initTextAnnotations(state);
     initUploader(state);
     initEditor(state);
+    initRecorder(state);
     initSettings();
     // Must run before applyDefaultPen(): that call emits a 'tool:change' to
     // sync other modules' tracked "previous tool" state (see below), and
