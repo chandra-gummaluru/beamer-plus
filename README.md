@@ -78,13 +78,12 @@ The download button (top-right) offers two files, plus any screen recordings
 
 ## Recording
 
-The record button (top-right) records the lecture as a video: either this tab
-(slides, ink, widgets) or any screen or window, with your microphone and/or
-computer sound (tab audio, or system audio when sharing a screen). While
-recording, a bar at the top centre shows the time and lets you pause, resume
-and stop. Stop and start again as often as you like — every take is kept and
-listed under the download button, where each can be downloaded (MP4 in
-Chrome/Edge, WebM elsewhere) or deleted.
+The record button (bottom-right, next to the hide-slide button) records this
+tab — slides, ink and widgets — as a video, with your microphone and/or the
+tab's sound (videos, audio, widgets). While recording, the button turns into a
+small bar with the time, pause / resume and stop. Stop and start again as often
+as you like — every take is kept and listed under the download button, where
+each can be downloaded (MP4 in Chrome/Edge, WebM elsewhere) or deleted.
 
 Takes are saved to the browser's storage (IndexedDB) a second at a time, so a
 reload or crash doesn't lose them; they stay until you delete them. Recording

@@ -13,7 +13,6 @@
     gap: var(--sp-2);
 }
 
-#top-right-controls #record-container,
 #top-right-controls #upload-container,
 #top-right-controls #save-container {
     display: flex;
@@ -40,7 +39,6 @@ body.focus-mode #slide-navigator,
 body.focus-mode #floating-annotation-toolbar,
 body.focus-mode #edit-mode-container,
 body.focus-mode #mute-container,
-body.focus-mode #top-right-controls #record-container,
 body.focus-mode #top-right-controls #upload-container,
 body.focus-mode #top-right-controls #save-container {
     display: none !important;
@@ -88,7 +86,7 @@ body.focus-mode #main-content {
         top: var(--sp-2);
     }
     #edit-mode-container {
-        left: calc(3 * var(--hit-min) + 4 * var(--sp-2));
+        left: calc(2 * var(--hit-min) + 3 * var(--sp-2));
         right: auto;
         top: var(--sp-2);
     }
@@ -100,6 +98,9 @@ body.focus-mode #main-content {
     right: var(--sp-3);
     bottom: var(--sp-3);
     z-index: 230;
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
 }
 #mute-container .btn {
     width: var(--hit-min);

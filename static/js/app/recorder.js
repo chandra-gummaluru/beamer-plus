@@ -1,9 +1,9 @@
-// Lecture recorder — records the screen (this tab, or any screen/window) with
-// optional microphone and computer sound, and keeps every take until it is
+// Lecture recorder — records this tab (slides, ink, widgets) with optional
+// microphone and tab sound, and keeps every take until it is
 // downloaded or deleted.
 //
-//   ● Record button (top-right)  → options dialog → browser's share picker
-//   ● Recording bar (top-centre) → timer, pause / resume, stop
+//   ● Record button (bottom-right, next to Mute) → options dialog → browser's share picker
+//   ● Recording bar (replaces the record button) → timer, pause / resume, stop
 //   ● Download menu              → lists every take (download-menu.js)
 //
 // Takes are written to IndexedDB a second at a time while recording, so a
@@ -87,7 +87,7 @@ export async function deleteRecording(id) {
 /* ─── start dialog ────────────────────────────────────────────── */
 
 function loadPrefs() {
-    const def = { source: 'tab', mic: true, sound: true };
+    const def = { mic: true, sound: true };
     try { return { ...def, ...JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') }; }
     catch { return def; }
 }
@@ -110,14 +110,6 @@ function openStartDialog() {
     const body = document.createElement('div');
     body.className = 'recorder-options';
     body.innerHTML = `
-        <div class="recorder-source" role="radiogroup" aria-label="What to record">
-            <label class="recorder-source-opt"><input type="radio" name="rec-source" value="tab">
-                <span class="recorder-source-title">This tab</span>
-                <span class="recorder-source-desc">Slides, ink and widgets</span></label>
-            <label class="recorder-source-opt"><input type="radio" name="rec-source" value="screen">
-                <span class="recorder-source-title">Screen or window</span>
-                <span class="recorder-source-desc">Include other apps</span></label>
-        </div>
         <label class="slide-setting">
             <span class="slide-setting-text">
                 <span class="slide-setting-name">Microphone</span>
@@ -133,27 +125,18 @@ function openStartDialog() {
             <input type="checkbox" class="editor-switch" role="switch" id="rec-opt-sound">
         </label>
         <p class="recorder-hint"></p>`;
-    body.querySelector(`input[name="rec-source"][value="${prefs.source === 'screen' ? 'screen' : 'tab'}"]`).checked = true;
     body.querySelector('#rec-opt-mic').checked = !!prefs.mic;
     body.querySelector('#rec-opt-sound').checked = !!prefs.sound;
 
     const hint = body.querySelector('.recorder-hint');
     const read = () => ({
-        source: body.querySelector('input[name="rec-source"]:checked')?.value || 'tab',
         mic:    body.querySelector('#rec-opt-mic').checked,
         sound:  body.querySelector('#rec-opt-sound').checked,
     });
     const updateHint = () => {
-        const o = read();
-        if (o.source === 'tab') {
-            hint.textContent = o.sound
-                ? 'Your browser will ask what to share: choose this tab and leave “Also share tab audio” on.'
-                : 'Your browser will ask what to share: choose this tab.';
-        } else {
-            hint.textContent = o.sound
-                ? 'Your browser will ask what to share: choose a screen and turn on “Also share system audio”.'
-                : 'Your browser will ask what to share: choose a screen or window.';
-        }
+        hint.textContent = read().sound
+            ? 'Records this tab. When your browser asks, allow it and leave “Also share tab audio” on.'
+            : 'Records this tab. When your browser asks, allow it.';
     };
     body.addEventListener('change', updateHint);
     updateHint();
@@ -190,7 +173,7 @@ function pickMimeType(hasAudio) {
 
 function stopTracks(stream) { stream?.getTracks().forEach(t => t.stop()); }
 
-async function startRecording({ source, mic, sound }) {
+async function startRecording({ mic, sound }) {
     if (active) return;
 
     // 1 — the screen. Must be the first await after the click.
@@ -200,16 +183,31 @@ async function startRecording({ source, mic, sound }) {
             video: { frameRate: { ideal: 30 }, width: { ideal: 1920 }, height: { ideal: 1080 } },
             audio: sound ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false,
                              suppressLocalAudioPlayback: false } : false,
+            // Always this tab: offer it first, and nothing but browser tabs.
+            preferCurrentTab: true,
             selfBrowserSurface: 'include',
-            surfaceSwitching: 'include',
-            systemAudio: sound ? 'include' : 'exclude',
+            surfaceSwitching: 'exclude',
+            monitorTypeSurfaces: 'exclude',
+            systemAudio: 'exclude',
         };
-        if (source === 'tab') opts.preferCurrentTab = true;
-        else opts.video.displaySurface = 'monitor';
+        opts.video.displaySurface = 'browser';
         display = await navigator.mediaDevices.getDisplayMedia(opts);
     } catch (err) {
         if (err?.name === 'NotAllowedError' || err?.name === 'AbortError') return; // picker cancelled
         showError('Could not start recording', err);
+        return;
+    }
+
+    // Browsers without preferCurrentTab (Firefox, Safari) still let you
+    // pick a screen or window: only a browser tab is accepted.
+    const surface = display.getVideoTracks()[0]?.getSettings?.().displaySurface;
+    if (surface && surface !== 'browser') {
+        stopTracks(display);
+        window.BeamerModal?.show({
+            kind: 'warning',
+            title: 'Choose this tab',
+            message: 'Beamer+ records only its own tab. Start again and pick this tab when your browser asks.',
+        });
         return;
     }
 
@@ -316,9 +314,7 @@ async function startRecording({ source, mic, sound }) {
     emitChange();
 
     if (sound && !displayAudio.length) {
-        toast(source === 'tab'
-            ? 'No computer sound: “Also share tab audio” was off. Stop and start again to include it.'
-            : 'No computer sound: system audio wasn’t shared (or isn’t available for this choice).');
+        toast('No tab sound: “Also share tab audio” was off. Stop and start again to include it.');
     }
 }
 
@@ -397,7 +393,9 @@ function renderBar() {
     if (a.stopping) clearInterval(a.timer);
     bar.classList.toggle('is-paused', a.paused && !a.stopping);
     bar.classList.toggle('is-stopping', !!a.stopping);
-    bar.querySelector('.recorder-state').textContent = a.stopping ? 'Saving' : a.paused ? 'Paused' : 'Rec';
+    const label = a.stopping ? 'Saving recording' : a.paused ? 'Recording paused' : 'Recording';
+    bar.querySelector('.recorder-state').textContent = label;
+    bar.title = label;
     bar.querySelector('.recorder-time').textContent = formatDuration(elapsed(a));
     const pause = document.getElementById('recorder-pause-btn');
     if (pause) {
