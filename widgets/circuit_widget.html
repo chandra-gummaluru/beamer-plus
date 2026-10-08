@@ -1088,7 +1088,9 @@ defineModule('engine', ['state'], (state) => {
         label: label === 'none'
           ? (ioId ? String.fromCharCode(Number(ioId.slice(2)) + 64) : def.label)
           : label,
-        lastChange: 0, facing, delay,
+        // Gates switch instantly: the only delay is the hop on each net.
+        // (Older saves carried a per-gate `delay`; it's ignored on load.)
+        lastChange: 0, facing, delay: 0,
       };
       components.set(id, comp);
       if (ioId) ioComponents.set(ioId, comp);
@@ -1342,7 +1344,7 @@ defineModule('engine', ['state'], (state) => {
       return {
         version: 2,
         components: [...components.values()].map(c=>({
-          id:c.id, ioId:c.ioId, kind:c.kind, x:c.x, y:c.y, facing:c.facing, flip:c.flip || undefined, delay:c.delay, label:c.label,
+          id:c.id, ioId:c.ioId, kind:c.kind, x:c.x, y:c.y, facing:c.facing, flip:c.flip || undefined, label:c.label,
           bits: BIT_CAPABLE[kindBase(c.kind)] ? (c.bits || 1) : undefined,
           state: c.kind==='INPUT' ? { value:c.state.value }
                : c.kind==='CLOCK' ? { period:c.state.period, paused:c.state.paused } : {},
@@ -1567,21 +1569,9 @@ defineModule('gates', ['state', 'engine'], (state, engine) => {
     return Math.ceil(Math.max(H, PIN_MARGIN*2 + (n-1)*PIN_GAP)/40)*40;
   }
 
-  // Fills left-to-right while a pending output counts down a component's own
-  // extra delay, so the bar reads as a progress meter for the value about to
-  // land. Most components have delay 0 and never show it.
-  function PendingBar({ pendingStart, delay, value }) {
-    const now = state.widgetState.now;
-    const t = delay > 0 ? Math.min(1, (now-(pendingStart||now))/delay) : 1;
-    return <g>
-      <rect x="20" y="-7" width="40" height="5" rx="2.5" fill="var(--panel-3)"/>
-      <rect x="20" y="-7" width={40*t} height="5" rx="2.5" fill={value ? 'var(--high)' : 'var(--low-p)'}/>
-    </g>;
-  }
-  function pendingBar(comp) {
-    return comp.pendingOutputVals && comp.pendingOutputVals[0] !== undefined && (comp.delay||0) > 0 &&
-      <PendingBar pendingStart={comp.pendingOutputStart[0]} delay={comp.delay||0} value={comp.pendingOutputVals[0]}/>;
-  }
+  // Gates have no delay of their own any more, so nothing to show while one
+  // "loads"; kept as a no-op so the gate bodies that call it stay simple.
+  function pendingBar() { return null; }
   // Every gate body shares the same ink: a soft inner highlight for a bit of
   // dimensionality, then the family fill and a family-tinted outline.
   function shape(d, f, edge, extra) {

@@ -2868,7 +2868,19 @@ function sameMemory(a, b){
   return true;
 }
 
+/* Look-alike whitespace from slides, PDFs and web pages: non-breaking and
+   typographic spaces become plain spaces (same length, so columns hold), and
+   zero-width characters and a BOM go. Real Python rejects all of these, but
+   they are invisible, so a student cannot see why their program won't run. */
+function cleanSource(source){
+  return String(source)
+    .replace(/\r\n?/g, '\n')
+    .replace(/[  -   　]/g, ' ')
+    .replace(/[​-‍⁠﻿]/g, '');
+}
+
 function buildTrace(source){
+  source = cleanSource(source);
   var srcLines = String(source).replace(/\r\n?/g, '\n').split('\n');
   var interp = new Interpreter(srcLines);
   var result = { states: [], error: null, execLines: new Set() };
@@ -3042,26 +3054,35 @@ function highlightLine(line){
 }
 
 /* The workspace owns the editor; the memory model only says which lines to
-   mark: the one about to run, the one that failed, and how far is history. */
+   mark: the one that just ran, the one that failed, and how far is history. */
 function paintEditor(){}
 
+/* The line whose effect the diagram is showing. A state's `line` is the line
+   it is about to run, so the line that produced this picture is the one the
+   previous state was waiting on. Nothing has run at step 0. */
+function lineJustRun(){
+  if (!app.trace || app.idx <= 0) return null;
+  var prev = app.trace.states[app.idx - 1];
+  return (prev && prev.line) || null;
+}
+
 function markLines(state){
-  var current = app.idx === 0 ? null : (state && state.line);
+  var current = lineJustRun();
   var errLine = (app.revealErrors && state && state.error) ? state.error.line : null;
   if (window.PWEditor) PWEditor.mark({
-    current: MM.visible && app.mode === 'trace' ? (current || null) : null,
+    current: MM.visible && app.mode === 'trace' ? current : null,
     err:     MM.visible && app.mode === 'trace' ? errLine : null,
     locked:  MM.visible ? lockedThrough() : 0
   });
-  paintCaption(state);
+  paintCaption(current);
 }
 
 /* The oversized single line shown when the editor is hidden in a lecture. */
-function paintCaption(state){
+function paintCaption(line){
   var cap = $('lineCaption');
-  if (!state || !state.line){ cap.innerHTML = '<span class="no">done</span>'; return; }
-  var text = app.code.split('\n')[state.line - 1] || '';
-  cap.innerHTML = '<span class="no">' + state.line + '</span>' + highlightLine(text.replace(/^\s+/, ''));
+  if (!line){ cap.innerHTML = '<span class="no">' + (app.idx > 0 ? 'done' : 'start') + '</span>'; return; }
+  var text = app.code.split('\n')[line - 1] || '';
+  cap.innerHTML = '<span class="no">' + line + '</span>' + highlightLine(text.replace(/^\s+/, ''));
 }
 
 /* -------------------------------------------------------------------------
@@ -3736,9 +3757,14 @@ function render(){
   renderStatus(state);
   renderError(state);
 
+  /* A program that fails before its first step traces to a single state, so
+     there is nowhere to step to — but the error stays hidden until the viewer
+     asks to execute. Leave Step and Run live while that's so; pressing either
+     is how the error gets shown, rather than two greyed buttons and no reason. */
+  var atEnd = app.idx >= states.length - 1 && !(state.error && !app.revealErrors);
   $('btnBack').disabled = app.idx === 0;
-  $('btnStep').disabled = app.idx >= states.length - 1;
-  $('btnRun').disabled = app.idx >= states.length - 1;
+  $('btnStep').disabled = atEnd;
+  $('btnRun').disabled = atEnd;
 
   app.painted = state;
   app.paintedPrev = prev;
@@ -4148,6 +4174,7 @@ window.PythonVisualizer = {
   codeEdited: codeEdited,
   syncCode: syncCode,
   editBlocked: editBlocked,
+  cleanSource: cleanSource,
   setVisible: function(v){
     v = !!v;
     if (v === MM.visible) return;
@@ -5805,7 +5832,7 @@ def _debug_file(src, fname, limit):
     reader.onload = () => {
       S.filename = file.name;
       fileEl.value = file.name;
-      codeEl.value = String(reader.result).replace(/\r\n?/g, '\n');
+      codeEl.value = PV.cleanSource(String(reader.result));
       onCodeInput();
     };
     reader.readAsText(file);
@@ -6693,6 +6720,19 @@ def _debug_file(src, fname, limit):
   // memory model has already run.
   codeEl.addEventListener('beforeinput', e => {
     if (PV.editBlocked(codeEl.selectionStart, codeEl.selectionEnd, e.inputType)) e.preventDefault();
+  });
+  // Code copied off a slide, a PDF or a web page often carries non-breaking
+  // spaces in its indentation. They look identical to spaces and Python
+  // rejects them, so swap them on the way in rather than leave a program
+  // that silently refuses to run.
+  codeEl.addEventListener('paste', e => {
+    if (IS_VIEWER) return;
+    const raw   = e.clipboardData?.getData('text/plain');
+    if (raw == null) return;
+    const clean = PV.cleanSource(raw);
+    if (clean === raw) return;
+    e.preventDefault();
+    insertText(clean);
   });
   inputEl.addEventListener('keydown', onShellKey);
   inputEl.addEventListener('input',   autoGrow);
