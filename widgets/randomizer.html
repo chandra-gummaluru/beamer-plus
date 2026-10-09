@@ -394,6 +394,52 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 }
 .bag-side { display: flex; align-items: center; justify-content: center; min-width: 0; }
 .spot { display: flex; gap: calc(var(--sz) * 0.2); align-items: center; justify-content: center; min-height: var(--sz); }
+/* Number: bingo cage and the ball it gives. Names: a hat and a slip. */
+.num-row { display: flex; align-items: center; justify-content: center; gap: 50px; width: 100%; }
+.cage-box, .hat-box { position: relative; flex: 0 0 auto; transform-origin: 50% 90%; }
+.cage-box svg, .hat-box svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.cage-count { position: absolute; left: 0; right: 0; bottom: -6px; text-align: center; font-family: var(--font-mono); font-size: var(--fs-chrome-sm); color: var(--text-3); }
+.ball-spot, .slip-spot { display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+.bingo {
+  position: relative; width: var(--d); height: var(--d); border-radius: 50%;
+  background:
+    radial-gradient(circle at 30% 24%, rgba(255,255,255,0.75) 0, rgba(255,255,255,0.2) 16%, rgba(255,255,255,0) 34%),
+    radial-gradient(circle at 50% 115%, rgba(0,0,0,0.35), rgba(0,0,0,0) 60%),
+    var(--c);
+  box-shadow: inset 0 calc(var(--d) * -0.05) calc(var(--d) * 0.1) rgba(0,0,0,0.25), 0 calc(var(--d) * 0.05) calc(var(--d) * 0.08) rgba(0,0,0,0.25);
+}
+.bingo-face {
+  position: absolute; inset: 21%; border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #ffffff, #efeee8 80%);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-ui); font-weight: 800; color: #1b1b1d; letter-spacing: -0.03em; font-variant-numeric: tabular-nums;
+}
+@keyframes tumble-ball {
+  0%   { transform: translate(0, 0); }
+  20%  { transform: translate(6px, -22px); }
+  40%  { transform: translate(-10px, -34px); }
+  60%  { transform: translate(8px, -16px); }
+  80%  { transform: translate(-4px, -26px); }
+  100% { transform: translate(0, 0); }
+}
+.cballs .cball { transform-box: fill-box; }
+.cballs.tumbling .cball { animation: tumble-ball 0.42s ease-in-out 3; }
+.slip {
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  padding: 0.35em 0.8em 0.45em; max-width: 100%;
+  background:
+    linear-gradient(180deg, rgba(0,0,0,0) 49.6%, rgba(0,0,0,0.07) 50%, rgba(0,0,0,0) 50.6%),
+    linear-gradient(170deg, #fffdf6, #f4efe0);
+  border-radius: 3px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.12), 0 10px 24px rgba(0,0,0,0.14);
+  transform: rotate(-1.5deg);
+  color: #24324f;
+  font-family: 'Segoe Print', 'Bradley Hand', 'Marker Felt', 'Comic Sans MS', cursive; font-weight: 700;
+  white-space: nowrap;
+}
+.slip span { display: block; line-height: 1.15; }
+
 /* Dice and coins: the throw on the left, its chalkboard history beside it. */
 .play-row { display: flex; align-items: center; justify-content: center; gap: 30px; width: 100%; }
 .play { display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
@@ -440,7 +486,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   border-radius: 2px;
 }
 #result.clickable { cursor: pointer; }
-#result .flying { position: absolute; z-index: 6; pointer-events: none; margin: 0; }
+#result .flying { position: absolute; z-index: 9; pointer-events: none; margin: 0; }
 .deck .pcard { z-index: 1; }
 
 /* ── d6: a real cube ──────────────────────────────────────── */
@@ -561,7 +607,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 
 /* ── Jar of balls ────────────────────────────────────────── */
 .bag-row { display: flex; align-items: center; justify-content: center; gap: calc(var(--jar) * 0.18); width: 100%; }
-.jar { height: var(--jar); width: calc(var(--jar) * 0.77); flex: 0 0 auto; position: relative; }
+.jar { height: var(--jar); width: calc(var(--jar) * 0.77); flex: 0 0 auto; position: relative; z-index: 5; }
 .jar svg { width: 100%; height: 100%; overflow: visible; }
 .jar-count { text-align: center; font-family: var(--font-mono); font-size: var(--fs-chrome-sm); color: var(--text-3); margin-top: 4px; }
 .tray { display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 0; }
@@ -1583,7 +1629,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     const tick = polys.length ? setInterval(() => polys.forEach(el => { const s = sides[+el.dataset.i]; setPolyFace(el, jiggle(1, s), s); }), 75) : null;
     if (cap) cap.style.visibility = 'hidden';
     const roll = (cubes.length ? 1150 : 900) + n * 70;
-    const g = prepNewest(), w = writeNewest(g, roll - 150);
+    const g = prepNewest(), w = writeNewest(g, roll + 120);
     hold(Math.max(roll, w.end) + 30, () => {
       clearInterval(tick);
       w.anims.forEach(a => a.cancel()); settleNewest(g);
@@ -1672,7 +1718,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       const cap = $('cap');
       if (cap) cap.style.visibility = 'hidden';
       const flip = 1300 + n * 60;
-      const g = prepNewest(), w = writeNewest(g, flip - 150);
+      const g = prepNewest(), w = writeNewest(g, flip + 120);
       hold(Math.max(flip, w.end) + 30, () => {
         w.anims.forEach(a => a.cancel()); settleNewest(g);
         els.forEach(el => { el.classList.remove('tossing'); el.querySelector('.coin').style.transition = 'none'; });
@@ -1761,16 +1807,22 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 
   // Fly a copy of a ball between two points in #result coordinates, along a
   // list of [x, y, scale, opacity] waypoints. Resolves when it lands.
-  function flyBall(c, size, path, { duration = 1000, delay = 0 } = {}) {
+  // `behindUntil` / `behindFrom`: the waypoint at which the ball comes out
+  // from behind the container, or goes back behind it — so it rises from
+  // inside, behind the glass and the label, rather than in front of them.
+  function flyBall(c, size, path, { duration = 1000, delay = 0, behindUntil = -1, behindFrom = Infinity } = {}) {
     const fly = document.createElement('span');
     fly.className = 'ball flying';
     fly.style.cssText = `--c:var(--hue-${c});--sz:${size}px;left:0;top:0;`;
     resultEl.appendChild(fly);
-    const kf = path.map(([x, y, s, op], i) => ({
-      transform: `translate(${x - size / 2}px, ${y - size / 2}px) scale(${s})`,
-      opacity: op == null ? 1 : op,
-      offset: i / (path.length - 1),
-    }));
+    const kf = [];
+    path.forEach(([x, y, s, op], i) => {
+      const k = { transform: `translate(${x - size / 2}px, ${y - size / 2}px) scale(${s})`, opacity: op == null ? 1 : op, offset: i / (path.length - 1) };
+      const behind = i < behindUntil || i > behindFrom;
+      if (i === behindUntil) kf.push({ ...k, zIndex: 2 });
+      kf.push({ ...k, zIndex: behind ? 2 : 9 });
+      if (i === behindFrom) kf.push({ ...k, zIndex: 2 });
+    });
     const a = fly.animate(kf, { duration, delay, easing: 'ease-in-out', fill: 'both' });
     a.onfinish = () => fly.remove();
     return { a, fly };
@@ -1934,8 +1986,8 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
         const small = Math.max(0.3, jar * 0.065 / w);
         const peak = Math.max(w * 0.4 + 6, Math.min(oy, y) - w * 0.6);
         flights.push(flyBall(c, w, [
-          [x, y, 1], [x, y - w * 0.15, 1.02], [(x + ox) / 2, peak, 0.75], [ox, oy, small], [fx, fy, small, look === 'bag' ? 0 : 1],
-        ], { duration: 900, delay: i * 220 }));
+          [x, y, 1], [x, y - w * 0.15, 1.02], [(x + ox) / 2, peak, 0.75], [ox, oy, small], [fx, fy, small],
+        ], { duration: 900, delay: i * 220, behindFrom: 3 }));
       });
       const after = back.length ? 900 + (back.length - 1) * 220 + 80 : 0;
 
@@ -1946,8 +1998,8 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
         const peak = Math.max(w * 0.4 + 6, Math.min(oy, y) - w * 0.7);
         const small = Math.max(0.25, Math.min(0.6, jar * 0.12 / w));
         const f = flyBall(o.balls[i], w, [
-          [fx, fy, small, look === 'bag' ? 0 : 1], [ox, oy - w * 0.1, small * 1.2], [(ox + x) / 2, peak, 0.85], [x, y, 1],
-        ], { duration: 1000, delay: after + i * 600 });
+          [fx, fy, small], [ox, oy - w * 0.1, small * 1.2], [(ox + x) / 2, peak, 0.85], [x, y, 1],
+        ], { duration: 1000, delay: after + i * 600, behindUntil: 1 });
         f.a.onfinish = () => { el.style.visibility = ''; f.fly.remove(); };
         flights.push(f);
       });
@@ -1973,8 +2025,8 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       const small = Math.max(0.25, Math.min(0.6, jar * 0.12 / sz));
       const peak = Math.max(sz * 0.4 + 6, Math.min(oy, y) - sz * 0.6);
       flights.push(flyBall(o.balls[i], sz, [
-        [fx, fy, small, look === 'bag' ? 0 : 1], [ox, oy - sz * 0.1, small * 1.2], [(ox + x) / 2, peak, 0.9], [x, y, 0.75, 1], [x, y, 0.6, 0],
-      ], { duration: 950, delay }));
+        [fx, fy, small], [ox, oy - sz * 0.1, small * 1.2], [(ox + x) / 2, peak, 0.9], [x, y, 0.75, 1], [x, y, 0.6, 0],
+      ], { duration: 950, delay, behindUntil: 1 }));
       const d = drawSketch(g, delay + 780);
       extra.push(...d.anims);
       lastEnd = Math.max(lastEnd, d.end);
@@ -2189,26 +2241,20 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
         <g id="ptr" filter="url(#wsh)">
           <path d="M50,10 C46,3 43.2,-1 43.2,-6 A6.8,6.8 0 1 1 56.8,-6 C56.8,-1 54,3 50,10 Z" fill="#d7263d" stroke="#fff" stroke-width="1.1"/>
           <circle cx="50" cy="-6" r="2.1" fill="#fff"/>
-        </g></svg></div>` +
-        `<div class="caption" id="spin-label"></div>`;
+        </g></svg></div>`;
     }
-    const wheel = $('wheel'), label = $('spin-label');
-    const showLabel = () => {
-      label.innerHTML = '';
-    };
+    const wheel = $('wheel');
     if (play) {
-      label.innerHTML = '&nbsp;';
       wheel.classList.add('spinning');
       reflow(wheel);
       wheel.style.transform = `rotate(${-S.spin}deg)`;
       const stopTick = tickPointer(wheel, sec);
-      const stop = () => { stopTick(); wheel.classList.remove('spinning'); showLabel(); label.classList.add('fade'); };
+      const stop = () => { stopTick(); wheel.classList.remove('spinning'); };
       wheel.addEventListener('transitionend', function te(e) { if (e.target === wheel) { wheel.removeEventListener('transitionend', te); finishAnim(); } });
       hold(4700, stop, { kind: 'spin' });
     } else {
       wheel.classList.remove('spinning');
       wheel.style.transform = `rotate(${-S.spin}deg)`;
-      showLabel();
     }
   }
 
@@ -2279,57 +2325,119 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     return Math.ceil(S.spin / 360) * 360 + 360 * 5 + at;
   }
 
-  // ── Number reels ────────────────────────────────────────────────────────────
-  function odoHtml(text) {
-    return `<div class="odo" id="odo">${[...text].map(ch => /\d/.test(ch)
-      ? `<span class="reel"><span class="strip" data-d="${ch}">${'0123456789'.repeat(3).split('').map(d => `<span>${d}</span>`).join('')}</span></span>`
-      : `<span class="sym">${escHtml(ch)}</span>`).join('')}</div>`;
+  // ── Number: a bingo cage ────────────────────────────────────────────────────
+  // A brass wire cage on a stand. Turning it tumbles the balls inside; one
+  // rolls out down the chute and comes to rest beside it, number up.
+  function cageSvg() {
+    const cx = 78, cy = 60, R = 46;
+    // A handful of balls resting in the bottom of the cage.
+    const inside = [[-26, 30], [-12, 34], [3, 35], [18, 33], [31, 26], [-20, 20], [-5, 23], [10, 22], [24, 15], [-33, 17], [37, 10]];
+    const ballsIn = inside.map(([dx, dy], k) =>
+      `<circle class="cball" cx="${cx + dx}" cy="${cy + dy}" r="6.2" fill="url(#cb${k % 6})" style="animation-delay:${-k * 83}ms"/>`).join('');
+    const grads = Array.from({ length: 6 }, (_, h) => {
+      const base = hueHex(h);
+      return `<radialGradient id="cb${h}" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="${mixHex(base, '#ffffff', 0.6)}"/><stop offset="0.5" stop-color="${base}"/><stop offset="1" stop-color="${mixHex(base, '#000000', 0.4)}"/></radialGradient>`;
+    }).join('');
+    const wire = 'url(#brass)';
+    return `<svg viewBox="0 0 160 150"><defs>${grads}
+        <linearGradient id="brass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f6e39b"/><stop offset="0.5" stop-color="#c99a2e"/><stop offset="1" stop-color="#7f5c12"/></linearGradient>
+        <linearGradient id="baseWood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9b6a3d"/><stop offset="1" stop-color="#5e3d20"/></linearGradient>
+      </defs>
+      <ellipse cx="80" cy="143" rx="64" ry="4" fill="rgba(0,0,0,0.22)"/>
+      <rect x="16" y="127" width="128" height="13" rx="3" fill="url(#baseWood)"/>
+      <path d="M36,128 L${cx - 4},${cy}" stroke="${wire}" stroke-width="4" stroke-linecap="round"/>
+      <path d="M124,128 L${cx + 4},${cy}" stroke="${wire}" stroke-width="4" stroke-linecap="round"/>
+      <g class="cballs">${ballsIn}</g>
+      <g id="cage" style="transform-origin:${cx}px ${cy}px">
+        <circle cx="${cx}" cy="${cy}" r="${R}" fill="rgba(255,240,200,0.05)" stroke="${wire}" stroke-width="2.6"/>
+        <ellipse cx="${cx}" cy="${cy}" rx="${R * 0.66}" ry="${R}" fill="none" stroke="${wire}" stroke-width="1.3"/>
+        <ellipse cx="${cx}" cy="${cy}" rx="${R * 0.28}" ry="${R}" fill="none" stroke="${wire}" stroke-width="1.3"/>
+        <ellipse cx="${cx}" cy="${cy}" rx="${R}" ry="${R * 0.4}" fill="none" stroke="${wire}" stroke-width="1.3"/>
+        <line x1="${cx - R}" y1="${cy}" x2="${cx + R}" y2="${cy}" stroke="${wire}" stroke-width="1.1"/>
+        <path d="M${cx},${cy} L${cx - 30},${cy - 34}" stroke="#6e4f10" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="${cx - 30}" cy="${cy - 34}" r="4.2" fill="#b3261e" stroke="#6e1410" stroke-width="0.8"/>
+      </g>
+      <circle cx="${cx}" cy="${cy}" r="5" fill="${wire}" stroke="#6e4f10" stroke-width="0.8"/>
+      <path d="M${cx + 30},${cy + 34} L150,108 L150,116 L${cx + 26},${cy + 41} Z" fill="${wire}" stroke="#7f5c12" stroke-width="0.6"/>
+    </svg>`;
   }
-  function fitOdo(len) {
-    const r = resultEl.getBoundingClientRect();
-    const units = len * 0.88 + 0.4;
-    const fs = Math.max(20, Math.min(r.height * 0.36, (r.width - 60) / units, 190));
-    $('odo').style.fontSize = fs + 'px';
-  }
-  function spinReels(play) {
-    const strips = [...resultEl.querySelectorAll('.reel .strip')];
-    let longest = 0;
-    strips.forEach((s, i) => {
-      const d = +s.dataset.d;
-      if (!play) { s.style.transition = 'none'; s.style.transform = `translateY(-${(20 + d) * 1.2}em)`; return; }
-      s.style.transition = 'none';
-      s.style.transform = `translateY(-${jiggle(0, 9) * 1.2}em)`;
-      reflow(s);
-      const dur = 0.9 + i * 0.16;
-      longest = Math.max(longest, dur);
-      s.style.transition = `transform ${dur}s cubic-bezier(0.15, 0.8, 0.25, 1)`;
-      s.style.transform = `translateY(-${(20 + d) * 1.2}em)`;
-    });
-    return longest * 1000;
-  }
-  function renderReelValue(text, captionHtml, play, emptyHint, digits) {
-    if (text == null) {
-      const blank = '0'.repeat(digits || 1);
-      resultEl.innerHTML = `<div class="ghost">${odoHtml(blank)}</div>${emptyHint}`;
-      fitOdo(blank.length);
-      spinReels(false);
-      return;
-    }
-    resultEl.innerHTML = odoHtml(text) + (captionHtml ? `<div class="caption" id="cap">${captionHtml}</div>` : '');
-    fitOdo(text.length);
-    const ms = spinReels(play);
-    if (play) hold(ms + 50, () => resultEl.querySelectorAll('.reel .strip').forEach(s => { s.style.transition = 'none'; }));
+  // Where a ball leaves the chute, in the cage's viewBox (160 × 150).
+  const CHUTE = [146, 104];
+
+  function bingoHtml(text, hue, D) {
+    const fs = D * 0.3 * Math.min(1, 2.6 / Math.max(2, text.length));
+    return `<div class="bingo" id="bingo" style="--c:var(--hue-${hue});--d:${D}px"><div class="bingo-face"><span style="font-size:${fs.toFixed(1)}px">${escHtml(text)}</span></div></div>`;
   }
 
   function renderNumber(o, play) {
     const st = S.setup.number;
-    let note = '';
-    if (st.unique) note = `<span class="note">${S.pool.number.length} of ${st.max - st.min + 1} used</span>`;
-    const pad = v => String(v).padStart(st.digits, '0');
-    renderReelValue(o ? pad(o.v) : null, note, play, '', st.digits);
+    const r = resultEl.getBoundingClientRect();
+    const W = r.width - 40, H = r.height - 30;
+    const cageH = Math.max(120, Math.min(H * 0.86, W * 0.5 * 150 / 160));
+    const cageW = cageH * 160 / 150;
+    const D = Math.max(70, Math.min(H * 0.6, W - cageW - 70, 280));
+    const text = o ? String(o.v).padStart(st.digits, '0') : '';
+    const hue = o ? o.v % 6 : 0;
+    resultEl.innerHTML =
+      `<div class="num-row"><div class="cage-box" id="cage-box" style="width:${cageW}px;height:${cageH}px">${cageSvg()}` +
+      (st.unique ? `<div class="cage-count">${S.pool.number.length} of ${st.max - st.min + 1} drawn</div>` : '') +
+      `</div><div class="ball-spot" style="width:${D}px;height:${D}px">${o ? bingoHtml(text, hue, D) : ''}</div></div>`;
+    if (!play || !o) return;
+
+    // Turn the cage, tumble the balls, then one rolls out to its spot.
+    const cage = $('cage'), anims = [];
+    anims.push(cage.animate([{ transform: 'rotate(0deg)' }, { transform: 'rotate(-720deg)' }],
+      { duration: 1300, easing: 'cubic-bezier(0.45, 0, 0.3, 1)' }));
+    resultEl.querySelector('.cballs').classList.add('tumbling');
+    const ball = $('bingo'), box = $('cage-box').getBoundingClientRect(), b = ball.getBoundingClientRect();
+    const sx = box.left + CHUTE[0] / 160 * box.width - (b.left + b.width / 2);
+    const sy = box.top + CHUTE[1] / 150 * box.height - (b.top + b.height / 2);
+    const k = (box.height * 0.085) / b.height;
+    anims.push(ball.animate([
+      { transform: `translate(${sx}px, ${sy}px) scale(${k}) rotate(-300deg)`, opacity: 0 },
+      { transform: `translate(${sx}px, ${sy}px) scale(${k}) rotate(-300deg)`, opacity: 1, offset: 0.05 },
+      { transform: `translate(${sx * 0.35}px, ${sy * 0.2}px) scale(${(k + 1) / 2}) rotate(-90deg)`, offset: 0.6 },
+      { transform: 'translate(0, 0) scale(1.03) rotate(8deg)', offset: 0.85 },
+      { transform: 'translate(0, 0) scale(1) rotate(0deg)' },
+    ], { duration: 800, delay: 1150, easing: 'ease-out', fill: 'both' }));
+    hold(1980, () => {
+      anims.forEach(a => a.cancel());
+      resultEl.querySelector('.cballs')?.classList.remove('tumbling');
+    });
   }
 
-  // ── Name slot ───────────────────────────────────────────────────────────────
+  // ── Names: slips of paper from a hat ────────────────────────────────────────
+  // A top hat, upside down, full of folded slips. Drawing pulls one out; it
+  // rises, unfolds, and the name is there in handwriting.
+  function hatSvg(left) {
+    const slips = [[60, -14], [74, 8], [88, -6], [100, 12], [68, 20], [82, 26]].slice(0, Math.max(0, Math.min(6, left)))
+      .map(([x, rot], k) => `<rect x="${x - 7}" y="${28 + (k % 2) * 3}" width="14" height="10" rx="1" fill="#fbf8ef" stroke="#d8d1bf" stroke-width="0.5" transform="rotate(${rot} ${x} ${33})"/>`).join('');
+    return `<svg viewBox="0 0 160 150"><defs>
+        <linearGradient id="felt" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#121214"/><stop offset="0.45" stop-color="#3a3a40"/><stop offset="0.6" stop-color="#26262b"/><stop offset="1" stop-color="#0d0d0f"/></linearGradient>
+        <linearGradient id="brim" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a3a40"/><stop offset="1" stop-color="#151518"/></linearGradient>
+      </defs>
+      <ellipse cx="80" cy="140" rx="54" ry="5" fill="rgba(0,0,0,0.22)"/>
+      <path d="M42,42 L118,42 L113,128 Q80,138 47,128 Z" fill="url(#felt)"/>
+      <path d="M43.5,54 L116.5,54 L116,64 L44,64 Z" fill="#8b1e2d"/>
+      <path d="M43.5,54 L116.5,54" stroke="#b03244" stroke-width="0.8"/>
+      <ellipse cx="80" cy="42" rx="66" ry="13" fill="url(#brim)"/>
+      <ellipse cx="80" cy="42" rx="38" ry="8" fill="#060607"/>
+      ${slips}
+      <path d="M14,42 A66,13 0 0 0 146,42 L118,42 A38,8 0 0 1 42,42 Z" fill="url(#brim)"/>
+      <path d="M18,45 A62,10 0 0 0 142,45" stroke="rgba(255,255,255,0.08)" stroke-width="1" fill="none"/>
+      <g class="hat-tag">
+        <path d="M128,47 C132,58 134,66 133,74" stroke="#cdb57d" stroke-width="0.9" fill="none"/>
+        <g transform="rotate(8 133 86)">
+          <path d="M122,78 L128,74.5 L138,74.5 L144,78 L144,100 L122,100 Z" fill="#d9bd8c" stroke="#a7875a" stroke-width="0.7" stroke-linejoin="round"/>
+          <circle cx="133" cy="77.6" r="1.5" fill="#3a2a1a" stroke="#f4ead2" stroke-width="0.8"/>
+          <text x="133" y="93" text-anchor="middle" font-size="12" font-weight="700" fill="#3b2a18" font-family="'Segoe Print','Bradley Hand','Marker Felt','Comic Sans MS',cursive">${left}</text>
+          <text x="133" y="98.4" text-anchor="middle" font-size="3.6" fill="#5a4630" font-family="'Segoe Print','Bradley Hand','Marker Felt','Comic Sans MS',cursive">${left === 1 ? 'name' : 'names'}</text>
+        </g>
+      </g>
+    </svg>`;
+  }
+  const HAT_MOUTH = [80, 40];
+
   function renderList(o, play) {
     const st = S.setup.list;
     if (o && o.type === 'order') {
@@ -2341,28 +2449,38 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
         `<div class="group bw-card"><h4>Group ${i + 1}</h4>${g.map(x => `<div>${escHtml(x)}</div>`).join('')}</div>`).join('')}</div>`;
       return;
     }
-    const name = o ? o.name : '?';
-    const reel = play && st.items.length > 1
-      ? Array.from({ length: 26 }, () => st.items[jiggle(0, st.items.length - 1)]).concat([name])
-      : [name];
+    const left = st.remove ? S.pool.list.length : st.items.length;
+    const r = resultEl.getBoundingClientRect();
+    const W = r.width - 40, H = r.height - 30;
+    const hatH = Math.max(120, Math.min(H * 0.8, W * 0.36 * 150 / 160));
+    const hatW = hatH * 160 / 150;
+    const slipW = Math.max(160, Math.min(W - hatW - 60, 560));
     resultEl.innerHTML =
-      `<div class="slot${o ? '' : ' ghost'}" id="slot"><div class="strip">${reel.map(x => `<div>${escHtml(x)}</div>`).join('')}</div></div>` +
-      (o && st.remove ? `<div class="bw-hint">${S.pool.list.length} left to pick</div>` : '');
-    // Size by the longest name the reel will show, so it doesn't jump.
-    const slot = $('slot'), r = resultEl.getBoundingClientRect();
-    let fs = Math.min(r.height * 0.3, 150);
-    slot.style.fontSize = fs + 'px';
-    for (let i = 0; i < 14 && slot.getBoundingClientRect().width > r.width - 50 && fs > 18; i++) { fs *= 0.88; slot.style.fontSize = fs + 'px'; }
-    const strip = slot.querySelector('.strip');
-    strip.style.transform = `translateY(-${(reel.length - 1) * 1.3}em)`;
-    if (play && reel.length > 1) {
-      strip.style.transition = 'none';
-      strip.style.transform = 'translateY(0)';
-      reflow(strip);
-      strip.style.transition = 'transform 1.7s cubic-bezier(0.12, 0.75, 0.18, 1)';
-      strip.style.transform = `translateY(-${(reel.length - 1) * 1.3}em)`;
-      hold(1750, () => { strip.style.transition = 'none'; });
-    }
+      `<div class="num-row"><div class="hat-box" id="hat-box" style="width:${hatW}px;height:${hatH}px">${hatSvg(left)}</div>` +
+      `<div class="slip-spot" style="width:${slipW}px">${o ? `<div class="slip" id="slip"><span>${escHtml(o.name)}</span></div>` : ''}</div></div>`;
+    if (!o) return;
+    // The name as large as the slip allows.
+    const slip = $('slip'), span = slip.querySelector('span');
+    let fs = Math.min(H * 0.22, 96);
+    span.style.fontSize = fs + 'px';
+    for (let i = 0; i < 16 && span.scrollWidth > slipW - 48 && fs > 16; i++) { fs *= 0.9; span.style.fontSize = fs + 'px'; }
+    if (!play) return;
+
+    const hat = $('hat-box'), hb = hat.getBoundingClientRect(), sb = slip.getBoundingClientRect();
+    const mx = hb.left + HAT_MOUTH[0] / 160 * hb.width - (sb.left + sb.width / 2);
+    const my = hb.top + HAT_MOUTH[1] / 150 * hb.height - (sb.top + sb.height / 2);
+    const k = (hb.width * 0.16) / sb.width;
+    const anims = [];
+    anims.push(hat.animate([{ transform: 'rotate(0)' }, { transform: 'rotate(-4deg)' }, { transform: 'rotate(3deg)' }, { transform: 'rotate(-2deg)' }, { transform: 'rotate(0)' }],
+      { duration: 520, easing: 'ease-in-out' }));
+    anims.push(slip.animate([
+      { transform: `translate(${mx}px, ${my}px) scale(${k}) rotateX(80deg) rotate(-6deg)`, opacity: 0 },
+      { transform: `translate(${mx}px, ${my}px) scale(${k}) rotateX(80deg) rotate(-6deg)`, opacity: 1, offset: 0.06 },
+      { transform: `translate(${mx}px, ${my - hb.height * 0.35}px) scale(${k * 1.4}) rotateX(80deg) rotate(4deg)`, offset: 0.35 },
+      { transform: `translate(${mx * 0.4}px, ${my * 0.4 - hb.height * 0.2}px) scale(${(k + 1) / 2}) rotateX(70deg) rotate(-2deg)`, offset: 0.62 },
+      { transform: 'translate(0, 0) scale(1) rotateX(0deg) rotate(-1.5deg)', offset: 1 },
+    ], { duration: 1500, delay: 380, easing: 'cubic-bezier(0.3, 0.6, 0.3, 1)', fill: 'both' }));
+    hold(1900, () => anims.forEach(a => a.cancel()));
   }
 
   // ── Animation ───────────────────────────────────────────────────────────────
