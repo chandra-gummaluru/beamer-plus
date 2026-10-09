@@ -1,0 +1,1257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script id="widget-schema" type="application/json">
+{
+  "label": "Table",
+  "category": "Tools",
+  "fields": [
+    { "key": "csv", "label": "Starting data (CSV, or paste from Excel)", "type": "textarea", "rows": 6,
+      "placeholder": "Name, Score\nAda, 92\nAlan, 88" },
+    { "key": "showLabels", "label": "Show row numbers and column letters", "type": "checkbox", "default": true },
+    { "key": "readOnly",   "label": "Lock editing", "type": "checkbox", "default": false }
+  ]
+}
+</script>
+<!-- Standalone fallback. Inside Beamer+ the host injects the shared widget
+     base ahead of everything else; opened directly, load the same stylesheet
+     from the repo at the same point in the cascade. -->
+<script id="bw-standalone">
+(function () {
+  if (document.querySelector('link[href*="widget-base.css"]')) return;
+  var head = document.head || document.getElementsByTagName('head')[0];
+  [['preconnect', 'https://fonts.googleapis.com'],
+   ['stylesheet', 'https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@400;500;600&display=swap'],
+   ['stylesheet', '../static/css/widget-base.css']].forEach(function (l) {
+    var el = document.createElement('link');
+    el.rel = l[0]; el.href = l[1];
+    head.appendChild(el);
+  });
+  document.documentElement.setAttribute('data-bw-standalone', '');
+})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Table — Beamer+</title>
+
+<!-- Vendored by the Beamer+ server. Never call io() bare. -->
+<script src="/static/vendor/socket.io.min.js"></script>
+
+<style>
+/* Tokens, reset, toolbar, buttons and inputs come from the shared widget base
+   (static/css/widget-base.css). What's left here is the grid: sticky headers,
+   a selection you can see from the back of the room, highlight tints, cells
+   covered for a reveal, and a bar chart beside it. */
+
+html, body { height: 100%; overflow: hidden; }
+
+/* Highlight tints. Mixed into transparency rather than fixed pastels, so a
+   highlighted cell reads on the dark deck as well as the light one. */
+:root {
+  --hl-1: #f5c518; --hl-2: #30a46c; --hl-3: #e5484d; --hl-4: #3e63dd; --hl-5: #8e4ec6;
+  /* Chart series. One series uses the house ink; several need telling apart. */
+  --series-1: #3e63dd; --series-2: #f5a524; --series-3: #30a46c; --series-4: #e5484d; --series-5: #8e4ec6; --series-6: #12a594;
+}
+
+/* ── Toolbar ────────────────────────────────────────────── */
+#filter { width: 150px; height: var(--ctl-h); padding: 0 9px; }
+.bw-btn .sw { width: 11px; height: 11px; border-radius: 3px; border: 1px solid var(--border-med); }
+#reveal-group[hidden] { display: none; }
+#reveal-group { display: contents; }
+
+/* ── Body ───────────────────────────────────────────────── */
+#app  { flex: 1 1 auto; min-height: 0; display: flex; position: relative; }
+#wrap {
+  flex: 1 1 auto; min-width: 0;
+  overflow: auto;
+  outline: none;
+  position: relative;
+}
+#wrap::-webkit-scrollbar { width: 8px; height: 8px; }
+#wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+#wrap::-webkit-scrollbar-thumb:hover { background: var(--border-med); }
+
+/* Fixed layout: column widths come from the colgroup, so a long value can't
+   shove its neighbours around and a 500-row table lays out at once. */
+#grid {
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  font-size: var(--fs-body);
+  color: var(--text);
+  user-select: none;
+}
+#grid th, #grid td {
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: calc(5px * var(--u)) calc(8px * var(--u));
+  height: calc(28px * var(--u));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+  position: relative;
+  font-variant-numeric: tabular-nums;
+}
+#grid td.num { text-align: right; }
+#grid td.err { color: var(--err); font-family: var(--font-mono); font-size: 0.85em; }
+
+/* Headers stay put while the body scrolls under them. */
+#grid thead th { position: sticky; z-index: 2; background: var(--bg-subtle); }
+#grid tr.letters th {
+  top: 0; height: 22px; padding: 0 6px;
+  font-family: var(--font-mono); font-size: var(--fs-chrome-sm); font-weight: 400;
+  color: var(--text-3); text-align: center; cursor: pointer;
+}
+#grid tr.heads th { top: var(--head-top, 0px); font-weight: 600; cursor: default; }
+#grid .gutter {
+  position: sticky; left: 0; z-index: 1;
+  background: var(--bg-subtle);
+  font-family: var(--font-mono); font-size: var(--fs-chrome-sm); font-weight: 400;
+  color: var(--text-3); text-align: center; padding: 0 4px; cursor: pointer;
+}
+#grid thead .gutter { z-index: 3; }
+body.no-labels #grid .gutter, body.no-labels #grid tr.letters { display: none; }
+#grid th.col-sel, #grid .gutter.row-sel { color: var(--text); background: var(--accent-bg); }
+
+/* Sort control, on hover in the header — presenter only. */
+.sort {
+  position: absolute; right: 3px; top: 50%; transform: translateY(-50%);
+  width: 20px; height: 20px; border: 0; border-radius: 4px;
+  background: var(--bg-subtle); color: var(--text-3);
+  display: none; align-items: center; justify-content: center; cursor: pointer;
+}
+.sort svg { width: 12px; height: 12px; }
+.sort:hover { color: var(--text); background: var(--accent-bg); }
+body.can-edit #grid tr.heads th:hover .sort { display: inline-flex; }
+
+/* Column resize grip on the right edge of a header. */
+.grip { position: absolute; top: 0; right: -3px; width: 7px; height: 100%; cursor: col-resize; z-index: 4; }
+body:not(.can-edit) .grip { display: none; }
+
+/* Selection: a tint for the range, a solid ring for the active cell. */
+#grid td.sel, #grid th.sel { background-image: linear-gradient(color-mix(in srgb, var(--text) 9%, transparent), color-mix(in srgb, var(--text) 9%, transparent)); }
+#grid td.cur, #grid th.cur { box-shadow: inset 0 0 0 2px var(--text); }
+#wrap:not(:focus-within) #grid td.cur, #wrap:not(:focus-within) #grid th.cur { box-shadow: inset 0 0 0 2px var(--text-3); }
+
+/* Covered for a reveal: stripes, value hidden. A presenter sees a faint
+   mark on cells they've revealed, so they know which are the answers. */
+#grid td.covered {
+  color: transparent !important;
+  background-image: repeating-linear-gradient(-45deg, var(--bg-subtle) 0 6px, var(--border) 6px 7px);
+  cursor: pointer;
+}
+body.can-edit #grid td.revealed::after {
+  content: ''; position: absolute; right: 3px; top: 3px; width: 5px; height: 5px;
+  border-radius: 50%; background: var(--text-3);
+}
+@keyframes reveal { from { opacity: 0; } to { opacity: 1; } }
+#grid td.just-revealed { animation: reveal 0.35s ease-out; }
+
+/* In-place editor. */
+#grid td.editing, #grid th.editing { padding: 0; overflow: visible; }
+.cell-input {
+  width: 100%; height: 100%;
+  border: 0; outline: 2px solid var(--text); outline-offset: -2px;
+  padding: 0 calc(8px * var(--u));
+  font: inherit; color: var(--text); background: var(--bg);
+}
+
+#grid tr.filtered { display: none; }
+
+.empty-filter { padding: 18px; color: var(--text-3); font-size: var(--fs-small); }
+
+/* ── Chart ──────────────────────────────────────────────── */
+#chart-pane {
+  flex: 0 0 42%; min-width: 0;
+  display: flex; flex-direction: column; gap: 8px;
+  border-left: 1px solid var(--border);
+  padding: 12px 14px 10px;
+}
+#chart-pane[hidden] { display: none; }
+@media (max-width: 640px) {
+  #app { flex-direction: column; }
+  #chart-pane { flex-basis: 45%; border-left: 0; border-top: 1px solid var(--border); }
+}
+#chart { flex: 1 1 auto; min-height: 0; position: relative; }
+#chart svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+#chart text { fill: var(--text-2); font-family: var(--font-mono); font-size: 10px; }
+#chart .axis { stroke: var(--border-med); }
+#chart .grid { stroke: var(--border); stroke-dasharray: 2 3; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: var(--fs-chrome-sm); color: var(--text-2); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+#chart-msg { font-size: var(--fs-small); color: var(--text-3); }
+
+/* ── Menus ──────────────────────────────────────────────── */
+.menu {
+  position: fixed; z-index: 20;
+  min-width: 190px; padding: 4px;
+  background: var(--bg); border: 1px solid var(--border-med); border-radius: var(--radius);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.14);
+  font-size: var(--fs-chrome);
+}
+.menu[hidden] { display: none; }
+.menu button {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 6px 9px; border: 0; border-radius: 4px; background: none;
+  color: var(--text); font: inherit; text-align: left; cursor: pointer;
+}
+.menu button:hover { background: var(--accent-bg); }
+.menu button .k { margin-left: auto; color: var(--text-3); font-family: var(--font-mono); font-size: 10px; }
+.menu hr { border: 0; border-top: 1px solid var(--border); margin: 4px 2px; }
+.menu .swatches { display: flex; gap: 6px; padding: 6px 9px; align-items: center; }
+.menu .swatches button { width: 20px; height: 20px; padding: 0; border-radius: 5px; border: 1px solid var(--border-med); }
+.menu .swatches button.none { background: var(--bg); color: var(--text-3); justify-content: center; font-size: 12px; }
+
+#viewer-badge {
+  position: absolute; right: 10px; bottom: 8px; z-index: 5;
+  font-size: var(--fs-chrome-sm); color: var(--text-3); pointer-events: none;
+  background: var(--bg); padding: 2px 6px; border-radius: 4px;
+}
+#file-in { display: none; }
+</style>
+</head>
+<body>
+<div id="shell" class="bw-shell">
+
+  <div id="toolbar" class="bw-toolbar" data-bw-topbar>
+    <span class="bw-toolbar-title">Table</span>
+    <div class="bw-sep"></div>
+    <span id="edit-group" style="display:contents">
+      <button class="bw-btn" id="add-row" title="Add a row at the bottom">+ Row</button>
+      <button class="bw-btn" id="add-col" title="Add a column at the right">+ Column</button>
+      <button class="bw-btn" id="hl-btn" title="Highlight the selected cells"><span class="sw" style="background:color-mix(in srgb, var(--hl-1) 45%, transparent)"></span>Highlight</button>
+      <button class="bw-btn" id="hide-btn" title="Cover the selected cells; click one to reveal it">Cover</button>
+      <span id="reveal-group" hidden>
+        <button class="bw-btn" id="reveal-all" title="Uncover every covered cell">Reveal all</button>
+        <button class="bw-btn" id="cover-all" title="Cover them all again">Re-cover</button>
+      </span>
+      <div class="bw-sep"></div>
+      <button class="bw-btn bw-btn--icon" id="undo-btn" title="Undo (Ctrl+Z)" aria-label="Undo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+      </button>
+      <button class="bw-btn bw-btn--icon" id="redo-btn" title="Redo (Ctrl+Y)" aria-label="Redo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>
+      </button>
+    </span>
+    <div class="bw-spacer"></div>
+    <input class="bw-input" id="filter" type="search" placeholder="Filter rows…" spellcheck="false">
+    <button class="bw-btn" id="chart-btn" title="Chart the numeric columns">Chart</button>
+    <button class="bw-btn bw-btn--icon" id="import-btn" title="Import a CSV file" aria-label="Import CSV">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+    </button>
+    <button class="bw-btn bw-btn--icon" id="export-btn" title="Download as CSV" aria-label="Export CSV">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14"/></svg>
+    </button>
+    <input type="file" id="file-in" accept=".csv,.tsv,.txt,text/csv">
+  </div>
+
+  <div id="app">
+    <div id="wrap" tabindex="0">
+      <table id="grid"></table>
+    </div>
+    <div id="chart-pane" hidden>
+      <div class="bw-hint" id="chart-title">Chart</div>
+      <div id="chart"></div>
+      <div class="legend" id="legend"></div>
+    </div>
+    <div id="viewer-badge" hidden>View-only · synced with presenter</div>
+  </div>
+
+</div>
+
+<div class="menu" id="ctx" hidden></div>
+<div class="menu" id="hl-menu" hidden></div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ── Config ──────────────────────────────────────────────────────────────────
+  const _qs       = new URLSearchParams(location.search);
+  const CFG0      = window.WIDGET_CONFIG || {};
+  let   cfg       = { ...CFG0 };
+  let   WIDGET_ID = CFG0.id || CFG0.widgetId || 'table';
+  let   IS_VIEWER = CFG0.role === 'viewer' || _qs.get('viewer') === '1';
+
+  const MAX_ROWS  = 2000;
+  const MAX_COLS  = 52;
+  const UNDO_CAP  = 100;
+  const HL_COUNT  = 5;
+
+  // ── DOM ─────────────────────────────────────────────────────────────────────
+  const $ = id => document.getElementById(id);
+  const wrap      = $('wrap');
+  const grid      = $('grid');
+  const filterIn  = $('filter');
+  const chartBtn  = $('chart-btn');
+  const chartPane = $('chart-pane');
+  const chartEl   = $('chart');
+  const legendEl  = $('legend');
+  const ctxMenu   = $('ctx');
+  const hlMenu    = $('hl-menu');
+  const fileIn    = $('file-in');
+  const undoBtn   = $('undo-btn');
+  const redoBtn   = $('redo-btn');
+
+  // ── State ───────────────────────────────────────────────────────────────────
+  // A cell is { v } plus optional h (highlight 1–5), x (covered), r (revealed).
+  // Properties travel with the cell, so sorting or inserting rows keeps a
+  // highlight on the value it was put on.
+  const T = {
+    cols:   [],          // [{ name, w }]
+    rows:   [],          // [[cell, …], …]
+    chart:  false,
+    filter: '',
+  };
+  let pristine = true;   // nothing edited and nothing restored — config may replace the data
+
+  // Selection in data coordinates. r = -1 is the header row (single cell only).
+  let sel = { r0: 0, c0: 0, r1: 0, c1: 0, ar: 0, ac: 0 };
+  let editing = null;    // { r, c, input, orig }
+  let undoStack = [], redoStack = [];
+
+  const canEdit = () => !IS_VIEWER && !cfg.readOnly;
+
+  // ── Data helpers ────────────────────────────────────────────────────────────
+  const cell    = v => ({ v: v == null ? '' : String(v) });
+  const colName = c => { let s = ''; c++; while (c > 0) { const m = (c - 1) % 26; s = String.fromCharCode(65 + m) + s; c = Math.floor((c - 1) / 26); } return s; };
+  const colIndex = s => { let n = 0; for (const ch of s.toUpperCase()) n = n * 26 + (ch.charCodeAt(0) - 64); return n - 1; };
+
+  function blankTable() {
+    T.cols = [{ name: 'Column 1' }, { name: 'Column 2' }, { name: 'Column 3' }];
+    T.rows = Array.from({ length: 5 }, () => T.cols.map(() => cell('')));
+  }
+
+  function normalise() {
+    if (!T.cols.length) T.cols = [{ name: 'Column 1' }];
+    if (!T.rows.length) T.rows = [T.cols.map(() => cell(''))];
+    T.rows.forEach(row => {
+      while (row.length < T.cols.length) row.push(cell(''));
+      if (row.length > T.cols.length) row.length = T.cols.length;
+      row.forEach((c, i) => { if (!c || typeof c !== 'object') row[i] = cell(c); });
+    });
+  }
+
+  // ── CSV / TSV ───────────────────────────────────────────────────────────────
+  // RFC-4180-ish: quoted fields, doubled quotes, newlines inside quotes. The
+  // delimiter is sniffed from the first line: a tab means it came from a
+  // spreadsheet's clipboard, which is what a presenter usually pastes.
+  function parseDelimited(text, delim) {
+    text = String(text || '').replace(/\r\n?/g, '\n').replace(/\n+$/, '');
+    if (!delim) {
+      const first = text.split('\n', 1)[0];
+      delim = first.includes('\t') ? '\t' : (first.split(';').length > first.split(',').length ? ';' : ',');
+    }
+    const out = []; let row = [], f = '', q = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (q) {
+        if (ch === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; }
+        else f += ch;
+      } else if (ch === '"' && f === '') q = true;
+      else if (ch === delim) { row.push(f); f = ''; }
+      else if (ch === '\n') { row.push(f); out.push(row); row = []; f = ''; }
+      else f += ch;
+    }
+    row.push(f); out.push(row);
+    const tidy = r => r.map(s => (delim === ',' || delim === ';' ? s.trim() : s));
+    return out.map(r => tidy(delim === '\t' ? r : rejoinFormulas(r, delim)));
+  }
+  // Hand-typed CSV in the settings rarely quotes a formula, so
+  // =ROUND(AVERAGE(C1:C4), 1) arrives split at its comma. Re-join the
+  // pieces of a formula until its brackets balance.
+  function rejoinFormulas(r, delim) {
+    const out = [];
+    for (let i = 0; i < r.length; i++) {
+      let f = r[i];
+      if (f.trim()[0] === '=') {
+        const depth = s => (s.match(/\(/g) || []).length - (s.match(/\)/g) || []).length;
+        while (depth(f) > 0 && i + 1 < r.length) f += delim + r[++i];
+      }
+      out.push(f);
+    }
+    return out;
+  }
+  function toCsv(matrix) {
+    return matrix.map(r => r.map(v => /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v).join(',')).join('\n');
+  }
+
+  function loadMatrix(m) {
+    m = m.filter(r => r.some(v => String(v).trim() !== ''));
+    if (!m.length) { blankTable(); return; }
+    const width = Math.min(MAX_COLS, Math.max(...m.map(r => r.length)));
+    const head = m[0];
+    T.cols = Array.from({ length: width }, (_, i) => ({ name: (head[i] || '').trim() || `Column ${i + 1}` }));
+    T.rows = m.slice(1, MAX_ROWS + 1).map(r => Array.from({ length: width }, (_, i) => cell(r[i] ?? '')));
+    if (!T.rows.length) T.rows = [T.cols.map(() => cell(''))];
+  }
+
+  // ── Formulas ────────────────────────────────────────────────────────────────
+  // Enough of a spreadsheet for a slide: =A1*2, =SUM(B1:B10), =ROUND(AVERAGE(C1:C5), 1),
+  // =IF(B2>=50, "pass", "fail"). Rows are numbered from the first data row,
+  // matching the gutter, so what the room sees is what a formula refers to.
+  const FUNCS = {
+    SUM:     a => nums(a).reduce((s, x) => s + x, 0),
+    AVERAGE: a => { const n = nums(a); return n.length ? n.reduce((s, x) => s + x, 0) / n.length : err('#DIV/0'); },
+    MIN:     a => { const n = nums(a); return n.length ? Math.min(...n) : 0; },
+    MAX:     a => { const n = nums(a); return n.length ? Math.max(...n) : 0; },
+    COUNT:   a => nums(a).length,
+    COUNTA:  a => flat(a).filter(v => v !== '' && v != null).length,
+    MEDIAN:  a => { const n = nums(a).sort((x, y) => x - y); if (!n.length) return err('#NUM'); const m = n.length >> 1; return n.length % 2 ? n[m] : (n[m - 1] + n[m]) / 2; },
+    STDEV:   a => { const n = nums(a); if (n.length < 2) return err('#DIV/0'); const mu = n.reduce((s, x) => s + x, 0) / n.length; return Math.sqrt(n.reduce((s, x) => s + (x - mu) ** 2, 0) / (n.length - 1)); },
+    PRODUCT: a => nums(a).reduce((s, x) => s * x, 1),
+    ROUND:   a => { const [x, d = 0] = a.map(num); const k = 10 ** d; return Math.round(x * k) / k; },
+    ABS:     a => Math.abs(num(a[0])),
+    SQRT:    a => { const x = num(a[0]); return x < 0 ? err('#NUM') : Math.sqrt(x); },
+    POWER:   a => num(a[0]) ** num(a[1]),
+    MOD:     a => { const d = num(a[1]); return d === 0 ? err('#DIV/0') : ((num(a[0]) % d) + d) % d; },
+    IF:      a => (truthy(a[0]) ? a[1] : (a.length > 2 ? a[2] : false)),
+    AND:     a => flat(a).every(truthy),
+    OR:      a => flat(a).some(truthy),
+    NOT:     a => !truthy(a[0]),
+    CONCAT:  a => flat(a).map(str).join(''),
+  };
+  FUNCS.AVG = FUNCS.MEAN = FUNCS.AVERAGE;
+
+  class FErr { constructor(code) { this.code = code; } }
+  const err = code => { throw new FErr(code); };
+  const flat = a => a.flat(Infinity);
+  function asNumber(v) {
+    if (typeof v === 'number') return v;
+    if (typeof v === 'boolean') return v ? 1 : 0;
+    const s = String(v).trim().replace(/,/g, '');
+    if (s === '') return null;
+    if (/%$/.test(s) && isFinite(+s.slice(0, -1))) return +s.slice(0, -1) / 100;
+    return isFinite(+s) ? +s : null;
+  }
+  const nums = a => flat(a).map(v => (typeof v === 'boolean' ? null : asNumber(v))).filter(v => v != null);
+  function num(v) {
+    if (Array.isArray(v)) err('#VALUE');
+    if (v === '' || v == null) return 0;
+    const n = asNumber(v);
+    return n == null ? err('#VALUE') : n;
+  }
+  const str = v => (typeof v === 'number' ? fmtNum(v) : typeof v === 'boolean' ? (v ? 'TRUE' : 'FALSE') : String(v ?? ''));
+  const truthy = v => (typeof v === 'string' ? (asNumber(v) != null ? asNumber(v) !== 0 : v.toUpperCase() === 'TRUE') : !!v);
+
+  function tokenize(src) {
+    const re = /\s*(?:(\d+\.?\d*(?:[eE][+-]?\d+)?|\.\d+)|("(?:[^"]|"")*")|([A-Za-z]{1,2}\d+(?::[A-Za-z]{1,2}\d+)?)|([A-Za-z_][A-Za-z0-9_.]*)|(<=|>=|<>|[-+*/^(),=<>&%]))/y;
+    const out = []; let m;
+    re.lastIndex = 0;
+    while (re.lastIndex < src.length) {
+      const at = re.lastIndex;
+      if (!(m = re.exec(src))) { if (/^\s*$/.test(src.slice(at))) break; err('#ERR'); }
+      if (m[1] != null)      out.push({ t: 'n', v: +m[1] });
+      else if (m[2] != null) out.push({ t: 's', v: m[2].slice(1, -1).replace(/""/g, '"') });
+      else if (m[3] != null) out.push({ t: 'ref', v: m[3].toUpperCase() });
+      else if (m[4] != null) out.push({ t: 'id', v: m[4].toUpperCase() });
+      else                   out.push({ t: 'op', v: m[5] });
+    }
+    return out;
+  }
+
+  function evalFormula(src, stack) {
+    const tk = tokenize(src); let i = 0;
+    const peek = () => tk[i], eat = v => (tk[i] && tk[i].v === v ? (i++, true) : false);
+    function cmp() {
+      let a = concat();
+      for (;;) {
+        const t = peek(); if (!t || t.t !== 'op' || !['=', '<>', '<', '>', '<=', '>='].includes(t.v)) return a;
+        i++; const b = concat();
+        const na = asNumber(a), nb = asNumber(b);
+        const [x, y] = na != null && nb != null ? [na, nb] : [str(a).toLowerCase(), str(b).toLowerCase()];
+        a = { '=': x === y, '<>': x !== y, '<': x < y, '>': x > y, '<=': x <= y, '>=': x >= y }[t.v];
+      }
+    }
+    function concat() { let a = add(); while (eat('&')) a = str(a) + str(add()); return a; }
+    function add() {
+      let a = mul();
+      for (;;) { if (eat('+')) a = num(a) + num(mul()); else if (eat('-')) a = num(a) - num(mul()); else return a; }
+    }
+    function mul() {
+      let a = pow();
+      for (;;) {
+        if (eat('*')) a = num(a) * num(pow());
+        else if (eat('/')) { const b = num(pow()); a = b === 0 ? err('#DIV/0') : num(a) / b; }
+        else return a;
+      }
+    }
+    function pow() { const a = unary(); return eat('^') ? num(a) ** num(pow()) : a; }
+    function unary() {
+      if (eat('-')) return -num(unary());
+      if (eat('+')) return num(unary());
+      let v = atom();
+      if (eat('%')) v = num(v) / 100;
+      return v;
+    }
+    function atom() {
+      const t = tk[i++];
+      if (!t) err('#ERR');
+      if (t.t === 'n' || t.t === 's') return t.v;
+      if (t.t === 'op' && t.v === '(') { const v = cmp(); if (!eat(')')) err('#ERR'); return v; }
+      if (t.t === 'ref') return t.v.includes(':') ? range(t.v) : refValue(t.v, stack);
+      if (t.t === 'id') {
+        if (t.v === 'TRUE') return true;
+        if (t.v === 'FALSE') return false;
+        if (t.v === 'PI') { if (eat('(')) eat(')'); return Math.PI; }
+        const fn = FUNCS[t.v]; if (!fn || !eat('(')) err('#NAME');
+        const args = [];
+        if (!eat(')')) { do args.push(cmp()); while (eat(',')); if (!eat(')')) err('#ERR'); }
+        return fn(args);
+      }
+      return err('#ERR');
+    }
+    function range(s) {
+      const [a, b] = s.split(':').map(parseRef);
+      const out = [];
+      for (let r = Math.min(a.r, b.r); r <= Math.max(a.r, b.r); r++)
+        for (let c = Math.min(a.c, b.c); c <= Math.max(a.c, b.c); c++) out.push(valueAt(r, c, stack));
+      return out;
+    }
+    const v = cmp();
+    if (i < tk.length) err('#ERR');
+    if (Array.isArray(v)) err('#VALUE');
+    return v;
+  }
+  function parseRef(s) {
+    const m = s.match(/^([A-Z]{1,2})(\d+)$/);
+    const r = +m[2] - 1, c = colIndex(m[1]);
+    if (r < 0 || r >= T.rows.length || c >= T.cols.length) err('#REF');
+    return { r, c };
+  }
+  function refValue(s, stack) { const { r, c } = parseRef(s); return valueAt(r, c, stack); }
+
+  // Value of a cell for formulas and display, cached per render. A formula
+  // that reaches itself again through its references is a cycle.
+  let cache = new Map();
+  function valueAt(r, c, stack = new Set()) {
+    const key = r * 1000 + c;
+    if (cache.has(key)) return cache.get(key);
+    const raw = T.rows[r]?.[c]?.v ?? '';
+    if (raw[0] !== '=' || raw.length < 2) return raw;
+    if (stack.has(key)) err('#CYCLE');
+    stack.add(key);
+    let v;
+    try { v = evalFormula(raw.slice(1), stack); }
+    catch (e) { stack.delete(key); if (e instanceof FErr) { if (e.code === '#CYCLE') throw e; v = new FErr(e.code); } else v = new FErr('#ERR'); }
+    stack.delete(key);
+    if (v instanceof FErr) { cache.set(key, v); throw v; }
+    cache.set(key, v);
+    return v;
+  }
+  function display(r, c) {
+    try {
+      const v = valueAt(r, c);
+      if (typeof v === 'number') return { text: fmtNum(v), num: true };
+      if (typeof v === 'boolean') return { text: v ? 'TRUE' : 'FALSE', num: false };
+      const isNum = asNumber(v) != null;
+      return { text: String(v), num: isNum };
+    } catch (e) {
+      return { text: e instanceof FErr ? e.code : '#ERR', err: true };
+    }
+  }
+  function fmtNum(v) {
+    if (!isFinite(v)) return v > 0 ? '∞' : v < 0 ? '-∞' : '#NUM';
+    const r = +v.toPrecision(12);
+    return Math.abs(r) >= 1e15 || (Math.abs(r) < 1e-6 && r !== 0) ? r.toExponential(4) : String(+r.toFixed(6));
+  }
+
+  // ── Undo ────────────────────────────────────────────────────────────────────
+  const snapshot = () => JSON.stringify({ cols: T.cols, rows: T.rows });
+  function restore(s) { const o = JSON.parse(s); T.cols = o.cols; T.rows = o.rows; normalise(); clampSel(); }
+  /** Record the table as it is now, before a change. */
+  function checkpoint() {
+    undoStack.push(snapshot());
+    if (undoStack.length > UNDO_CAP) undoStack.shift();
+    redoStack = [];
+    pristine = false;
+  }
+  function undo() { if (!canEdit() || !undoStack.length) return; redoStack.push(snapshot()); restore(undoStack.pop()); changed(); }
+  function redo() { if (!canEdit() || !redoStack.length) return; undoStack.push(snapshot()); restore(redoStack.pop()); changed(); }
+
+  /** After any change to the data: redraw, and send it to viewers. */
+  function changed() { render(); emitState(); }
+
+  // ── Selection ───────────────────────────────────────────────────────────────
+  const selBox = () => ({ r0: Math.min(sel.r0, sel.r1), r1: Math.max(sel.r0, sel.r1),
+                          c0: Math.min(sel.c0, sel.c1), c1: Math.max(sel.c0, sel.c1) });
+  function select(r, c, extend) {
+    r = Math.max(-1, Math.min(T.rows.length - 1, r));
+    c = Math.max(0, Math.min(T.cols.length - 1, c));
+    if (extend && r >= 0 && sel.r0 >= 0) { sel.r1 = r; sel.c1 = c; }
+    else sel = { r0: r, c0: c, r1: r, c1: c };
+    sel.ar = r; sel.ac = c;
+    paintSelection();
+    scrollIntoView(r, c);
+  }
+  function clampSel() {
+    const R = T.rows.length - 1, C = T.cols.length - 1;
+    sel.r0 = Math.min(sel.r0, R); sel.r1 = Math.min(sel.r1, R);
+    sel.c0 = Math.min(sel.c0, C); sel.c1 = Math.min(sel.c1, C);
+    sel.ar = Math.min(sel.ar, R); sel.ac = Math.min(sel.ac, C);
+  }
+  function cellEl(r, c) {
+    return r < 0 ? grid.querySelector(`tr.heads th[data-c="${c}"]`) : grid.querySelector(`td[data-r="${r}"][data-c="${c}"]`);
+  }
+  function paintSelection() {
+    grid.querySelectorAll('.sel, .cur, .col-sel, .row-sel').forEach(el => el.classList.remove('sel', 'cur', 'col-sel', 'row-sel'));
+    if (IS_VIEWER) return;
+    const b = selBox();
+    if (b.r0 < 0) { cellEl(-1, b.c0)?.classList.add('cur'); return; }
+    for (let r = b.r0; r <= b.r1; r++) {
+      const tr = grid.querySelector(`tr[data-r="${r}"]`); if (!tr) continue;
+      tr.querySelector('.gutter')?.classList.add('row-sel');
+      for (let c = b.c0; c <= b.c1; c++) tr.children[c + 1]?.classList.add('sel');
+    }
+    for (let c = b.c0; c <= b.c1; c++) grid.querySelector(`tr.letters th[data-c="${c}"]`)?.classList.add('col-sel');
+    cellEl(sel.ar, sel.ac)?.classList.add('cur');
+  }
+  function scrollIntoView(r, c) {
+    const el = cellEl(r, c); if (!el) return;
+    const w = wrap.getBoundingClientRect(), e = el.getBoundingClientRect();
+    const headH = grid.tHead ? grid.tHead.getBoundingClientRect().height : 0;
+    const gutW = cfg.showLabels === false ? 0 : (grid.querySelector('tbody .gutter')?.getBoundingClientRect().width || 0);
+    if (r >= 0 && e.top < w.top + headH) wrap.scrollTop -= (w.top + headH - e.top);
+    else if (e.bottom > w.bottom) wrap.scrollTop += e.bottom - w.bottom + 2;
+    if (e.left < w.left + gutW) wrap.scrollLeft -= (w.left + gutW - e.left);
+    else if (e.right > w.right) wrap.scrollLeft += e.right - w.right + 2;
+  }
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+  const SORT_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>';
+
+  function render() {
+    cancelEdit(true);
+    cache = new Map();
+    document.body.classList.toggle('can-edit', canEdit());
+    document.body.classList.toggle('no-labels', cfg.showLabels === false);
+    $('edit-group').style.display = canEdit() ? 'contents' : 'none';
+    $('viewer-badge').hidden = !IS_VIEWER;
+    [filterIn, chartBtn, $('import-btn')].forEach(b => { b.disabled = IS_VIEWER; });
+    chartBtn.style.display = $('export-btn').style.display = IS_VIEWER ? 'none' : '';
+    $('import-btn').style.display = canEdit() ? '' : 'none';
+    filterIn.style.display = IS_VIEWER ? 'none' : '';
+    if (document.activeElement !== filterIn) filterIn.value = T.filter;
+    chartBtn.classList.toggle('is-active', T.chart);
+    undoBtn.disabled = !undoStack.length;
+    redoBtn.disabled = !redoStack.length;
+    const anyCovered = T.rows.some(r => r.some(c => c.x));
+    $('reveal-group').hidden = !anyCovered;
+    $('reveal-group').style.display = anyCovered && canEdit() ? 'contents' : 'none';
+
+    const u = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--u')) || 1.4;
+    const defW = Math.round(130 * u);
+    let h = `<colgroup><col style="width:${Math.round(34 + 6 * u)}px">` +
+      T.cols.map(c => `<col style="width:${c.w || defW}px">`).join('') + `</colgroup><thead>`;
+    h += `<tr class="letters"><th class="gutter"></th>${T.cols.map((_, c) => `<th data-c="${c}" data-col="${c}">${colName(c)}</th>`).join('')}</tr>`;
+    h += `<tr class="heads"><th class="gutter"></th>${T.cols.map((col, c) =>
+      `<th data-r="-1" data-c="${c}" title="${escHtml(col.name)}">${escHtml(col.name)}` +
+      `<button class="sort" data-sort="${c}" title="Sort by this column">${SORT_ICON}</button><span class="grip" data-grip="${c}"></span></th>`).join('')}</tr></thead><tbody>`;
+
+    const q = T.filter.trim().toLowerCase();
+    T.rows.forEach((row, r) => {
+      const cells = row.map((cl, c) => {
+        const d = display(r, c);
+        const cls = [d.num ? 'num' : '', d.err ? 'err' : '', cl.x && !cl.r ? 'covered' : '', cl.x && cl.r ? 'revealed' : ''].filter(Boolean).join(' ');
+        const bg = cl.h ? ` style="background-color:color-mix(in srgb, var(--hl-${cl.h}) 26%, transparent)"` : '';
+        // A covered value isn't in the page at all — the projector shows the
+        // presenter's screen, and transparent text is still selectable text.
+        const shownText = cl.x && !cl.r ? '' : d.text;
+        return { html: `<td data-r="${r}" data-c="${c}"${cls ? ` class="${cls}"` : ''}${bg}>${escHtml(shownText)}</td>`, text: d.text };
+      });
+      // A covered cell must not give itself away by matching the filter.
+      const hit = !q || row.some((cl, c) => !(cl.x && !cl.r) && cells[c].text.toLowerCase().includes(q));
+      h += `<tr data-r="${r}"${hit ? '' : ' class="filtered"'}><th class="gutter" data-row="${r}">${r + 1}</th>${cells.map(x => x.html).join('')}</tr>`;
+    });
+    h += '</tbody>';
+    grid.innerHTML = h;
+    grid.style.width = (Math.round(34 + 6 * u) + T.cols.reduce((s, c) => s + (c.w || defW), 0)) + 'px';
+    const lettersH = cfg.showLabels === false ? 0 : (grid.querySelector('tr.letters')?.getBoundingClientRect().height || 22);
+    grid.style.setProperty('--head-top', lettersH + 'px');
+    paintSelection();
+    renderChart();
+  }
+
+  // ── Editing ─────────────────────────────────────────────────────────────────
+  function startEdit(r, c, initial) {
+    if (!canEdit()) return;
+    cancelEdit();
+    const el = cellEl(r, c); if (!el) return;
+    const orig = r < 0 ? T.cols[c].name : T.rows[r][c].v;
+    const input = document.createElement('input');
+    input.className = 'cell-input';
+    input.spellcheck = false;
+    input.value = initial != null ? initial : orig;
+    el.classList.add('editing');
+    el.textContent = '';
+    el.appendChild(input);
+    editing = { r, c, input, orig };
+    input.focus();
+    if (initial == null) input.select(); else input.setSelectionRange(input.value.length, input.value.length);
+    input.addEventListener('keydown', onEditKey);
+    input.addEventListener('blur', () => { if (editing && editing.input === input) commitEdit(); });
+  }
+  function commitEdit(dr = 0, dc = 0) {
+    if (!editing) return;
+    const { r, c, input, orig } = editing;
+    editing = null;
+    const v = input.value;
+    if (v !== orig) {
+      checkpoint();
+      if (r < 0) T.cols[c].name = v.trim() || `Column ${c + 1}`;
+      else T.rows[r][c].v = v;
+    }
+    // Enter on the last row grows the table — the natural way to keep typing.
+    if (dr > 0 && r === T.rows.length - 1 && r >= 0 && T.rows.length < MAX_ROWS) {
+      if (v === orig) checkpoint();
+      T.rows.push(T.cols.map(() => cell('')));
+    }
+    changed();
+    select(r < 0 && dr > 0 ? 0 : r + dr, c + dc);
+    wrap.focus({ preventScroll: true });
+  }
+  function cancelEdit(silent) {
+    if (!editing) return;
+    editing = null;
+    if (!silent) { render(); wrap.focus({ preventScroll: true }); }
+  }
+  function onEditKey(e) {
+    if (e.key === 'Enter')  { e.preventDefault(); commitEdit(e.shiftKey ? -1 : 1, 0); }
+    else if (e.key === 'Tab') { e.preventDefault(); commitEdit(0, e.shiftKey ? -1 : 1); }
+    else if (e.key === 'Escape') { e.preventDefault(); cancelEdit(); }
+    else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !e.shiftKey) { e.preventDefault(); commitEdit(e.key === 'ArrowUp' ? -1 : 1, 0); }
+    e.stopPropagation();
+  }
+
+  // ── Structural edits ────────────────────────────────────────────────────────
+  function insertRows(at, n = 1) {
+    if (T.rows.length + n > MAX_ROWS) return;
+    checkpoint();
+    T.rows.splice(at, 0, ...Array.from({ length: n }, () => T.cols.map(() => cell(''))));
+    changed(); select(at, sel.ac);
+  }
+  function deleteRows(r0, r1) {
+    checkpoint();
+    T.rows.splice(r0, r1 - r0 + 1);
+    normalise(); clampSel(); changed(); select(Math.min(r0, T.rows.length - 1), sel.ac);
+  }
+  function insertCols(at, n = 1) {
+    if (T.cols.length + n > MAX_COLS) return;
+    checkpoint();
+    T.cols.splice(at, 0, ...Array.from({ length: n }, (_, i) => ({ name: `Column ${T.cols.length + i + 1}` })));
+    T.rows.forEach(row => row.splice(at, 0, ...Array.from({ length: n }, () => cell(''))));
+    changed(); select(Math.max(0, sel.ar), at);
+  }
+  function deleteCols(c0, c1) {
+    checkpoint();
+    T.cols.splice(c0, c1 - c0 + 1);
+    T.rows.forEach(row => row.splice(c0, c1 - c0 + 1));
+    normalise(); clampSel(); changed(); select(Math.max(0, sel.ar), Math.min(c0, T.cols.length - 1));
+  }
+  // Numbers before text, blanks last, either direction. Sorts by displayed
+  // value, so a column of formulas sorts by their results.
+  let lastSort = { c: -1, dir: 1 };
+  function sortBy(c, dir) {
+    if (!canEdit()) return;
+    if (dir == null) dir = lastSort.c === c ? -lastSort.dir : 1;
+    lastSort = { c, dir };
+    checkpoint();
+    cache = new Map();
+    const keyed = T.rows.map((row, r) => ({ row, d: display(r, c) }));
+    keyed.sort((a, b) => {
+      const ea = a.d.text === '', eb = b.d.text === '';
+      if (ea || eb) return ea - eb;
+      const na = asNumber(a.d.text), nb = asNumber(b.d.text);
+      if (na != null && nb != null) return (na - nb) * dir;
+      if (na != null) return -1; if (nb != null) return 1;
+      return a.d.text.localeCompare(b.d.text, undefined, { numeric: true, sensitivity: 'base' }) * dir;
+    });
+    T.rows = keyed.map(k => k.row);
+    changed();
+  }
+  function clearCells() {
+    const b = selBox();
+    if (b.r0 < 0) return;
+    checkpoint();
+    for (let r = b.r0; r <= b.r1; r++) for (let c = b.c0; c <= b.c1; c++) T.rows[r][c].v = '';
+    changed();
+  }
+  function forSel(fn) {
+    const b = selBox();
+    if (b.r0 < 0) return;
+    checkpoint();
+    for (let r = b.r0; r <= b.r1; r++) for (let c = b.c0; c <= b.c1; c++) fn(T.rows[r][c]);
+    changed();
+  }
+  const setHighlight = h => forSel(cl => { if (h) cl.h = h; else delete cl.h; });
+  function toggleCover() {
+    const b = selBox(); if (b.r0 < 0) return;
+    const allCovered = (() => { for (let r = b.r0; r <= b.r1; r++) for (let c = b.c0; c <= b.c1; c++) if (!T.rows[r][c].x) return false; return true; })();
+    forSel(cl => { if (allCovered) { delete cl.x; delete cl.r; } else { cl.x = true; delete cl.r; } });
+  }
+  function revealCell(r, c) {
+    const cl = T.rows[r]?.[c];
+    if (!cl || !cl.x || cl.r) return false;
+    cl.r = true;
+    render(); emitState();
+    cellEl(r, c)?.classList.add('just-revealed');
+    return true;
+  }
+  function revealAll(on) {
+    if (!canEdit()) return;
+    T.rows.forEach(row => row.forEach(cl => { if (cl.x) { if (on) cl.r = true; else delete cl.r; } }));
+    changed();
+  }
+
+  // ── Clipboard ───────────────────────────────────────────────────────────────
+  function selectionMatrix(raw) {
+    const b = selBox();
+    if (b.r0 < 0) return [[T.cols[b.c0].name]];
+    cache = new Map();
+    const out = [];
+    for (let r = b.r0; r <= b.r1; r++) {
+      const row = [];
+      for (let c = b.c0; c <= b.c1; c++) row.push(raw ? T.rows[r][c].v : display(r, c).text);
+      out.push(row);
+    }
+    return out;
+  }
+  function pasteText(text) {
+    if (!canEdit()) return;
+    const m = parseDelimited(text, text.includes('\t') ? '\t' : (/\n/.test(text.trim()) || text.includes(',') && text.includes('"') ? null : '\u0000'));
+    const b = selBox();
+    if (b.r0 < 0) { checkpoint(); T.cols[b.c0].name = m[0][0] || T.cols[b.c0].name; changed(); return; }
+    checkpoint();
+    // One value into a bigger selection fills it, as a spreadsheet does.
+    if (m.length === 1 && m[0].length === 1 && (b.r1 > b.r0 || b.c1 > b.c0)) {
+      for (let r = b.r0; r <= b.r1; r++) for (let c = b.c0; c <= b.c1; c++) T.rows[r][c].v = m[0][0];
+    } else {
+      const needR = Math.min(MAX_ROWS, b.r0 + m.length), needC = Math.min(MAX_COLS, b.c0 + Math.max(...m.map(r => r.length)));
+      while (T.cols.length < needC) T.cols.push({ name: `Column ${T.cols.length + 1}` });
+      while (T.rows.length < needR) T.rows.push([]);
+      normalise();
+      m.forEach((row, i) => row.forEach((v, j) => { if (b.r0 + i < needR && b.c0 + j < needC) T.rows[b.r0 + i][b.c0 + j].v = v; }));
+      sel = { r0: b.r0, c0: b.c0, r1: needR - 1, c1: Math.min(needC, b.c0 + m[0].length) - 1, ar: b.r0, ac: b.c0 };
+    }
+    changed();
+  }
+
+  // ── Import / export ─────────────────────────────────────────────────────────
+  function exportCsv() {
+    cache = new Map();
+    const m = [T.cols.map(c => c.name), ...T.rows.map((row, r) => row.map((_, c) => display(r, c).text))];
+    const blob = new Blob([toCsv(m) + '\n'], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (window.BeamerWidget && BeamerWidget.fileName) ? BeamerWidget.fileName('table', '.csv') : 'table.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+  function importFile(f) {
+    if (!f || !canEdit()) return;
+    const rd = new FileReader();
+    rd.onload = () => { checkpoint(); loadMatrix(parseDelimited(rd.result)); sel = { r0: 0, c0: 0, r1: 0, c1: 0, ar: 0, ac: 0 }; changed(); };
+    rd.readAsText(f);
+  }
+
+  // ── Chart ───────────────────────────────────────────────────────────────────
+  // Grouped bars: one group per row, labelled from the first text column; one
+  // series per column that is mostly numbers. With a multi-column selection,
+  // only those columns are charted. Filtered-out rows are left out.
+  function renderChart() {
+    chartPane.hidden = !T.chart;
+    if (!T.chart) return;
+    cache = new Map();
+    const R = T.rows.length;
+    const visible = [...grid.querySelectorAll('tbody tr:not(.filtered)')].map(tr => +tr.dataset.r);
+    const isNumCol = c => {
+      let n = 0, filled = 0;
+      for (let r = 0; r < R; r++) { const d = display(r, c); if (d.text !== '') { filled++; if (d.num) n++; } }
+      return filled > 0 && n >= filled * 0.6;
+    };
+    const b = selBox();
+    let cols = [...T.cols.keys()].filter(isNumCol);
+    if (b.r0 >= 0 && b.c1 > b.c0) cols = cols.filter(c => c >= b.c0 && c <= b.c1);
+    const labelCol = [...T.cols.keys()].find(c => !isNumCol(c));
+    cols = cols.slice(0, 6);
+    $('chart-title').textContent = cols.length ? cols.map(c => T.cols[c].name).join(' · ') : 'Chart';
+    if (!cols.length) {
+      chartEl.innerHTML = '<div id="chart-msg">No numeric columns to chart yet.</div>';
+      legendEl.innerHTML = '';
+      return;
+    }
+    const rows = visible.filter(r => cols.some(c => display(r, c).num)).slice(0, 60);
+    const vals = rows.map(r => cols.map(c => { const d = display(r, c); return d.num ? asNumber(d.text) : 0; }));
+    const labels = rows.map(r => labelCol != null ? display(r, labelCol).text : String(r + 1));
+    const all = vals.flat();
+    const lo = Math.min(0, ...all), hi = Math.max(0, ...all);
+    const rect = chartEl.getBoundingClientRect();
+    const W = Math.max(140, rect.width), H = Math.max(90, rect.height);
+    const padL = 40, padB = 20, padT = 6, padR = 4;
+    const span = (hi - lo) || 1;
+    const y = v => padT + (H - padT - padB) * (1 - (v - lo) / span);
+    const gw = (W - padL - padR) / Math.max(1, rows.length);
+    const bw = Math.max(1, (gw * 0.78) / cols.length);
+    let svg = '';
+    niceTicks(lo, hi, 4).forEach(t => {
+      svg += `<line class="grid" x1="${padL}" x2="${W - padR}" y1="${y(t).toFixed(1)}" y2="${y(t).toFixed(1)}"/>` +
+             `<text x="${padL - 5}" y="${(y(t) + 3).toFixed(1)}" text-anchor="end">${escHtml(fmtNum(t))}</text>`;
+    });
+    svg += `<line class="axis" x1="${padL}" x2="${W - padR}" y1="${y(0).toFixed(1)}" y2="${y(0).toFixed(1)}"/>`;
+    vals.forEach((vs, i) => {
+      const gx = padL + i * gw + gw * 0.11;
+      vs.forEach((v, j) => {
+        const y0 = y(Math.max(0, v)), h = Math.abs(y(v) - y(0));
+        svg += `<rect x="${(gx + j * bw).toFixed(1)}" y="${y0.toFixed(1)}" width="${Math.max(1, bw - 1).toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" style="fill:${seriesColor(j, cols.length)}"><title>${escHtml(labels[i])} · ${escHtml(T.cols[cols[j]].name)}: ${escHtml(fmtNum(v))}</title></rect>`;
+      });
+    });
+    const every = Math.max(1, Math.ceil(rows.length / Math.max(1, Math.floor((W - padL) / 52))));
+    labels.forEach((l, i) => {
+      if (i % every) return;
+      svg += `<text x="${(padL + (i + 0.5) * gw).toFixed(1)}" y="${H - 5}" text-anchor="middle">${escHtml(l.length > 9 ? l.slice(0, 8) + '…' : l)}</text>`;
+    });
+    chartEl.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${svg}</svg>`;
+    legendEl.innerHTML = cols.length > 1 ? cols.map((c, j) => `<span><i style="background:${seriesColor(j, cols.length)}"></i>${escHtml(T.cols[c].name)}</span>`).join('') : '';
+  }
+  const seriesColor = (j, n) => (n === 1 ? 'var(--chart-3)' : `var(--series-${j + 1})`);
+  function niceTicks(lo, hi, n) {
+    const span = hi - lo || 1, step0 = span / n, mag = 10 ** Math.floor(Math.log10(step0));
+    const step = [1, 2, 5, 10].map(k => k * mag).find(s => s >= step0) || mag * 10;
+    const out = [];
+    for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) out.push(+t.toPrecision(10));
+    return out;
+  }
+
+  // ── Menus ───────────────────────────────────────────────────────────────────
+  function openMenu(menu, x, y) {
+    closeMenus();
+    menu.hidden = false;
+    const r = menu.getBoundingClientRect();
+    menu.style.left = Math.max(4, Math.min(x, innerWidth - r.width - 4)) + 'px';
+    menu.style.top  = Math.max(4, Math.min(y, innerHeight - r.height - 4)) + 'px';
+  }
+  function closeMenus() { ctxMenu.hidden = true; hlMenu.hidden = true; }
+
+  function swatchesHtml() {
+    return `<div class="swatches">${Array.from({ length: HL_COUNT }, (_, i) =>
+      `<button data-hl="${i + 1}" title="Highlight" style="background:color-mix(in srgb, var(--hl-${i + 1}) 45%, transparent)"></button>`).join('')}` +
+      `<button class="none" data-hl="0" title="No highlight">×</button></div>`;
+  }
+
+  function showContext(x, y) {
+    const b = selBox(), header = b.r0 < 0;
+    const nr = b.r1 - b.r0 + 1, nc = b.c1 - b.c0 + 1;
+    const rows = header ? '' :
+      `<button data-m="row-above">Insert row above</button><button data-m="row-below">Insert row below</button>` +
+      `<button data-m="row-del">Delete ${nr > 1 ? nr + ' rows' : 'row'}</button><hr>`;
+    ctxMenu.innerHTML = rows +
+      `<button data-m="col-left">Insert column left</button><button data-m="col-right">Insert column right</button>` +
+      (T.cols.length > nc ? `<button data-m="col-del">Delete ${nc > 1 ? nc + ' columns' : 'column'}</button>` : '') + `<hr>` +
+      `<button data-m="sort-asc">Sort A → Z</button><button data-m="sort-desc">Sort Z → A</button>` +
+      (header ? '' : `<hr>${swatchesHtml()}<button data-m="cover">Cover / uncover</button>` +
+                     `<button data-m="clear">Clear contents<span class="k">Del</span></button>`);
+    openMenu(ctxMenu, x, y);
+  }
+
+  function onMenu(m) {
+    const b = selBox();
+    closeMenus();
+    if (m === 'row-above') insertRows(b.r0);
+    if (m === 'row-below') insertRows(b.r1 + 1);
+    if (m === 'row-del')   deleteRows(b.r0, b.r1);
+    if (m === 'col-left')  insertCols(b.c0);
+    if (m === 'col-right') insertCols(b.c1 + 1);
+    if (m === 'col-del')   deleteCols(b.c0, b.c1);
+    if (m === 'sort-asc')  sortBy(sel.ac, 1);
+    if (m === 'sort-desc') sortBy(sel.ac, -1);
+    if (m === 'cover')     toggleCover();
+    if (m === 'clear')     clearCells();
+    wrap.focus({ preventScroll: true });
+  }
+
+  // ── Mouse ───────────────────────────────────────────────────────────────────
+  let dragging = false;
+  grid.addEventListener('mousedown', e => {
+    if (IS_VIEWER || e.button === 2 && isInSel(e)) return;
+    const sortBtn = e.target.closest('[data-sort]');
+    if (sortBtn) { e.preventDefault(); e.stopPropagation(); sortBy(+sortBtn.dataset.sort); return; }
+    const grip = e.target.closest('[data-grip]');
+    if (grip) { startResize(e, +grip.dataset.grip); return; }
+    if (editing && e.target.closest('.cell-input')) return;
+    const letter = e.target.closest('[data-col]');
+    if (letter) {
+      const c = +letter.dataset.col;
+      if (e.shiftKey && sel.r0 >= 0) { sel.c1 = c; sel.r0 = 0; sel.r1 = T.rows.length - 1; }
+      else sel = { r0: 0, r1: T.rows.length - 1, c0: c, c1: c, ar: 0, ac: c };
+      paintSelection(); renderChart(); wrap.focus({ preventScroll: true }); e.preventDefault(); return;
+    }
+    const gut = e.target.closest('[data-row]');
+    if (gut) {
+      const r = +gut.dataset.row;
+      if (e.shiftKey && sel.r0 >= 0) { sel.r1 = r; sel.c0 = 0; sel.c1 = T.cols.length - 1; }
+      else sel = { r0: r, r1: r, c0: 0, c1: T.cols.length - 1, ar: r, ac: 0 };
+      paintSelection(); renderChart(); wrap.focus({ preventScroll: true }); e.preventDefault(); return;
+    }
+    const td = e.target.closest('td[data-r], th[data-r]');
+    if (!td) return;
+    e.preventDefault();
+    commitEdit();
+    const r = +td.dataset.r, c = +td.dataset.c;
+    select(r, c, e.shiftKey);
+    wrap.focus({ preventScroll: true });
+    // A click on a covered cell is the reveal — the presenter's main gesture.
+    if (r >= 0 && !e.shiftKey && T.rows[r][c].x && !T.rows[r][c].r) { revealCell(r, c); select(r, c); return; }
+    dragging = r >= 0;
+  });
+  function isInSel(e) {
+    const td = e.target.closest('td[data-r]'); if (!td) return false;
+    const b = selBox(), r = +td.dataset.r, c = +td.dataset.c;
+    return r >= b.r0 && r <= b.r1 && c >= b.c0 && c <= b.c1;
+  }
+  grid.addEventListener('mouseover', e => {
+    if (!dragging) return;
+    const td = e.target.closest('td[data-r]'); if (!td) return;
+    sel.r1 = +td.dataset.r; sel.c1 = +td.dataset.c;
+    paintSelection();
+  });
+  addEventListener('mouseup', () => { if (dragging) { dragging = false; if (T.chart) renderChart(); } });
+  grid.addEventListener('dblclick', e => {
+    const td = e.target.closest('td[data-r], th[data-r]');
+    if (td && !e.target.closest('[data-sort], [data-grip]')) startEdit(+td.dataset.r, +td.dataset.c);
+  });
+  grid.addEventListener('contextmenu', e => {
+    if (!canEdit()) return;
+    const td = e.target.closest('td[data-r], th[data-r], [data-col], [data-row]');
+    if (!td) return;
+    e.preventDefault();
+    if (td.matches('td, th[data-r]') && !isInSel(e)) select(+td.dataset.r, +td.dataset.c);
+    showContext(e.clientX, e.clientY);
+  });
+
+  function startResize(e, c) {
+    e.preventDefault(); e.stopPropagation();
+    const th = cellEl(-1, c), x0 = e.clientX, w0 = th.getBoundingClientRect().width;
+    const before = snapshot();
+    const move = ev => { T.cols[c].w = Math.max(48, Math.min(900, Math.round(w0 + ev.clientX - x0))); render(); };
+    const up = () => {
+      removeEventListener('mousemove', move); removeEventListener('mouseup', up);
+      if (snapshot() !== before) { undoStack.push(before); redoStack = []; pristine = false; emitState(); render(); }
+    };
+    addEventListener('mousemove', move); addEventListener('mouseup', up);
+  }
+
+  ctxMenu.addEventListener('mousedown', e => e.preventDefault());
+  hlMenu.addEventListener('mousedown', e => e.preventDefault());
+  ctxMenu.addEventListener('click', e => {
+    const hl = e.target.closest('[data-hl]'); if (hl) { closeMenus(); setHighlight(+hl.dataset.hl); return; }
+    const b = e.target.closest('[data-m]'); if (b) onMenu(b.dataset.m);
+  });
+  hlMenu.addEventListener('click', e => {
+    const hl = e.target.closest('[data-hl]'); if (hl) { closeMenus(); setHighlight(+hl.dataset.hl); wrap.focus({ preventScroll: true }); }
+  });
+  addEventListener('mousedown', e => { if (!e.target.closest('.menu')) closeMenus(); }, true);
+
+  // ── Keyboard ────────────────────────────────────────────────────────────────
+  wrap.addEventListener('keydown', e => {
+    if (editing || IS_VIEWER) return;
+    const mod = e.ctrlKey || e.metaKey;
+    if (mod && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+    if (mod && (e.key === 'y' || e.key === 'Y')) { e.preventDefault(); redo(); return; }
+    if (mod && (e.key === 'a' || e.key === 'A')) { e.preventDefault(); sel = { r0: 0, c0: 0, r1: T.rows.length - 1, c1: T.cols.length - 1, ar: sel.ar, ac: sel.ac }; paintSelection(); return; }
+    if (mod) return;   // copy / cut / paste arrive as clipboard events
+    const moves = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+    if (moves[e.key]) {
+      e.preventDefault();
+      const [dr, dc] = moves[e.key];
+      if (e.shiftKey && sel.r0 >= 0) {
+        sel.r1 = Math.max(0, Math.min(T.rows.length - 1, sel.r1 + dr));
+        sel.c1 = Math.max(0, Math.min(T.cols.length - 1, sel.c1 + dc));
+        paintSelection(); scrollIntoView(sel.r1, sel.c1);
+      } else select(sel.ar + dr, sel.ac + dc);
+      return;
+    }
+    if (e.key === 'Tab')    { e.preventDefault(); select(sel.ar, sel.ac + (e.shiftKey ? -1 : 1)); return; }
+    if (e.key === 'Escape') { closeMenus(); select(sel.ar, sel.ac); return; }
+    if (!canEdit()) return;
+    if (e.key === 'Enter' || e.key === 'F2') { e.preventDefault(); startEdit(sel.ar, sel.ac); return; }
+    if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); clearCells(); return; }
+    if (e.key === ' ' && sel.ar >= 0 && T.rows[sel.ar][sel.ac].x) { e.preventDefault(); revealCell(sel.ar, sel.ac); select(sel.ar, sel.ac); return; }
+    // Typing over a cell starts editing it with that character, as in Excel.
+    if (e.key.length === 1 && !e.altKey) { e.preventDefault(); startEdit(sel.ar, sel.ac, e.key); }
+  });
+  document.addEventListener('copy', e => {
+    if (editing || IS_VIEWER || document.activeElement === filterIn) return;
+    e.preventDefault();
+    e.clipboardData.setData('text/plain', selectionMatrix(false).map(r => r.join('\t')).join('\n'));
+  });
+  document.addEventListener('cut', e => {
+    if (editing || !canEdit() || document.activeElement === filterIn) return;
+    e.preventDefault();
+    e.clipboardData.setData('text/plain', selectionMatrix(true).map(r => r.join('\t')).join('\n'));
+    clearCells();
+  });
+  document.addEventListener('paste', e => {
+    if (editing || !canEdit() || document.activeElement === filterIn) return;
+    const text = e.clipboardData?.getData('text/plain');
+    if (text == null) return;
+    e.preventDefault();
+    pasteText(text);
+  });
+
+  // ── Toolbar ─────────────────────────────────────────────────────────────────
+  $('add-row').addEventListener('click', () => insertRows(T.rows.length));
+  $('add-col').addEventListener('click', () => insertCols(T.cols.length));
+  $('hl-btn').addEventListener('click', e => {
+    hlMenu.innerHTML = swatchesHtml();
+    const r = e.currentTarget.getBoundingClientRect();
+    openMenu(hlMenu, r.left, r.bottom + 4);
+  });
+  $('hide-btn').addEventListener('click', () => { toggleCover(); wrap.focus({ preventScroll: true }); });
+  $('reveal-all').addEventListener('click', () => revealAll(true));
+  $('cover-all').addEventListener('click', () => revealAll(false));
+  undoBtn.addEventListener('click', undo);
+  redoBtn.addEventListener('click', redo);
+  chartBtn.addEventListener('click', () => { if (IS_VIEWER) return; T.chart = !T.chart; render(); emitState(); });
+  $('import-btn').addEventListener('click', () => fileIn.click());
+  fileIn.addEventListener('change', () => { importFile(fileIn.files[0]); fileIn.value = ''; });
+  $('export-btn').addEventListener('click', exportCsv);
+  // Filtering is a view, not an edit: no undo step, but it does sync, so the
+  // room sees the same rows the presenter does.
+  filterIn.addEventListener('input', () => { if (IS_VIEWER) return; T.filter = filterIn.value; render(); emitState(); });
+
+  // ── Socket.IO sync ──────────────────────────────────────────────────────────
+  let socket = null, syncTimer = null;
+
+  function initSocket(url) {
+    if (typeof io === 'undefined') { socket = { emit() {}, on() {} }; return; }
+    try {
+      const prev = socket;
+      socket = io(url || (window.BeamerWidget ? BeamerWidget.serverOrigin() : ''),
+                  { transports: ['websocket', 'polling'] });
+      if (prev && prev.disconnect) prev.disconnect();
+      socket.on('widget_state', data => {
+        if (!IS_VIEWER || data?.widgetId !== WIDGET_ID) return;
+        applyState(data.state || {});
+      });
+    } catch (_) {
+      socket = { emit() {}, on() {} };
+    }
+  }
+
+  function emitState() {
+    if (!socket || IS_VIEWER) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => socket.emit('widget_state', { widgetId: WIDGET_ID, state: getState(true) }), 150);
+  }
+
+  // ── State serialisation ─────────────────────────────────────────────────────
+  // Same shape for live sync and for saving with the deck. Undo history is
+  // not saved: it belongs to this sitting, not to the slide.
+  // `redact`: for the room's devices. A covered answer is blanked before it
+  // leaves the presenter, so it can't be read out of a viewer's page; the
+  // copy saved with the deck keeps it.
+  function getState(redact) {
+    return { v: 1, cols: T.cols, rows: T.rows.map(r => r.map(c => (c.x && !c.r && redact ? { ...c, v: '' } : c.h || c.x || c.r ? c : c.v))),
+             chart: T.chart, filter: T.filter };
+  }
+
+  function applyState(s) {
+    if (!s || !Array.isArray(s.cols) || !Array.isArray(s.rows)) return;
+    T.cols = s.cols.slice(0, MAX_COLS).map((c, i) => ({ name: String(c?.name ?? `Column ${i + 1}`), ...(c?.w ? { w: +c.w } : {}) }));
+    T.rows = s.rows.slice(0, MAX_ROWS).map(r => (Array.isArray(r) ? r : []).map(c =>
+      (c && typeof c === 'object') ? { v: String(c.v ?? ''), ...(c.h ? { h: c.h } : {}), ...(c.x ? { x: true } : {}), ...(c.r ? { r: true } : {}) } : cell(c)));
+    T.chart  = !!s.chart;
+    T.filter = typeof s.filter === 'string' ? s.filter : '';
+    pristine = false;
+    normalise(); clampSel();
+    render();
+  }
+
+  // ── Config ──────────────────────────────────────────────────────────────────
+  // The CSV setting is the table's starting point: it replaces the data when
+  // it is changed in the settings, or when nothing has been edited yet, but
+  // a re-sent config never wipes edits made on the slide.
+  let lastCsv = null;
+  function applyConfig(c) {
+    if (!c) return;
+    const prevUrl = cfg.socketUrl;
+    cfg = { ...cfg, ...c };
+    WIDGET_ID = cfg.id || cfg.widgetId || WIDGET_ID;
+    IS_VIEWER = cfg.role === 'viewer' || IS_VIEWER;
+    const csv = typeof cfg.csv === 'string' ? cfg.csv : '';
+    if (csv !== lastCsv) {
+      if (csv.trim() && (pristine || lastCsv !== null)) {
+        if (!pristine) checkpoint();
+        loadMatrix(parseDelimited(csv));
+        if (lastCsv === null) pristine = true;
+      }
+      lastCsv = csv;
+    }
+    if (cfg.socketUrl && cfg.socketUrl !== prevUrl) initSocket(cfg.socketUrl);
+    render();
+    if (!IS_VIEWER && lastCsv !== null) emitState();
+  }
+
+  function destroy() {
+    clearTimeout(syncTimer);
+    clearTimeout(resizeTimer);
+    if (ro) ro.disconnect();
+    if (socket && socket.disconnect) socket.disconnect();
+    socket = null;
+  }
+
+  // ── Beamer+ message bridge ──────────────────────────────────────────────────
+  window.addEventListener('message', e => {
+    const d = e.data || {};
+    if (d.type === 'widget-config')  applyConfig(d.config);
+    if (d.type === 'widget-cleanup') destroy();
+    if (d.type === 'widget-get-state') {
+      window.parent.postMessage({ type: 'widget-state', widgetId: WIDGET_ID, state: getState() }, '*');
+    }
+    if (d.type === 'widget-set-state' && d.state) applyState(d.state);
+  });
+
+  let resizeTimer = null, ro = null;
+  try {
+    ro = new ResizeObserver(() => { clearTimeout(resizeTimer); resizeTimer = setTimeout(renderChart, 60); });
+    ro.observe(chartEl);
+  } catch (_) { /* fixed size is fine */ }
+
+  // The text-size stepper changes --u, which the default column width and
+  // row height are built from.
+  try { new MutationObserver(() => { if (!editing) render(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['style'] }); }
+  catch (_) { /* no live resize on old engines */ }
+
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // ── Boot ────────────────────────────────────────────────────────────────────
+  blankTable();
+  initSocket(CFG0.socketUrl);
+  applyConfig(CFG0);
+  render();
+
+  // The shared bar's reset means back to the starting data, not a reload.
+  function resetTable() {
+    if (!canEdit()) return;
+    checkpoint();
+    const csv = typeof cfg.csv === 'string' ? cfg.csv : '';
+    if (csv.trim()) loadMatrix(parseDelimited(csv)); else blankTable();
+    T.filter = ''; sel = { r0: 0, c0: 0, r1: 0, c1: 0, ar: 0, ac: 0 };
+    changed();
+  }
+  (function wireReset(tries) {
+    if (window.BeamerWidget && BeamerWidget.topbar) { BeamerWidget.topbar.onReset(resetTable); return; }
+    if (tries > 0) setTimeout(() => wireReset(tries - 1), 120);
+  })(20);
+})();
+</script>
+</body>
+</html>

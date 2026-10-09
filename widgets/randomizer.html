@@ -1,0 +1,1522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script id="widget-schema" type="application/json">
+{
+  "label": "Randomizer",
+  "category": "Tools",
+  "fields": [
+    { "key": "mode", "label": "Starts as", "type": "select", "default": "dice",
+      "options": [
+        { "v": "dice",    "l": "Dice" },
+        { "v": "coin",    "l": "Coin" },
+        { "v": "bag",     "l": "Bag of balls" },
+        { "v": "spinner", "l": "Spinner" },
+        { "v": "cards",   "l": "Deck of cards" },
+        { "v": "number",  "l": "Random number" },
+        { "v": "list",    "l": "Name / list picker" },
+        { "v": "dist",    "l": "Distribution sampler" }
+      ] },
+    { "key": "items", "label": "List items (one per line)", "type": "textarea-lines", "rows": 5,
+      "placeholder": "Ada\nGrace\nAlan\n…", "showIf": { "mode": "list" } },
+    { "key": "seed", "label": "Seed (same results every time)", "type": "text",
+      "placeholder": "Blank = truly random" },
+    { "key": "animate", "label": "Animate", "type": "checkbox", "default": true }
+  ]
+}
+</script>
+<!-- Standalone fallback. Inside Beamer+ the host injects the shared widget
+     base ahead of everything else; opened directly, load the same stylesheet
+     from the repo at the same point in the cascade. -->
+<script id="bw-standalone">
+(function () {
+  if (document.querySelector('link[href*="widget-base.css"]')) return;
+  var head = document.head || document.getElementsByTagName('head')[0];
+  [['preconnect', 'https://fonts.googleapis.com'],
+   ['stylesheet', 'https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@400;500;600&display=swap'],
+   ['stylesheet', '../static/css/widget-base.css']].forEach(function (l) {
+    var el = document.createElement('link');
+    el.rel = l[0]; el.href = l[1];
+    head.appendChild(el);
+  });
+  document.documentElement.setAttribute('data-bw-standalone', '');
+})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Randomizer — Beamer+</title>
+
+<!-- Vendored by the Beamer+ server. Never call io() bare. -->
+<script src="/static/vendor/socket.io.min.js"></script>
+
+<style>
+/* Tokens, reset, toolbar, buttons and inputs come from the shared widget base
+   (static/css/widget-base.css). What's left here is the randomizer itself: a
+   setup strip for the current mode, the result as large as the region allows,
+   a history strip, and an observed-vs-expected chart beside it. */
+
+html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
+
+/* Ball and spinner colours are data — a red ball is red in either theme — so
+   they are fixed hues rather than tokens. Chosen to stay distinct on white
+   and on the dark deck background alike. */
+:root {
+  --hue-0: #e5484d; --hue-1: #3e63dd; --hue-2: #30a46c; --hue-3: #f5a524;
+  --hue-4: #8e4ec6; --hue-5: #12a594; --hue-6: #e93d82; --hue-7: #8b8d98;
+}
+
+/* ── Toolbar ────────────────────────────────────────────── */
+#mode-sel { width: auto; height: var(--ctl-h); padding: 0 8px; }
+#runs-sel { width: auto; height: var(--ctl-h); padding: 0 6px; font-family: var(--font-mono); }
+#go-btn   { min-width: 72px; }
+
+/* ── Setup strip (presenter only) ───────────────────────── */
+#setup {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  padding: 7px var(--pad-x);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-subtle);
+  font-size: var(--fs-chrome);
+  color: var(--text-2);
+  min-height: 40px;
+}
+#setup[hidden] { display: none; }
+#setup label { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+#setup .bw-input, #setup .bw-select { width: auto; height: 26px; padding: 0 7px; background: var(--bg); }
+#setup input[type=number] { width: 64px; font-family: var(--font-mono); }
+#setup input.wide { width: min(340px, 50vw); }
+#setup .bw-btn { height: 26px; }
+#setup input[type=checkbox] { accent-color: var(--text); }
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 26px; padding: 0 4px 0 6px;
+  border: 1px solid var(--border-med); border-radius: 13px; background: var(--bg);
+}
+.chip .sw { width: 12px; height: 12px; border-radius: 50%; }
+.chip .n  { min-width: 18px; text-align: center; font-family: var(--font-mono); color: var(--text); }
+.chip button {
+  width: 20px; height: 20px; border: 0; border-radius: 50%; background: none;
+  color: var(--text-2); cursor: pointer; font: inherit; line-height: 1;
+}
+.chip button:hover { background: var(--accent-bg); color: var(--text); }
+
+/* ── Body: stage + stats ────────────────────────────────── */
+#app { flex: 1 1 auto; min-height: 0; display: flex; }
+#stage { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; position: relative; }
+#stats {
+  flex: 0 0 40%;
+  min-width: 0;
+  display: flex; flex-direction: column;
+  border-left: 1px solid var(--border);
+  padding: 12px 14px 10px;
+  gap: 8px;
+}
+#stats[hidden] { display: none; }
+@media (max-width: 640px) {
+  #app { flex-direction: column; }
+  #stats { flex-basis: 42%; border-left: 0; border-top: 1px solid var(--border); }
+}
+.stats-head { display: flex; align-items: baseline; gap: 10px; }
+#stats-title { text-transform: none; letter-spacing: 0.02em; }
+.stats-sum  { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--text-2); }
+.stats-sum strong { color: var(--text); font-weight: 500; }
+#chart { flex: 1 1 auto; min-height: 0; position: relative; }
+#chart svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+#chart .bar    { fill: var(--text-3); }
+#chart .bar.hl { fill: var(--text); }
+#chart .exp    { stroke: var(--warn); stroke-width: 2.5; stroke-linecap: round; }
+#chart .axis   { stroke: var(--border-med); stroke-width: 1; }
+#chart text    { fill: var(--text-2); font-family: var(--font-mono); font-size: 10px; }
+.legend { display: flex; gap: 14px; font-size: var(--fs-chrome-sm); color: var(--text-2); }
+.legend i { display: inline-block; width: 10px; height: 10px; margin-right: 5px; vertical-align: -1px; }
+.legend .l-obs i { background: var(--text-3); border-radius: 2px; }
+.legend .l-exp i { height: 0; border-top: 2.5px solid var(--warn); vertical-align: 3px; }
+
+/* ── Result area ────────────────────────────────────────── */
+#result {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(10px * var(--u));
+  padding: 16px 20px 8%;     /* bias slightly above true centre */
+  overflow: hidden;
+  --sz: 120px;
+}
+.items { display: flex; flex-wrap: wrap; justify-content: center; align-content: center; gap: calc(var(--sz) * 0.16); }
+.caption { font-family: var(--font-mono); font-size: var(--fs-lead); color: var(--text-2); text-align: center; }
+.caption strong { color: var(--text); font-weight: 500; }
+.big {
+  font-family: var(--font-mono); font-weight: 500; line-height: 1; letter-spacing: -0.02em;
+  color: var(--text); text-align: center; word-break: break-word;
+}
+.big.name { font-family: var(--font-ui); letter-spacing: -0.01em; line-height: 1.1; }
+
+/* Dice */
+.die { width: var(--sz); height: var(--sz); }
+.die svg { width: 100%; height: 100%; overflow: visible; }
+.die .body { fill: var(--bg); stroke: var(--text); stroke-width: 4; stroke-linejoin: round; }
+.die .pip  { fill: var(--text); }
+.die .num  { fill: var(--text); font-family: var(--font-mono); font-weight: 500; text-anchor: middle; dominant-baseline: central; }
+.die .kind { fill: var(--text-3); font-family: var(--font-mono); font-size: 11px; text-anchor: middle; }
+
+/* Coins */
+.coin {
+  width: var(--sz); height: var(--sz); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-weight: 600; font-size: calc(var(--sz) * 0.42);
+  border: calc(var(--sz) * 0.04) solid var(--text);
+  user-select: none;
+}
+.coin.h { background: var(--text); color: var(--bg); }
+.coin.t { background: var(--bg);   color: var(--text); }
+
+/* Balls */
+.ball {
+  width: var(--sz); height: var(--sz); border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.45), rgba(255,255,255,0) 45%), var(--c);
+  box-shadow: inset 0 -4px 10px rgba(0,0,0,0.18);
+}
+.bag {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 5px;
+  max-width: min(560px, 90%);
+  padding: 9px 12px; border: 1px dashed var(--border-med); border-radius: 18px;
+}
+.bag .ball { --sz: calc(14px * var(--u)); box-shadow: none; }
+.bag-empty { font-size: var(--fs-small); color: var(--text-3); }
+
+/* Cards */
+.card {
+  width: calc(var(--sz) * 0.72); height: var(--sz);
+  border: 2px solid var(--text); border-radius: calc(var(--sz) * 0.07);
+  background: var(--bg);
+  display: grid; grid-template-rows: auto 1fr auto; padding: calc(var(--sz) * 0.05) calc(var(--sz) * 0.07);
+  font-family: var(--font-ui); font-weight: 600; color: var(--text); user-select: none;
+}
+.card.red { color: var(--red); }
+.card .corner { font-size: calc(var(--sz) * 0.16); line-height: 1; }
+.card .corner.b { transform: rotate(180deg); }
+.card .mid { display: flex; align-items: center; justify-content: center; font-size: calc(var(--sz) * 0.38); line-height: 1; }
+
+/* Spinner */
+#wheel-wrap { position: relative; width: var(--sz); height: var(--sz); }
+#wheel-wrap svg { width: 100%; height: 100%; overflow: visible; }
+#wheel { transform-origin: 50px 50px; }
+#wheel.spinning { transition: transform 3.4s cubic-bezier(0.12, 0.7, 0.12, 1); }
+#wheel .seg   { stroke: var(--bg); stroke-width: 0.6; }
+#wheel text   { fill: #fff; font-family: var(--font-ui); font-weight: 600; text-anchor: middle; dominant-baseline: central; }
+.pointer      { fill: var(--text); }
+.hub          { fill: var(--bg); stroke: var(--text); stroke-width: 1.2; }
+
+/* Lists: shuffled order and groups */
+.order {
+  columns: auto calc(170px * var(--u)); column-gap: 28px;
+  max-width: 100%; max-height: 100%; overflow: auto;
+  font-size: var(--fs-body); color: var(--text);
+}
+.order li { list-style: none; break-inside: avoid; padding: 2px 0; }
+.order li span { display: inline-block; min-width: 2.2em; color: var(--text-3); font-family: var(--font-mono); font-size: 0.85em; }
+.groups {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(calc(150px * var(--u)), 1fr));
+  gap: 10px; width: 100%; max-height: 100%; overflow: auto; align-content: center;
+}
+.group h4 { font-size: var(--fs-chrome-sm); font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin-bottom: 4px; }
+.group div { font-size: var(--fs-body); color: var(--text); line-height: 1.35; }
+
+.msg { font-size: var(--fs-body); color: var(--text-2); text-align: center; max-width: 34em; }
+
+/* ── History ────────────────────────────────────────────── */
+#history {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px var(--pad-x);
+  border-top: 1px solid var(--border);
+  overflow: hidden;
+  white-space: nowrap;
+  min-height: 38px;
+}
+#history .bw-hint { margin-right: 4px; }
+.h-item {
+  flex: 0 0 auto;
+  font-family: var(--font-mono); font-size: var(--fs-small); color: var(--text-3);
+  display: inline-flex; align-items: center; gap: 3px;
+}
+.h-item:first-of-type { color: var(--text); font-weight: 500; }
+.h-item .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
+.h-item + .h-item::before { content: '·'; color: var(--border-med); margin-right: 3px; }
+
+/* ── List editor overlay ────────────────────────────────── */
+#list-editor {
+  position: absolute; inset: 0; z-index: 5;
+  display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  padding: 20px;
+}
+#list-editor[hidden] { display: none; }
+#list-editor .bw-card { width: min(460px, 100%); display: flex; flex-direction: column; gap: 10px; background: var(--bg); box-shadow: 0 8px 30px rgba(0,0,0,0.12); }
+#list-editor textarea { height: 220px; }
+#list-editor .row { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+#list-editor .row .bw-hint { margin-right: auto; }
+
+#viewer-badge {
+  position: absolute; right: 10px; bottom: 8px;
+  font-size: var(--fs-chrome-sm); color: var(--text-3); pointer-events: none;
+}
+
+/* ── Motion ─────────────────────────────────────────────── */
+@keyframes tumble {
+  0%   { transform: rotate(0deg)   translateY(0); }
+  25%  { transform: rotate(-14deg) translateY(-6%); }
+  50%  { transform: rotate(10deg)  translateY(0); }
+  75%  { transform: rotate(-6deg)  translateY(-3%); }
+  100% { transform: rotate(0deg)   translateY(0); }
+}
+@keyframes flip { from { transform: rotateY(0); } to { transform: rotateY(1080deg); } }
+@keyframes pop  { 0% { transform: translateY(-40%) scale(0.2); opacity: 0; } 70% { transform: translateY(4%) scale(1.06); opacity: 1; } 100% { transform: none; } }
+@keyframes deal { from { transform: translateY(-18%) rotateY(90deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.anim .die  { animation: tumble 0.16s linear infinite; }
+.anim .coin { animation: flip 0.75s cubic-bezier(0.3, 0.6, 0.4, 1) both; }
+.drop .items .ball { animation: pop 0.38s ease-out both; }
+.drop .card { animation: deal 0.32s ease-out both; }
+.fade       { animation: fade 0.25s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .anim .die, .anim .coin, .drop .items .ball, .drop .card, .fade { animation: none !important; }
+  #wheel.spinning { transition-duration: 0.01s; }
+}
+</style>
+</head>
+<body>
+<div id="shell" class="bw-shell">
+
+  <div id="toolbar" class="bw-toolbar" data-bw-topbar>
+    <span class="bw-toolbar-title">Randomizer</span>
+    <div class="bw-sep"></div>
+    <select class="bw-select" id="mode-sel" title="What to randomize">
+      <option value="dice">Dice</option>
+      <option value="coin">Coin</option>
+      <option value="bag">Bag of balls</option>
+      <option value="spinner">Spinner</option>
+      <option value="cards">Cards</option>
+      <option value="number">Number</option>
+      <option value="list">List</option>
+      <option value="dist">Distribution</option>
+    </select>
+    <div class="bw-spacer"></div>
+    <select class="bw-select" id="runs-sel" title="Repeat this many times at once">
+      <option value="1">×1</option>
+      <option value="10">×10</option>
+      <option value="100">×100</option>
+      <option value="1000">×1000</option>
+    </select>
+    <button class="bw-btn" id="stats-btn" title="Observed vs expected (S)">Stats</button>
+    <button class="bw-btn bw-btn--primary" id="go-btn" title="Go (Space)">Roll</button>
+  </div>
+
+  <div id="setup"></div>
+
+  <div id="app">
+    <div id="stage">
+      <div id="result"></div>
+      <div id="history"></div>
+      <div id="list-editor" hidden>
+        <div class="bw-card bw-card--lg">
+          <div class="bw-hint">One item per line</div>
+          <textarea class="bw-textarea" id="list-text" spellcheck="false"></textarea>
+          <div class="row">
+            <span class="bw-hint" id="list-count"></span>
+            <button class="bw-btn" id="list-cancel">Cancel</button>
+            <button class="bw-btn bw-btn--primary" id="list-done">Done</button>
+          </div>
+        </div>
+      </div>
+      <div id="viewer-badge" hidden>View-only · synced with presenter</div>
+    </div>
+    <div id="stats" hidden>
+      <div class="stats-head">
+        <span class="bw-hint" id="stats-title">Results</span>
+        <div class="bw-spacer"></div>
+        <span class="stats-sum" id="stats-sum"></span>
+      </div>
+      <div id="chart"></div>
+      <div class="legend" id="legend">
+        <span class="l-obs"><i></i>observed</span>
+        <span class="l-exp"><i></i>expected</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>
+(function () {
+  'use strict';
+
+  // ── Config ──────────────────────────────────────────────────────────────────
+  const _qs       = new URLSearchParams(location.search);
+  const CFG0      = window.WIDGET_CONFIG || {};
+  let   cfg       = { ...CFG0 };
+  let   WIDGET_ID = CFG0.id || CFG0.widgetId || 'randomizer';
+  let   IS_VIEWER = CFG0.role === 'viewer' || _qs.get('viewer') === '1';
+
+  const MODES     = ['dice', 'coin', 'bag', 'spinner', 'cards', 'number', 'list', 'dist'];
+  const VERB      = { dice: 'Roll', coin: 'Flip', bag: 'Draw', spinner: 'Spin', cards: 'Draw',
+                      number: 'Generate', list: 'Pick', dist: 'Sample' };
+  const HUES      = 8;
+  const HUE_NAMES = ['Red', 'Blue', 'Green', 'Amber', 'Purple', 'Teal', 'Pink', 'Grey'];
+  const SUITS     = ['♠', '♥', '♦', '♣'];
+  const RANKS     = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+  const HIST_CAP  = 60;
+
+  // ── DOM ─────────────────────────────────────────────────────────────────────
+  const $ = id => document.getElementById(id);
+  const modeSel   = $('mode-sel');
+  const runsSel   = $('runs-sel');
+  const statsBtn  = $('stats-btn');
+  const goBtn     = $('go-btn');
+  const setupEl   = $('setup');
+  const resultEl  = $('result');
+  const historyEl = $('history');
+  const statsEl   = $('stats');
+  const statsTtl  = $('stats-title');
+  const statsSum  = $('stats-sum');
+  const chartEl   = $('chart');
+  const legendEl  = $('legend');
+  const listEd    = $('list-editor');
+  const listText  = $('list-text');
+  const listCount = $('list-count');
+
+  // ── State ───────────────────────────────────────────────────────────────────
+  // Everything a viewer or a reopened deck needs lives in S; the DOM is a
+  // projection of it. Pools (what's left in the bag, the deck, the list) are
+  // kept per mode so switching modes and back doesn't refill anything.
+  const S = {
+    mode: 'dice',
+    runs: 1,
+    showStats: false,
+    setup: {
+      dice:    { n: 2, sides: 6 },
+      coin:    { n: 1, p: 0.5 },
+      bag:     { balls: [{ c: 0, n: 3 }, { c: 1, n: 2 }, { c: 2, n: 1 }], replace: false, k: 1 },
+      spinner: { text: 'A, B, C, D' },
+      cards:   { replace: false, k: 1 },
+      number:  { min: 1, max: 100, decimals: 0, unique: false },
+      list:    { items: ['Ada', 'Grace', 'Alan', 'Katherine', 'Edsger', 'Barbara', 'Donald', 'Margaret'],
+                 remove: true, groupBy: 'count', groupN: 3 },
+      dist:    { kind: 'normal', mu: 0, sigma: 1, a: 0, b: 1, lambda: 1, n: 10, p: 0.5 },
+    },
+    pool:    { bag: null, cards: null, number: [], list: null },
+    last:    {},            // mode → last outcome (shape depends on mode)
+    history: {},            // mode → newest-first display items
+    stats:   {},            // mode → { sig, counts, total, sum, sumsq }
+    rng:     0,             // PRNG state, so a seeded demo continues where it was
+    rollId:  0,             // bumps on every action, so a viewer knows to animate
+    spin:    0,             // spinner wheel angle, degrees, only ever increases
+  };
+
+  // ── Random numbers ──────────────────────────────────────────────────────────
+  // mulberry32: small, fast, good enough for a classroom, and its whole state
+  // is one integer — which is what makes a seeded demo replay exactly and lets
+  // a saved deck carry on from the same point.
+  function hashSeed(str) {
+    let h = 1779033703 ^ str.length;
+    for (let i = 0; i < str.length; i++) {
+      h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+      h = (h << 13) | (h >>> 19);
+    }
+    return (h >>> 0) || 1;
+  }
+  function freshSeed() {
+    const seed = String(cfg.seed || '').trim();
+    if (seed) return hashSeed(seed);
+    try { return crypto.getRandomValues(new Uint32Array(1))[0] || 1; }
+    catch (_) { return (Math.random() * 4294967296) >>> 0 || 1; }
+  }
+  function rand() {
+    let t = (S.rng = (S.rng + 0x6D2B79F5) >>> 0);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+  const randInt = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));
+  function randNormal() {
+    let u = 0; while (u === 0) u = rand();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand());
+  }
+  function shuffle(a) {
+    for (let i = a.length - 1; i > 0; i--) { const j = randInt(0, i); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  }
+  // Index into weights by one draw.
+  function pickWeighted(w) {
+    const tot = w.reduce((s, x) => s + x, 0);
+    let r = rand() * tot;
+    for (let i = 0; i < w.length; i++) { r -= w[i]; if (r < 0) return i; }
+    return w.length - 1;
+  }
+
+  // ── Mode setups ─────────────────────────────────────────────────────────────
+  function clamp(v, lo, hi, d) { v = Number(v); return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d; }
+
+  function spinnerSectors() {
+    // "Red, Blue, Green:2" — a trailing :n weights a sector.
+    const out = String(S.setup.spinner.text || '').split(/[,\n]/).map(s => s.trim()).filter(Boolean).map(s => {
+      const m = s.match(/^(.*?)\s*:\s*(\d+(?:\.\d+)?)$/);
+      return m ? { label: m[1] || '?', w: Math.max(0.0001, +m[2]) } : { label: s, w: 1 };
+    });
+    return out.length ? out.slice(0, 24) : [{ label: 'A', w: 1 }, { label: 'B', w: 1 }];
+  }
+
+  function fullBag()  { return S.setup.bag.balls.map(b => b.n); }
+  function fullDeck() { return Array.from({ length: 52 }, (_, i) => i); }
+  function fullList() { return S.setup.list.items.slice(); }
+  function refill(mode) {
+    if (mode === 'bag')    S.pool.bag    = fullBag();
+    if (mode === 'cards')  S.pool.cards  = fullDeck();
+    if (mode === 'number') S.pool.number = [];
+    if (mode === 'list')   S.pool.list   = fullList();
+  }
+  function ensurePools() {
+    if (!Array.isArray(S.pool.bag) || S.pool.bag.length !== S.setup.bag.balls.length) S.pool.bag = fullBag();
+    if (!Array.isArray(S.pool.cards))  S.pool.cards  = fullDeck();
+    if (!Array.isArray(S.pool.number)) S.pool.number = [];
+    if (!Array.isArray(S.pool.list))   S.pool.list   = fullList();
+  }
+
+  // Whether repeating many times at once makes sense: not when every draw
+  // changes what's left (that's the point of the demo), nor for a name picker.
+  function canRepeat(mode = S.mode) {
+    if (mode === 'list') return false;
+    if (mode === 'bag' || mode === 'cards') return !!S.setup[mode].replace;
+    if (mode === 'number') return !S.setup.number.unique || S.setup.number.decimals > 0;
+    return true;
+  }
+
+  // ── Probability models ──────────────────────────────────────────────────────
+  // For each mode with a chart: the bins, the expected probability of each,
+  // which bin an outcome lands in, and the expected mean where one means
+  // something. Built from the current setup; a changed setup starts the
+  // tally over, since the old counts were for a different experiment.
+  function erf(x) {
+    const s = Math.sign(x); x = Math.abs(x);
+    const t = 1 / (1 + 0.3275911 * x);
+    const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x);
+    return s * y;
+  }
+  const normCdf = (x, mu, sd) => 0.5 * (1 + erf((x - mu) / (sd * Math.SQRT2)));
+  function binomPmf(n, p) {
+    const out = new Array(n + 1).fill(0);
+    if (p <= 0) { out[0] = 1; return out; }
+    if (p >= 1) { out[n] = 1; return out; }
+    let logC = 0;
+    for (let k = 0; k <= n; k++) {
+      if (k > 0) logC += Math.log(n - k + 1) - Math.log(k);
+      out[k] = Math.exp(logC + k * Math.log(p) + (n - k) * Math.log(1 - p));
+    }
+    return out;
+  }
+  function fmt(v, d = 2) {
+    if (!Number.isFinite(v)) return '—';
+    const r = +v.toFixed(d);
+    return String(Object.is(r, -0) ? 0 : r);
+  }
+
+  function model(mode = S.mode) {
+    const st = S.setup[mode];
+    if (mode === 'dice') {
+      let dist = [1];
+      for (let i = 0; i < st.n; i++) {
+        const next = new Array(dist.length + st.sides - 1).fill(0);
+        dist.forEach((p, j) => { for (let f = 0; f < st.sides; f++) next[j + f] += p / st.sides; });
+        dist = next;
+      }
+      return { title: st.n > 1 ? 'Sum of dice' : 'Face',
+               labels: dist.map((_, i) => String(i + st.n)), probs: dist,
+               bin: v => v - st.n, mean: st.n * (st.sides + 1) / 2 };
+    }
+    if (mode === 'coin') {
+      if (st.n === 1) return { title: 'Face', labels: ['H', 'T'], probs: [st.p, 1 - st.p], bin: v => v ? 0 : 1 };
+      const pm = binomPmf(st.n, st.p);
+      return { title: 'Number of heads', labels: pm.map((_, i) => String(i)), probs: pm, bin: v => v, mean: st.n * st.p };
+    }
+    if (mode === 'bag') {
+      const tot = st.balls.reduce((s, b) => s + b.n, 0) || 1;
+      return { title: st.replace ? 'Colour of each ball' : 'Balls drawn so far',
+               labels: st.balls.map(b => HUE_NAMES[b.c]), colors: st.balls.map(b => `var(--hue-${b.c})`),
+               probs: st.replace ? st.balls.map(b => b.n / tot) : null, bin: v => v };
+    }
+    if (mode === 'spinner') {
+      const sec = spinnerSectors(), tot = sec.reduce((s, x) => s + x.w, 0);
+      return { title: 'Sector', labels: sec.map(x => x.label), colors: sec.map((_, i) => `var(--hue-${i % HUES})`),
+               probs: sec.map(x => x.w / tot), bin: v => v };
+    }
+    if (mode === 'cards') {
+      return { title: st.replace ? 'Suit of each card' : 'Suits drawn so far', labels: SUITS.slice(),
+               colors: ['var(--text)', 'var(--red)', 'var(--red)', 'var(--text)'],
+               probs: st.replace ? [0.25, 0.25, 0.25, 0.25] : null, bin: v => Math.floor(v / 13) };
+    }
+    if (mode === 'number') {
+      const { min, max, decimals } = st;
+      if (decimals === 0 && max - min + 1 <= 40) {
+        const n = max - min + 1;
+        return { title: 'Value', labels: Array.from({ length: n }, (_, i) => String(min + i)),
+                 probs: new Array(n).fill(1 / n), bin: v => v - min, mean: (min + max) / 2 };
+      }
+      const B = 20, w = (max - min) / B;
+      const labels = Array.from({ length: B }, (_, i) => fmt(min + i * w, decimals ? 2 : 0));
+      let probs;
+      if (decimals === 0) {
+        // Integers into 20 bins: each bin's share is how many integers it holds.
+        const span = max - min + 1, cnt = new Array(B).fill(0);
+        for (let i = 0; i < B; i++) {
+          const lo = Math.ceil(min + i * span / B), hi = Math.ceil(min + (i + 1) * span / B) - 1;
+          cnt[i] = Math.max(0, hi - lo + 1);
+        }
+        probs = cnt.map(c => c / span);
+        return { title: 'Value', labels, probs, mean: (min + max) / 2,
+                 bin: v => Math.min(B - 1, Math.floor((v - min) * B / span)) };
+      }
+      probs = new Array(B).fill(1 / B);
+      return { title: 'Value', labels, probs, mean: (min + max) / 2,
+               bin: v => Math.min(B - 1, Math.max(0, Math.floor((v - min) / w))) };
+    }
+    if (mode === 'dist') {
+      const d = st;
+      if (d.kind === 'binomial') {
+        const pm = binomPmf(d.n, d.p);
+        return { title: `Binomial(${d.n}, ${d.p})`, labels: pm.map((_, i) => String(i)), probs: pm,
+                 bin: v => v, mean: d.n * d.p, sd: Math.sqrt(d.n * d.p * (1 - d.p)) };
+      }
+      if (d.kind === 'poisson') {
+        const K = Math.ceil(d.lambda + 4 * Math.sqrt(d.lambda) + 3);
+        const pm = []; let p = Math.exp(-d.lambda), acc = 0;
+        for (let k = 0; k < K; k++) { pm.push(p); acc += p; p *= d.lambda / (k + 1); }
+        pm.push(Math.max(0, 1 - acc));
+        return { title: `Poisson(${d.lambda})`, labels: pm.map((_, i) => i === K ? `${K}+` : String(i)), probs: pm,
+                 bin: v => Math.min(K, v), mean: d.lambda, sd: Math.sqrt(d.lambda) };
+      }
+      let lo, hi, B, cdf, title, mean, sd;
+      if (d.kind === 'normal') {
+        lo = d.mu - 4 * d.sigma; hi = d.mu + 4 * d.sigma; B = 32;
+        cdf = x => normCdf(x, d.mu, d.sigma); title = `Normal(μ=${d.mu}, σ=${d.sigma})`; mean = d.mu; sd = d.sigma;
+      } else if (d.kind === 'uniform') {
+        lo = d.a; hi = d.b; B = 20;
+        cdf = x => Math.min(1, Math.max(0, (x - d.a) / (d.b - d.a))); title = `Uniform(${d.a}, ${d.b})`;
+        mean = (d.a + d.b) / 2; sd = (d.b - d.a) / Math.sqrt(12);
+      } else {
+        lo = 0; hi = 6 / d.lambda; B = 24;
+        cdf = x => 1 - Math.exp(-d.lambda * Math.max(0, x)); title = `Exponential(λ=${d.lambda})`;
+        mean = 1 / d.lambda; sd = 1 / d.lambda;
+      }
+      const w = (hi - lo) / B;
+      const probs = Array.from({ length: B }, (_, i) =>
+        (i === B - 1 ? 1 : cdf(lo + (i + 1) * w)) - (i === 0 ? 0 : cdf(lo + i * w)));
+      return { title, probs, mean, sd, continuous: true,
+               labels: Array.from({ length: B }, (_, i) => fmt(lo + (i + 0.5) * w, 2)),
+               bin: v => Math.min(B - 1, Math.max(0, Math.floor((v - lo) / w))) };
+    }
+    return null;
+  }
+
+  function statsFor(mode) {
+    if (mode === 'list') return null;
+    const sig = JSON.stringify(mode === 'spinner' ? spinnerSectors() : S.setup[mode]);
+    let st = S.stats[mode];
+    if (!st || st.sig !== sig) {
+      const m = model(mode);
+      st = S.stats[mode] = { sig, counts: new Array(m.labels.length).fill(0), total: 0, sum: 0, sumsq: 0 };
+    }
+    return st;
+  }
+  function tally(mode, v, m) {
+    const st = statsFor(mode);
+    const i = m.bin(v);
+    if (i >= 0 && i < st.counts.length) st.counts[i]++;
+    st.total++; st.sum += v; st.sumsq += v * v;
+  }
+
+  // ── One trial per mode ──────────────────────────────────────────────────────
+  // Returns the outcome, or null if nothing can be drawn (empty bag, deck…).
+  // Tallying happens here too so a ×1000 run never builds a 1000-long array.
+  function trial(mode, m) {
+    const st = S.setup[mode];
+    if (mode === 'dice') {
+      const faces = Array.from({ length: st.n }, () => randInt(1, st.sides));
+      tally(mode, faces.reduce((s, x) => s + x, 0), m);
+      return { faces };
+    }
+    if (mode === 'coin') {
+      const faces = Array.from({ length: st.n }, () => rand() < st.p ? 1 : 0);
+      tally(mode, st.n === 1 ? faces[0] : faces.reduce((s, x) => s + x, 0), m);
+      return { faces };
+    }
+    if (mode === 'bag') {
+      const pool = st.replace ? fullBag() : S.pool.bag;
+      const balls = [];
+      for (let i = 0; i < st.k; i++) {
+        if (pool.reduce((s, x) => s + x, 0) <= 0) break;
+        const j = pickWeighted(pool);
+        if (!st.replace) pool[j]--;
+        balls.push(j);
+        tally(mode, j, m);
+      }
+      return balls.length ? { balls: balls.map(j => st.balls[j].c), idx: balls } : null;
+    }
+    if (mode === 'spinner') {
+      const sec = spinnerSectors();
+      const i = pickWeighted(sec.map(s => s.w));
+      tally(mode, i, m);
+      // Where in the sector the pointer lands, 0.1–0.9 so it never sits on a line.
+      return { i, label: sec[i].label, frac: 0.1 + 0.8 * rand() };
+    }
+    if (mode === 'cards') {
+      const cards = [];
+      for (let i = 0; i < st.k; i++) {
+        if (st.replace) cards.push(randInt(0, 51));
+        else { if (!S.pool.cards.length) break; cards.push(S.pool.cards.splice(randInt(0, S.pool.cards.length - 1), 1)[0]); }
+        tally(mode, cards[cards.length - 1], m);
+      }
+      return cards.length ? { cards } : null;
+    }
+    if (mode === 'number') {
+      const { min, max, decimals, unique } = st;
+      let v;
+      if (decimals > 0) {
+        v = +(min + rand() * (max - min)).toFixed(decimals);
+      } else if (unique) {
+        const span = max - min + 1;
+        if (S.pool.number.length >= span) return null;
+        const used = new Set(S.pool.number);
+        // Rejection while there's room; walk the gaps once the range is mostly used.
+        if (used.size < span * 0.7) { do { v = randInt(min, max); } while (used.has(v)); }
+        else {
+          const free = []; for (let x = min; x <= max; x++) if (!used.has(x)) free.push(x);
+          v = free[randInt(0, free.length - 1)];
+        }
+        S.pool.number.push(v);
+        if (S.pool.number.length > 5000) S.pool.number.shift();
+      } else v = randInt(min, max);
+      tally(mode, v, m);
+      return { v };
+    }
+    if (mode === 'dist') {
+      const d = st; let v;
+      if (d.kind === 'normal')        v = d.mu + d.sigma * randNormal();
+      else if (d.kind === 'uniform')  v = d.a + (d.b - d.a) * rand();
+      else if (d.kind === 'exponential') v = -Math.log(1 - rand()) / d.lambda;
+      else if (d.kind === 'binomial') { v = 0; for (let i = 0; i < d.n; i++) if (rand() < d.p) v++; }
+      else {
+        const L = Math.exp(-d.lambda); let k = 0, p = 1;
+        do { k++; p *= rand(); } while (p > L && k < 1000);
+        v = k - 1;
+      }
+      tally(mode, v, m);
+      return { v };
+    }
+    return null;
+  }
+
+  // ── Actions ─────────────────────────────────────────────────────────────────
+  function go() {
+    if (IS_VIEWER) return;
+    finishAnim();
+    const mode = S.mode;
+    ensurePools();
+    if (mode === 'list') return pickName();
+    const runs = canRepeat(mode) ? S.runs : 1;
+    const m = model(mode);
+    let out = null, done = 0;
+    for (let r = 0; r < runs; r++) {
+      const o = trial(mode, m);
+      if (!o) break;
+      out = o; done++;
+      if (runs <= HIST_CAP || r >= runs - HIST_CAP) pushHistory(mode, o);
+    }
+    if (!out) { S.last[mode] = { empty: true }; S.rollId++; render(); emitState(true); return; }
+    out.runs = done;
+    if (mode === 'spinner') S.spin = targetAngle(out);
+    S.last[mode] = out;
+    S.rollId++;
+    if (done > 1 && !S.showStats) S.showStats = true;
+    render(done === 1);
+    emitState(true);
+  }
+
+  function pickName() {
+    const st = S.setup.list;
+    const pool = st.remove ? S.pool.list : st.items;
+    if (!pool.length) { S.last.list = { empty: true }; S.rollId++; render(); emitState(true); return; }
+    const i = randInt(0, pool.length - 1);
+    const name = pool[i];
+    if (st.remove) pool.splice(i, 1);
+    S.last.list = { type: 'pick', name };
+    pushHistory('list', { name });
+    S.rollId++;
+    render(true); emitState(true);
+  }
+
+  function shuffleList() {
+    if (IS_VIEWER) return;
+    finishAnim();
+    S.last.list = { type: 'order', list: shuffle(S.setup.list.items.slice()) };
+    S.rollId++;
+    render(true); emitState(true);
+  }
+
+  function makeGroups() {
+    if (IS_VIEWER) return;
+    finishAnim();
+    const st = S.setup.list, items = shuffle(st.items.slice());
+    const g = st.groupBy === 'count'
+      ? Math.max(1, Math.min(items.length, st.groupN))
+      : Math.max(1, Math.ceil(items.length / Math.max(1, st.groupN)));
+    const groups = Array.from({ length: g }, () => []);
+    items.forEach((x, i) => groups[i % g].push(x));
+    S.last.list = { type: 'groups', groups };
+    S.rollId++;
+    render(true); emitState(true);
+  }
+
+  function resetMode(mode = S.mode) {
+    refill(mode);
+    delete S.last[mode];
+    delete S.stats[mode];
+    S.history[mode] = [];
+  }
+
+  // The shared bar's Reset: clear this mode's results, refill what was drawn,
+  // and re-seed — with a seed set, the demo then replays exactly.
+  function reset() {
+    if (IS_VIEWER) return;
+    finishAnim();
+    resetMode();
+    S.rng = freshSeed();
+    S.rollId++;
+    render(); emitState(true);
+  }
+
+  function setMode(m) {
+    if (IS_VIEWER || !MODES.includes(m) || m === S.mode) return;
+    finishAnim();
+    S.mode = m;
+    ensurePools();
+    render(); emitState();
+  }
+
+  function pushHistory(mode, o) {
+    const h = S.history[mode] || (S.history[mode] = []);
+    h.unshift(histItem(mode, o));
+    if (h.length > HIST_CAP) h.length = HIST_CAP;
+  }
+
+  function histItem(mode, o) {
+    if (mode === 'dice') return { t: o.faces.length > 1 ? `${o.faces.join('+')}=${o.faces.reduce((s, x) => s + x, 0)}` : String(o.faces[0]) };
+    if (mode === 'coin') {
+      const h = o.faces.reduce((s, x) => s + x, 0);
+      return { t: o.faces.length <= 6 ? o.faces.map(f => f ? 'H' : 'T').join('') : `${h}H` };
+    }
+    if (mode === 'bag')     return { dots: o.balls.slice(0, 6) };
+    if (mode === 'spinner') return { t: o.label, c: o.i % HUES };
+    if (mode === 'cards')   return { t: o.cards.slice(0, 4).map(cardText).join(' ') };
+    if (mode === 'number')  return { t: String(o.v) };
+    if (mode === 'list')    return { t: o.name };
+    if (mode === 'dist')    return { t: fmtDist(o.v) };
+    return { t: '' };
+  }
+
+  const cardText = id => RANKS[id % 13] + SUITS[Math.floor(id / 13)];
+  const fmtDist  = v => (['binomial', 'poisson'].includes(S.setup.dist.kind) ? String(v) : fmt(v, 3));
+
+  // ── Setup strip ─────────────────────────────────────────────────────────────
+  // Rebuilt only when the mode changes (or a structural edit, like adding a
+  // colour), so typing into an input never loses focus mid-number.
+  let setupFor = '';
+  function num(label, key, obj, lo, hi, step = 1, after) {
+    return { html: `<label>${escHtml(label)} <input class="bw-input" type="number" data-k="${key}" min="${lo}" max="${hi}" step="${step}" value="${escHtml(obj[key])}"></label>`, key, lo, hi, after };
+  }
+  function check(label, key, obj) {
+    return { html: `<label><input type="checkbox" data-k="${key}" ${obj[key] ? 'checked' : ''}> ${escHtml(label)}</label>` };
+  }
+
+  function buildSetup(force) {
+    const key = S.mode + (S.mode === 'bag' ? ':' + S.setup.bag.balls.map(b => b.c).join(',') : '');
+    if (!force && key === setupFor) { syncSetupValues(); return; }
+    setupFor = key;
+    const st = S.setup[S.mode];
+    const parts = [];
+    if (S.mode === 'dice') {
+      parts.push(num('Dice', 'n', st, 1, 10));
+      parts.push({ html: `<label>Sides <select class="bw-select" data-k="sides">${[4, 6, 8, 10, 12, 20].map(s =>
+        `<option value="${s}" ${st.sides === s ? 'selected' : ''}>d${s}</option>`).join('')}<option value="custom" ${[4, 6, 8, 10, 12, 20].includes(st.sides) ? '' : 'selected'}>other…</option></select></label>` });
+      if (![4, 6, 8, 10, 12, 20].includes(st.sides)) parts.push(num('', 'sides', st, 2, 100));
+    } else if (S.mode === 'coin') {
+      parts.push(num('Coins', 'n', st, 1, 20));
+      parts.push(num('P(heads)', 'p', st, 0, 1, 0.05));
+    } else if (S.mode === 'bag') {
+      parts.push({ html: st.balls.map((b, i) =>
+        `<span class="chip" title="${HUE_NAMES[b.c]}"><span class="sw" style="background:var(--hue-${b.c})"></span>` +
+        `<button data-act="dec" data-i="${i}" title="One fewer">−</button><span class="n">${b.n}</span>` +
+        `<button data-act="inc" data-i="${i}" title="One more">+</button>` +
+        (st.balls.length > 1 ? `<button data-act="del" data-i="${i}" title="Remove colour">×</button>` : '') + `</span>`).join('') +
+        (st.balls.length < HUES ? `<button class="bw-btn bw-btn--quiet" data-act="add">+ Colour</button>` : '') });
+      parts.push(num('Draw', 'k', st, 1, 20));
+      parts.push(check('Replace after drawing', 'replace', st));
+      parts.push({ html: `<button class="bw-btn" data-act="refill">Put balls back</button>` });
+    } else if (S.mode === 'spinner') {
+      parts.push({ html: `<label>Sectors <input class="bw-input wide" type="text" data-k="text" value="${escHtml(st.text)}" placeholder="A, B, C:2  (:n = weight)"></label>` });
+    } else if (S.mode === 'cards') {
+      parts.push(num('Draw', 'k', st, 1, 13));
+      parts.push(check('Replace after drawing', 'replace', st));
+      parts.push({ html: `<button class="bw-btn" data-act="refill">Shuffle deck</button>` });
+    } else if (S.mode === 'number') {
+      parts.push(num('From', 'min', st, -1e9, 1e9));
+      parts.push(num('to', 'max', st, -1e9, 1e9));
+      parts.push(num('Decimals', 'decimals', st, 0, 6));
+      if (st.decimals === 0) parts.push(check('No repeats', 'unique', st));
+      if (st.decimals === 0 && st.unique) parts.push({ html: `<button class="bw-btn" data-act="refill">Allow all again</button>` });
+    } else if (S.mode === 'list') {
+      parts.push({ html: `<button class="bw-btn" data-act="edit-list">Edit list (${st.items.length})</button>` });
+      parts.push(check('Remove when picked', 'remove', st));
+      if (st.remove) parts.push({ html: `<button class="bw-btn" data-act="refill">Put all back</button>` });
+      parts.push({ html: `<div class="bw-sep"></div><button class="bw-btn" data-act="shuffle">Shuffle order</button>` });
+      parts.push({ html: `<button class="bw-btn" data-act="groups">Make groups</button>` +
+        `<select class="bw-select" data-k="groupBy"><option value="count" ${st.groupBy === 'count' ? 'selected' : ''}>groups:</option>` +
+        `<option value="size" ${st.groupBy === 'size' ? 'selected' : ''}>of size:</option></select>` });
+      parts.push(num('', 'groupN', st, 1, 100));
+    } else if (S.mode === 'dist') {
+      const kinds = [['normal', 'Normal'], ['uniform', 'Uniform'], ['exponential', 'Exponential'], ['binomial', 'Binomial'], ['poisson', 'Poisson']];
+      parts.push({ html: `<select class="bw-select" data-k="kind">${kinds.map(([v, l]) => `<option value="${v}" ${st.kind === v ? 'selected' : ''}>${l}</option>`).join('')}</select>` });
+      if (st.kind === 'normal')      { parts.push(num('μ', 'mu', st, -1e6, 1e6, 0.1)); parts.push(num('σ', 'sigma', st, 0.001, 1e6, 0.1)); }
+      if (st.kind === 'uniform')     { parts.push(num('a', 'a', st, -1e6, 1e6, 0.1)); parts.push(num('b', 'b', st, -1e6, 1e6, 0.1)); }
+      if (st.kind === 'exponential') parts.push(num('λ', 'lambda', st, 0.001, 1000, 0.1));
+      if (st.kind === 'poisson')     parts.push(num('λ', 'lambda', st, 0.01, 200, 0.5));
+      if (st.kind === 'binomial')    { parts.push(num('n', 'n', st, 1, 500)); parts.push(num('p', 'p', st, 0, 1, 0.05)); }
+    }
+    setupEl.innerHTML = parts.map(p => p.html).join('');
+  }
+
+  // A viewer's strip is hidden, and a re-render while the presenter types
+  // shouldn't fight the field; only push values into fields not focused.
+  function syncSetupValues() {
+    const st = S.setup[S.mode];
+    setupEl.querySelectorAll('[data-k]').forEach(el => {
+      if (el === document.activeElement) return;
+      const v = st[el.dataset.k];
+      if (el.type === 'checkbox') el.checked = !!v;
+      else if (el.tagName !== 'SELECT' || el.dataset.k !== 'sides') el.value = v;
+    });
+  }
+
+  function onSetupChange(el) {
+    if (IS_VIEWER) return;
+    const k = el.dataset.k, st = S.setup[S.mode];
+    let rebuild = false;
+    if (el.type === 'checkbox') { st[k] = el.checked; rebuild = true; }
+    else if (k === 'text' || k === 'groupBy' || k === 'kind') { st[k] = el.value; rebuild = k !== 'text'; }
+    else if (k === 'sides' && el.tagName === 'SELECT') {
+      st.sides = el.value === 'custom' ? (st.sides in { 4: 1, 6: 1, 8: 1, 10: 1, 12: 1, 20: 1 } ? 7 : st.sides) : +el.value;
+      rebuild = true;
+    } else {
+      const lo = +el.min, hi = +el.max;
+      if (el.value === '' || !Number.isFinite(+el.value)) return;   // mid-typing a minus sign
+      let v = clamp(el.value, lo, hi, st[k]);
+      if (el.step === '1' || !el.step) v = Math.round(v);
+      st[k] = v;
+      if (k === 'decimals') rebuild = true;
+    }
+    tidySetup(S.mode);
+    if (['bag', 'cards', 'list', 'number'].includes(S.mode) && (k === 'replace' || k === 'unique' || k === 'remove' || k === 'min' || k === 'max' || k === 'decimals')) refill(S.mode);
+    if (rebuild) buildSetup(true);
+    render(); emitState();
+  }
+
+  // Keep a setup self-consistent after an edit (min ≤ max, a < b, …).
+  function tidySetup(mode) {
+    const st = S.setup[mode];
+    if (mode === 'number' && st.max < st.min) [st.min, st.max] = [st.max, st.min];
+    if (mode === 'dist' && st.b <= st.a) st.b = st.a + 1;
+    if (mode === 'number' && st.decimals > 0) st.unique = false;
+  }
+
+  function onSetupAction(act, i) {
+    if (IS_VIEWER) return;
+    const bag = S.setup.bag;
+    if (act === 'inc') { bag.balls[i].n = Math.min(30, bag.balls[i].n + 1); refill('bag'); }
+    if (act === 'dec') { bag.balls[i].n = Math.max(0, bag.balls[i].n - 1); refill('bag'); }
+    if (act === 'del') { bag.balls.splice(i, 1); refill('bag'); }
+    if (act === 'add') {
+      const used = new Set(bag.balls.map(b => b.c));
+      const c = [...Array(HUES).keys()].find(h => !used.has(h));
+      if (c != null) bag.balls.push({ c, n: 1 });
+      refill('bag');
+    }
+    if (act === 'refill')    { refill(S.mode); delete S.last[S.mode]; }
+    if (act === 'shuffle')   return shuffleList();
+    if (act === 'groups')    return makeGroups();
+    if (act === 'edit-list') return openListEditor();
+    buildSetup(true);
+    render(); emitState();
+  }
+
+  // ── List editor ─────────────────────────────────────────────────────────────
+  function openListEditor() {
+    listText.value = S.setup.list.items.join('\n');
+    updateListCount();
+    listEd.hidden = false;
+    listText.focus();
+  }
+  function updateListCount() {
+    const n = listText.value.split('\n').filter(s => s.trim()).length;
+    listCount.textContent = `${n} item${n === 1 ? '' : 's'}`;
+  }
+  function closeListEditor(save) {
+    if (save && !IS_VIEWER) {
+      setListItems(listText.value.split('\n'));
+      buildSetup(true);
+      render(); emitState();
+    }
+    listEd.hidden = true;
+  }
+  function setListItems(lines) {
+    const items = lines.map(s => String(s).trim()).filter(Boolean).slice(0, 1000);
+    S.setup.list.items = items;
+    S.pool.list = items.slice();
+    delete S.last.list;
+    S.history.list = [];
+  }
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+  function render(animate) {
+    modeSel.value = S.mode;
+    runsSel.value = String(S.runs);
+    goBtn.textContent = VERB[S.mode];
+    const rep = canRepeat();
+    runsSel.style.display = rep && !IS_VIEWER ? '' : 'none';
+    statsBtn.style.display = S.mode === 'list' ? 'none' : '';
+    statsBtn.classList.toggle('is-active', S.showStats && S.mode !== 'list');
+    goBtn.style.display = IS_VIEWER ? 'none' : '';
+    goBtn.disabled = isExhausted();
+    [modeSel, runsSel, statsBtn].forEach(b => { b.disabled = IS_VIEWER; });
+    setupEl.hidden = IS_VIEWER;
+    $('viewer-badge').hidden = !IS_VIEWER;
+    if (!IS_VIEWER) buildSetup();
+
+    renderResult(animate);
+    renderHistory();
+    renderStats();
+  }
+
+  function isExhausted() {
+    ensurePools();
+    if (S.mode === 'bag' && !S.setup.bag.replace) return S.pool.bag.reduce((s, x) => s + x, 0) <= 0;
+    if (S.mode === 'cards' && !S.setup.cards.replace) return S.pool.cards.length === 0;
+    if (S.mode === 'list') return S.setup.list.remove ? !S.pool.list.length : !S.setup.list.items.length;
+    if (S.mode === 'number' && S.setup.number.unique && S.setup.number.decimals === 0)
+      return S.pool.number.length >= S.setup.number.max - S.setup.number.min + 1;
+    return false;
+  }
+
+  // Largest item size that fits n items in the result area, trying every row
+  // count — two rows of five dice beat one row of ten tiny ones.
+  function fitSize(n, aspect = 1, reserve = 0.3, maxPx = 260) {
+    const r = resultEl.getBoundingClientRect();
+    const W = Math.max(60, r.width - 40), H = Math.max(60, (r.height - 40) * (1 - reserve));
+    let best = 0;
+    for (let rows = 1; rows <= n; rows++) {
+      const cols = Math.ceil(n / rows);
+      const s = Math.min(W / (cols * 1.18 * aspect), H / (rows * 1.18));
+      if (s > best) best = s;
+    }
+    return Math.max(24, Math.min(maxPx, Math.floor(best)));
+  }
+
+  function placeholder(text) {
+    return `<div class="bw-hint">${escHtml(text)}</div>`;
+  }
+
+  function renderResult(animate) {
+    finishAnim(true);
+    const mode = S.mode, o = S.last[mode], st = S.setup[mode];
+    const canAnim = animate && cfg.animate !== false;
+    let html = '', sz = 120, drop = false;
+
+    if (mode === 'spinner') return renderSpinner(animate);
+    wheelBuiltFor = '';
+
+    if (o && o.empty) {
+      const why = { bag: 'The bag is empty.', cards: 'The deck is empty.', list: 'Everyone has been picked.',
+                    number: 'Every number in the range has been used.' }[mode] || 'Nothing left.';
+      html = `<div class="msg">${why}${IS_VIEWER ? '' : ' Reset, or put them back, to start again.'}</div>`;
+    } else if (mode === 'dice') {
+      const faces = o ? o.faces : Array.from({ length: st.n }, () => null);
+      sz = fitSize(faces.length);
+      html = `<div class="items">${faces.map(f => dieSvg(f, st.sides)).join('')}</div>` +
+        (o && faces.length > 1 ? `<div class="caption">Σ <strong>${faces.reduce((s, x) => s + x, 0)}</strong>${runsNote(o)}</div>` :
+         o ? (runsNote(o) ? `<div class="caption">${runsNote(o).slice(3)}</div>` : '') : placeholder(`Press ${VERB[mode]}`));
+    } else if (mode === 'coin') {
+      const faces = o ? o.faces : [];
+      sz = fitSize(Math.max(1, faces.length), 1, 0.25, 220);
+      const h = faces.reduce((s, x) => s + x, 0);
+      html = o ? `<div class="items">${faces.map(f => `<div class="coin ${f ? 'h' : 't'}">${f ? 'H' : 'T'}</div>`).join('')}</div>` +
+                 `<div class="caption">${faces.length > 1 ? `<strong>${h}</strong> heads, <strong>${faces.length - h}</strong> tails` : (faces[0] ? '<strong>Heads</strong>' : '<strong>Tails</strong>')}${runsNote(o)}</div>`
+               : `<div class="items"><div class="coin t" style="opacity:.35">?</div></div>${placeholder('Press Flip')}`;
+    } else if (mode === 'bag') {
+      const pool = st.replace ? fullBag() : S.pool.bag;
+      const left = pool.reduce((s, x) => s + x, 0);
+      const dots = [];
+      pool.forEach((n, j) => { for (let i = 0; i < n && dots.length < 120; i++) dots.push(st.balls[j].c); });
+      const balls = o ? o.balls : [];
+      sz = fitSize(Math.max(1, balls.length), 1, 0.45, 200);
+      html = `<div class="bag">${dots.length ? dots.map(c => `<span class="ball" style="--c:var(--hue-${c})"></span>`).join('') : '<span class="bag-empty">empty</span>'}</div>` +
+             `<div class="bw-hint">${left} in the bag${st.replace ? ' · drawn with replacement' : ''}</div>` +
+             (o ? `<div class="items">${balls.map(c => `<span class="ball" style="--c:var(--hue-${c})" title="${HUE_NAMES[c]}"></span>`).join('')}</div>` +
+                  (runsNote(o) ? `<div class="caption">${runsNote(o).slice(3)}</div>` : '')
+                : placeholder('Press Draw'));
+      drop = true;
+    } else if (mode === 'cards') {
+      const cards = o ? o.cards : [];
+      sz = fitSize(Math.max(1, cards.length), 0.72, 0.2, 280);
+      html = (o ? `<div class="items">${cards.map(cardHtml).join('')}</div>`
+                : `<div class="items"><div class="card" style="opacity:.25"><span></span><span class="mid">?</span><span></span></div></div>`) +
+             `<div class="bw-hint">${st.replace ? 'drawn with replacement' : `${S.pool.cards.length} left in the deck`}${o && o.runs > 1 ? ` · last of ${o.runs}` : ''}</div>`;
+      drop = true;
+    } else if (mode === 'number') {
+      html = o ? `<div class="big" id="big">${escHtml(String(o.v))}</div>${o.runs > 1 ? `<div class="caption">last of ${o.runs}</div>` : ''}`
+               : `<div class="big" style="color:var(--text-3)">?</div>${placeholder(`${st.min} – ${st.max}`)}`;
+      if (st.unique && st.decimals === 0) html += `<div class="bw-hint">${S.pool.number.length} used of ${st.max - st.min + 1}</div>`;
+    } else if (mode === 'list') {
+      if (!o) html = `<div class="big name" style="color:var(--text-3)">?</div>${placeholder(`${st.items.length} names · press Pick`)}`;
+      else if (o.type === 'pick') html = `<div class="big name" id="big">${escHtml(o.name)}</div>` +
+        (st.remove ? `<div class="bw-hint">${S.pool.list.length} left to pick</div>` : '');
+      else if (o.type === 'order') html = `<ol class="order">${o.list.map((x, i) => `<li><span>${i + 1}</span>${escHtml(x)}</li>`).join('')}</ol>`;
+      else if (o.type === 'groups') html = `<div class="groups">${o.groups.map((g, i) =>
+        `<div class="group bw-card"><h4>Group ${i + 1}</h4>${g.map(x => `<div>${escHtml(x)}</div>`).join('')}</div>`).join('')}</div>`;
+    } else if (mode === 'dist') {
+      const m = model('dist');
+      html = o ? `<div class="big" id="big">${escHtml(fmtDist(o.v))}</div><div class="caption">${escHtml(m.title)}${o.runs > 1 ? ` · last of ${o.runs}` : ''}</div>`
+               : `<div class="big" style="color:var(--text-3)">?</div><div class="caption">${escHtml(m.title)}</div>`;
+    }
+
+    resultEl.style.setProperty('--sz', sz + 'px');
+    const big = mode === 'number' || mode === 'dist' || (mode === 'list' && (!o || o.type === 'pick'));
+    resultEl.innerHTML = html;
+    if (big) sizeBig();
+    resultEl.classList.toggle('drop', !!(canAnim && drop && o && o.runs === 1));
+    if (canAnim && o && !o.empty && (o.runs === 1 || mode === 'list')) startAnim(mode, o);
+  }
+
+  const runsNote = o => (o && o.runs > 1 ? ` · last of ${o.runs}` : '');
+
+  // A single value as large as the area allows, by measuring rather than guessing.
+  function sizeBig() {
+    const el = resultEl.querySelector('.big');
+    if (!el) return;
+    const r = resultEl.getBoundingClientRect();
+    let fs = Math.min(r.height * 0.42, 220);
+    el.style.fontSize = fs + 'px';
+    for (let i = 0; i < 12 && (el.scrollWidth > r.width - 40 || el.scrollHeight > r.height * 0.6) && fs > 18; i++) {
+      fs *= 0.85; el.style.fontSize = fs + 'px';
+    }
+  }
+
+  // ── Dice, cards ─────────────────────────────────────────────────────────────
+  const PIPS = { 1: [[50, 50]], 2: [[28, 28], [72, 72]], 3: [[28, 28], [50, 50], [72, 72]],
+                 4: [[28, 28], [72, 28], [28, 72], [72, 72]], 5: [[28, 28], [72, 28], [50, 50], [28, 72], [72, 72]],
+                 6: [[28, 26], [72, 26], [28, 50], [72, 50], [28, 74], [72, 74]] };
+  const SHAPES = {
+    4:  '50,6 95,88 5,88',
+    8:  '50,4 95,50 50,96 5,50',
+    10: '50,4 94,40 50,96 6,40',
+    12: '50,5 93,36 77,90 23,90 7,36',
+    20: '50,4 91,27 91,73 50,96 9,73 9,27',
+  };
+  function dieSvg(v, sides) {
+    let body, inner = '';
+    if (sides === 6) {
+      body = '<rect class="body" x="4" y="4" width="92" height="92" rx="16"/>';
+      if (v) inner = PIPS[v].map(([x, y]) => `<circle class="pip" cx="${x}" cy="${y}" r="8.5"/>`).join('');
+    } else {
+      body = SHAPES[sides] ? `<polygon class="body" points="${SHAPES[sides]}"/>` : '<rect class="body" x="4" y="4" width="92" height="92" rx="16"/>';
+      const y = sides === 4 ? 62 : 52;
+      const fs = String(v || '').length > 2 ? 26 : 34;
+      inner = `<text class="num" x="50" y="${y}" font-size="${fs}">${v == null ? '?' : v}</text>`;
+      if (!SHAPES[sides]) inner += `<text class="kind" x="50" y="88">d${sides}</text>`;
+    }
+    if (v == null && sides === 6) inner = '<text class="num" x="50" y="52" font-size="34">?</text>';
+    return `<div class="die"><svg viewBox="0 0 100 100">${body}${inner}</svg></div>`;
+  }
+  function cardHtml(id) {
+    const r = RANKS[id % 13], s = SUITS[Math.floor(id / 13)], red = s === '♥' || s === '♦';
+    return `<div class="card${red ? ' red' : ''}"><span class="corner">${r}${s}</span><span class="mid">${s}</span><span class="corner b">${r}${s}</span></div>`;
+  }
+
+  // ── Spinner ─────────────────────────────────────────────────────────────────
+  // The wheel element persists across renders so its rotation can transition;
+  // it is rebuilt only when the sectors change.
+  let wheelBuiltFor = '';
+  function renderSpinner(animate) {
+    const sec = spinnerSectors(), sig = JSON.stringify(sec);
+    const o = S.last.spinner;
+    const sz = fitSize(1, 1, 0.2, 520);
+    resultEl.style.setProperty('--sz', sz + 'px');
+    if (wheelBuiltFor !== sig || !$('wheel')) {
+      wheelBuiltFor = sig;
+      const tot = sec.reduce((s, x) => s + x.w, 0);
+      let a0 = 0, paths = '';
+      sec.forEach((s, i) => {
+        const a1 = a0 + s.w / tot * 360;
+        paths += sectorPath(a0, a1, i, s.label, sec.length);
+        a0 = a1;
+      });
+      resultEl.innerHTML =
+        `<div id="wheel-wrap"><svg viewBox="-4 -10 108 114">` +
+        `<g id="wheel" style="transform:rotate(${-S.spin}deg)">${paths}</g>` +
+        `<circle class="hub" cx="50" cy="50" r="5"/>` +
+        `<polygon class="pointer" points="44,-8 56,-8 50,6"/></svg></div>` +
+        `<div class="caption" id="spin-label"></div>`;
+    }
+    const wheel = $('wheel'), label = $('spin-label');
+    const showLabel = () => { label.innerHTML = o && !o.empty ? `<strong>${escHtml(o.label)}</strong>${runsNote(o)}` : placeholder('Press Spin'); };
+    if (animate && cfg.animate !== false && o && o.runs === 1) {
+      label.innerHTML = '&nbsp;';
+      wheel.classList.add('spinning');
+      void wheel.getBoundingClientRect();
+      wheel.style.transform = `rotate(${-S.spin}deg)`;
+      anim = { kind: 'spin', done: showLabel };
+      wheel.addEventListener('transitionend', function te() { wheel.removeEventListener('transitionend', te); finishAnim(); }, { once: true });
+      anim.timer = setTimeout(() => finishAnim(), 3600);
+    } else {
+      wheel.classList.remove('spinning');
+      wheel.style.transform = `rotate(${-S.spin}deg)`;
+      showLabel();
+    }
+  }
+  function sectorPath(a0, a1, i, label, n) {
+    // Angles clockwise from 12 o'clock, so the pointer at the top reads the
+    // sector the wheel stops under.
+    const pt = (a, r) => [50 + r * Math.sin(a * Math.PI / 180), 50 - r * Math.cos(a * Math.PI / 180)];
+    const [x0, y0] = pt(a0, 48), [x1, y1] = pt(a1, 48);
+    const large = a1 - a0 > 180 ? 1 : 0;
+    const d = a1 - a0 >= 359.99
+      ? 'M50,2 A48,48 0 1,1 49.99,2 Z'
+      : `M50,50 L${x0.toFixed(2)},${y0.toFixed(2)} A48,48 0 ${large},1 ${x1.toFixed(2)},${y1.toFixed(2)} Z`;
+    let text = '';
+    if (n <= 16 && a1 - a0 >= 12) {
+      const mid = (a0 + a1) / 2, [tx, ty] = pt(mid, 31);
+      const fs = Math.max(3.2, Math.min(7.5, 70 / Math.max(4, label.length + 2), (a1 - a0) / 5));
+      const short = label.length > 14 ? label.slice(0, 13) + '…' : label;
+      text = `<text x="${tx.toFixed(2)}" y="${ty.toFixed(2)}" font-size="${fs.toFixed(2)}">${escHtml(short)}</text>`;
+    }
+    return `<path class="seg" d="${d}" style="fill:var(--hue-${i % HUES})"/>${text}`;
+  }
+  // The wheel turns by -angle; the pointer then reads the sector at `angle`
+  // (mod 360). Always spin forward several turns to land there.
+  function targetAngle(o) {
+    const sec = spinnerSectors(), tot = sec.reduce((s, x) => s + x.w, 0);
+    let a0 = 0;
+    for (let i = 0; i < o.i; i++) a0 += sec[i].w / tot * 360;
+    const at = a0 + o.frac * sec[o.i].w / tot * 360;
+    const base = Math.ceil(S.spin / 360) * 360 + 360 * 4;
+    return base + at;
+  }
+
+  // ── Animation ───────────────────────────────────────────────────────────────
+  // Purely cosmetic: the outcome is already decided and in S, so cutting an
+  // animation short (a second press, a mode switch) just shows it sooner.
+  let anim = null;
+  function startAnim(mode, o) {
+    if (mode === 'dice') {
+      const items = resultEl.querySelector('.items'), cap = resultEl.querySelector('.caption');
+      items.classList.add('anim');
+      if (cap) cap.style.visibility = 'hidden';
+      const sides = S.setup.dice.sides;
+      const tick = setInterval(() => {
+        items.innerHTML = o.faces.map(() => dieSvg(1 + Math.floor(Math.random() * sides), sides)).join('');
+      }, 70);
+      anim = { kind: 'dice', done: () => {
+        clearInterval(tick);
+        items.classList.remove('anim');
+        items.innerHTML = o.faces.map(f => dieSvg(f, sides)).join('');
+        if (cap) cap.style.visibility = '';
+      } };
+      anim.timer = setTimeout(() => finishAnim(), 650);
+    } else if (mode === 'coin') {
+      const items = resultEl.querySelector('.items'), cap = resultEl.querySelector('.caption');
+      items.classList.add('anim');
+      if (cap) cap.style.visibility = 'hidden';
+      anim = { kind: 'coin', done: () => { items.classList.remove('anim'); if (cap) cap.style.visibility = ''; } };
+      anim.timer = setTimeout(() => finishAnim(), 780);
+    } else if (mode === 'number' || (mode === 'list' && o.type === 'pick')) {
+      const big = $('big'); if (!big) return;
+      const final = big.textContent;
+      const pool = mode === 'list' ? S.setup.list.items : null;
+      const st = S.setup.number;
+      const tick = setInterval(() => {
+        big.textContent = pool ? pool[Math.floor(Math.random() * pool.length)] || final
+          : st.decimals ? (st.min + Math.random() * (st.max - st.min)).toFixed(st.decimals)
+          : String(st.min + Math.floor(Math.random() * (st.max - st.min + 1)));
+      }, mode === 'list' ? 80 : 50);
+      big.style.opacity = '0.55';
+      anim = { kind: 'scramble', done: () => { clearInterval(tick); big.textContent = final; big.style.opacity = ''; big.classList.add('fade'); } };
+      anim.timer = setTimeout(() => finishAnim(), mode === 'list' ? 900 : 450);
+    } else if (mode === 'list' || mode === 'dist') {
+      resultEl.firstElementChild?.classList.add('fade');
+    }
+  }
+  function finishAnim(silent) {
+    if (!anim) return;
+    const a = anim; anim = null;
+    clearTimeout(a.timer);
+    if (a.kind === 'spin' && silent) { const w = $('wheel'); w && w.classList.remove('spinning'); }
+    a.done && a.done();
+  }
+
+  // ── History ─────────────────────────────────────────────────────────────────
+  function renderHistory() {
+    const h = S.history[S.mode] || [];
+    if (!h.length || (S.mode === 'list' && S.last.list && S.last.list.type !== 'pick' && !h.length)) {
+      historyEl.innerHTML = `<span class="bw-hint">History</span><span class="h-item" style="color:var(--text-3);font-weight:400">—</span>`;
+      return;
+    }
+    historyEl.innerHTML = `<span class="bw-hint">History</span>` + h.slice(0, 30).map(x =>
+      x.dots ? `<span class="h-item">${x.dots.map(c => `<span class="dot" style="--c:var(--hue-${c})"></span>`).join('')}</span>`
+             : `<span class="h-item">${x.c != null ? `<span class="dot" style="--c:var(--hue-${x.c})"></span>` : ''}${escHtml(x.t)}</span>`).join('');
+  }
+
+  // ── Stats chart ─────────────────────────────────────────────────────────────
+  function renderStats() {
+    const show = S.showStats && S.mode !== 'list';
+    statsEl.hidden = !show;
+    if (!show) return;
+    const m = model(), st = statsFor(S.mode);
+    statsTtl.textContent = m.title;
+    let sum = `n = <strong>${st.total}</strong>`;
+    if (m.mean != null && st.total) {
+      sum += ` · mean <strong>${fmt(st.sum / st.total)}</strong> (exp. ${fmt(m.mean)})`;
+    }
+    statsSum.innerHTML = sum;
+    legendEl.querySelector('.l-exp').style.display = m.probs ? '' : 'none';
+    drawChart(m, st);
+  }
+
+  function drawChart(m, st) {
+    const r = chartEl.getBoundingClientRect();
+    const W = Math.max(120, r.width), H = Math.max(80, r.height);
+    const padL = 34, padB = 18, padT = 6, padR = 4;
+    const n = m.labels.length;
+    const obs = st.counts.map(c => st.total ? c / st.total : 0);
+    const exp = m.probs || [];
+    const top = Math.max(0.0001, ...obs, ...exp) * 1.08;
+    const bw = (W - padL - padR) / n;
+    const y = p => padT + (H - padT - padB) * (1 - p / top);
+    const lastBin = (() => {
+      const o = S.last[S.mode];
+      if (!o || o.empty || o.runs > 1) return -1;
+      try {
+        if (S.mode === 'dice')    return m.bin(o.faces.reduce((s, x) => s + x, 0));
+        if (S.mode === 'coin')    return m.bin(o.faces.length === 1 ? o.faces[0] : o.faces.reduce((s, x) => s + x, 0));
+        if (S.mode === 'spinner') return o.i;
+        if (S.mode === 'number' || S.mode === 'dist') return m.bin(o.v);
+      } catch (_) { /* a stale outcome from an older setup — no highlight */ }
+      return -1;
+    })();
+    let svg = `<line class="axis" x1="${padL}" x2="${W - padR}" y1="${H - padB}" y2="${H - padB}"/>`;
+    // y gridline labels at 0 and the top value, as percentages.
+    svg += `<text x="${padL - 5}" y="${y(0) + 3}" text-anchor="end">0%</text>`;
+    svg += `<text x="${padL - 5}" y="${padT + 8}" text-anchor="end">${fmt(top * 100, top < 0.1 ? 1 : 0)}%</text>`;
+    const gap = Math.min(4, bw * 0.18);
+    for (let i = 0; i < n; i++) {
+      const x = padL + i * bw + gap / 2, w = Math.max(1, bw - gap);
+      const h = (H - padT - padB) * obs[i] / top;
+      const col = m.colors ? ` style="fill:${m.colors[i]}${i === lastBin ? '' : ';opacity:0.75'}"` : '';
+      svg += `<rect class="bar${i === lastBin ? ' hl' : ''}" x="${x.toFixed(1)}" y="${(H - padB - h).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}"${col}/>`;
+      if (m.probs) svg += `<line class="exp" x1="${(x + 1).toFixed(1)}" x2="${(x + w - 1).toFixed(1)}" y1="${y(exp[i]).toFixed(1)}" y2="${y(exp[i]).toFixed(1)}"/>`;
+    }
+    // Axis labels: as many as fit without colliding.
+    const every = Math.max(1, Math.ceil(n / Math.max(1, Math.floor((W - padL) / 34))));
+    for (let i = 0; i < n; i += every) {
+      svg += `<text x="${(padL + (i + 0.5) * bw).toFixed(1)}" y="${H - 4}" text-anchor="middle">${escHtml(String(m.labels[i]).slice(0, 8))}</text>`;
+    }
+    chartEl.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${svg}</svg>`;
+  }
+
+  // ── Socket.IO sync ──────────────────────────────────────────────────────────
+  let socket = null, syncTimer = null;
+
+  function initSocket(url) {
+    if (typeof io === 'undefined') { socket = { emit() {}, on() {} }; return; }
+    try {
+      const prev = socket;
+      socket = io(url || (window.BeamerWidget ? BeamerWidget.serverOrigin() : ''),
+                  { transports: ['websocket', 'polling'] });
+      if (prev && prev.disconnect) prev.disconnect();
+      socket.on('widget_state', data => {
+        if (!IS_VIEWER || data?.widgetId !== WIDGET_ID) return;
+        applyState(data.state || {}, true);
+      });
+    } catch (_) {
+      socket = { emit() {}, on() {} };
+    }
+  }
+
+  // `now`: an outcome the room is waiting on goes straight out; setup typing
+  // is debounced.
+  function emitState(now) {
+    if (!socket || IS_VIEWER) return;
+    clearTimeout(syncTimer);
+    const send = () => socket.emit('widget_state', { widgetId: WIDGET_ID, state: getState() });
+    if (now) send(); else syncTimer = setTimeout(send, 200);
+  }
+
+  // ── State serialisation ─────────────────────────────────────────────────────
+  function getState() {
+    return JSON.parse(JSON.stringify({
+      v: 1, mode: S.mode, runs: S.runs, showStats: S.showStats, setup: S.setup, pool: S.pool,
+      last: S.last, history: S.history, stats: S.stats, rng: S.rng, rollId: S.rollId, spin: S.spin,
+    }));
+  }
+
+  function applyState(s, live) {
+    if (!s || typeof s !== 'object') return;
+    const prevRoll = S.rollId;
+    if (MODES.includes(s.mode)) S.mode = s.mode;
+    if ([1, 10, 100, 1000].includes(s.runs)) S.runs = s.runs;
+    if (typeof s.showStats === 'boolean') S.showStats = s.showStats;
+    if (s.setup && typeof s.setup === 'object') {
+      for (const k of MODES) if (s.setup[k] && typeof s.setup[k] === 'object') S.setup[k] = { ...S.setup[k], ...s.setup[k] };
+    }
+    if (s.pool && typeof s.pool === 'object') S.pool = { ...S.pool, ...s.pool };
+    if (s.last && typeof s.last === 'object') S.last = s.last;
+    if (s.history && typeof s.history === 'object') S.history = s.history;
+    if (s.stats && typeof s.stats === 'object') S.stats = s.stats;
+    if (typeof s.rng === 'number') S.rng = s.rng >>> 0;
+    if (typeof s.spin === 'number') S.spin = s.spin;
+    if (typeof s.rollId === 'number') S.rollId = s.rollId;
+    ensurePools();
+    setupFor = '';
+    // A viewer animates a fresh outcome the way the presenter's screen did;
+    // a restored slide just shows where it was.
+    render(!!live && S.rollId !== prevRoll);
+  }
+
+  // ── Config ──────────────────────────────────────────────────────────────────
+  // Only a changed setting is adopted, so re-sent config never undoes what
+  // the presenter has done in the widget since.
+  let lastCfgMode = null, lastItems = null, lastSeed = null;
+  function applyConfig(c) {
+    if (!c) return;
+    const prevUrl = cfg.socketUrl;
+    cfg = { ...cfg, ...c };
+    WIDGET_ID = cfg.id || cfg.widgetId || WIDGET_ID;
+    IS_VIEWER = cfg.role === 'viewer' || IS_VIEWER;
+    if (MODES.includes(cfg.mode) && cfg.mode !== lastCfgMode) {
+      if (lastCfgMode !== null || !S.rollId) S.mode = cfg.mode;
+      lastCfgMode = cfg.mode;
+    }
+    const items = Array.isArray(cfg.items) ? cfg.items : typeof cfg.items === 'string' ? cfg.items.split('\n') : null;
+    const itemsSig = items ? JSON.stringify(items) : null;
+    if (itemsSig && itemsSig !== lastItems) {
+      if (lastItems !== null || !S.rollId) setListItems(items);
+      lastItems = itemsSig;
+    }
+    const seed = String(cfg.seed || '');
+    if (seed !== lastSeed) {
+      if (lastSeed !== null || !S.rollId) S.rng = freshSeed();
+      lastSeed = seed;
+    }
+    if (cfg.socketUrl && cfg.socketUrl !== prevUrl) initSocket(cfg.socketUrl);
+    setupFor = '';
+    render();
+  }
+
+  function destroy() {
+    finishAnim(true);
+    clearTimeout(syncTimer);
+    clearTimeout(resizeTimer);
+    if (ro) ro.disconnect();
+    if (socket && socket.disconnect) socket.disconnect();
+    socket = null;
+  }
+
+  // ── Beamer+ message bridge ──────────────────────────────────────────────────
+  window.addEventListener('message', e => {
+    const d = e.data || {};
+    if (d.type === 'widget-config')  applyConfig(d.config);
+    if (d.type === 'widget-cleanup') destroy();
+    if (d.type === 'widget-get-state') {
+      window.parent.postMessage({ type: 'widget-state', widgetId: WIDGET_ID, state: getState() }, '*');
+    }
+    if (d.type === 'widget-set-state' && d.state) applyState(d.state, false);
+  });
+
+  // ── Event wiring ────────────────────────────────────────────────────────────
+  goBtn.addEventListener('click', go);
+  modeSel.addEventListener('change', () => setMode(modeSel.value));
+  runsSel.addEventListener('change', () => { if (IS_VIEWER) return; S.runs = +runsSel.value || 1; emitState(); });
+  statsBtn.addEventListener('click', () => {
+    if (IS_VIEWER) return;
+    S.showStats = !S.showStats;
+    render(); emitState();
+  });
+  setupEl.addEventListener('input', e => { if (e.target.dataset.k && e.target.type !== 'checkbox' && e.target.tagName !== 'SELECT') onSetupChange(e.target); });
+  setupEl.addEventListener('change', e => { if (e.target.dataset.k) onSetupChange(e.target); });
+  setupEl.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (b) onSetupAction(b.dataset.act, +b.dataset.i);
+  });
+  listText.addEventListener('input', updateListCount);
+  $('list-done').addEventListener('click', () => closeListEditor(true));
+  $('list-cancel').addEventListener('click', () => closeListEditor(false));
+  listText.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { e.stopPropagation(); closeListEditor(false); }
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) closeListEditor(true);
+  });
+
+  // Space / Enter goes, S toggles stats — from anywhere except a field.
+  document.addEventListener('keydown', e => {
+    if (IS_VIEWER || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.target.closest && e.target.closest('input, textarea, select, #list-editor')) return;
+    if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); if (!goBtn.disabled) go(); }
+    else if ((e.key === 's' || e.key === 'S') && S.mode !== 'list') statsBtn.click();
+  });
+
+  // Re-fit dice / wheel / numbers to the region, without replaying anything.
+  let resizeTimer = null, ro = null;
+  try {
+    ro = new ResizeObserver(() => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => { if (!anim) { wheelBuiltFor = ''; renderResult(false); } renderStats(); }, 60);
+    });
+    ro.observe(resultEl); ro.observe(chartEl);
+  } catch (_) { /* very old engines: fixed sizes are fine */ }
+
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // ── Boot ────────────────────────────────────────────────────────────────────
+  S.rng = freshSeed();
+  ensurePools();
+  initSocket(CFG0.socketUrl);
+  applyConfig(CFG0);
+  render();
+
+  // The shared bar's reset means clear the results, not reload the widget.
+  (function wireReset(tries) {
+    if (window.BeamerWidget && BeamerWidget.topbar) { BeamerWidget.topbar.onReset(reset); return; }
+    if (tries > 0) setTimeout(() => wireReset(tries - 1), 120);
+  })(20);
+})();
+</script>
+</body>
+</html>
