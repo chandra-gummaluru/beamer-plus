@@ -207,6 +207,7 @@ const isTemplateField = (f) => f?.type === 'textarea' && f.blanks && typeof f.bl
 // so the widget's own default applies again — so a widget behaves the same
 // whichever surface configured it.
 function buildFieldRow(field, item, variant) {
+    if (field.type === 'colour-counts') return buildColourCountsRow(field, item);
     if (isListField(field))     return buildListRow(field, item);
     if (isTemplateField(field)) return buildTemplateRow(field, item, variant);
 
@@ -945,4 +946,162 @@ function pickWidgetAsset(field, item, input, btn) {
         }
     });
     picker.click();
+}
+
+/* ─── colour + count list: a swatch you click to pick a colour, and how many ─ */
+// `type: "colour-counts"` — stored as [{ c: <option value>, n: <count> }, …].
+// Options carry their own colour: { v, l, hex }. Each colour is used once; the
+// swatch opens a small palette, and the count is a −/+ stepper.
+
+function buildColourCountsRow(field, item) {
+    const opts = (field.options || []).map(o => ({ v: o.v, l: o.l ?? String(o.v), hex: o.hex || '#888' }));
+    const maxRows = Math.min(field.max || opts.length, opts.length);
+    const nMin = field.countMin ?? 0, nMax = field.countMax ?? 99;
+    const row = document.createElement('div');
+    row.className = 'editor-prop-row wf-cc-row';
+    row.appendChild(fieldLabel(field));
+    const list = document.createElement('div');
+    list.className = 'wf-cc';
+    row.appendChild(list);
+    const add = document.createElement('button');
+    add.type = 'button';
+    add.className = 'wf-list-add wf-cc-add';
+    add.innerHTML = '<span aria-hidden="true">+</span> Add ' + escText((field.itemLabel || 'colour').toLowerCase());
+    row.appendChild(add);
+
+    const eff = fieldValue(item, field);
+    let items = (Array.isArray(eff) ? eff : [])
+        .map(x => ({ c: String(x?.c), n: Number(x?.n) }))
+        .filter(x => opts.some(o => String(o.v) === x.c));
+    const changed = () => list.dispatchEvent(new Event('input', { bubbles: true }));
+    const optOf = c => opts.find(o => String(o.v) === String(c)) || opts[0];
+    const clampN = n => Math.max(nMin, Math.min(nMax, Math.round(isNaN(n) ? nMin : n)));
+
+    let pop = null;
+    function closePop() {
+        if (!pop) return;
+        pop.remove(); pop = null;
+        list.querySelectorAll('.wf-cc-swatch.is-open').forEach(b => b.classList.remove('is-open'));
+        document.removeEventListener('pointerdown', outside, true);
+        document.removeEventListener('keydown', onKey, true);
+        window.removeEventListener('scroll', closePop, true);
+        window.removeEventListener('resize', closePop);
+    }
+    function outside(e) { if (pop && !pop.contains(e.target) && !e.target.closest?.('.wf-cc-swatch.is-open')) closePop(); }
+    function onKey(e) { if (e.key === 'Escape') { e.stopPropagation(); closePop(); } }
+    function openPop(btn, idx) {
+        const wasOpen = btn.classList.contains('is-open');
+        closePop();
+        list.querySelectorAll('.wf-cc-swatch.is-open').forEach(b => b.classList.remove('is-open'));
+        if (wasOpen) return;
+        btn.classList.add('is-open');
+        pop = document.createElement('div');
+        pop.className = 'wf-cc-pop';
+        pop.setAttribute('role', 'listbox');
+        const used = new Set(items.filter((_, j) => j !== idx).map(x => x.c));
+        for (const o of opts) {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'wf-cc-choice';
+            b.style.setProperty('--sw', o.hex);
+            b.title = o.l;
+            b.setAttribute('aria-label', o.l);
+            const cur = String(o.v) === items[idx].c;
+            b.setAttribute('aria-selected', cur ? 'true' : 'false');
+            if (used.has(String(o.v))) { b.disabled = true; b.title = o.l + ' (already used)'; }
+            b.addEventListener('click', () => {
+                items[idx].c = String(o.v);
+                closePop(); paint(); changed();
+                list.querySelectorAll('.wf-cc-swatch')[idx]?.focus();
+            });
+            pop.appendChild(b);
+        }
+        document.body.appendChild(pop);
+        const r = btn.getBoundingClientRect(), pr = pop.getBoundingClientRect();
+        let top = r.bottom + 6;
+        if (top + pr.height > window.innerHeight - 8) top = r.top - pr.height - 6;
+        pop.style.left = Math.max(8, Math.min(window.innerWidth - pr.width - 8, r.left - 6)) + 'px';
+        pop.style.top = top + 'px';
+        (pop.querySelector('[aria-selected="true"]') || pop.querySelector('button:not(:disabled)'))?.focus();
+        document.addEventListener('pointerdown', outside, true);
+        document.addEventListener('keydown', onKey, true);
+        window.addEventListener('scroll', closePop, true);
+        window.addEventListener('resize', closePop);
+    }
+
+    function paint() {
+        list.textContent = '';
+        items.forEach((it, i) => {
+            const o = optOf(it.c);
+            const r = document.createElement('div');
+            r.className = 'wf-cc-item';
+            const sw = document.createElement('button');
+            sw.type = 'button';
+            sw.className = 'wf-cc-swatch';
+            sw.style.setProperty('--sw', o.hex);
+            sw.title = o.l + ' — click to change';
+            sw.setAttribute('aria-label', 'Colour: ' + o.l);
+            sw.setAttribute('aria-haspopup', 'listbox');
+            sw.addEventListener('click', () => openPop(sw, i));
+            const name = document.createElement('span');
+            name.className = 'wf-cc-name';
+            name.textContent = o.l;
+            const step = document.createElement('div');
+            step.className = 'wf-cc-step';
+            const minus = document.createElement('button');
+            minus.type = 'button'; minus.textContent = '−'; minus.setAttribute('aria-label', 'Fewer');
+            const num = document.createElement('input');
+            num.type = 'text'; num.inputMode = 'numeric';
+            num.className = 'wf-cc-num';
+            num.value = String(it.n);
+            num.setAttribute('aria-label', 'How many ' + o.l.toLowerCase());
+            const plus = document.createElement('button');
+            plus.type = 'button'; plus.textContent = '+'; plus.setAttribute('aria-label', 'More');
+            const set = n => { it.n = clampN(n); num.value = String(it.n); minus.disabled = it.n <= nMin; plus.disabled = it.n >= nMax; changed(); };
+            minus.disabled = it.n <= nMin; plus.disabled = it.n >= nMax;
+            minus.addEventListener('click', () => set(it.n - 1));
+            plus.addEventListener('click', () => set(it.n + 1));
+            num.addEventListener('input', e => {
+                e.stopPropagation();
+                const v = parseInt(num.value, 10);
+                if (!isNaN(v)) { it.n = clampN(v); changed(); }
+            });
+            num.addEventListener('change', e => { e.stopPropagation(); set(parseInt(num.value, 10)); });
+            num.addEventListener('keydown', e => {
+                if (e.key === 'ArrowUp') { e.preventDefault(); set(it.n + 1); }
+                if (e.key === 'ArrowDown') { e.preventDefault(); set(it.n - 1); }
+            });
+            step.append(minus, num, plus);
+            const rm = document.createElement('button');
+            rm.type = 'button';
+            rm.className = 'wf-list-remove';
+            rm.title = 'Remove';
+            rm.setAttribute('aria-label', 'Remove ' + o.l.toLowerCase());
+            rm.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+            rm.disabled = items.length <= 1;
+            rm.addEventListener('click', () => { closePop(); items.splice(i, 1); paint(); changed(); });
+            r.append(sw, name, step, rm);
+            list.appendChild(r);
+        });
+        add.hidden = items.length >= maxRows;
+    }
+    add.addEventListener('click', () => {
+        const free = opts.find(o => !items.some(x => x.c === String(o.v)));
+        if (!free) return;
+        items.push({ c: String(free.v), n: clampN(field.addCount ?? 2) });
+        paint(); changed();
+        list.lastElementChild?.querySelector('.wf-cc-swatch')?.focus();
+    });
+    paint();
+
+    return {
+        key: field.key,
+        node: row,
+        wide: true,
+        read() {
+            if (!items.length) return { remove: true };
+            const typed = v => (typeof opts[0]?.v === 'number' ? Number(v) : v);
+            return { value: items.map(x => ({ c: typed(x.c), n: x.n })) };
+        },
+    };
 }

@@ -364,590 +364,71 @@
    ]
   },
   {
-   "key": "colourCount",
-   "label": "Number of colours",
-   "type": "select",
-   "default": "3",
+   "key": "ballSet",
+   "label": "Balls",
+   "type": "colour-counts",
+   "itemLabel": "colour",
+   "countMin": 0,
+   "countMax": 40,
+   "addCount": 2,
+   "options": [
+    {
+     "v": 0,
+     "l": "Red",
+     "hex": "#e5484d"
+    },
+    {
+     "v": 1,
+     "l": "Blue",
+     "hex": "#3e63dd"
+    },
+    {
+     "v": 2,
+     "l": "Green",
+     "hex": "#30a46c"
+    },
+    {
+     "v": 3,
+     "l": "Yellow",
+     "hex": "#f2c230"
+    },
+    {
+     "v": 4,
+     "l": "Purple",
+     "hex": "#8e4ec6"
+    },
+    {
+     "v": 5,
+     "l": "Teal",
+     "hex": "#12a594"
+    },
+    {
+     "v": 6,
+     "l": "Pink",
+     "hex": "#e93d82"
+    },
+    {
+     "v": 7,
+     "l": "Grey",
+     "hex": "#8b8d98"
+    }
+   ],
+   "default": [
+    {
+     "c": 0,
+     "n": 3
+    },
+    {
+     "c": 1,
+     "n": 2
+    },
+    {
+     "c": 2,
+     "n": 1
+    }
+   ],
    "showIf": {
     "mode": "bag"
-   },
-   "options": [
-    {
-     "v": "1",
-     "l": "1"
-    },
-    {
-     "v": "2",
-     "l": "2"
-    },
-    {
-     "v": "3",
-     "l": "3"
-    },
-    {
-     "v": "4",
-     "l": "4"
-    },
-    {
-     "v": "5",
-     "l": "5"
-    },
-    {
-     "v": "6",
-     "l": "6"
-    },
-    {
-     "v": "7",
-     "l": "7"
-    },
-    {
-     "v": "8",
-     "l": "8"
-    }
-   ]
-  },
-  {
-   "key": "ball1Colour",
-   "label": "Colour 1",
-   "type": "select",
-   "default": "0",
-   "showIf": {
-    "mode": "bag",
-    "colourCount": [
-     "1",
-     "2",
-     "3",
-     "4",
-     "5",
-     "6",
-     "7",
-     "8"
-    ]
-   },
-   "options": [
-    {
-     "v": "0",
-     "l": "Red"
-    },
-    {
-     "v": "1",
-     "l": "Blue"
-    },
-    {
-     "v": "2",
-     "l": "Green"
-    },
-    {
-     "v": "3",
-     "l": "Yellow"
-    },
-    {
-     "v": "4",
-     "l": "Purple"
-    },
-    {
-     "v": "5",
-     "l": "Teal"
-    },
-    {
-     "v": "6",
-     "l": "Pink"
-    },
-    {
-     "v": "7",
-     "l": "Grey"
-    }
-   ]
-  },
-  {
-   "key": "ball1Count",
-   "label": "How many",
-   "type": "number",
-   "min": 0,
-   "max": 40,
-   "step": 1,
-   "default": 3,
-   "showIf": {
-    "mode": "bag",
-    "colourCount": [
-     "1",
-     "2",
-     "3",
-     "4",
-     "5",
-     "6",
-     "7",
-     "8"
-    ]
-   }
-  },
-  {
-   "key": "ball2Colour",
-   "label": "Colour 2",
-   "type": "select",
-   "default": "1",
-   "showIf": {
-    "mode": "bag",
-    "colourCount": [
-     "2",
-     "3",
-     "4",
-     "5",
-     "6",
-     "7",
-     "8"
-    ]
-   },
-   "options": [
-    {
-     "v": "0",
-     "l": "Red"
-    },
-    {
-     "v": "1",
-     "l": "Blue"
-    },
-    {
-     "v": "2",
-     "l": "Green"
-    },
-    {
-     "v": "3",
-     "l": "Yellow"
-    },
-    {
-     "v": "4",
-     "l": "Purple"
-    },
-    {
-     "v": "5",
-     "l": "Teal"
-    },
-    {
-     "v": "6",
-     "l": "Pink"
-    },
-    {
-     "v": "7",
-     "l": "Grey"
-    }
-   ]
-  },
-  {
-   "key": "ball2Count",
-   "label": "How many",
-   "type": "number",
-   "min": 0,
-   "max": 40,
-   "step": 1,
-   "default": 2,
-   "showIf": {
-    "mode": "bag",
-    "colourCount": [
-     "2",
-     "3",
-     "4",
-     "5",
-     "6",
-     "7",
-     "8"
-    ]
-   }
-  },
-  {
-   "key": "ball3Colour",
-   "label": "Colour 3",
-   "type": "select",
-   "default": "2",
-   "showIf": {
-    "mode": "bag",
-    "colourCount": [
-     "3",
-     "4",
-     "5",
-     "6",
-     "7",
-     "8"
-    ]
-   },
-   "options": [
-    {
-     "v": "0",
-     "l": "Red"
-    },
-    {
-     "v": "1",
-     "l": "Blue"
-    },
-    {
-     "v": "2",
-     "l": "Green"
-    },
-    {
-     "v": "3",
-     "l": "Yellow"
-    },
-    {
-     "v": "4",
-     "l": "Purple"
-    },
-    {
-     "v": "5",
-     "l": "Teal"
-    },
-    {
-     "v": "6",
-     "l": "Pink"
-    },
-    {
-     "v": "7",
-     "l": "Grey"
-    }
-   ]
-  },
-  {
-   "key": "ball3Count",
-   "label": "How many",
-   "type": "number",
-   "min": 0,
-   "max": 40,
-   "step": 1,
-   "default": 1,
-   "showIf": {
-    "mode": "bag",
-    "colourCount": [
-     "3",
-     "4",
-     "5",
-     "6",
-     "7",
-     "8"
-    ]
-   }
-  },
-  {
-   "key": "ball4Colour",
-   "label": "Colour 4",
-   "type": "select",
-   "default": "3",
-   "showIf": {
-    "mode": "bag",
-    "colourCount": [
-     "4",
-     "5",
-     "6",
-     "7",
-     "8"
-    ]
-   },
-   "options": [
-    {
-     "v": "0",
-     "l": "Red"
-    },
-    {
-     "v": "1",
-     "l": "Blue"
-    },
-    {
-     "v": "2",
-     "l": "Green"
-    },
-    {
-     "v": "3",
-     "l": "Yellow"
-    },
-    {
-     "v": "4",
-     "l": "Purple"
-    },
-    {
-     "v": "5",
-     "l": "Teal"
-    },
-    {
-     "v": "6",
-     "l": "Pink"
-    },
-    {
-     "v": "7",
-     "l": "Grey"
-    }
-   ]
-  },
-  {
-   "key": "ball4Count",
-   "label": "How many",
-   "type": "number",
-   "min": 0,
-   "max": 40,
-   "step": 1,
-   "default": 2,
-   "showIf": {
-    "mode": "bag",
-    "colourCount": [
-     "4",
-     "5",
-     "6",
-     "7",
-     "8"
-    ]
-   }
-  },
-  {
-   "key": "ball5Colour",
-   "label": "Colour 5",
-   "type": "select",
-   "default": "4",
-   "showIf": {
-    "mode": "bag",
-    "colourCount": [
-     "5",
-     "6",
-     "7",
-     "8"
-    ]
-   },
-   "options": [
-    {
-     "v": "0",
-     "l": "Red"
-    },
-    {
-     "v": "1",
-     "l": "Blue"
-    },
-    {
-     "v": "2",
-     "l": "Green"
-    },
-    {
-     "v": "3",
-     "l": "Yellow"
-    },
-    {
-     "v": "4",
-     "l": "Purple"
-    },
-    {
-     "v": "5",
-     "l": "Teal"
-    },
-    {
-     "v": "6",
-     "l": "Pink"
-    },
-    {
-     "v": "7",
-     "l": "Grey"
-    }
-   ]
-  },
-  {
-   "key": "ball5Count",
-   "label": "How many",
-   "type": "number",
-   "min": 0,
-   "max": 40,
-   "step": 1,
-   "default": 2,
-   "showIf": {
-    "mode": "bag",
-    "colourCount": [
-     "5",
-     "6",
-     "7",
-     "8"
-    ]
-   }
-  },
-  {
-   "key": "ball6Colour",
-   "label": "Colour 6",
-   "type": "select",
-   "default": "5",
-   "showIf": {
-    "mode": "bag",
-    "colourCount": [
-     "6",
-     "7",
-     "8"
-    ]
-   },
-   "options": [
-    {
-     "v": "0",
-     "l": "Red"
-    },
-    {
-     "v": "1",
-     "l": "Blue"
-    },
-    {
-     "v": "2",
-     "l": "Green"
-    },
-    {
-     "v": "3",
-     "l": "Yellow"
-    },
-    {
-     "v": "4",
-     "l": "Purple"
-    },
-    {
-     "v": "5",
-     "l": "Teal"
-    },
-    {
-     "v": "6",
-     "l": "Pink"
-    },
-    {
-     "v": "7",
-     "l": "Grey"
-    }
-   ]
-  },
-  {
-   "key": "ball6Count",
-   "label": "How many",
-   "type": "number",
-   "min": 0,
-   "max": 40,
-   "step": 1,
-   "default": 2,
-   "showIf": {
-    "mode": "bag",
-    "colourCount": [
-     "6",
-     "7",
-     "8"
-    ]
-   }
-  },
-  {
-   "key": "ball7Colour",
-   "label": "Colour 7",
-   "type": "select",
-   "default": "6",
-   "showIf": {
-    "mode": "bag",
-    "colourCount": [
-     "7",
-     "8"
-    ]
-   },
-   "options": [
-    {
-     "v": "0",
-     "l": "Red"
-    },
-    {
-     "v": "1",
-     "l": "Blue"
-    },
-    {
-     "v": "2",
-     "l": "Green"
-    },
-    {
-     "v": "3",
-     "l": "Yellow"
-    },
-    {
-     "v": "4",
-     "l": "Purple"
-    },
-    {
-     "v": "5",
-     "l": "Teal"
-    },
-    {
-     "v": "6",
-     "l": "Pink"
-    },
-    {
-     "v": "7",
-     "l": "Grey"
-    }
-   ]
-  },
-  {
-   "key": "ball7Count",
-   "label": "How many",
-   "type": "number",
-   "min": 0,
-   "max": 40,
-   "step": 1,
-   "default": 2,
-   "showIf": {
-    "mode": "bag",
-    "colourCount": [
-     "7",
-     "8"
-    ]
-   }
-  },
-  {
-   "key": "ball8Colour",
-   "label": "Colour 8",
-   "type": "select",
-   "default": "7",
-   "showIf": {
-    "mode": "bag",
-    "colourCount": [
-     "8"
-    ]
-   },
-   "options": [
-    {
-     "v": "0",
-     "l": "Red"
-    },
-    {
-     "v": "1",
-     "l": "Blue"
-    },
-    {
-     "v": "2",
-     "l": "Green"
-    },
-    {
-     "v": "3",
-     "l": "Yellow"
-    },
-    {
-     "v": "4",
-     "l": "Purple"
-    },
-    {
-     "v": "5",
-     "l": "Teal"
-    },
-    {
-     "v": "6",
-     "l": "Pink"
-    },
-    {
-     "v": "7",
-     "l": "Grey"
-    }
-   ]
-  },
-  {
-   "key": "ball8Count",
-   "label": "How many",
-   "type": "number",
-   "min": 0,
-   "max": 40,
-   "step": 1,
-   "default": 2,
-   "showIf": {
-    "mode": "bag",
-    "colourCount": [
-     "8"
-    ]
    }
   },
   {
@@ -2013,6 +1494,15 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 
   const BALL_NAMES = ['Red', 'Blue', 'Green', 'Yellow', 'Purple', 'Teal', 'Pink', 'Grey'];
   function bagFromConfig(c) {
+    if (Array.isArray(c.ballSet) && c.ballSet.length) {
+      const out = [];
+      c.ballSet.forEach(b => {
+        const hue = numCfg(b && b.c, 0, 0, 7, true), count = numCfg(b && b.n, 0, 0, 40, true);
+        const same = out.find(x => x.c === hue);
+        if (same) same.n += count; else out.push({ c: hue, n: count, label: BALL_NAMES[hue] });
+      });
+      return out;
+    }
     const picked = c.colourCount != null || [1, 2, 3, 4, 5, 6, 7, 8].some(i => c['ball' + i + 'Colour'] != null || c['ball' + i + 'Count'] != null);
     if (!picked && lines(c.balls).length) return parseBalls(lines(c.balls));
     const n = numCfg(c.colourCount, 3, 1, 8, true), def = [3, 2, 1, 2, 2, 2, 2, 2];
@@ -2702,9 +2192,10 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     const T = T3, cam = HT.camera;
     cam.aspect = w / h;
     const vf = T.MathUtils.degToRad(cam.fov) / 2, hf = Math.atan(Math.tan(vf) * cam.aspect);
-    const dist = Math.max(3.6 / Math.tan(hf), 2.3 / Math.tan(vf)) * 1.05;
-    cam.position.set(0.55, 1.6 + dist * 0.42, dist);
-    cam.lookAt(0.55, 1.55, 0.3);
+    // The hat in the middle; the drawn name is held up beside it.
+    const dist = Math.max(4.15 / Math.tan(hf), 2.3 / Math.tan(vf)) * 1.05;
+    cam.position.set(HAT.x, 1.6 + dist * 0.42, dist);
+    cam.lookAt(HAT.x, 1.55, 0.3);
     cam.updateProjectionMatrix();
   }
   // The picked slip: two halves of one sheet, the lower one hinged at the fold.
@@ -2750,7 +2241,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     m.castShadow = true;
     return m;
   }
-  const PICK_AT = { x: 2.05, y: 1.85, z: 1.9 };
+  const PICK_AT = { x: 0.7, y: 1.85, z: 1.6 };
   function pickRestQuat(p) {
     p.position.set(PICK_AT.x, PICK_AT.y, PICK_AT.z);
     p.quaternion.identity();
@@ -2785,14 +2276,12 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     HT.hat.rotation.set(0, 0, 0);
     const name = o ? o.name : null;
     if (!play || !o) {
-      hatCount(host, left);
       if (HT.pickKey !== name) { disposePick(HT.pick); HT.pick = name == null ? null : buildPick(name); HT.pickKey = name; if (HT.pick) HT.scene.add(HT.pick); }
       fillHat(inHat(left));
       restPick(); draw();
       return 0;
     }
-    hatCount(host, remove ? left + 1 : left);
-    const note = host.querySelector('.count-note b');
+    const note = null;
 
     // The slip already out goes first: back into the hat if names can come
     // up again, otherwise screwed up and thrown away.
@@ -3128,19 +2617,55 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     jar.add(note);
     // Velvet drawstring bag.
     const sack = new T.Group(); sack.position.x = JAR.x; scene.add(sack);
-    const sp = [[0.0, 0.02], [0.75, 0.04], [1.15, 0.3], [1.32, 0.85], [1.28, 1.5], [1.05, 2.05], [0.6, 2.45], [0.42, 2.62], [0.46, 2.8], [0.58, 3.0], [0.62, 3.05]]
-      .map(([x, y]) => new T.Vector2(x, y));
-    const sgeo = new T.LatheGeometry(sp, 120, 0, Math.PI * 2);
-    // Folds: the fabric gathers in toward the neck.
+    // A smooth profile (no straight segments, so no ridges), slumped a
+    // little at the bottom the way a filled bag sits.
+    const sp = new T.SplineCurve([[0.0, 0.0], [0.62, 0.02], [1.08, 0.2], [1.3, 0.62], [1.33, 1.15], [1.22, 1.62], [0.98, 2.05], [0.62, 2.42], [0.43, 2.6], [0.47, 2.76], [0.6, 2.94], [0.66, 3.04]]
+      .map(([x, y]) => new T.Vector2(x, y))).getPoints(110);
+    const SEG = 160;
+    const sgeo = new T.LatheGeometry(sp, SEG, 0, Math.PI * 2);
+    // Cloth: soft pleats where the drawstring gathers it, fading into the
+    // belly; a gentle unevenness lower down; a soft frill above the tie.
     const pos = sgeo.getAttribute('position'), v = new T.Vector3();
+    const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
     for (let i = 0; i < pos.count; i++) {
       v.fromBufferAttribute(pos, i);
-      const th = Math.atan2(v.z, v.x), gather = Math.max(0, Math.min(1, (v.y - 1.0) / 1.6));
-      const k = 1 + (0.025 + 0.06 * gather) * Math.sin(th * 9 + v.y * 2.2);
-      pos.setXYZ(i, v.x * k, v.y, v.z * k);
+      const th = Math.atan2(v.z, v.x), y = v.y;
+      const gather = smooth(1.05, 2.55, y) * (1 - smooth(2.62, 2.7, y));
+      const frill = smooth(2.66, 2.8, y);
+      const pleat = Math.sin(th * 8 + 0.6 * Math.sin(th * 3)) * 0.7 + Math.sin(th * 13 + 1.1) * 0.3;
+      const lump = Math.sin(th * 2 + 0.4) * 0.55 + Math.sin(th * 3 + y * 1.3 + 1.7) * 0.45;
+      let k = 1 + pleat * (0.012 + 0.1 * gather) + lump * 0.028 * (1 - gather) * smooth(0.05, 0.5, y)
+                + Math.sin(th * 11 + 0.8 * Math.sin(th * 4)) * 0.09 * frill;
+      pos.setXYZ(i, v.x * k, y, v.z * k);
     }
     sgeo.computeVertexNormals();
-    const velvet = new T.MeshPhysicalMaterial({ color: 0x4b3591, roughness: 0.75, sheen: 1, sheenRoughness: 0.4, sheenColor: new T.Color(0xb7a4ff), side: T.DoubleSide });
+    // Close the seam: the first and last columns of the lathe are the same
+    // points, so give them the same normal.
+    { const nrm = sgeo.getAttribute('normal'), P = sp.length, n = new T.Vector3(), m = new T.Vector3();
+      for (let j = 0; j < P; j++) {
+        const a0 = j, a1 = SEG * P + j;
+        n.fromBufferAttribute(nrm, a0).add(m.fromBufferAttribute(nrm, a1)).normalize();
+        nrm.setXYZ(a0, n.x, n.y, n.z); nrm.setXYZ(a1, n.x, n.y, n.z);
+      } }
+    // A fine woven texture for the light to catch.
+    const weave = (() => {
+      const cv = document.createElement('canvas'), N = 256;
+      cv.width = cv.height = N;
+      const ctx = cv.getContext('2d'), img = ctx.createImageData(N, N);
+      for (let yy = 0; yy < N; yy++) for (let xx = 0; xx < N; xx++) {
+        const w = 0.5 + 0.25 * Math.sin(xx * Math.PI / 2) * (Math.floor(yy / 2) % 2 ? 1 : -1) + 0.25 * Math.sin(yy * Math.PI / 2) * (Math.floor(xx / 2) % 2 ? 1 : -1);
+        const g = Math.max(0, Math.min(255, (w + wob(xx * 7 + yy * 131, 9) * 0.25) * 255));
+        const o = (yy * N + xx) * 4; img.data[o] = img.data[o + 1] = img.data[o + 2] = g; img.data[o + 3] = 255;
+      }
+      ctx.putImageData(img, 0, 0);
+      const t = new T.CanvasTexture(cv);
+      t.wrapS = t.wrapT = T.RepeatWrapping;
+      t.repeat.set(14, 9);
+      t.anisotropy = 8;
+      return t;
+    })();
+    const velvet = new T.MeshPhysicalMaterial({ color: 0x4b3591, roughness: 0.9, bumpMap: weave, bumpScale: 0.35,
+      sheen: 1, sheenRoughness: 0.55, sheenColor: new T.Color(0xc2b2ff), side: T.DoubleSide });
     const sackMesh = new T.Mesh(sgeo, velvet); sackMesh.castShadow = true; sack.add(sackMesh);
     const hole = new T.Mesh(new T.CircleGeometry(0.56, 48), new T.MeshBasicMaterial({ color: 0x0d0818 }));
     hole.rotation.x = -Math.PI / 2; hole.position.y = 2.96; sack.add(hole);
@@ -3210,13 +2735,13 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     const T = T3, cam = BG.camera;
     cam.aspect = w / h;
     const vf = T.MathUtils.degToRad(cam.fov) / 2, hf = Math.atan(Math.tan(vf) * cam.aspect);
-    // The container and the spot a drawn ball is held up at, centred together.
-    const dist = Math.max(2.3 / Math.tan(hf), 2.2 / Math.tan(vf)) * 1.08;
-    cam.position.set(0.65, 1.7 + dist * 0.28, dist);
-    cam.lookAt(0.65, 1.75, 0);
+    // The container in the middle, room beside it for a ball held up.
+    const dist = Math.max(2.75 / Math.tan(hf), 2.2 / Math.tan(vf)) * 1.08;
+    cam.position.set(JAR.x, 1.7 + dist * 0.28, dist);
+    cam.lookAt(JAR.x, 1.75, 0);
     cam.updateProjectionMatrix();
   }
-  const HOLD = { x: 1.45, y: 3.0, z: 0.6 };
+  const HOLD = { x: 0.95, y: 3.0, z: 0.6 };
 
   function renderBag3D(o, play, host, w, h, look) {
     const T = T3, st = S.setup.bag;
@@ -3589,7 +3114,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     d.camera.aspect = w / h;
     const halfW = (n * gap) / 2 + 0.3, halfH = 1.75;
     const vf = T.MathUtils.degToRad(d.camera.fov) / 2, hf = Math.atan(Math.tan(vf) * d.camera.aspect);
-    const dist = Math.max(halfW / Math.tan(hf), halfH / Math.tan(vf)) * 1.08;
+    const dist = Math.max(halfW / Math.tan(hf), halfH / Math.tan(vf)) * 1.3;
     // Nearly straight down, as you'd look at dice on a table to read them:
     // the face that came up is the one facing the room.
     d.camera.position.set(0, dist * 0.96, dist * 0.28);
@@ -4470,9 +3995,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       cam.updateMatrixWorld();
       let mx = 0, my = 0, minY = 1;
       pts.forEach(p => { const v = p.clone().project(cam); mx = Math.max(mx, Math.abs(v.x)); my = Math.max(my, Math.abs(v.y)); minY = Math.min(minY, v.y); });
-      // Under the mat: ~30px for the count.
-      const room = 1 - 60 / h;
-      dist *= Math.max(mx / 0.95, my / 0.95, -minY / room);
+      dist *= Math.max(mx / 0.95, my / 0.95);
     }
     cam.position.copy(tgt).addScaledVector(dir, dist);
     cam.lookAt(tgt);
@@ -4510,10 +4033,8 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     frameCards(w, h, mode);
     const draw = () => renderer.render(CD.scene, CD.camera);
     const deckN = S.pool.cards.length, hand = st.replace ? [] : S.pool.hand;
-    const note = deckCount(host, deckN);
-    const say = n => { if (note) note.textContent = String(n); };
 
-    if (shuffling) return shuffle3D(deckN, note, draw);
+    if (shuffling) return shuffle3D(deckN, draw);
     const k = play && o ? o.cards.length : 0;
     if (!k) { layTable(hand); setDeck(deckN); draw(); return 0; }
 
@@ -4525,7 +4046,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       const from = cards.map((_, j) => new T.Vector3(DECK3.x, deckTop(deckN + k - j) + 0.0005, DECK3.z));
       const to = cards.map((_, j) => slotPose(first + j));
       cards.forEach(c => { c.visible = false; });
-      setDeck(deckN + k); say(deckN + k);
+      setDeck(deckN + k);
       const DUR = (k - 1) * GAP + EACH, t0 = performance.now();
       const frame = now => {
         const t = now - t0;
@@ -4543,7 +4064,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
           const flip = easeInOut(seg(u, 0.18, 0.85));
           c.rotation.set(0, to[j].yaw * e + Math.sin(Math.PI * u) * 0.22, Math.PI * (1 - flip));
         });
-        setDeck(onDeck); say(onDeck);
+        setDeck(onDeck);
         draw();
         if (t < DUR) CD.raf = requestAnimationFrame(frame);
       };
@@ -4551,57 +4072,83 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       return DUR;
     }
 
-    // Put back: off the top, turned up to the room, held, then turned down
-    // and slid into the deck at some depth.
+    // Put back: every card comes off the top and is turned up to the room;
+    // then, one at a time, each is turned back down and slid into the deck,
+    // the cards above it lifting to let it in.
     layTable([]);
     setDeck(deckN);
-    const EACH = 2700, GAP = 240, SC = 1.25;
-    const tilt = Math.PI / 2 - CARD_EL;
+    const SC = 1.25, tilt = Math.PI / 2 - CARD_EL;
     const camDist = CD.camera.position.distanceTo(new T.Vector3(DECK3.x, 1, DECK3.z + 0.5));
     const availW = 2 * Math.tan(T.MathUtils.degToRad(CD.camera.fov) / 2) * CD.camera.aspect * camDist * 0.88;
     const step = Math.min(CARD.w * SC * 1.08, (availW - CARD.w * SC) / Math.max(1, k - 1));
     const cards = o.cards.map(id => makeCard(id));
-    CD.fly = cards;
+    const upperMat = CD.edgeMat.clone();
+    upperMat.map = CD.edgeMat.map.clone(); upperMat.map.needsUpdate = true;
+    const upper = new T.Mesh(CD.slabGeo, [CD.backMat, upperMat]);
+    upper.castShadow = true; upper.visible = false;
+    CD.scene.add(upper);
+    CD.fly = [...cards, upper];
     const show = cards.map((_, j) => new T.Vector3(DECK3.x + (j - (k - 1) / 2) * step, 0.85, DECK3.z + 0.35 + j * 0.004));
-    const depth = cards.map((_, j) => 0.15 + 0.7 * (wob(S.rollId, j + 11) + 0.5));
+    const depth = cards.map((_, j) => 0.2 + 0.6 * (wob(S.rollId, j + 11) + 0.5));
     cards.forEach(c => { c.visible = false; });
-    const DUR = (k - 1) * GAP + EACH, t0 = performance.now();
+    const UP = 150, OUT = 1000, HOLDT = 2300, IN = 900;
+    const DUR = HOLDT + k * IN + 60, t0 = performance.now();
     const frame = now => {
       const t = now - t0;
-      let out = 0;
+      let gone = 0, back = 0;
       cards.forEach((c, j) => {
-        const u = (t - j * GAP) / EACH;
-        if (u < 0 || u >= 1) { c.visible = false; return; }
-        out++;
+        const a = j * UP, b = HOLDT + j * IN;
+        if (t < a) { c.visible = false; return; }
+        if (t >= b + IN) { c.visible = false; back++; gone++; return; }
+        gone++;
         c.visible = true;
-        const top = new T.Vector3(DECK3.x, deckTop(deckN - 1) + 0.0005, DECK3.z);
+        const onDeck = deckN - k + (k - j) - 1;          // cards under it as it leaves
+        const top = new T.Vector3(DECK3.x, deckTop(Math.max(0, deckN - 1 - j)) + 0.0005, DECK3.z);
         const lifted = top.clone().add(new T.Vector3(0.12, 0.3, 0.08));
-        const side = new T.Vector3(DECK3.x + CARD.w * 1.05, MAT_Y + depth[j] * (deckN - 1) * CARD.th, DECK3.z);
-        const slot = side.clone(); slot.x = DECK3.x;
         let face = 0, tl = 0, sc = 1;
-        if (u < 0.12) { c.position.lerpVectors(top, lifted, easeInOut(u / 0.12)); }
-        else if (u < 0.34) {
-          const e = easeInOut(seg(u, 0.12, 0.34));
-          c.position.lerpVectors(lifted, show[j], e);
-          face = e; tl = e; sc = 1 + (SC - 1) * e;
-        } else if (u < 0.74) {
-          c.position.copy(show[j]); c.position.y += Math.sin((u - 0.34) * 9) * 0.012;
-          face = 1; tl = 1; sc = SC;
-        } else if (u < 0.88) {
-          const e = easeInOut(seg(u, 0.74, 0.88));
-          c.position.lerpVectors(show[j], side, e);
-          c.position.y += Math.sin(Math.PI * e) * 0.15;
-          face = 1 - e; tl = 1 - e; sc = SC + (1 - SC) * e;
+        if (t < b) {
+          const u = t - a;
+          if (u < 300) c.position.lerpVectors(top, lifted, easeInOut(u / 300));
+          else {
+            const e = easeInOut(seg(u, 300, OUT));
+            c.position.lerpVectors(lifted, show[j], e);
+            if (e >= 1) c.position.y += Math.sin((u - OUT) / 300) * 0.012;
+            face = e; tl = e; sc = 1 + (SC - 1) * e;
+          }
         } else {
-          c.position.lerpVectors(side, slot, easeInOut(seg(u, 0.88, 1)));
+          // Its turn to go back.
+          const u = t - b;
+          const n = deckN - k + j;                        // in the deck right now
+          const nb = Math.round(depth[j] * n);
+          const slot = new T.Vector3(DECK3.x, MAT_Y + nb * CARD.th + 0.002, DECK3.z);
+          const side = slot.clone(); side.x += CARD.w * 1.1; side.y += 0.03;
+          const open = easeInOut(seg(u, 250, 420)) * (1 - easeInOut(seg(u, 720, 860)));
+          // The deck, split where it goes in.
+          setDeck(nb);
+          upper.visible = n - nb > 0;
+          upper.scale.y = Math.max(0.0001, (n - nb) * CARD.th);
+          upperMat.map.repeat.set(1, Math.max(1, (n - nb) / 2));
+          upper.position.set(DECK3.x, MAT_Y + nb * CARD.th + open * 0.08, DECK3.z);
+          upper.rotation.set(0, 0, open * 0.07);
+          if (u < 420) {
+            const e = easeInOut(seg(u, 0, 420));
+            c.position.lerpVectors(show[j], side, e);
+            c.position.y += Math.sin(Math.PI * e) * 0.15;
+            face = 1 - e; tl = 1 - e; sc = SC + (1 - SC) * e;
+          } else {
+            c.position.lerpVectors(side, slot, easeInOut(seg(u, 420, 760)));
+          }
+          if (u >= 860) c.visible = false;
         }
         c.rotation.set(tilt * tl, 0, Math.PI * (1 - face));
         c.scale.setScalar(sc);
       });
-      setDeck(deckN - out); say(deckN - out);
+      // Before anything's going back, the deck is just short of the cards out.
+      const active = cards.some((_, j) => t >= HOLDT + j * IN && t < HOLDT + (j + 1) * IN);
+      if (!active) { upper.visible = false; setDeck(deckN - gone + back); }
       draw();
       if (t < DUR) CD.raf = requestAnimationFrame(frame);
-      else { clearFly(); setDeck(deckN); say(deckN); draw(); }
+      else { clearFly(); upperMat.map.dispose(); upperMat.dispose(); setDeck(deckN); draw(); }
     };
     frame(t0);
     return DUR;
@@ -4610,9 +4157,9 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   // Shuffle: whatever is on the table is gathered back onto the deck, then
   // the deck is riffled — cut, the halves pulled apart, the cards falling
   // back in turn, squared up.
-  function shuffle3D(deckN, note, draw) {
+  function shuffle3D(deckN, draw) {
     const T = T3;
-    const say = n => { if (note) note.textContent = String(n); };
+    const say = () => {};
     const out = CD.table.filter(c => c.parent && c.visible).reverse();
     CD.table = [];
     const n0 = Math.max(0, deckN - out.length);
@@ -4684,8 +4231,6 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     const st = S.setup.cards;
     layTable(st.replace ? [] : S.pool.hand);
     setDeck(S.pool.cards.length);
-    const note = document.querySelector('#stage3d .count-note b');
-    if (note) note.textContent = String(S.pool.cards.length);
     getRenderer().render(CD.scene, CD.camera);
   }
 

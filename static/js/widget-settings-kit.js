@@ -223,7 +223,63 @@
     // Each row returns { key, node, read() } — read() reports either a value to
     // write or that the key should be dropped, matching how the editor panel
     // used to treat a cleared field.
+    // A colour + count list, kept simple here: a colour menu and a number per
+    // row. (The editor's panel draws this as swatches and steppers.)
+    function buildColourCountsRow(field, onChange) {
+        var row = el('div', 'bws-row');
+        row.appendChild(labelFor(field));
+        var opts = field.options || [];
+        var box = el('div');
+        row.appendChild(box);
+        var eff = effective(field);
+        var items = (Array.isArray(eff) ? eff : []).map(function (x) { return { c: String(x && x.c), n: Number(x && x.n) || 0 }; });
+        var add = el('button', 'bws-btn');
+        add.type = 'button';
+        add.textContent = '+ Add colour';
+        row.appendChild(add);
+        function paint() {
+            box.innerHTML = '';
+            items.forEach(function (it, i) {
+                var line = el('div');
+                line.style.cssText = 'display:flex;gap:6px;align-items:center;margin:4px 0';
+                var dot = el('span');
+                var sel = el('select', 'bws-select');
+                opts.forEach(function (o) {
+                    var op = el('option'); op.value = String(o.v); op.textContent = o.l; if (String(o.v) === it.c) op.selected = true; sel.appendChild(op);
+                });
+                var hexOf = function () { var o = opts.filter(function (o) { return String(o.v) === it.c; })[0]; return (o && o.hex) || '#888'; };
+                dot.style.cssText = 'width:18px;height:18px;border-radius:50%;flex:none;background:' + hexOf();
+                sel.addEventListener('change', function () { it.c = sel.value; dot.style.background = hexOf(); onChange(); });
+                var num = el('input', 'bws-input');
+                num.type = 'number'; num.min = field.countMin || 0; num.max = field.countMax || 99; num.value = it.n;
+                num.style.width = '64px';
+                num.addEventListener('input', function () { it.n = Math.max(0, parseInt(num.value, 10) || 0); onChange(); });
+                var rm = el('button', 'bws-btn');
+                rm.type = 'button'; rm.textContent = '×'; rm.disabled = items.length <= 1;
+                rm.addEventListener('click', function () { items.splice(i, 1); paint(); onChange(); });
+                line.appendChild(dot); line.appendChild(sel); line.appendChild(num); line.appendChild(rm);
+                box.appendChild(line);
+            });
+            add.hidden = items.length >= Math.min(field.max || opts.length, opts.length);
+        }
+        add.addEventListener('click', function () {
+            var free = opts.filter(function (o) { return !items.some(function (x) { return x.c === String(o.v); }); })[0];
+            if (!free) return;
+            items.push({ c: String(free.v), n: 2 }); paint(); onChange();
+        });
+        paint();
+        return {
+            key: field.key,
+            node: row,
+            read: function () {
+                if (!items.length) return { remove: true };
+                return { value: items.map(function (x) { return { c: typeof (opts[0] && opts[0].v) === 'number' ? Number(x.c) : x.c, n: x.n }; }) };
+            },
+        };
+    }
+
     function buildRow(field, onChange) {
+        if (field.type === 'colour-counts') return buildColourCountsRow(field, onChange);
         var eff = effective(field);
         var row = el('div', 'bws-row');
         var input;
