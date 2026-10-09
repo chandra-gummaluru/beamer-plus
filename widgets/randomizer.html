@@ -3,26 +3,425 @@
 <head>
 <script id="widget-schema" type="application/json">
 {
-  "label": "Randomizer",
-  "category": "Tools",
-  "fields": [
-    { "key": "mode", "label": "Starts as", "type": "select", "default": "dice",
-      "options": [
-        { "v": "dice",    "l": "Dice" },
-        { "v": "coin",    "l": "Coin" },
-        { "v": "bag",     "l": "Bag of balls" },
-        { "v": "spinner", "l": "Spinner" },
-        { "v": "cards",   "l": "Deck of cards" },
-        { "v": "number",  "l": "Random number" },
-        { "v": "list",    "l": "Name / list picker" },
-        { "v": "dist",    "l": "Distribution sampler" }
-      ] },
-    { "key": "items", "label": "List items (one per line)", "type": "textarea-lines", "rows": 5,
-      "placeholder": "Ada\nGrace\nAlan\n…", "showIf": { "mode": "list" } },
-    { "key": "seed", "label": "Seed (same results every time)", "type": "text",
-      "placeholder": "Blank = truly random" },
-    { "key": "animate", "label": "Animate", "type": "checkbox", "default": true }
-  ]
+ "label": "Randomizer",
+ "category": "Tools",
+ "fields": [
+  {
+   "key": "mode",
+   "label": "Type",
+   "type": "select",
+   "default": "dice",
+   "options": [
+    {
+     "v": "dice",
+     "l": "Dice"
+    },
+    {
+     "v": "coin",
+     "l": "Coin"
+    },
+    {
+     "v": "bag",
+     "l": "Bag of balls"
+    },
+    {
+     "v": "spinner",
+     "l": "Spinner"
+    },
+    {
+     "v": "cards",
+     "l": "Deck of cards"
+    },
+    {
+     "v": "number",
+     "l": "Random number"
+    },
+    {
+     "v": "list",
+     "l": "Name picker"
+    },
+    {
+     "v": "dist",
+     "l": "Distribution sampler"
+    }
+   ]
+  },
+  {
+   "key": "dice",
+   "label": "Dice (number of sides)",
+   "type": "textarea-lines",
+   "editor": "list",
+   "itemLabel": "die",
+   "itemPlaceholder": "Sides, e.g. 6",
+   "default": [
+    "6",
+    "6"
+   ],
+   "showIf": {
+    "mode": "dice"
+   }
+  },
+  {
+   "key": "coins",
+   "label": "Coins",
+   "type": "number",
+   "min": 1,
+   "max": 20,
+   "step": 1,
+   "default": 1,
+   "showIf": {
+    "mode": "coin"
+   }
+  },
+  {
+   "key": "pHeads",
+   "label": "Chance of heads",
+   "type": "number",
+   "min": 0,
+   "max": 1,
+   "step": 0.05,
+   "default": 0.5,
+   "showIf": {
+    "mode": "coin"
+   }
+  },
+  {
+   "key": "metal",
+   "label": "Metal",
+   "type": "select",
+   "default": "gold",
+   "showIf": {
+    "mode": "coin"
+   },
+   "options": [
+    {
+     "v": "gold",
+     "l": "Gold"
+    },
+    {
+     "v": "silver",
+     "l": "Silver"
+    },
+    {
+     "v": "copper",
+     "l": "Copper"
+    }
+   ]
+  },
+  {
+   "key": "bagLook",
+   "label": "Container",
+   "type": "select",
+   "default": "jar",
+   "showIf": {
+    "mode": "bag"
+   },
+   "options": [
+    {
+     "v": "jar",
+     "l": "Clear jar (you can see inside)"
+    },
+    {
+     "v": "bag",
+     "l": "Cloth bag (you can't)"
+    }
+   ]
+  },
+  {
+   "key": "balls",
+   "label": "Balls (colour and how many)",
+   "type": "textarea-lines",
+   "editor": "list",
+   "itemLabel": "colour",
+   "itemPlaceholder": "e.g. Red 3 —",
+   "default": [
+    "Red 3",
+    "Blue 2",
+    "Green 1"
+   ],
+   "showIf": {
+    "mode": "bag"
+   }
+  },
+  {
+   "key": "bagDraw",
+   "label": "Balls per draw",
+   "type": "number",
+   "min": 1,
+   "max": 20,
+   "step": 1,
+   "default": 1,
+   "showIf": {
+    "mode": "bag"
+   }
+  },
+  {
+   "key": "bagReplace",
+   "label": "Put each ball back after drawing",
+   "type": "checkbox",
+   "default": false,
+   "showIf": {
+    "mode": "bag"
+   }
+  },
+  {
+   "key": "sectors",
+   "label": "Slices (add :2 to make one twice as likely)",
+   "type": "textarea-lines",
+   "editor": "list",
+   "itemLabel": "slice",
+   "itemPlaceholder": "Slice",
+   "default": [
+    "A",
+    "B",
+    "C",
+    "D"
+   ],
+   "showIf": {
+    "mode": "spinner"
+   }
+  },
+  {
+   "key": "cardsDraw",
+   "label": "Cards per draw",
+   "type": "number",
+   "min": 1,
+   "max": 13,
+   "step": 1,
+   "default": 1,
+   "showIf": {
+    "mode": "cards"
+   }
+  },
+  {
+   "key": "cardsReplace",
+   "label": "Put each card back after drawing",
+   "type": "checkbox",
+   "default": false,
+   "showIf": {
+    "mode": "cards"
+   }
+  },
+  {
+   "key": "numMin",
+   "label": "From",
+   "type": "number",
+   "default": 1,
+   "showIf": {
+    "mode": "number"
+   }
+  },
+  {
+   "key": "numMax",
+   "label": "To",
+   "type": "number",
+   "default": 100,
+   "showIf": {
+    "mode": "number"
+   }
+  },
+  {
+   "key": "numDecimals",
+   "label": "Decimal places",
+   "type": "number",
+   "min": 0,
+   "max": 6,
+   "step": 1,
+   "default": 0,
+   "showIf": {
+    "mode": "number"
+   }
+  },
+  {
+   "key": "numUnique",
+   "label": "No repeats",
+   "type": "checkbox",
+   "default": false,
+   "showIf": {
+    "mode": "number"
+   }
+  },
+  {
+   "key": "items",
+   "label": "Names",
+   "type": "textarea-lines",
+   "editor": "list",
+   "itemLabel": "name",
+   "itemPlaceholder": "Name",
+   "showIf": {
+    "mode": "list"
+   }
+  },
+  {
+   "key": "removePicked",
+   "label": "Don't pick the same name twice",
+   "type": "checkbox",
+   "default": true,
+   "showIf": {
+    "mode": "list"
+   }
+  },
+  {
+   "key": "groupBy",
+   "label": "Make groups by",
+   "type": "select",
+   "default": "count",
+   "showIf": {
+    "mode": "list"
+   },
+   "options": [
+    {
+     "v": "count",
+     "l": "Number of groups"
+    },
+    {
+     "v": "size",
+     "l": "Group size"
+    }
+   ]
+  },
+  {
+   "key": "groupN",
+   "label": "Groups / size",
+   "type": "number",
+   "min": 1,
+   "max": 100,
+   "step": 1,
+   "default": 3,
+   "showIf": {
+    "mode": "list"
+   }
+  },
+  {
+   "key": "distKind",
+   "label": "Distribution",
+   "type": "select",
+   "default": "normal",
+   "showIf": {
+    "mode": "dist"
+   },
+   "options": [
+    {
+     "v": "normal",
+     "l": "Normal"
+    },
+    {
+     "v": "uniform",
+     "l": "Uniform"
+    },
+    {
+     "v": "exponential",
+     "l": "Exponential"
+    },
+    {
+     "v": "binomial",
+     "l": "Binomial"
+    },
+    {
+     "v": "poisson",
+     "l": "Poisson"
+    }
+   ]
+  },
+  {
+   "key": "distMu",
+   "label": "Mean μ",
+   "type": "number",
+   "step": 0.1,
+   "default": 0,
+   "showIf": {
+    "mode": "dist",
+    "distKind": "normal"
+   }
+  },
+  {
+   "key": "distSigma",
+   "label": "Standard deviation σ",
+   "type": "number",
+   "min": 0.001,
+   "step": 0.1,
+   "default": 1,
+   "showIf": {
+    "mode": "dist",
+    "distKind": "normal"
+   }
+  },
+  {
+   "key": "distA",
+   "label": "From a",
+   "type": "number",
+   "step": 0.1,
+   "default": 0,
+   "showIf": {
+    "mode": "dist",
+    "distKind": "uniform"
+   }
+  },
+  {
+   "key": "distB",
+   "label": "To b",
+   "type": "number",
+   "step": 0.1,
+   "default": 1,
+   "showIf": {
+    "mode": "dist",
+    "distKind": "uniform"
+   }
+  },
+  {
+   "key": "distLambda",
+   "label": "Rate λ",
+   "type": "number",
+   "min": 0.01,
+   "step": 0.1,
+   "default": 1,
+   "showIf": {
+    "mode": "dist",
+    "distKind": [
+     "exponential",
+     "poisson"
+    ]
+   }
+  },
+  {
+   "key": "distN",
+   "label": "Trials n",
+   "type": "number",
+   "min": 1,
+   "max": 500,
+   "step": 1,
+   "default": 10,
+   "showIf": {
+    "mode": "dist",
+    "distKind": "binomial"
+   }
+  },
+  {
+   "key": "distP",
+   "label": "Success chance p",
+   "type": "number",
+   "min": 0,
+   "max": 1,
+   "step": 0.05,
+   "default": 0.5,
+   "showIf": {
+    "mode": "dist",
+    "distKind": "binomial"
+   }
+  },
+  {
+   "key": "seed",
+   "label": "Seed (same results every time)",
+   "type": "text",
+   "placeholder": "Blank = truly random"
+  },
+  {
+   "key": "animate",
+   "label": "Animate",
+   "type": "checkbox",
+   "default": true
+  }
+ ]
 }
 </script>
 <!-- Standalone fallback. Inside Beamer+ the host injects the shared widget
@@ -66,43 +465,8 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 }
 
 /* ── Toolbar ────────────────────────────────────────────── */
-#mode-sel { width: auto; height: var(--ctl-h); padding: 0 8px; }
 #runs-sel { width: auto; height: var(--ctl-h); padding: 0 6px; font-family: var(--font-mono); }
 #go-btn   { min-width: 72px; }
-
-/* ── Setup strip (presenter only) ───────────────────────── */
-#setup {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px 12px;
-  padding: 7px var(--pad-x);
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-subtle);
-  font-size: var(--fs-chrome);
-  color: var(--text-2);
-  min-height: 40px;
-}
-#setup[hidden] { display: none; }
-#setup label { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
-#setup .bw-input, #setup .bw-select { width: auto; height: 26px; padding: 0 7px; background: var(--bg); }
-#setup input[type=number] { width: 64px; font-family: var(--font-mono); }
-#setup input.wide { width: min(340px, 50vw); }
-#setup .bw-btn { height: 26px; }
-#setup input[type=checkbox] { accent-color: var(--text); }
-.chip {
-  display: inline-flex; align-items: center; gap: 4px;
-  height: 26px; padding: 0 4px 0 6px;
-  border: 1px solid var(--border-med); border-radius: 13px; background: var(--bg);
-}
-.chip .sw { width: 12px; height: 12px; border-radius: 50%; }
-.chip .n  { min-width: 18px; text-align: center; font-family: var(--font-mono); color: var(--text); }
-.chip button {
-  width: 20px; height: 20px; border: 0; border-radius: 50%; background: none;
-  color: var(--text-2); cursor: pointer; font: inherit; line-height: 1;
-}
-.chip button:hover { background: var(--accent-bg); color: var(--text); }
 
 /* ── Body: stage + stats ────────────────────────────────── */
 #app { flex: 1 1 auto; min-height: 0; display: flex; }
@@ -121,7 +485,9 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   #stats { flex-basis: 42%; border-left: 0; border-top: 1px solid var(--border); }
 }
 .stats-head { display: flex; align-items: baseline; gap: 10px; }
-#stats-title { text-transform: none; letter-spacing: 0.02em; }
+#stats-title { text-transform: none; letter-spacing: 0.02em; white-space: nowrap; }
+.stats-head { flex-wrap: wrap; row-gap: 2px; }
+.stats-sum { text-align: right; margin-left: auto; }
 .stats-sum  { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--text-2); }
 .stats-sum strong { color: var(--text); font-weight: 500; }
 #chart { flex: 1 1 auto; min-height: 0; position: relative; }
@@ -169,6 +535,24 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   pointer-events: none;
 }
 
+#result { position: relative; }
+#result.clickable { cursor: pointer; }
+#result.clickable:active .items, #result.clickable:active .jar, #result.clickable:active #wheel-wrap { transform: scale(0.985); }
+#result .flying { position: absolute; z-index: 6; pointer-events: none; margin: 0; }
+.deck .pcard { z-index: 1; }
+
+/* Distribution: the histogram is the whole view. */
+.dist-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; width: 100%; padding: 0 24px; }
+.dist-title { font-size: var(--fs-body); color: var(--text-2); }
+.dist-n { font-family: var(--font-mono); font-size: var(--fs-body); color: var(--text-2); }
+.dist-n strong { color: var(--text); font-weight: 500; }
+.dist-chart { display: block; overflow: visible; }
+.dist-chart text { fill: var(--text-2); font-family: var(--font-mono); font-size: 11px; }
+.dbar { fill: var(--text-3); transition: y 0.15s, height 0.15s; }
+.dbar.hl { fill: var(--text); }
+.dball { fill: var(--text); }
+.dist-legend .l-mean i { width: 0; height: 12px; border-left: 2px solid var(--text); vertical-align: -2px; }
+
 /* ── d6: a real cube ──────────────────────────────────────── */
 .die3d { position: relative; width: var(--sz); height: var(--sz); perspective: calc(var(--sz) * 5); }
 .cube {
@@ -199,7 +583,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   background: radial-gradient(circle at 45% 40%, var(--d-pip-hi), var(--d-pip) 70%);
   box-shadow: inset 0 calc(var(--sz) * 0.012) calc(var(--sz) * 0.02) rgba(0,0,0,0.55), 0 calc(var(--sz) * -0.006) 0 rgba(255,255,255,0.35);
 }
-.pip.one { width: 25%; height: 25%; background: radial-gradient(circle at 45% 40%, #e2404e, #a3121f 70%); }
+.pip.one { width: 25%; height: 25%; }
 
 /* ── d4 … d20: faceted polyhedra ──────────────────────────── */
 .poly { position: relative; width: var(--sz); height: var(--sz); }
@@ -349,39 +733,6 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 .group h4 { font-size: var(--fs-chrome-sm); font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin-bottom: 4px; }
 .group div { font-size: var(--fs-body); color: var(--text); line-height: 1.35; }
 
-/* ── History ────────────────────────────────────────────── */
-#history {
-  flex: 0 0 auto;
-  display: flex; align-items: center; gap: 6px;
-  padding: 8px var(--pad-x);
-  border-top: 1px solid var(--border);
-  overflow: hidden;
-  white-space: nowrap;
-  min-height: 38px;
-}
-#history .bw-hint { margin-right: 4px; }
-.h-item {
-  flex: 0 0 auto;
-  font-family: var(--font-mono); font-size: var(--fs-small); color: var(--text-3);
-  display: inline-flex; align-items: center; gap: 3px;
-}
-.h-item:first-of-type { color: var(--text); font-weight: 500; }
-.h-item .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
-.h-item + .h-item::before { content: '·'; color: var(--border-med); margin-right: 3px; }
-
-/* ── List editor overlay ────────────────────────────────── */
-#list-editor {
-  position: absolute; inset: 0; z-index: 5;
-  display: flex; align-items: center; justify-content: center;
-  background: color-mix(in srgb, var(--bg) 82%, transparent);
-  padding: 20px;
-}
-#list-editor[hidden] { display: none; }
-#list-editor .bw-card { width: min(460px, 100%); display: flex; flex-direction: column; gap: 10px; background: var(--bg); box-shadow: 0 8px 30px rgba(0,0,0,0.12); }
-#list-editor textarea { height: 220px; }
-#list-editor .row { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
-#list-editor .row .bw-hint { margin-right: auto; }
-
 #viewer-badge {
   position: absolute; right: 10px; bottom: 8px;
   font-size: var(--fs-chrome-sm); color: var(--text-3); pointer-events: none;
@@ -451,18 +802,9 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 
   <div id="toolbar" class="bw-toolbar" data-bw-topbar>
     <span class="bw-toolbar-title">Randomizer</span>
-    <div class="bw-sep"></div>
-    <select class="bw-select" id="mode-sel" title="What to randomize">
-      <option value="dice">Dice</option>
-      <option value="coin">Coin</option>
-      <option value="bag">Bag of balls</option>
-      <option value="spinner">Spinner</option>
-      <option value="cards">Cards</option>
-      <option value="number">Number</option>
-      <option value="list">List</option>
-      <option value="dist">Distribution</option>
-    </select>
     <div class="bw-spacer"></div>
+    <button class="bw-btn" id="shuffle-btn" title="Show the whole list in a random order">Shuffle order</button>
+    <button class="bw-btn" id="groups-btn" title="Split the list into random groups">Make groups</button>
     <select class="bw-select" id="runs-sel" title="Repeat this many times at once">
       <option value="1">×1</option>
       <option value="10">×10</option>
@@ -470,26 +812,12 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       <option value="1000">×1000</option>
     </select>
     <button class="bw-btn" id="stats-btn" title="Observed vs expected (S)">Stats</button>
-    <button class="bw-btn bw-btn--primary" id="go-btn" title="Go (Space)">Roll</button>
+    <button class="bw-btn" id="deck-btn" title="Put every card back and shuffle">Shuffle</button>
   </div>
-
-  <div id="setup"></div>
 
   <div id="app">
     <div id="stage">
       <div id="result"></div>
-      <div id="history"></div>
-      <div id="list-editor" hidden>
-        <div class="bw-card bw-card--lg">
-          <div class="bw-hint">One item per line</div>
-          <textarea class="bw-textarea" id="list-text" spellcheck="false"></textarea>
-          <div class="row">
-            <span class="bw-hint" id="list-count"></span>
-            <button class="bw-btn" id="list-cancel">Cancel</button>
-            <button class="bw-btn bw-btn--primary" id="list-done">Done</button>
-          </div>
-        </div>
-      </div>
       <div id="viewer-badge" hidden>View-only · synced with presenter</div>
     </div>
     <div id="stats" hidden>
@@ -525,48 +853,33 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   const HUE_NAMES = ['Red', 'Blue', 'Green', 'Amber', 'Purple', 'Teal', 'Pink', 'Grey'];
   const SUITS     = ['♠', '♥', '♦', '♣'];
   const RANKS     = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-  const HIST_CAP  = 60;
 
   // ── DOM ─────────────────────────────────────────────────────────────────────
   const $ = id => document.getElementById(id);
-  const modeSel   = $('mode-sel');
-  const runsSel   = $('runs-sel');
-  const statsBtn  = $('stats-btn');
-  const goBtn     = $('go-btn');
-  const setupEl   = $('setup');
-  const resultEl  = $('result');
-  const historyEl = $('history');
-  const statsEl   = $('stats');
-  const statsTtl  = $('stats-title');
-  const statsSum  = $('stats-sum');
-  const chartEl   = $('chart');
-  const legendEl  = $('legend');
-  const listEd    = $('list-editor');
-  const listText  = $('list-text');
-  const listCount = $('list-count');
+  const runsSel    = $('runs-sel');
+  const statsBtn   = $('stats-btn');
+  const deckBtn    = $('deck-btn');
+  const shuffleBtn = $('shuffle-btn');
+  const groupsBtn  = $('groups-btn');
+  const resultEl   = $('result');
+  const statsEl    = $('stats');
+  const statsTtl   = $('stats-title');
+  const statsSum   = $('stats-sum');
+  const chartEl    = $('chart');
+  const legendEl   = $('legend');
 
   // ── State ───────────────────────────────────────────────────────────────────
   // Everything a viewer or a reopened deck needs lives in S; the DOM is a
   // projection of it. Pools (what's left in the bag, the deck, the list) are
-  // kept per mode so switching modes and back doesn't refill anything.
+  // kept per mode so switching the type in the settings and back doesn't
+  // refill anything.
   const S = {
     mode: 'dice',
     runs: 1,
     showStats: false,
-    setup: {
-      dice:    { n: 2, sides: 6, color: 'auto' },
-      coin:    { n: 1, p: 0.5, metal: 'gold' },
-      bag:     { balls: [{ c: 0, n: 3 }, { c: 1, n: 2 }, { c: 2, n: 1 }], replace: false, k: 1 },
-      spinner: { text: 'A, B, C, D' },
-      cards:   { replace: false, k: 1 },
-      number:  { min: 1, max: 100, decimals: 0, unique: false },
-      list:    { items: ['Ada', 'Grace', 'Alan', 'Katherine', 'Edsger', 'Barbara', 'Donald', 'Margaret'],
-                 remove: true, groupBy: 'count', groupN: 3 },
-      dist:    { kind: 'normal', mu: 0, sigma: 1, a: 0, b: 1, lambda: 1, n: 10, p: 0.5 },
-    },
+    setup:   null,          // from the settings panel — see setupFromConfig()
     pool:    { bag: null, cards: null, number: [], list: null },
     last:    {},            // mode → last outcome (shape depends on mode)
-    history: {},            // mode → newest-first display items
     stats:   {},            // mode → { sig, counts, total, sum, sumsq }
     rng:     0,             // PRNG state, so a seeded demo continues where it was
     rollId:  0,             // bumps on every action, so a viewer knows to animate
@@ -618,8 +931,8 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   function clamp(v, lo, hi, d) { v = Number(v); return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d; }
 
   function spinnerSectors() {
-    // "Red, Blue, Green:2" — a trailing :n weights a sector.
-    const out = String(S.setup.spinner.text || '').split(/[,\n]/).map(s => s.trim()).filter(Boolean).map(s => {
+    // One slice per line; "Prize : 2" makes a slice twice as likely.
+    const out = (S.setup.spinner.items || []).map(s => {
       const m = s.match(/^(.*?)\s*:\s*(\d+(?:\.\d+)?)$/);
       return m ? { label: m[1] || '?', w: Math.max(0.0001, +m[2]) } : { label: s, w: 1 };
     });
@@ -683,15 +996,18 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   function model(mode = S.mode) {
     const st = S.setup[mode];
     if (mode === 'dice') {
+      // Distribution of the sum: convolve one die at a time, so a d6 with a
+      // d20 works as well as two d6.
       let dist = [1];
-      for (let i = 0; i < st.n; i++) {
-        const next = new Array(dist.length + st.sides - 1).fill(0);
-        dist.forEach((p, j) => { for (let f = 0; f < st.sides; f++) next[j + f] += p / st.sides; });
+      for (const sides of st.sides) {
+        const next = new Array(dist.length + sides - 1).fill(0);
+        dist.forEach((p, j) => { for (let f = 0; f < sides; f++) next[j + f] += p / sides; });
         dist = next;
       }
-      return { title: st.n > 1 ? 'Sum of dice' : 'Face',
-               labels: dist.map((_, i) => String(i + st.n)), probs: dist,
-               bin: v => v - st.n, mean: st.n * (st.sides + 1) / 2 };
+      const n = st.sides.length;
+      return { title: n > 1 ? 'Sum of dice' : 'Face',
+               labels: dist.map((_, i) => String(i + n)), probs: dist,
+               bin: v => v - n, mean: st.sides.reduce((s, x) => s + (x + 1) / 2, 0) };
     }
     if (mode === 'coin') {
       if (st.n === 1) return { title: 'Face', labels: ['H', 'T'], probs: [st.p, 1 - st.p], bin: v => v ? 0 : 1 };
@@ -700,8 +1016,8 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     }
     if (mode === 'bag') {
       const tot = st.balls.reduce((s, b) => s + b.n, 0) || 1;
-      return { title: st.replace ? 'Colour of each ball' : 'Balls drawn so far',
-               labels: st.balls.map(b => HUE_NAMES[b.c]), colors: st.balls.map(b => `var(--hue-${b.c})`),
+      return { title: st.replace ? 'Each ball drawn' : 'Balls drawn so far',
+               labels: st.balls.map(b => b.label), colors: st.balls.map(b => `var(--hue-${b.c})`),
                probs: st.replace ? st.balls.map(b => b.n / tot) : null, bin: v => v };
     }
     if (mode === 'spinner') {
@@ -779,9 +1095,9 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 
   function statsFor(mode) {
     if (mode === 'list') return null;
-    // Looks (die colour, coin metal) don't change the experiment, so they
+    // Looks (coin metal, jar or bag) don't change the experiment, so they
     // don't clear the tally.
-    const { color, metal, ...exp } = S.setup[mode];
+    const { metal, look, ...exp } = S.setup[mode];
     const sig = JSON.stringify(mode === 'spinner' ? spinnerSectors() : exp);
     let st = S.stats[mode];
     if (!st || st.sig !== sig) {
@@ -803,7 +1119,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   function trial(mode, m) {
     const st = S.setup[mode];
     if (mode === 'dice') {
-      const faces = Array.from({ length: st.n }, () => randInt(1, st.sides));
+      const faces = st.sides.map(sides => randInt(1, sides));
       tally(mode, faces.reduce((s, x) => s + x, 0), m);
       return { faces };
     }
@@ -892,14 +1208,13 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       const o = trial(mode, m);
       if (!o) break;
       out = o; done++;
-      if (runs <= HIST_CAP || r >= runs - HIST_CAP) pushHistory(mode, o);
     }
     if (!out) { S.last[mode] = { empty: true }; S.rollId++; render(); emitState(true); return; }
     out.runs = done;
     if (mode === 'spinner') S.spin = targetAngle(out);
     S.last[mode] = out;
     S.rollId++;
-    if (done > 1 && !S.showStats) S.showStats = true;
+    if (done > 1 && !S.showStats && mode !== 'dist') S.showStats = true;
     render(done === 1);
     emitState(true);
   }
@@ -912,7 +1227,6 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     const name = pool[i];
     if (st.remove) pool.splice(i, 1);
     S.last.list = { type: 'pick', name };
-    pushHistory('list', { name });
     S.rollId++;
     render(true); emitState(true);
   }
@@ -939,237 +1253,110 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     render(true); emitState(true);
   }
 
-  function resetMode(mode = S.mode) {
-    refill(mode);
-    delete S.last[mode];
-    delete S.stats[mode];
-    S.history[mode] = [];
-  }
-
-  // The shared bar's Reset: clear this mode's results, refill what was drawn,
-  // and re-seed — with a seed set, the demo then replays exactly.
+  // The shared bar's Reset: clear this mode's results, put back whatever was
+  // drawn, and re-seed — with a seed set, the demo then replays exactly.
   function reset() {
     if (IS_VIEWER) return;
     finishAnim();
-    resetMode();
+    refill(S.mode);
+    delete S.last[S.mode];
+    delete S.stats[S.mode];
+    if (S.mode === 'cards') { S.shuffleId = (S.shuffleId || 0) + 1; pendingShuffle = true; }
     S.rng = freshSeed();
     S.rollId++;
     render(); emitState(true);
   }
 
-  function setMode(m) {
-    if (IS_VIEWER || !MODES.includes(m) || m === S.mode) return;
-    finishAnim();
-    S.mode = m;
-    ensurePools();
-    render(); emitState();
-  }
+  const fmtDist = v => (['binomial', 'poisson'].includes(S.setup.dist.kind) ? String(v) : fmt(v, 3));
 
-  function pushHistory(mode, o) {
-    const h = S.history[mode] || (S.history[mode] = []);
-    h.unshift(histItem(mode, o));
-    if (h.length > HIST_CAP) h.length = HIST_CAP;
+  // ── Settings → setup ────────────────────────────────────────────────────────
+  // Everything the presenter configures lives in the slide's settings panel;
+  // the widget itself only shows the result and the buttons that act on it.
+  const lines = v => (Array.isArray(v) ? v : typeof v === 'string' ? v.split('\n') : [])
+    .map(s => String(s).trim()).filter(Boolean);
+  function numCfg(v, d, lo, hi, int) {
+    let x = (v === '' || v == null) ? d : Number(v);
+    if (!Number.isFinite(x)) x = d;
+    x = Math.min(hi, Math.max(lo, x));
+    return int ? Math.round(x) : x;
   }
-
-  function histItem(mode, o) {
-    if (mode === 'dice') return { t: o.faces.length > 1 ? `${o.faces.join('+')}=${o.faces.reduce((s, x) => s + x, 0)}` : String(o.faces[0]) };
-    if (mode === 'coin') {
-      const h = o.faces.reduce((s, x) => s + x, 0);
-      return { t: o.faces.length <= 6 ? o.faces.map(f => f ? 'H' : 'T').join('') : `${h}H` };
-    }
-    if (mode === 'bag')     return { dots: o.balls.slice(0, 6) };
-    if (mode === 'spinner') return { t: o.label, c: o.i % HUES };
-    if (mode === 'cards')   return { t: o.cards.slice(0, 4).map(cardText).join(' ') };
-    if (mode === 'number')  return { t: String(o.v) };
-    if (mode === 'list')    return { t: o.name };
-    if (mode === 'dist')    return { t: fmtDist(o.v) };
-    return { t: '' };
-  }
-
-  const cardText = id => RANKS[id % 13] + SUITS[Math.floor(id / 13)];
-  const fmtDist  = v => (['binomial', 'poisson'].includes(S.setup.dist.kind) ? String(v) : fmt(v, 3));
-
-  // ── Setup strip ─────────────────────────────────────────────────────────────
-  // Rebuilt only when the mode changes (or a structural edit, like adding a
-  // colour), so typing into an input never loses focus mid-number.
-  let setupFor = '';
-  function num(label, key, obj, lo, hi, step = 1, after) {
-    return { html: `<label>${escHtml(label)} <input class="bw-input" type="number" data-k="${key}" min="${lo}" max="${hi}" step="${step}" value="${escHtml(obj[key])}"></label>`, key, lo, hi, after };
-  }
-  function sel(label, key, obj, opts) {
-    return { html: `<label>${escHtml(label)} <select class="bw-select" data-k="${key}">${opts.map(([v, l]) => `<option value="${v}" ${obj[key] === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>` };
-  }
-  function check(label, key, obj) {
-    return { html: `<label><input type="checkbox" data-k="${key}" ${obj[key] ? 'checked' : ''}> ${escHtml(label)}</label>` };
-  }
-
-  function buildSetup(force) {
-    const key = S.mode + (S.mode === 'bag' ? ':' + S.setup.bag.balls.map(b => b.c).join(',') : '');
-    if (!force && key === setupFor) { syncSetupValues(); return; }
-    setupFor = key;
-    const st = S.setup[S.mode];
-    const parts = [];
-    if (S.mode === 'dice') {
-      parts.push(num('Dice', 'n', st, 1, 10));
-      parts.push({ html: `<label>Sides <select class="bw-select" data-k="sides">${[4, 6, 8, 10, 12, 20].map(s =>
-        `<option value="${s}" ${st.sides === s ? 'selected' : ''}>d${s}</option>`).join('')}<option value="custom" ${[4, 6, 8, 10, 12, 20].includes(st.sides) ? '' : 'selected'}>other…</option></select></label>` });
-      if (![4, 6, 8, 10, 12, 20].includes(st.sides)) parts.push(num('', 'sides', st, 2, 100));
-      parts.push(sel('Colour', 'color', st, [['auto', 'Classic'], ['ivory', 'Ivory'], ['ruby', 'Ruby'], ['sapphire', 'Sapphire'], ['emerald', 'Emerald'], ['onyx', 'Onyx']]));
-    } else if (S.mode === 'coin') {
-      parts.push(num('Coins', 'n', st, 1, 20));
-      parts.push(num('P(heads)', 'p', st, 0, 1, 0.05));
-      parts.push(sel('Metal', 'metal', st, [['gold', 'Gold'], ['silver', 'Silver'], ['copper', 'Copper']]));
-    } else if (S.mode === 'bag') {
-      parts.push({ html: st.balls.map((b, i) =>
-        `<span class="chip" title="${HUE_NAMES[b.c]}"><span class="sw" style="background:var(--hue-${b.c})"></span>` +
-        `<button data-act="dec" data-i="${i}" title="One fewer">−</button><span class="n">${b.n}</span>` +
-        `<button data-act="inc" data-i="${i}" title="One more">+</button>` +
-        (st.balls.length > 1 ? `<button data-act="del" data-i="${i}" title="Remove colour">×</button>` : '') + `</span>`).join('') +
-        (st.balls.length < HUES ? `<button class="bw-btn bw-btn--quiet" data-act="add">+ Colour</button>` : '') });
-      parts.push(num('Draw', 'k', st, 1, 20));
-      parts.push(check('Replace after drawing', 'replace', st));
-      parts.push({ html: `<button class="bw-btn" data-act="refill">Put balls back</button>` });
-    } else if (S.mode === 'spinner') {
-      parts.push({ html: `<label>Sectors <input class="bw-input wide" type="text" data-k="text" value="${escHtml(st.text)}" placeholder="A, B, C:2  (:n = weight)"></label>` });
-    } else if (S.mode === 'cards') {
-      parts.push(num('Draw', 'k', st, 1, 13));
-      parts.push(check('Replace after drawing', 'replace', st));
-      parts.push({ html: `<button class="bw-btn" data-act="refill">Shuffle deck</button>` });
-    } else if (S.mode === 'number') {
-      parts.push(num('From', 'min', st, -1e9, 1e9));
-      parts.push(num('to', 'max', st, -1e9, 1e9));
-      parts.push(num('Decimals', 'decimals', st, 0, 6));
-      if (st.decimals === 0) parts.push(check('No repeats', 'unique', st));
-      if (st.decimals === 0 && st.unique) parts.push({ html: `<button class="bw-btn" data-act="refill">Allow all again</button>` });
-    } else if (S.mode === 'list') {
-      parts.push({ html: `<button class="bw-btn" data-act="edit-list">Edit list (${st.items.length})</button>` });
-      parts.push(check('Remove when picked', 'remove', st));
-      if (st.remove) parts.push({ html: `<button class="bw-btn" data-act="refill">Put all back</button>` });
-      parts.push({ html: `<div class="bw-sep"></div><button class="bw-btn" data-act="shuffle">Shuffle order</button>` });
-      parts.push({ html: `<button class="bw-btn" data-act="groups">Make groups</button>` +
-        `<select class="bw-select" data-k="groupBy"><option value="count" ${st.groupBy === 'count' ? 'selected' : ''}>groups:</option>` +
-        `<option value="size" ${st.groupBy === 'size' ? 'selected' : ''}>of size:</option></select>` });
-      parts.push(num('', 'groupN', st, 1, 100));
-    } else if (S.mode === 'dist') {
-      const kinds = [['normal', 'Normal'], ['uniform', 'Uniform'], ['exponential', 'Exponential'], ['binomial', 'Binomial'], ['poisson', 'Poisson']];
-      parts.push({ html: `<select class="bw-select" data-k="kind">${kinds.map(([v, l]) => `<option value="${v}" ${st.kind === v ? 'selected' : ''}>${l}</option>`).join('')}</select>` });
-      if (st.kind === 'normal')      { parts.push(num('μ', 'mu', st, -1e6, 1e6, 0.1)); parts.push(num('σ', 'sigma', st, 0.001, 1e6, 0.1)); }
-      if (st.kind === 'uniform')     { parts.push(num('a', 'a', st, -1e6, 1e6, 0.1)); parts.push(num('b', 'b', st, -1e6, 1e6, 0.1)); }
-      if (st.kind === 'exponential') parts.push(num('λ', 'lambda', st, 0.001, 1000, 0.1));
-      if (st.kind === 'poisson')     parts.push(num('λ', 'lambda', st, 0.01, 200, 0.5));
-      if (st.kind === 'binomial')    { parts.push(num('n', 'n', st, 1, 500)); parts.push(num('p', 'p', st, 0, 1, 0.05)); }
-    }
-    setupEl.innerHTML = parts.map(p => p.html).join('');
-  }
-
-  // A viewer's strip is hidden, and a re-render while the presenter types
-  // shouldn't fight the field; only push values into fields not focused.
-  function syncSetupValues() {
-    const st = S.setup[S.mode];
-    setupEl.querySelectorAll('[data-k]').forEach(el => {
-      if (el === document.activeElement) return;
-      const v = st[el.dataset.k];
-      if (el.type === 'checkbox') el.checked = !!v;
-      else if (el.tagName !== 'SELECT' || el.dataset.k !== 'sides') el.value = v;
+  const COLOUR_WORDS = { red: 0, blue: 1, green: 2, amber: 3, yellow: 3, orange: 3, gold: 3, purple: 4, violet: 4,
+                         teal: 5, cyan: 5, turquoise: 5, pink: 6, magenta: 6, grey: 7, gray: 7, silver: 7, black: 7 };
+  // "Red 3", "blue x2", "Apples: 4" — a known colour word picks its colour;
+  // anything else is a label of its own with the next unused colour.
+  function parseBalls(rows) {
+    const out = [], used = new Set();
+    const parsed = rows.slice(0, HUES).map(s => {
+      const m = s.match(/^(.*?)[\s:×x*=-]*(\d+)\s*$/i);
+      const label = ((m ? m[1] : s).trim() || 'Ball').replace(/^./, ch => ch.toUpperCase());
+      const word = label.toLowerCase().split(/\s+/)[0];
+      return { label, n: m ? Math.min(40, +m[2]) : 1, want: COLOUR_WORDS[word] };
     });
+    parsed.forEach(p => { if (p.want != null && !used.has(p.want)) { p.c = p.want; used.add(p.want); } });
+    parsed.forEach(p => {
+      if (p.c == null) { p.c = [...Array(HUES).keys()].find(h => !used.has(h)) ?? 0; used.add(p.c); }
+      out.push({ c: p.c, n: p.n, label: p.label });
+    });
+    return out.length ? out : [{ c: 0, n: 3, label: 'Red' }, { c: 1, n: 2, label: 'Blue' }];
   }
 
-  function onSetupChange(el) {
-    if (IS_VIEWER) return;
-    const k = el.dataset.k, st = S.setup[S.mode];
-    let rebuild = false;
-    if (el.type === 'checkbox') { st[k] = el.checked; rebuild = true; }
-    else if (['text', 'groupBy', 'kind', 'color', 'metal'].includes(k)) { st[k] = el.value; rebuild = k === 'groupBy' || k === 'kind'; }
-    else if (k === 'sides' && el.tagName === 'SELECT') {
-      st.sides = el.value === 'custom' ? (st.sides in { 4: 1, 6: 1, 8: 1, 10: 1, 12: 1, 20: 1 } ? 7 : st.sides) : +el.value;
-      rebuild = true;
-    } else {
-      const lo = +el.min, hi = +el.max;
-      if (el.value === '' || !Number.isFinite(+el.value)) return;   // mid-typing a minus sign
-      let v = clamp(el.value, lo, hi, st[k]);
-      if (el.step === '1' || !el.step) v = Math.round(v);
-      st[k] = v;
-      if (k === 'decimals') rebuild = true;
+  function setupFromConfig(c) {
+    const diceRows = lines(c.dice);
+    const items = lines(c.items);
+    const sectors = lines(c.sectors);
+    const min = numCfg(c.numMin, 1, -1e9, 1e9), max = numCfg(c.numMax, 100, -1e9, 1e9);
+    const decimals = numCfg(c.numDecimals, 0, 0, 6, true);
+    const a = numCfg(c.distA, 0, -1e6, 1e6), b = numCfg(c.distB, 1, -1e6, 1e6);
+    return {
+      dice:    { sides: (diceRows.length ? diceRows : ['6', '6']).slice(0, 12)
+                   .map(s => numCfg(String(s).replace(/^d/i, ''), 6, 2, 100, true)),
+                 },
+      coin:    { n: numCfg(c.coins, 1, 1, 20, true), p: numCfg(c.pHeads, 0.5, 0, 1), metal: c.metal || 'gold' },
+      bag:     { balls: parseBalls(lines(c.balls).length ? lines(c.balls) : ['Red 3', 'Blue 2', 'Green 1']),
+                 replace: !!c.bagReplace, k: numCfg(c.bagDraw, 1, 1, 20, true), look: c.bagLook === 'bag' ? 'bag' : 'jar' },
+      spinner: { items: sectors.length ? sectors : ['A', 'B', 'C', 'D'] },
+      cards:   { replace: !!c.cardsReplace, k: numCfg(c.cardsDraw, 1, 1, 13, true) },
+      number:  { min: Math.min(min, max), max: Math.max(min, max), decimals, unique: !!c.numUnique && decimals === 0 },
+      list:    { items: (items.length ? items : ['Ada', 'Grace', 'Alan', 'Katherine', 'Edsger', 'Barbara', 'Donald', 'Margaret']).slice(0, 1000),
+                 remove: c.removePicked !== false, groupBy: c.groupBy === 'size' ? 'size' : 'count',
+                 groupN: numCfg(c.groupN, 3, 1, 100, true) },
+      dist:    { kind: ['normal', 'uniform', 'exponential', 'binomial', 'poisson'].includes(c.distKind) ? c.distKind : 'normal',
+                 mu: numCfg(c.distMu, 0, -1e6, 1e6), sigma: numCfg(c.distSigma, 1, 0.001, 1e6),
+                 a: Math.min(a, b), b: Math.max(b, a + (a === b ? 1 : 0)),
+                 lambda: numCfg(c.distLambda, 1, 0.01, 200), n: numCfg(c.distN, 10, 1, 500, true), p: numCfg(c.distP, 0.5, 0, 1) },
+    };
+  }
+
+  // Adopt new settings. A mode whose experiment changed starts fresh — its
+  // jar, deck or list refilled and its last result cleared — while one whose
+  // settings are untouched keeps where it was.
+  function adoptSetup(next) {
+    const drawSig = (m, st) => { if (!st) return ''; const { metal, look, ...rest } = st; void metal; void look; return JSON.stringify(rest); };
+    S.setup = S.setup || {};
+    for (const m of MODES) {
+      const changed = drawSig(m, S.setup[m]) !== drawSig(m, next[m]);
+      S.setup[m] = next[m];
+      if (changed && setupAdopted) { refill(m); delete S.last[m]; }
     }
-    tidySetup(S.mode);
-    if (['bag', 'cards', 'list', 'number'].includes(S.mode) && (k === 'replace' || k === 'unique' || k === 'remove' || k === 'min' || k === 'max' || k === 'decimals')) refill(S.mode);
-    if (rebuild) buildSetup(true);
-    render(); emitState();
+    setupAdopted = true;
+    ensurePools();
   }
-
-  // Keep a setup self-consistent after an edit (min ≤ max, a < b, …).
-  function tidySetup(mode) {
-    const st = S.setup[mode];
-    if (mode === 'number' && st.max < st.min) [st.min, st.max] = [st.max, st.min];
-    if (mode === 'dist' && st.b <= st.a) st.b = st.a + 1;
-    if (mode === 'number' && st.decimals > 0) st.unique = false;
-  }
-
-  function onSetupAction(act, i) {
-    if (IS_VIEWER) return;
-    const bag = S.setup.bag;
-    if (act === 'inc') { bag.balls[i].n = Math.min(30, bag.balls[i].n + 1); refill('bag'); }
-    if (act === 'dec') { bag.balls[i].n = Math.max(0, bag.balls[i].n - 1); refill('bag'); }
-    if (act === 'del') { bag.balls.splice(i, 1); refill('bag'); }
-    if (act === 'add') {
-      const used = new Set(bag.balls.map(b => b.c));
-      const c = [...Array(HUES).keys()].find(h => !used.has(h));
-      if (c != null) bag.balls.push({ c, n: 1 });
-      refill('bag');
-    }
-    if (act === 'refill')    { refill(S.mode); delete S.last[S.mode]; }
-    if (act === 'shuffle')   return shuffleList();
-    if (act === 'groups')    return makeGroups();
-    if (act === 'edit-list') return openListEditor();
-    buildSetup(true);
-    render(); emitState();
-  }
-
-  // ── List editor ─────────────────────────────────────────────────────────────
-  function openListEditor() {
-    listText.value = S.setup.list.items.join('\n');
-    updateListCount();
-    listEd.hidden = false;
-    listText.focus();
-  }
-  function updateListCount() {
-    const n = listText.value.split('\n').filter(s => s.trim()).length;
-    listCount.textContent = `${n} item${n === 1 ? '' : 's'}`;
-  }
-  function closeListEditor(save) {
-    if (save && !IS_VIEWER) {
-      setListItems(listText.value.split('\n'));
-      buildSetup(true);
-      render(); emitState();
-    }
-    listEd.hidden = true;
-  }
-  function setListItems(lines) {
-    const items = lines.map(s => String(s).trim()).filter(Boolean).slice(0, 1000);
-    S.setup.list.items = items;
-    S.pool.list = items.slice();
-    delete S.last.list;
-    S.history.list = [];
-  }
+  let setupAdopted = false;
 
   // ── Render ──────────────────────────────────────────────────────────────────
   function render(animate) {
-    modeSel.value = S.mode;
     runsSel.value = String(S.runs);
-    goBtn.textContent = VERB[S.mode];
-    const rep = canRepeat();
-    runsSel.style.display = rep && !IS_VIEWER ? '' : 'none';
-    statsBtn.style.display = S.mode === 'list' ? 'none' : '';
+    runsSel.style.display = canRepeat() && !IS_VIEWER ? '' : 'none';
+    statsBtn.style.display = S.mode === 'list' || S.mode === 'dist' || IS_VIEWER ? 'none' : '';
+    deckBtn.style.display = S.mode === 'cards' && !IS_VIEWER ? '' : 'none';
     statsBtn.classList.toggle('is-active', S.showStats && S.mode !== 'list');
-    goBtn.style.display = IS_VIEWER ? 'none' : '';
-    goBtn.disabled = isExhausted();
-    [modeSel, runsSel, statsBtn].forEach(b => { b.disabled = IS_VIEWER; });
-    setupEl.hidden = IS_VIEWER;
+    shuffleBtn.style.display = groupsBtn.style.display = S.mode === 'list' && !IS_VIEWER ? '' : 'none';
+    // The thing itself is the button: click the dice, the coin, the jar…
+    resultEl.classList.toggle('clickable', !IS_VIEWER && !isExhausted());
+    resultEl.title = IS_VIEWER ? '' : `${VERB[S.mode]} (click or Space)`;
     $('viewer-badge').hidden = !IS_VIEWER;
-    if (!IS_VIEWER) buildSetup();
 
     renderResult(animate);
-    renderHistory();
     renderStats();
   }
 
@@ -1245,9 +1432,9 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     emerald:  { face: '#1d9461', hi: '#4fcb91', lo: '#0c5636', ink: '#ffffff', pip: '#fbf7ef', pipHi: '#ffffff' },
     onyx:     { face: '#2e2e33', hi: '#5a5a62', lo: '#111114', ink: '#ffffff', pip: '#f2efe6', pipHi: '#ffffff' },
   };
-  function dieColor() {
-    const c = S.setup.dice.color;
-    return DIE_COLORS[c] || (S.setup.dice.sides === 6 ? DIE_COLORS.ivory : DIE_COLORS.sapphire);
+  // Classic dice: an ivory d6, blue polyhedra.
+  function dieColor(sides) {
+    return sides === 6 ? DIE_COLORS.ivory : DIE_COLORS.sapphire;
   }
 
   const PIPS = { 1: [[50, 50]], 2: [[27, 27], [73, 73]], 3: [[27, 27], [50, 50], [73, 73]],
@@ -1260,7 +1447,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 
   function cubeHtml(i) {
     const faces = [1, 2, 3, 4, 5, 6].map(v =>
-      `<div class="face f${v}">${PIPS[v].map(([x, y]) => `<span class="pip${v === 1 && S.setup.dice.color !== 'onyx' && dieColor() === DIE_COLORS.ivory ? ' one' : ''}" style="left:${x}%;top:${y}%"></span>`).join('')}</div>`).join('');
+      `<div class="face f${v}">${PIPS[v].map(([x, y]) => `<span class="pip" style="left:${x}%;top:${y}%"></span>`).join('')}</div>`).join('');
     return `<div class="die3d" data-i="${i}"><div class="ground"></div><div class="cube">${faces}<div class="core"></div><div class="core cx"></div><div class="core cy"></div></div></div>`;
   }
   function cubeTransform(t) {
@@ -1306,7 +1493,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, '0')).join('');
   }
   function polyHtml(i, v, sides) {
-    const col = dieColor(), shape = polyShape(sides);
+    const col = dieColor(sides), shape = polyShape(sides);
     const pts = ps => ps.map(p => p.map(n => n.toFixed(2)).join(',')).join(' ');
     let svg = `<polygon points="${pts(shape.outer)}" fill="${col.lo}" stroke="${col.lo}" stroke-width="2" stroke-linejoin="round"/>`;
     facets(shape).forEach(tri => {
@@ -1333,54 +1520,50 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   }
 
   function renderDice(o, play) {
-    const st = S.setup.dice, n = o ? o.faces.length : st.n;
-    const faces = o ? o.faces : Array.from({ length: n }, (_, i) => (st.sides === 6 ? 1 + (i * 3) % 6 : null));
+    const sides = S.setup.dice.sides;
+    // Outcomes from an older set of dice (the settings changed since) are
+    // shown as blank dice rather than mismatched faces.
+    const fresh = o && o.faces.length === sides.length;
+    const faces = fresh ? o.faces : sides.map((s, i) => (s === 6 ? 1 + (i * 3) % 6 : null));
+    const n = sides.length, anyCube = sides.includes(6);
     // A cube in perspective, tilted, takes more room than its face size,
     // and it needs headroom to be thrown into.
-    const sz = st.sides === 6 ? fitSize(n, 1.3, 0.42, 160) : fitSize(n, 1.05, 0.34, 190);
+    const sz = anyCube ? fitSize(n, 1.3, 0.42, 160) : fitSize(n, 1.05, 0.34, 190);
     resultEl.style.setProperty('--sz', sz + 'px');
-    const col = dieColor();
+    const col = dieColor(6);
     ['face', 'hi', 'lo', 'pip'].forEach(k => resultEl.style.setProperty(`--d-${k}`, col[k]));
     resultEl.style.setProperty('--d-pip-hi', col.pipHi);
-    const sum = faces.reduce((s, x) => s + (x || 0), 0);
+    play = play && fresh;
     resultEl.innerHTML =
-      `<div class="items${o ? '' : ' ghost'}">${faces.map((f, i) => (st.sides === 6 ? cubeHtml(i) : polyHtml(i, f, st.sides))).join('')}</div>` +
-      (o ? `<div class="caption" id="cap">${n > 1 ? `Σ <strong>${sum}</strong>` : `<strong>${faces[0]}</strong>`}${runsNote(o)}</div>` : placeholder('Press Roll'));
+      `<div class="items${fresh ? '' : ' ghost'}">${faces.map((f, i) => (sides[i] === 6 ? cubeHtml(i) : polyHtml(i, f, sides[i]))).join('')}</div>` +
+      (fresh ? '' : placeholder('Click the dice to roll'));
 
     const cap = $('cap');
-    if (st.sides === 6) {
-      const cubes = [...resultEl.querySelectorAll('.die3d')];
-      cubes.forEach((el, i) => {
-        const cube = el.querySelector('.cube');
-        const t = diceTurns[i] || (diceTurns[i] = { x: 0, y: 0, z: 0, f: faces[i] || 1 });
-        cube.style.transition = 'none';
-        if (!play) { t.f = faces[i] || 1; cube.style.transform = cubeTransform(t); return; }
-        cube.style.transform = cubeTransform(t);
-        reflow(cube);
-        t.x += jiggle(2, 3); t.y += jiggle(1, 2); t.z += jiggle(0, 1); t.f = faces[i];
-        cube.style.transition = '';
-        cube.style.transitionDelay = el.style.animationDelay = (i * 70) + 'ms';
-        cube.style.transform = cubeTransform(t);
-        el.classList.add('tossing');
-      });
-      if (play) {
-        if (cap) cap.style.visibility = 'hidden';
-        hold(1150 + n * 70, () => {
-          cubes.forEach(el => { el.classList.remove('tossing'); const c = el.querySelector('.cube'); c.style.transition = 'none'; });
-          if (cap) { cap.style.visibility = ''; cap.classList.add('fade'); }
-        });
-      }
-    } else if (play) {
-      const els = [...resultEl.querySelectorAll('.poly')];
-      els.forEach((el, i) => { el.classList.add('tossing'); el.querySelector('svg').style.animationDelay = (i * 70) + 'ms'; });
-      if (cap) cap.style.visibility = 'hidden';
-      const tick = setInterval(() => els.forEach(el => setPolyFace(el, jiggle(1, st.sides), st.sides)), 75);
-      hold(900 + n * 70, () => {
-        clearInterval(tick);
-        els.forEach((el, i) => { el.classList.remove('tossing'); setPolyFace(el, faces[i], st.sides); });
-        if (cap) { cap.style.visibility = ''; cap.classList.add('fade'); }
-      });
-    }
+    const cubes = [...resultEl.querySelectorAll('.die3d')];
+    cubes.forEach(el => {
+      const i = +el.dataset.i, cube = el.querySelector('.cube');
+      const t = diceTurns[i] || (diceTurns[i] = { x: 0, y: 0, z: 0, f: faces[i] || 1 });
+      cube.style.transition = 'none';
+      if (!play) { t.f = faces[i] || 1; cube.style.transform = cubeTransform(t); return; }
+      cube.style.transform = cubeTransform(t);
+      reflow(cube);
+      t.x += jiggle(2, 3); t.y += jiggle(1, 2); t.z += jiggle(0, 1); t.f = faces[i];
+      cube.style.transition = '';
+      cube.style.transitionDelay = el.style.animationDelay = (i * 70) + 'ms';
+      cube.style.transform = cubeTransform(t);
+      el.classList.add('tossing');
+    });
+    if (!play) return;
+    const polys = [...resultEl.querySelectorAll('.poly')];
+    polys.forEach(el => { el.classList.add('tossing'); el.querySelector('svg').style.animationDelay = (+el.dataset.i * 70) + 'ms'; });
+    const tick = polys.length ? setInterval(() => polys.forEach(el => { const s = sides[+el.dataset.i]; setPolyFace(el, jiggle(1, s), s); }), 75) : null;
+    if (cap) cap.style.visibility = 'hidden';
+    hold((cubes.length ? 1150 : 900) + n * 70, () => {
+      clearInterval(tick);
+      cubes.forEach(el => { el.classList.remove('tossing'); el.querySelector('.cube').style.transition = 'none'; });
+      polys.forEach(el => { const i = +el.dataset.i; el.classList.remove('tossing'); setPolyFace(el, faces[i], sides[i]); });
+      if (cap) { cap.style.visibility = ''; cap.classList.add('fade'); }
+    });
   }
 
   // ── Coins ───────────────────────────────────────────────────────────────────
@@ -1438,12 +1621,10 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     const sz = fitSize(n, 1.05, 0.42, 190);
     resultEl.style.setProperty('--sz', sz + 'px');
     const faces = o ? o.faces : [1];
-    const h = faces.reduce((s, x) => s + x, 0);
     resultEl.innerHTML =
       `<div class="items${o ? '' : ' ghost'}">${faces.map((_, i) =>
         `<div class="coin3d" data-i="${i}"><div class="ground"></div><div class="coin"><div class="cface heads">${coinFace(true)}</div><div class="cface tails">${coinFace(false)}</div></div></div>`).join('')}</div>` +
-      (o ? `<div class="caption" id="cap">${n > 1 ? `<strong>${h}</strong> heads, <strong>${n - h}</strong> tails` : `<strong>${faces[0] ? 'Heads' : 'Tails'}</strong>`}${runsNote(o)}</div>`
-         : placeholder('Press Flip'));
+      (o ? '' : placeholder('Click the coin to flip'));
     const els = [...resultEl.querySelectorAll('.coin3d')];
     els.forEach((el, i) => {
       const coin = el.querySelector('.coin');
@@ -1505,13 +1686,44 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       <path d="M16,54 L16,104" stroke="rgba(255,255,255,0.55)" stroke-width="3" stroke-linecap="round"/>
       <path d="M21,46 Q22,38 30,33" stroke="rgba(255,255,255,0.4)" stroke-width="2" fill="none" stroke-linecap="round"/>
       <path d="M84,62 L84,96" stroke="rgba(255,255,255,0.22)" stroke-width="2" stroke-linecap="round"/>
-      <rect x="25" y="8" width="50" height="13" rx="2.5" fill="url(#lid)"/>
-      <path d="M27,11 H73 M27,14.5 H73 M27,18 H73" stroke="rgba(0,0,0,0.18)" stroke-width="0.6"/>
+      <ellipse cx="50" cy="20" rx="20" ry="3" fill="rgba(160,190,220,0.18)" stroke="rgba(130,145,160,0.75)" stroke-width="1.3"/>
     </svg>`;
   }
 
+  // A drawn ball's name: its row in the settings, else its colour.
+  function ballName(o, i) {
+    const j = o.idx ? o.idx[i] : -1, b = S.setup.bag.balls[j];
+    return b && b.c === o.balls[i] ? b.label : HUE_NAMES[o.balls[i]];
+  }
+
+  // An opaque cloth bag: you know how many are in it, not which.
+  function sackSvg(left) {
+    return `<svg viewBox="0 0 100 130"><defs>
+        <linearGradient id="sack" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2d2150"/><stop offset="0.42" stop-color="#5b44a0"/><stop offset="0.6" stop-color="#4a3689"/><stop offset="1" stop-color="#221838"/></linearGradient>
+        <radialGradient id="sackHi" cx="38%" cy="45%" r="55%"><stop offset="0" stop-color="#fff" stop-opacity="0.18"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+        <linearGradient id="rope" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f0dca6"/><stop offset="1" stop-color="#b8975a"/></linearGradient>
+      </defs>
+      <ellipse cx="50" cy="125" rx="38" ry="3.5" fill="rgba(0,0,0,0.25)"/>
+      <path d="M33,38 C12,52 6,84 12,106 Q18,124 50,124 Q82,124 88,106 C94,84 88,52 67,38 Z" fill="url(#sack)"/>
+      <path d="M33,38 C12,52 6,84 12,106 Q18,124 50,124 Q82,124 88,106 C94,84 88,52 67,38 Z" fill="url(#sackHi)"/>
+      <path d="M38,44 C30,62 28,88 32,112 M50,44 C49,70 49,96 50,120 M62,44 C70,62 72,88 68,112" stroke="rgba(0,0,0,0.22)" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+      <path d="M41,46 C35,64 34,86 37,104" stroke="rgba(255,255,255,0.12)" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      <path d="M33,39 L36,22 L64,22 L67,39 Z" fill="url(#sack)"/>
+      <path d="M38,24 L39,38 M44,23 L44.5,38 M50,23 L50,38 M56,23 L55.5,38 M62,24 L61,38" stroke="rgba(0,0,0,0.25)" stroke-width="0.9"/>
+      <ellipse cx="50" cy="21.5" rx="15" ry="4.2" fill="#130c24" stroke="#6d55b8" stroke-width="1.2"/>
+      <path d="M32,36 Q50,41 68,36" stroke="url(#rope)" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+      <path d="M62,37.5 C66,44 70,50 67,58 M63,38 C60,46 61,52 58,58" stroke="url(#rope)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+      <circle cx="62.5" cy="37.8" r="2.4" fill="url(#rope)"/>
+      <circle cx="67" cy="58.5" r="1.6" fill="#b8975a"/><circle cx="58" cy="58.5" r="1.6" fill="#b8975a"/>
+    </svg>`;
+  }
+
+  // Where a ball leaves the container, in viewBox units (100 × 130): the
+  // jar's neck or the bag's mouth, and where it starts from inside.
+  const MOUTH = { jar: { from: [50, 96], out: [50, 6] }, bag: { from: [50, 26], out: [50, 2] } };
+
   function renderBag(o, play) {
-    const st = S.setup.bag;
+    const st = S.setup.bag, look = st.look === 'bag' ? 'bag' : 'jar';
     const pool = st.replace ? fullBag() : S.pool.bag;
     const left = pool.reduce((s, x) => s + x, 0);
     // Shuffle the colours into the jar deterministically, so the same jar
@@ -1520,21 +1732,53 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     pool.forEach((n, j) => { for (let i = 0; i < n && dots.length < 200; i++) dots.push(st.balls[j].c); });
     dots.forEach((_, i) => { const j = (i * 7919 + 13) % dots.length; [dots[i], dots[j]] = [dots[j], dots[i]]; });
     const r = resultEl.getBoundingClientRect();
-    const jar = Math.max(90, Math.min(r.height * 0.78, r.width * 0.45 / 0.77, 420));
+    const jar = Math.max(90, Math.min(r.height * 0.8, r.width * 0.45 / 0.77, 420));
     const balls = o ? o.balls : [];
     const trayW = Math.max(80, r.width - jar * 0.77 - jar * 0.18 - 60);
-    const sz = Math.max(28, Math.min(jar * 0.42, trayW / (Math.min(balls.length, 4) * 1.25 || 1), 170));
+    const sz = Math.max(28, Math.min(jar * 0.38, trayW / (Math.min(balls.length, 4) * 1.25 || 1), 160));
     resultEl.style.setProperty('--jar', jar + 'px');
     resultEl.style.setProperty('--sz', sz + 'px');
-    const trayItems = o ? `<div class="items" style="gap:${Math.round(sz * 0.18)}px">${balls.map((c, i) =>
-      `<span class="ball${play ? ' dropping' : ''}" style="--c:var(--hue-${c});animation-delay:${i * 110}ms" title="${HUE_NAMES[c]}"></span>`).join('')}</div>` +
-      `<div class="caption" id="cap">${balls.length === 1 ? `<strong>${HUE_NAMES[balls[0]]}</strong>` : balls.map(c => HUE_NAMES[c]).join(', ')}${runsNote(o)}</div>`
-      : placeholder('Press Draw');
+    const tray = o
+      ? `<div class="items" style="gap:${Math.round(sz * 0.18)}px">${balls.map((c, i) =>
+          `<span class="ball" data-i="${i}" style="--c:var(--hue-${c})" title="${escHtml(ballName(o, i))}"></span>`).join('')}</div>`
+      : placeholder(`Click the ${look} to draw`);
     resultEl.innerHTML =
-      `<div class="bag-row"><div><div class="jar">${jarSvg(dots)}</div>` +
-      `<div class="jar-count">${left} in the jar${st.replace ? ' · with replacement' : ''}</div></div>` +
-      `<div class="tray">${trayItems}</div></div>`;
-    if (play) hold(600 + balls.length * 110, () => resultEl.querySelectorAll('.dropping').forEach(b => b.classList.remove('dropping')));
+      `<div class="bag-row"><div><div class="jar" id="container">${look === 'bag' ? sackSvg(left) : jarSvg(dots)}</div>` +
+      `<div class="jar-count">${left} in the ${look}</div></div>` +
+      `<div class="tray">${tray}</div></div>`;
+    if (!play) return;
+
+    // The draw: each ball comes up out of the container, over, and down onto
+    // the table beside it, one after another.
+    const box = $('container').getBoundingClientRect(), host = resultEl.getBoundingClientRect();
+    const at = ([x, y]) => [box.left - host.left + x / 100 * box.width, box.top - host.top + y / 130 * box.height];
+    const [fx, fy] = at(MOUTH[look].from), [ox, oy] = at(MOUTH[look].out);
+    const flights = [];
+    [...resultEl.querySelectorAll('.tray .ball')].forEach((el, i) => {
+      el.style.visibility = 'hidden';
+      const t = el.getBoundingClientRect();
+      const tx = t.left - host.left, ty = t.top - host.top, half = t.width / 2;
+      const fly = el.cloneNode(true);
+      fly.classList.add('flying');
+      fly.style.visibility = '';
+      fly.style.left = tx + 'px'; fly.style.top = ty + 'px';
+      resultEl.appendChild(fly);
+      const rel = (x, y, s) => `translate(${x - half - tx}px, ${y - half - ty}px) scale(${s})`;
+      const small = look === 'bag' ? 0.3 : 0.32;
+      // Arc over to the table, but never above the top of the widget.
+      const peak = Math.max(half * 0.4 + 6, Math.min(oy, ty) - t.height * 0.6);
+      const a = fly.animate([
+        { transform: rel(fx, fy, small), opacity: look === 'bag' ? 0 : 1, offset: 0 },
+        { transform: rel(ox, oy - t.height * 0.1, small * 1.25), opacity: 1, offset: 0.32 },
+        { transform: rel((ox + tx + half) / 2, peak, 0.8), offset: 0.62 },
+        { transform: rel(tx + half, ty + half, 1), offset: 0.86 },
+        { transform: rel(tx + half, ty + half - t.height * 0.08, 1), offset: 0.93 },
+        { transform: 'none', offset: 1 },
+      ], { duration: 1100, delay: i * 650, easing: 'ease-in-out', fill: 'both' });
+      flights.push({ fly, el, a });
+      a.onfinish = () => { el.style.visibility = ''; fly.remove(); };
+    });
+    hold(1100 + (flights.length - 1) * 650 + 30, () => flights.forEach(f => { f.a.cancel(); f.fly.remove(); f.el.style.visibility = ''; }));
   }
 
   // ── Cards ───────────────────────────────────────────────────────────────────
@@ -1560,27 +1804,92 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 
   function renderCards(o, play) {
     const st = S.setup.cards;
-    const cards = o ? o.cards : [];
+    const cards = o && o.cards ? o.cards : [];
     const left = st.replace ? 52 : S.pool.cards.length;
+    const shuffling = pendingShuffle; pendingShuffle = false;
     // One row: the deck, then the hand. Sized to fit across, not wrapped,
     // so a dealt hand reads left to right like one on a table.
     const rr = resultEl.getBoundingClientRect();
     const k = Math.max(1, cards.length);
-    const sz = Math.max(40, Math.min(270, (rr.height - 40) * 0.62, (rr.width - 50) / ((k + 1) * 0.714 + k * 0.12 + 0.32)));
+    const sz = Math.max(40, Math.min(270, (rr.height - 40) * 0.66, (rr.width - 50) / ((k + 1) * 0.714 + k * 0.12 + 0.32)));
     resultEl.style.setProperty('--sz', sz + 'px');
     const stack = left
       ? Array.from({ length: Math.min(4, Math.ceil(left / 13)) }, (_, i) =>
           `<div class="pcard back" style="transform:translate(${-i * 2}px, ${-i * 2}px)"></div>`).join('')
       : '<div class="deck-empty"></div>';
-    const hand = o
-      ? cards.map((id, i) => `<div class="slot-card${play ? ' dealing' : ''}"><div class="flip" style="animation-delay:${i * 130}ms;--from:${-(i + 1) * 105 - 30}%">${cardFace(id)}<div class="pcard back"></div></div></div>`).join('')
-      : `<div class="slot-card ghost"><div class="pcard back"></div></div>`;
+    const hand = cards.length
+      ? cards.map(id => `<div class="slot-card"><div class="flip">${cardFace(id)}<div class="pcard back"></div></div></div>`).join('')
+      : `<div class="slot-card ghost"><div class="pcard back" style="opacity:.0"></div></div>`;
     resultEl.innerHTML =
-      `<div class="table-row"><div class="deck">${stack}<div class="deck-count">${st.replace ? 'full deck · with replacement' : `${left} left`}</div></div>` +
+      `<div class="table-row"><div class="deck" id="deck">${stack}<div class="deck-count">${st.replace ? 'full deck · with replacement' : `${left} left`}</div></div>` +
       `<div class="items hand">${hand}</div></div>` +
-      (o ? `<div class="caption" id="cap" style="margin-top:calc(var(--sz) * 0.12)">${cards.length === 1 ? `<strong>${cardName(cards[0])}</strong>` : `${cards.length} cards`}${runsNote(o)}</div>`
-         : `<div style="margin-top:calc(var(--sz) * 0.12)">${placeholder('Press Draw')}</div>`);
-    if (play) hold(600 + cards.length * 130, () => resultEl.querySelectorAll('.dealing').forEach(c => c.classList.remove('dealing')));
+      (cards.length ? '' : `<div style="margin-top:calc(var(--sz) * 0.16)">${placeholder('Click the deck to draw')}</div>`);
+    if (shuffling && canAnimate()) return riffle();
+    if (!play || !cards.length) return;
+
+    // The deal: each card slides off the top of the deck face down, lifts,
+    // and turns over as it lands in the hand.
+    const deck = $('deck').getBoundingClientRect();
+    const anims = [...resultEl.querySelectorAll('.hand .flip')].map((el, i) => {
+      const t = el.getBoundingClientRect();
+      const dx = deck.left - t.left - 6, dy = deck.top - t.top - 6;
+      return el.animate([
+        { transform: `translate(${dx}px, ${dy}px) rotateY(180deg)`, offset: 0 },
+        { transform: `translate(${dx + 10}px, ${dy - t.height * 0.12}px) rotateY(180deg) scale(1.05)`, offset: 0.18 },
+        { transform: `translate(${dx * 0.35}px, ${-t.height * 0.16}px) rotateY(160deg) scale(1.08)`, offset: 0.6 },
+        { transform: `translate(0, -${t.height * 0.04}px) rotateY(10deg) scale(1.02)`, offset: 0.88 },
+        { transform: 'none', offset: 1 },
+      ], { duration: 900, delay: i * 320, easing: 'cubic-bezier(0.3, 0.6, 0.3, 1)', fill: 'both' });
+    });
+    hold(900 + (anims.length - 1) * 320 + 30, () => anims.forEach(a => a.cancel()));
+  }
+
+  // A riffle shuffle: cut the deck in two, pull the halves apart, let the
+  // cards fall back in alternately, square it up.
+  let pendingShuffle = false;
+  function riffle() {
+    const deck = $('deck');
+    const statics = [...deck.querySelectorAll(':scope > .pcard')];
+    statics.forEach(c => { c.style.visibility = 'hidden'; });
+    const N = 14, anims = [], cards = [];
+    for (let i = 0; i < N; i++) {
+      const c = document.createElement('div');
+      c.className = 'pcard back';
+      c.style.zIndex = String(2 + i);
+      deck.appendChild(c);
+      cards.push(c);
+    }
+    const D = 1700;
+    cards.forEach((c, i) => {
+      const leftHalf = i % 2 === 0, side = leftHalf ? -1 : 1;
+      const lift = -(i >> 1) * 1.2;
+      const order = i;                       // falls back in the order they alternate
+      const fall = 0.42 + order * (0.36 / N);
+      anims.push(c.animate([
+        { transform: `translate(0, ${-i * 0.6}px)`, offset: 0 },
+        { transform: `translate(${side * 62}%, ${lift}px) rotate(${side * 9}deg)`, offset: 0.24 },
+        { transform: `translate(${side * 62}%, ${lift}px) rotate(${side * 9}deg)`, offset: Math.max(0.25, fall - 0.04) },
+        { transform: `translate(${side * 8}%, ${-i * 0.6}px) rotate(${side * 2}deg)`, offset: fall + 0.06 },
+        { transform: `translate(0, ${-i * 0.6}px)`, offset: 0.9 },
+        { transform: `translate(0, ${-i * 0.6}px)`, offset: 1 },
+      ], { duration: D, easing: 'ease-in-out', fill: 'both' }));
+    });
+    hold(D + 30, () => {
+      anims.forEach(a => a.cancel());
+      cards.forEach(c => c.remove());
+      statics.forEach(c => { c.style.visibility = ''; });
+    });
+  }
+
+  function shuffleDeck() {
+    if (IS_VIEWER) return;
+    finishAnim();
+    refill('cards');
+    delete S.last.cards;
+    S.shuffleId = (S.shuffleId || 0) + 1;
+    pendingShuffle = true;
+    S.rollId++;
+    render(); emitState(true);
   }
   const cardName = id => `${['Ace', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'Jack', 'Queen', 'King'][id % 13]} of ${['spades', 'hearts', 'diamonds', 'clubs'][Math.floor(id / 13)]}`;
 
@@ -1627,9 +1936,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     }
     const wheel = $('wheel'), label = $('spin-label');
     const showLabel = () => {
-      label.innerHTML = o && !o.empty
-        ? `<span class="spin-result"><i style="background:var(--hue-${o.i % HUES})"></i><strong>${escHtml(o.label)}</strong></span>${runsNote(o)}`
-        : placeholder('Press Spin');
+      label.innerHTML = o && !o.empty ? '' : placeholder('Click the wheel to spin');
     };
     if (play) {
       label.innerHTML = '&nbsp;';
@@ -1757,15 +2064,90 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 
   function renderNumber(o, play) {
     const st = S.setup.number;
-    let note = o && o.runs > 1 ? `<span class="note">last of ${o.runs}</span>` : '';
+    let note = '';
     if (st.unique && st.decimals === 0) note += `${note ? ' ' : ''}<span class="note">${S.pool.number.length} of ${st.max - st.min + 1} used</span>`;
     renderReelValue(o ? String(o.v) : null, note, play, placeholder(`${st.min} – ${st.max}`));
   }
 
+  // ── Distribution: one live histogram ────────────────────────────────────────
+  // For a room, the shape is the point, not any single number: every sample
+  // drops into its bar, and the curve it should build towards is drawn over
+  // it. Click to add one; ×10 … ×1000 to fill it in.
   function renderDist(o, play) {
-    const m = model('dist');
-    renderReelValue(o ? fmtDist(o.v) : null, `${escHtml(m.title)}${o && o.runs > 1 ? ` <span class="note">· last of ${o.runs}</span>` : ''}`,
-                    play, `<div class="caption">${escHtml(m.title)}</div>`);
+    const m = model('dist'), st = statsFor('dist');
+    const r = resultEl.getBoundingClientRect();
+    // Room for the heading above and the legend below.
+    const W = Math.max(200, r.width - 48), H = Math.max(120, r.height - 130);
+    const padL = 8, padR = 8, padT = 10, padB = 26;
+    const n = m.labels.length, total = st.total;
+    const counts = st.counts.slice();
+    const lastBin = o && !o.empty && o.runs === 1 ? m.bin(o.v) : -1;
+    const dropping = play && lastBin >= 0 && canAnimate();
+    if (dropping) counts[lastBin] = Math.max(0, counts[lastBin] - 1);
+    const expected = m.probs.map(p => p * Math.max(total, 1));
+    const top = Math.max(1, ...st.counts, ...expected) * 1.1;
+    const bw = (W - padL - padR) / n;
+    const y = v => padT + (H - padT - padB) * (1 - v / top);
+    let svg = `<line x1="${padL}" x2="${W - padR}" y1="${H - padB}" y2="${H - padB}" stroke="var(--border-med)"/>`;
+    const gap = Math.min(3, bw * 0.12);
+    for (let i = 0; i < n; i++) {
+      const h = (H - padT - padB) * counts[i] / top;
+      svg += `<rect class="dbar${i === lastBin ? ' hl' : ''}" data-i="${i}" x="${(padL + i * bw + gap / 2).toFixed(1)}" y="${(H - padB - h).toFixed(1)}" width="${Math.max(1, bw - gap).toFixed(1)}" height="${h.toFixed(1)}" rx="${Math.min(3, bw * 0.15).toFixed(1)}"/>`;
+    }
+    // The expected shape: a smooth curve for a continuous distribution,
+    // a dot per bar for a discrete one.
+    if (total > 0) {
+      if (m.continuous) {
+        const pts = expected.map((e, i) => `${(padL + (i + 0.5) * bw).toFixed(1)},${y(e).toFixed(1)}`);
+        svg += `<polyline points="${pts.join(' ')}" fill="none" stroke="var(--warn)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+      } else {
+        expected.forEach((e, i) => { svg += `<circle cx="${(padL + (i + 0.5) * bw).toFixed(1)}" cy="${y(e).toFixed(1)}" r="${Math.max(2, Math.min(5, bw * 0.18)).toFixed(1)}" fill="var(--warn)"/>`; });
+      }
+    }
+    const every = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(W / 46))));
+    for (let i = 0; i < n; i += every) {
+      svg += `<text x="${(padL + (i + 0.5) * bw).toFixed(1)}" y="${H - 7}" text-anchor="middle">${escHtml(String(m.labels[i]).slice(0, 7))}</text>`;
+    }
+    if (m.mean != null) {
+      // Expected mean as a faint guide; where the sample mean has got to as a solid one.
+      const pos = v => {
+        const b = m.bin(v);
+        if (m.continuous) { const lo = +m.labels[0], step = n > 1 ? +m.labels[1] - lo : 1; return padL + ((v - lo) / step + 0.5) * bw; }
+        return padL + (b + 0.5) * bw;
+      };
+      const ex = pos(m.mean);
+      svg += `<line x1="${ex.toFixed(1)}" x2="${ex.toFixed(1)}" y1="${padT}" y2="${H - padB}" stroke="var(--warn)" stroke-width="1" stroke-dasharray="3 4" opacity="0.8"/>`;
+      if (total) {
+        const sx = pos(st.sum / total);
+        svg += `<line x1="${sx.toFixed(1)}" x2="${sx.toFixed(1)}" y1="${padT}" y2="${H - padB}" stroke="var(--text)" stroke-width="1.5"/>`;
+      }
+    }
+    const head = `<div class="dist-head"><span class="dist-title">${escHtml(m.title)}</span>` +
+      `<span class="dist-n">${total ? `n = <strong>${total}</strong>${m.mean != null ? ` · mean <strong>${fmt(st.sum / total)}</strong>` : ''}` : 'Click to sample'}</span></div>`;
+    resultEl.innerHTML = head + `<svg class="dist-chart" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${svg}</svg>` +
+      `<div class="legend dist-legend"><span class="l-obs"><i></i>samples</span><span class="l-exp"><i></i>expected</span>${m.mean != null ? '<span class="l-mean"><i></i>sample mean</span>' : ''}</div>`;
+    if (!dropping) return;
+
+    // One sample: a ball falls from the top into its bar, which then grows.
+    const bar = resultEl.querySelector(`.dbar[data-i="${lastBin}"]`);
+    const cx = padL + (lastBin + 0.5) * bw, rad = Math.max(4, Math.min(11, bw * 0.38));
+    const ball = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    ball.setAttribute('cx', cx); ball.setAttribute('cy', padT); ball.setAttribute('r', rad);
+    ball.setAttribute('class', 'dball');
+    resultEl.querySelector('.dist-chart').appendChild(ball);
+    const land = +bar.getAttribute('y') - rad;
+    const a = ball.animate([
+      { transform: 'translateY(0)', opacity: 0 },
+      { transform: 'translateY(0)', opacity: 1, offset: 0.1 },
+      { transform: `translateY(${land - padT}px)`, opacity: 1, offset: 0.85 },
+      { transform: `translateY(${land - padT}px)`, opacity: 0, offset: 1 },
+    ], { duration: 650, easing: 'cubic-bezier(0.5, 0, 0.75, 0.5)', fill: 'both' });
+    hold(660, () => {
+      a.cancel(); ball.remove();
+      const h = (H - padT - padB) * st.counts[lastBin] / top;
+      bar.setAttribute('y', (H - padB - h).toFixed(1));
+      bar.setAttribute('height', h.toFixed(1));
+    });
   }
 
   // ── Name slot ───────────────────────────────────────────────────────────────
@@ -1787,7 +2169,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     resultEl.innerHTML =
       `<div class="slot${o ? '' : ' ghost'}" id="slot"><div class="strip">${reel.map(x => `<div>${escHtml(x)}</div>`).join('')}</div></div>` +
       (o ? (st.remove ? `<div class="bw-hint">${S.pool.list.length} left to pick</div>` : '')
-         : placeholder(`${st.items.length} names · press Pick`));
+         : placeholder(`${st.items.length} names · click to pick`));
     // Size by the longest name the reel will show, so it doesn't jump.
     const slot = $('slot'), r = resultEl.getBoundingClientRect();
     let fs = Math.min(r.height * 0.3, 150);
@@ -1820,21 +2202,9 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     a.done && a.done();
   }
 
-  // ── History ─────────────────────────────────────────────────────────────────
-  function renderHistory() {
-    const h = S.history[S.mode] || [];
-    if (!h.length || (S.mode === 'list' && S.last.list && S.last.list.type !== 'pick' && !h.length)) {
-      historyEl.innerHTML = `<span class="bw-hint">History</span><span class="h-item" style="color:var(--text-3);font-weight:400">—</span>`;
-      return;
-    }
-    historyEl.innerHTML = `<span class="bw-hint">History</span>` + h.slice(0, 30).map(x =>
-      x.dots ? `<span class="h-item">${x.dots.map(c => `<span class="dot" style="--c:var(--hue-${c})"></span>`).join('')}</span>`
-             : `<span class="h-item">${x.c != null ? `<span class="dot" style="--c:var(--hue-${x.c})"></span>` : ''}${escHtml(x.t)}</span>`).join('');
-  }
-
   // ── Stats chart ─────────────────────────────────────────────────────────────
   function renderStats() {
-    const show = S.showStats && S.mode !== 'list';
+    const show = S.showStats && S.mode !== 'list' && S.mode !== 'dist';
     statsEl.hidden = !show;
     if (!show) return;
     const m = model(), st = statsFor(S.mode);
@@ -1920,62 +2290,58 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   // ── State serialisation ─────────────────────────────────────────────────────
   function getState() {
     return JSON.parse(JSON.stringify({
-      v: 1, mode: S.mode, runs: S.runs, showStats: S.showStats, setup: S.setup, pool: S.pool,
-      last: S.last, history: S.history, stats: S.stats, rng: S.rng, rollId: S.rollId, spin: S.spin,
+      v: 2, mode: S.mode, runs: S.runs, showStats: S.showStats, setup: S.setup, pool: S.pool,
+      last: S.last, stats: S.stats, rng: S.rng, rollId: S.rollId, spin: S.spin, shuffleId: S.shuffleId || 0,
     }));
   }
 
   function applyState(s, live) {
     if (!s || typeof s !== 'object') return;
     const prevRoll = S.rollId;
-    if (MODES.includes(s.mode)) S.mode = s.mode;
+    // The settings own the setup. Only a live viewer takes the presenter's,
+    // in case its own copy of the settings is behind.
+    if (live) {
+      if (MODES.includes(s.mode)) S.mode = s.mode;
+      if (s.setup && typeof s.setup === 'object') {
+        for (const k of MODES) if (s.setup[k] && typeof s.setup[k] === 'object') S.setup[k] = { ...S.setup[k], ...s.setup[k] };
+      }
+    }
     if ([1, 10, 100, 1000].includes(s.runs)) S.runs = s.runs;
     if (typeof s.showStats === 'boolean') S.showStats = s.showStats;
-    if (s.setup && typeof s.setup === 'object') {
-      for (const k of MODES) if (s.setup[k] && typeof s.setup[k] === 'object') S.setup[k] = { ...S.setup[k], ...s.setup[k] };
-    }
     if (s.pool && typeof s.pool === 'object') S.pool = { ...S.pool, ...s.pool };
     if (s.last && typeof s.last === 'object') S.last = s.last;
-    if (s.history && typeof s.history === 'object') S.history = s.history;
     if (s.stats && typeof s.stats === 'object') S.stats = s.stats;
     if (typeof s.rng === 'number') S.rng = s.rng >>> 0;
     if (typeof s.spin === 'number') S.spin = s.spin;
     if (typeof s.rollId === 'number') S.rollId = s.rollId;
+    if (typeof s.shuffleId === 'number') { if (live && s.shuffleId !== (S.shuffleId || 0) && S.mode === 'cards') pendingShuffle = true; S.shuffleId = s.shuffleId; }
     ensurePools();
-    setupFor = '';
     // A viewer animates a fresh outcome the way the presenter's screen did;
     // a restored slide just shows where it was.
     render(!!live && S.rollId !== prevRoll);
   }
 
   // ── Config ──────────────────────────────────────────────────────────────────
-  // Only a changed setting is adopted, so re-sent config never undoes what
-  // the presenter has done in the widget since.
-  let lastCfgMode = null, lastItems = null, lastSeed = null;
+  let lastSeed = null;
   function applyConfig(c) {
     if (!c) return;
     const prevUrl = cfg.socketUrl;
     cfg = { ...cfg, ...c };
     WIDGET_ID = cfg.id || cfg.widgetId || WIDGET_ID;
     IS_VIEWER = cfg.role === 'viewer' || IS_VIEWER;
-    if (MODES.includes(cfg.mode) && cfg.mode !== lastCfgMode) {
-      if (lastCfgMode !== null || !S.rollId) S.mode = cfg.mode;
-      lastCfgMode = cfg.mode;
-    }
-    const items = Array.isArray(cfg.items) ? cfg.items : typeof cfg.items === 'string' ? cfg.items.split('\n') : null;
-    const itemsSig = items ? JSON.stringify(items) : null;
-    if (itemsSig && itemsSig !== lastItems) {
-      if (lastItems !== null || !S.rollId) setListItems(items);
-      lastItems = itemsSig;
-    }
+    const nextMode = MODES.includes(cfg.mode) ? cfg.mode : 'dice';
+    if (nextMode !== S.mode) finishAnim(true);
+    S.mode = nextMode;
+    adoptSetup(setupFromConfig(cfg));
+    // Only a changed seed re-seeds, so re-sent config doesn't restart a demo.
     const seed = String(cfg.seed || '');
     if (seed !== lastSeed) {
       if (lastSeed !== null || !S.rollId) S.rng = freshSeed();
       lastSeed = seed;
     }
     if (cfg.socketUrl && cfg.socketUrl !== prevUrl) initSocket(cfg.socketUrl);
-    setupFor = '';
     render();
+    if (!IS_VIEWER && lastSeed !== null) emitState();
   }
 
   function destroy() {
@@ -1999,33 +2365,25 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   });
 
   // ── Event wiring ────────────────────────────────────────────────────────────
-  goBtn.addEventListener('click', go);
-  modeSel.addEventListener('change', () => setMode(modeSel.value));
+  resultEl.addEventListener('click', e => {
+    if (IS_VIEWER || e.target.closest('.order, .groups') || isExhausted()) return;
+    go();
+  });
+  deckBtn.addEventListener('click', shuffleDeck);
+  shuffleBtn.addEventListener('click', shuffleList);
+  groupsBtn.addEventListener('click', makeGroups);
   runsSel.addEventListener('change', () => { if (IS_VIEWER) return; S.runs = +runsSel.value || 1; emitState(); });
   statsBtn.addEventListener('click', () => {
     if (IS_VIEWER) return;
     S.showStats = !S.showStats;
     render(); emitState();
   });
-  setupEl.addEventListener('input', e => { if (e.target.dataset.k && e.target.type !== 'checkbox' && e.target.tagName !== 'SELECT') onSetupChange(e.target); });
-  setupEl.addEventListener('change', e => { if (e.target.dataset.k) onSetupChange(e.target); });
-  setupEl.addEventListener('click', e => {
-    const b = e.target.closest('[data-act]');
-    if (b) onSetupAction(b.dataset.act, +b.dataset.i);
-  });
-  listText.addEventListener('input', updateListCount);
-  $('list-done').addEventListener('click', () => closeListEditor(true));
-  $('list-cancel').addEventListener('click', () => closeListEditor(false));
-  listText.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { e.stopPropagation(); closeListEditor(false); }
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) closeListEditor(true);
-  });
 
   // Space / Enter goes, S toggles stats — from anywhere except a field.
   document.addEventListener('keydown', e => {
     if (IS_VIEWER || e.ctrlKey || e.metaKey || e.altKey) return;
-    if (e.target.closest && e.target.closest('input, textarea, select, #list-editor')) return;
-    if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); if (!goBtn.disabled) go(); }
+    if (e.target.closest && e.target.closest('input, textarea, select')) return;
+    if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); if (!isExhausted()) go(); }
     else if ((e.key === 's' || e.key === 'S') && S.mode !== 'list') statsBtn.click();
   });
 
@@ -2050,7 +2408,6 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 
   // ── Boot ────────────────────────────────────────────────────────────────────
   S.rng = freshSeed();
-  ensurePools();
   initSocket(CFG0.socketUrl);
   applyConfig(CFG0);
   render();
