@@ -43,281 +43,44 @@
    ]
   },
   {
-   "key": "diceCount",
-   "label": "Number of dice",
-   "type": "select",
-   "default": "2",
+   "key": "diceSet",
+   "label": "Dice",
+   "type": "select-list",
+   "itemLabel": "die",
+   "max": 6,
+   "addValue": 6,
+   "options": [
+    {
+     "v": 4,
+     "l": "4-sided"
+    },
+    {
+     "v": 6,
+     "l": "6-sided"
+    },
+    {
+     "v": 8,
+     "l": "8-sided"
+    },
+    {
+     "v": 10,
+     "l": "10-sided"
+    },
+    {
+     "v": 12,
+     "l": "12-sided"
+    },
+    {
+     "v": 20,
+     "l": "20-sided"
+    }
+   ],
+   "default": [
+    6,
+    6
+   ],
    "showIf": {
     "mode": "dice"
-   },
-   "options": [
-    {
-     "v": "1",
-     "l": "1"
-    },
-    {
-     "v": "2",
-     "l": "2"
-    },
-    {
-     "v": "3",
-     "l": "3"
-    },
-    {
-     "v": "4",
-     "l": "4"
-    },
-    {
-     "v": "5",
-     "l": "5"
-    },
-    {
-     "v": "6",
-     "l": "6"
-    }
-   ]
-  },
-  {
-   "key": "die1",
-   "label": "Die 1",
-   "type": "select",
-   "default": "6",
-   "options": [
-    {
-     "v": "4",
-     "l": "d4 (4 sides)"
-    },
-    {
-     "v": "6",
-     "l": "d6 (6 sides)"
-    },
-    {
-     "v": "8",
-     "l": "d8 (8 sides)"
-    },
-    {
-     "v": "10",
-     "l": "d10 (10 sides)"
-    },
-    {
-     "v": "12",
-     "l": "d12 (12 sides)"
-    },
-    {
-     "v": "20",
-     "l": "d20 (20 sides)"
-    }
-   ],
-   "showIf": {
-    "mode": "dice",
-    "diceCount": [
-     "1",
-     "2",
-     "3",
-     "4",
-     "5",
-     "6"
-    ]
-   }
-  },
-  {
-   "key": "die2",
-   "label": "Die 2",
-   "type": "select",
-   "default": "6",
-   "options": [
-    {
-     "v": "4",
-     "l": "d4 (4 sides)"
-    },
-    {
-     "v": "6",
-     "l": "d6 (6 sides)"
-    },
-    {
-     "v": "8",
-     "l": "d8 (8 sides)"
-    },
-    {
-     "v": "10",
-     "l": "d10 (10 sides)"
-    },
-    {
-     "v": "12",
-     "l": "d12 (12 sides)"
-    },
-    {
-     "v": "20",
-     "l": "d20 (20 sides)"
-    }
-   ],
-   "showIf": {
-    "mode": "dice",
-    "diceCount": [
-     "2",
-     "3",
-     "4",
-     "5",
-     "6"
-    ]
-   }
-  },
-  {
-   "key": "die3",
-   "label": "Die 3",
-   "type": "select",
-   "default": "6",
-   "options": [
-    {
-     "v": "4",
-     "l": "d4 (4 sides)"
-    },
-    {
-     "v": "6",
-     "l": "d6 (6 sides)"
-    },
-    {
-     "v": "8",
-     "l": "d8 (8 sides)"
-    },
-    {
-     "v": "10",
-     "l": "d10 (10 sides)"
-    },
-    {
-     "v": "12",
-     "l": "d12 (12 sides)"
-    },
-    {
-     "v": "20",
-     "l": "d20 (20 sides)"
-    }
-   ],
-   "showIf": {
-    "mode": "dice",
-    "diceCount": [
-     "3",
-     "4",
-     "5",
-     "6"
-    ]
-   }
-  },
-  {
-   "key": "die4",
-   "label": "Die 4",
-   "type": "select",
-   "default": "6",
-   "options": [
-    {
-     "v": "4",
-     "l": "d4 (4 sides)"
-    },
-    {
-     "v": "6",
-     "l": "d6 (6 sides)"
-    },
-    {
-     "v": "8",
-     "l": "d8 (8 sides)"
-    },
-    {
-     "v": "10",
-     "l": "d10 (10 sides)"
-    },
-    {
-     "v": "12",
-     "l": "d12 (12 sides)"
-    },
-    {
-     "v": "20",
-     "l": "d20 (20 sides)"
-    }
-   ],
-   "showIf": {
-    "mode": "dice",
-    "diceCount": [
-     "4",
-     "5",
-     "6"
-    ]
-   }
-  },
-  {
-   "key": "die5",
-   "label": "Die 5",
-   "type": "select",
-   "default": "6",
-   "options": [
-    {
-     "v": "4",
-     "l": "d4 (4 sides)"
-    },
-    {
-     "v": "6",
-     "l": "d6 (6 sides)"
-    },
-    {
-     "v": "8",
-     "l": "d8 (8 sides)"
-    },
-    {
-     "v": "10",
-     "l": "d10 (10 sides)"
-    },
-    {
-     "v": "12",
-     "l": "d12 (12 sides)"
-    },
-    {
-     "v": "20",
-     "l": "d20 (20 sides)"
-    }
-   ],
-   "showIf": {
-    "mode": "dice",
-    "diceCount": [
-     "5",
-     "6"
-    ]
-   }
-  },
-  {
-   "key": "die6",
-   "label": "Die 6",
-   "type": "select",
-   "default": "6",
-   "options": [
-    {
-     "v": "4",
-     "l": "d4 (4 sides)"
-    },
-    {
-     "v": "6",
-     "l": "d6 (6 sides)"
-    },
-    {
-     "v": "8",
-     "l": "d8 (8 sides)"
-    },
-    {
-     "v": "10",
-     "l": "d10 (10 sides)"
-    },
-    {
-     "v": "12",
-     "l": "d12 (12 sides)"
-    },
-    {
-     "v": "20",
-     "l": "d20 (20 sides)"
-    }
-   ],
-   "showIf": {
-    "mode": "dice",
-    "diceCount": [
-     "6"
-    ]
    }
   },
   {
@@ -1527,7 +1290,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     return {
       // One dropdown per die (a d6 and a d20, say). Decks saved with the
       // older one-per-line list still read.
-      dice:    { sides: (c.diceCount != null || [1, 2, 3, 4, 5, 6].some(i => c['die' + i] != null)
+      dice:    { sides: (Array.isArray(c.diceSet) && c.diceSet.length ? c.diceSet.slice(0, 6) : c.diceCount != null || [1, 2, 3, 4, 5, 6].some(i => c['die' + i] != null)
                    ? Array.from({ length: numCfg(c.diceCount, 2, 1, 6, true) }, (_, i) => c['die' + (i + 1)] ?? 6)
                    : (diceRows.length ? diceRows : ['6', '6']).slice(0, 6))
                    .map(s => { const v = numCfg(String(s).replace(/^d/i, ''), 6, 2, 100, true); return [4, 6, 8, 10, 12, 20].includes(v) ? v : 6; }),
@@ -2614,6 +2377,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     lip.rotation.x = Math.PI / 2; lip.position.y = 3.05; lip.renderOrder = 3; jar.add(lip);
     const note = new T.Mesh(new T.PlaneGeometry(1.05, 0.98), new T.MeshStandardMaterial({ map: noteTexture(0, 'sticky'), roughness: 0.9, transparent: true, toneMapped: false }));
     note.position.set(0, 1.85, 1.07); note.rotation.z = -0.07; note.rotation.x = -0.03; note.renderOrder = 4;
+    note.visible = false;            // no count shown
     jar.add(note);
     // Velvet drawstring bag.
     const sack = new T.Group(); sack.position.x = JAR.x; scene.add(sack);
@@ -2671,10 +2435,9 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     hole.rotation.x = -Math.PI / 2; hole.position.y = 2.96; sack.add(hole);
     const rope = new T.MeshStandardMaterial({ color: 0xd9c08a, roughness: 0.8 });
     const tie = new T.Mesh(new T.TorusGeometry(0.47, 0.035, 10, 64), rope); tie.rotation.x = Math.PI / 2; tie.position.y = 2.6; sack.add(tie);
-    const cords = new T.CatmullRomCurve3([new T.Vector3(0.34, 2.6, 0.34), new T.Vector3(0.62, 2.3, 0.72), new T.Vector3(0.82, 2.0, 1.08)]);
-    sack.add(new T.Mesh(new T.TubeGeometry(cords, 20, 0.025, 8), rope));
     const tag = new T.Mesh(new T.PlaneGeometry(0.62, 0.58), new T.MeshStandardMaterial({ map: noteTexture(0, 'tag'), roughness: 0.9, transparent: true, side: T.DoubleSide }));
     tag.position.set(0.86, 1.72, 1.2); tag.rotation.set(-0.12, 0.42, 0.1); tag.castShadow = true;
+    tag.visible = false;             // no count shown
     sack.add(tag);
     // Balls inside the jar, in the jar's frame.
     const inside = new T.Group(); inside.position.x = JAR.x; scene.add(inside);
@@ -3108,21 +2871,123 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       d.dice.forEach(g => d.scene.add(g));
       d.sig = sig;
     }
-    // Side by side on the table, the camera pulled back to fit them all.
+    // The cup on the left, the dice laid out to its right; the whole group
+    // centred, the camera pulled back to fit it.
     const gap = 2.7, n = sides.length;
-    d.slots = sides.map((_, i) => new T.Vector3((i - (n - 1) / 2) * gap, 0, 0));
+    const total = CUPD.w + 1.1 + n * gap;
+    const left = -total / 2;
+    d.cupAt = new T.Vector3(left + CUPD.w / 2, 0, 0);
+    d.slots = sides.map((_, i) => new T.Vector3(left + CUPD.w + 1.1 + gap / 2 + i * gap, 0, 0));
+    if (!d.cup) { d.cup = buildCup(); d.scene.add(d.cup); }
     d.camera.aspect = w / h;
-    const halfW = (n * gap) / 2 + 0.3, halfH = 1.75;
-    const vf = T.MathUtils.degToRad(d.camera.fov) / 2, hf = Math.atan(Math.tan(vf) * d.camera.aspect);
-    const dist = Math.max(halfW / Math.tan(hf), halfH / Math.tan(vf)) * 1.3;
-    // Nearly straight down, as you'd look at dice on a table to read them:
-    // the face that came up is the one facing the room.
-    d.camera.position.set(0, dist * 0.96, dist * 0.28);
-    d.camera.lookAt(0, 0.2, 0);
     d.camera.updateProjectionMatrix();
+    // Looking down at the table at a slant: steep enough to read the dice,
+    // low enough that the cup reads as a cup.
+    const tgt = new T.Vector3(0, 0.8, 0), dir = new T.Vector3(0, Math.sin(1.0), Math.cos(1.0));
+    const pts = [];
+    [left - 0.1, -left + 0.1].forEach(x => [0, 1.7].forEach(y => [-1.3, 1.3].forEach(z => pts.push(new T.Vector3(x, y, z)))));
+    [-1.75, 1.75].forEach(x => [-1.6, 1.6].forEach(z => pts.push(new T.Vector3(d.cupAt.x + x, CUPD.h + 0.4, z))));
+    // Fit and centre: pull back until it all fits, and move the aim so the
+    // margins are even.
+    let dist = 14;
+    const vfT = Math.tan(T.MathUtils.degToRad(d.camera.fov) / 2);
+    const right = new T.Vector3(1, 0, 0), up = new T.Vector3().crossVectors(dir, right);
+    for (let k = 0; k < 10; k++) {
+      d.camera.position.copy(tgt).addScaledVector(dir, dist);
+      d.camera.lookAt(tgt);
+      d.camera.updateMatrixWorld();
+      let x0 = 1, x1 = -1, y0 = 1, y1 = -1;
+      pts.forEach(p => { const v = p.clone().project(d.camera); x0 = Math.min(x0, v.x); x1 = Math.max(x1, v.x); y0 = Math.min(y0, v.y); y1 = Math.max(y1, v.y); });
+      tgt.addScaledVector(right, (x0 + x1) / 2 * dist * vfT * d.camera.aspect);
+      tgt.addScaledVector(up, (y0 + y1) / 2 * dist * vfT);
+      dist *= Math.max((x1 - x0) / 2, (y1 - y0) / 2) / 0.92;
+    }
+    d.camera.position.copy(tgt).addScaledVector(dir, dist);
+    d.camera.lookAt(tgt);
+    d.camera.updateMatrixWorld();
     return d;
   }
   const easeOut = t => 1 - Math.pow(1 - t, 3);
+
+  // ── The dice cup ──
+  // Turned wood outside, a dark felt lining, a rolled rim.
+  const CUPD = { r: 1.62, h: 3.4, w: 3.5 };
+  function woodTexture() {
+    const cv = document.createElement('canvas'), W = 1024, H = 512;
+    cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d');
+    const g = ctx.createLinearGradient(0, 0, W, 0);
+    g.addColorStop(0, '#8a5530'); g.addColorStop(0.5, '#9a6238'); g.addColorStop(1, '#8a5530');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    // Grain: long wavy lines running up the cup.
+    for (let k = 0; k < 140; k++) {
+      const x0 = (k / 140) * W + wob(k, 1) * 6, dark = wob(k, 2) + 0.5;
+      ctx.strokeStyle = `rgba(${dark > 0.5 ? '70,38,18' : '190,130,80'},${(0.12 + 0.18 * Math.abs(wob(k, 3))).toFixed(3)})`;
+      ctx.lineWidth = 1 + 3 * Math.abs(wob(k, 4));
+      ctx.beginPath();
+      for (let y = 0; y <= H; y += 16) {
+        const x = x0 + Math.sin(y / 70 + k) * 5 + Math.sin(y / 23 + k * 3) * 1.5;
+        if (y === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+    const t = canvasTex(cv);
+    t.wrapS = T3.RepeatWrapping;
+    return t;
+  }
+  function buildCup() {
+    const T = T3, g = new T.Group();
+    const R = CUPD.r, H = CUPD.h;
+    const outer = new T.SplineCurve([[0, 0], [R - 0.12, 0], [R - 0.02, 0.08], [R - 0.06, 0.4], [R - 0.02, 1.4], [R + 0.06, 2.5], [R + 0.1, H - 0.08]]
+      .map(([x, y]) => new T.Vector2(x, y))).getPoints(60);
+    const wood = new T.MeshPhysicalMaterial({ map: woodTexture(), roughness: 0.45, clearcoat: 0.6, clearcoatRoughness: 0.35, side: T.DoubleSide });
+    const shell = new T.Mesh(new T.LatheGeometry(outer, 96), wood);
+    shell.castShadow = true; shell.receiveShadow = true;
+    g.add(shell);
+    // Lining: down the inside wall and across the floor.
+    const wall = R - 0.04;
+    const inner = [[wall, H - 0.08], [wall - 0.1, 1.2], [wall - 0.14, 0.3], [wall - 0.3, 0.16], [0, 0.16]].map(([x, y]) => new T.Vector2(x, y));
+    const felt = new T.MeshStandardMaterial({ color: 0x2a4636, roughness: 1, side: T.DoubleSide });
+    const lining = new T.Mesh(new T.LatheGeometry(new T.SplineCurve(inner).getPoints(30), 96), felt);
+    lining.receiveShadow = true;
+    g.add(lining);
+    // A rolled rim, and two turned grooves.
+    const rimMat = new T.MeshPhysicalMaterial({ map: wood.map, color: 0xc89a70, roughness: 0.4, clearcoat: 0.6 });
+    const rim = new T.Mesh(new T.TorusGeometry(R + 0.03, 0.09, 16, 96), rimMat);
+    rim.rotation.x = Math.PI / 2; rim.position.y = H - 0.06; rim.castShadow = true;
+    g.add(rim);
+    const groove = new T.MeshStandardMaterial({ color: 0x4a2a14, roughness: 0.6 });
+    [[0.38, R - 0.05], [H - 0.42, R + 0.085]].forEach(([y, r]) => {
+      const t = new T.Mesh(new T.TorusGeometry(r, 0.025, 8, 96), groove);
+      t.rotation.x = Math.PI / 2; t.position.y = y;
+      g.add(t);
+    });
+    return g;
+  }
+  // Where each die sits in the cup, in the cup's own frame: a jumbled heap.
+  function inCupPose(i, n, seed) {
+    const T = T3, layer = Math.floor(i / 3), k = i % 3, inLayer = Math.min(3, n - layer * 3);
+    const a = k * 2.09 + layer * 1.05 + seed * 0.37;
+    const r = inLayer > 1 ? 0.4 : 0.05;
+    const p = new T.Vector3(Math.cos(a) * r, 1.0 + layer * 1.0, Math.sin(a) * r);
+    // Tipped only a little, so a corner never pokes through the wall.
+    const q = new T.Quaternion().setFromEuler(new T.Euler(wob(i, seed + 1) * 0.5, wob(i, seed + 2) * 6, wob(i, seed + 3) * 0.5));
+    return { p, q };
+  }
+  function restCup(d) {
+    d.cup.position.copy(d.cupAt);
+    d.cup.rotation.set(0, 0, 0);
+    d.cup.updateMatrixWorld();
+  }
+  function diceInCup(d, seed) {
+    restCup(d);
+    d.dice.forEach((g, i) => {
+      const s = inCupPose(i, d.dice.length, seed);
+      g.position.copy(s.p).applyMatrix4(d.cup.matrixWorld);
+      g.quaternion.copy(d.cup.quaternion).multiply(s.q);
+    });
+    d.onTable = false;
+  }
 
   function renderDice3D(o, play, sides, faces, w, h) {
     const T = T3, d = layoutScene(sides, w, h);
@@ -3130,56 +2995,123 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     // Twist each die a little off square, the same way every time for a roll.
     const twistOf = i => ((S.rollId * 7 + i * 13) % 9 - 4) * 0.05;
     const rest = d.dice.map((g, i) => {
-      const q = faces[i] ? restQuat(g, faces[i], twistOf(i)) : restQuat(g, g.userData.faces[(i * 3) % g.userData.faces.length].value, 0.3);
+      if (!faces[i]) return null;
+      const q = restQuat(g, faces[i], twistOf(i));
       return { q, y: restY(g, q), x: d.slots[i].x };
     });
     const draw = () => d.renderer.render(d.scene, d.camera);
     if (!play) {
-      d.dice.forEach((g, i) => { g.quaternion.copy(rest[i].q); g.position.set(rest[i].x, rest[i].y, 0); });
+      // Before the first roll (or with new dice) they wait in the cup.
+      if (rest.some(r => !r)) diceInCup(d, 0);
+      else {
+        restCup(d);
+        d.dice.forEach((g, i) => { g.quaternion.copy(rest[i].q); g.position.set(rest[i].x, rest[i].y, 0); });
+        d.onTable = true;
+      }
       draw();
       return 0;
     }
-    // The throw: in from the left and above, tumbling about a random axis,
-    // bouncing, then settling onto the rolled face.
-    const DUR = 1500, start = performance.now();
-    const plan = d.dice.map((g, i) => {
-      const axis = new T.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
-      return { axis, spin: 14 + Math.random() * 6, q0: new T.Quaternion().setFromEuler(new T.Euler(Math.random() * 6, Math.random() * 6, Math.random() * 6)),
-               x0: rest[i].x - 3.2 - Math.random(), z0: -1.2 + Math.random() * 0.6, delay: i * 90 };
-    });
-    const tumble = new T.Quaternion(), from = new T.Quaternion();
+
+    // 1. Any dice on the table go back into the cup.
+    // 2. The cup is lifted and shaken.
+    // 3. It's tipped over to the right and the dice tumble out across the
+    //    table to where they land; the cup is set back down.
+    const n = d.dice.length, seed = S.rollId % 17;
+    restCup(d);
+    const start = d.dice.map(g => ({ p: g.position.clone(), q: g.quaternion.clone() }));
+    const wasOut = d.onTable;
+    const inCup = d.dice.map((_, i) => inCupPose(i, n, seed));
+    const cupTop = new T.Vector3(0, CUPD.h + 1.3, 0).add(d.cupAt);
+    const G = wasOut ? 650 + (n - 1) * 110 : 0;
+    const S0 = G + (wasOut ? 120 : 0), SH = 950;
+    const T0 = S0 + SH, TIP = 480;
+    const release = i => T0 + 330 + i * 70, SLIDE = 170;
+    const ROLL = 1350;
+    const BACK0 = T0 + TIP + 380, BACK = 650;
+    const DUR = Math.max(release(n - 1) + SLIDE + ROLL, BACK0 + BACK);
+    const plan = d.dice.map((g, i) => ({
+      axis: new T.Vector3(wob(i, seed + 7), wob(i, seed + 8), wob(i, seed + 9)).normalize(),
+      spin: 12 + (wob(i, seed + 10) + 0.5) * 6,
+    }));
+    const tumble = new T.Quaternion(), from = new T.Quaternion(), tmp = new T.Vector3();
+    const rel = d.dice.map(() => null);
+    const cupPose = t => {
+      // Shake: lifted, quick side-to-side with a rocking tilt.
+      const s = seg(t, S0, S0 + SH), env = Math.sin(Math.PI * Math.min(1, s * 1.15));
+      const lift = easeInOut(seg(t, S0, S0 + 180)) * (1 - easeInOut(seg(t, T0, T0 + TIP)));
+      const x = Math.sin(s * Math.PI * 2 * 5.5) * 0.28 * env, z = Math.sin(s * Math.PI * 2 * 4 + 1) * 0.12 * env;
+      const rz = Math.sin(s * Math.PI * 2 * 5.5 + 0.6) * 0.16 * env;
+      // Tip: swung over to the right, mouth down toward the table.
+      const tp = easeInOut(seg(t, T0, T0 + TIP)) * (1 - easeInOut(seg(t, BACK0, BACK0 + BACK)));
+      d.cup.position.set(d.cupAt.x + x + tp * 1.0, lift * 0.7 + tp * 2.25, z);
+      d.cup.rotation.set(0, 0, rz - tp * 1.75);
+      d.cup.updateMatrixWorld();
+    };
     const frame = now => {
-      let busy = false;
+      const t = now - t0;
+      cupPose(t);
       d.dice.forEach((g, i) => {
-        const p = plan[i], R = rest[i];
-        const t = Math.max(0, Math.min(1, (now - start - p.delay) / DUR));
-        if (t < 1) busy = true;
-        const SETTLE = 0.62;
-        // Rotation: free tumble, then ease onto the rest orientation.
-        const tt = Math.min(t, SETTLE) / SETTLE;
-        tumble.setFromAxisAngle(p.axis, p.spin * (1 - Math.pow(1 - tt, 2)));
-        from.copy(p.q0).premultiply(tumble);
-        if (t <= SETTLE) g.quaternion.copy(from);
-        else g.quaternion.copy(from).slerp(R.q, easeOut((t - SETTLE) / (1 - SETTLE)));
-        // Position: slide in, bouncing lower each time.
-        const e = easeOut(t);
-        const bounce = Math.abs(Math.cos(t * Math.PI * 2.6)) * 2.4 * Math.pow(1 - t, 2.2);
-        g.position.set(p.x0 + (R.x - p.x0) * e, R.y + bounce + (1 - e) * 0.6, p.z0 * (1 - e));
+        const R = rest[i];
+        // Still in the cup (or being gathered into it).
+        if (t < release(i) + SLIDE) {
+          const inside = tmp.copy(inCup[i].p).applyMatrix4(d.cup.matrixWorld);
+          const insideQ = new T.Quaternion().copy(d.cup.quaternion).multiply(inCup[i].q);
+          if (wasOut && t < G + 60) {
+            const u = seg(t, i * 110, i * 110 + 650), e = easeInOut(u);
+            // Up over the rim, then down into the cup.
+            const mid = cupTop.clone();
+            const a = start[i].p.clone().lerp(mid, Math.min(1, e / 0.6));
+            if (e > 0.6) a.copy(mid).lerp(inside, (e - 0.6) / 0.4);
+            else a.y += Math.sin(Math.PI * e / 0.6) * 0.6;
+            g.position.copy(a);
+            g.quaternion.copy(start[i].q).slerp(insideQ, e);
+          } else if (t >= release(i)) {
+            // Sliding down the tipped cup and out of its mouth.
+            const sl = seg(t, release(i), release(i) + SLIDE);
+            const lp = inCup[i].p.clone().lerp(new T.Vector3(inCup[i].p.x * 0.5, CUPD.h + 0.5, inCup[i].p.z * 0.5), sl * sl);
+            g.position.copy(lp.applyMatrix4(d.cup.matrixWorld));
+            g.quaternion.copy(insideQ);
+          } else {
+            // Rattling about inside while it's shaken.
+            const jig = Math.sin(t / 37 + i * 2) * 0.12 * seg(t, S0, S0 + 200) * (1 - seg(t, T0, T0 + 200));
+            g.position.copy(inside); g.position.y += jig;
+            g.quaternion.copy(insideQ);
+            if (t > S0 && t < T0) g.rotateOnAxis(plan[i].axis, (t - S0) / 90);
+          }
+          return;
+        }
+        // Out of the cup and across the table.
+        if (!rel[i]) rel[i] = { p: g.position.clone(), q: g.quaternion.clone() };
+        const u = seg(t, release(i) + SLIDE, release(i) + SLIDE + ROLL), SETTLE = 0.62;
+        const tt = Math.min(u, SETTLE) / SETTLE;
+        tumble.setFromAxisAngle(plan[i].axis, plan[i].spin * (1 - Math.pow(1 - tt, 2)));
+        from.copy(rel[i].q).premultiply(tumble);
+        if (u <= SETTLE) g.quaternion.copy(from);
+        else g.quaternion.copy(from).slerp(R.q, easeOut((u - SETTLE) / (1 - SETTLE)));
+        const e = easeOut(u), FALL = 0.14;
+        // Drops from the mouth to the table, then bounces lower each time.
+        let y;
+        if (u < FALL) y = rel[i].p.y + (R.y - rel[i].p.y) * (u / FALL) ** 2;
+        else { const v = (u - FALL) / (1 - FALL); y = R.y + Math.abs(Math.sin(v * Math.PI * 2.5)) * 0.9 * Math.pow(1 - v, 2.2); }
+        g.position.set(rel[i].p.x + (R.x - rel[i].p.x) * e, y, rel[i].p.z * (1 - e));
       });
       draw();
-      if (busy) d.raf = requestAnimationFrame(frame);
+      if (t < DUR) d.raf = requestAnimationFrame(frame);
+      else d.onTable = true;
     };
-    d.raf = requestAnimationFrame(frame);
-    return DUR + (d.dice.length - 1) * 90;
+    const t0 = performance.now();
+    frame(t0);
+    return DUR;
   }
-
   function settleDice3D(faces) {
     if (!D3) return;
     cancelAnimationFrame(D3.raf);
+    restCup(D3);
     D3.dice.forEach((g, i) => {
       const q = restQuat(g, faces[i] || 1, ((S.rollId * 7 + i * 13) % 9 - 4) * 0.05);
       g.quaternion.copy(q); g.position.set(D3.slots[i].x, restY(g, q), 0);
     });
+    D3.onTable = true;
     D3.renderer.render(D3.scene, D3.camera);
   }
 
@@ -3387,7 +3319,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     const body = sackBody();
     if (front) {
       return `<svg viewBox="0 0 100 130"><defs>${SACK_DEFS}<clipPath id="nearSide"><rect x="0" y="21.5" width="100" height="110"/></clipPath></defs>` +
-        `<g clip-path="url(#nearSide)">${body.replace(/<ellipse cx="50" cy="21.5" rx="15" ry="4.2" fill="#130c24"/, '<ellipse cx="50" cy="21.5" rx="15" ry="4.2" fill="none"')}</g>${bagTag(left)}</svg>`;
+        `<g clip-path="url(#nearSide)">${body.replace(/<ellipse cx="50" cy="21.5" rx="15" ry="4.2" fill="#130c24"/, '<ellipse cx="50" cy="21.5" rx="15" ry="4.2" fill="none"')}</g></svg>`;
     }
     return `<svg viewBox="0 0 100 130"><defs>${SACK_DEFS}</defs>${body}</svg>`;
   }
@@ -3494,7 +3426,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     const bw = Math.round(Math.min(sideW, jar * 1.45)), bh = Math.round(Math.min(jar * 0.85, bw * 0.72));
     const svg = look === 'bag' ? sackSvg(left) + `<div class="bag-front">${sackSvg(left, true)}</div>` : jarSvg(dots);
     resultEl.innerHTML =
-      `<div class="bag-row" style="gap:${Math.round(jar * 0.45)}px"><div class="jar${look === 'bag' ? ' sack' : ''}" id="container">${svg}${look === 'jar' ? stickyHtml(left) : ''}</div>` +
+      `<div class="bag-row" style="gap:${Math.round(jar * 0.45)}px"><div class="jar${look === 'bag' ? ' sack' : ''}" id="container">${svg}</div>` +
       `<div class="bag-side" style="width:${bw}px;height:${bh}px"></div></div>`;
     if (!play || !drawnNow) return;
 

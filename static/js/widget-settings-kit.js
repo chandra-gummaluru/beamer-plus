@@ -278,7 +278,49 @@
         };
     }
 
+    // A list of dropdowns (e.g. a set of dice), with Add and remove.
+    function buildSelectListRow(field, onChange) {
+        var row = el('div', 'bws-row');
+        row.appendChild(labelFor(field));
+        var opts = (field.options || []).map(function (o) { return o && typeof o === 'object' ? o : { v: o, l: String(o) }; });
+        var box = el('div');
+        row.appendChild(box);
+        var eff = effective(field);
+        var items = (Array.isArray(eff) ? eff : []).map(String);
+        var add = el('button', 'bws-btn');
+        add.type = 'button';
+        add.textContent = '+ Add';
+        row.appendChild(add);
+        function paint() {
+            box.innerHTML = '';
+            items.forEach(function (val, i) {
+                var line = el('div');
+                line.style.cssText = 'display:flex;gap:6px;align-items:center;margin:4px 0';
+                var sel = el('select', 'bws-select');
+                opts.forEach(function (o) { var op = el('option'); op.value = String(o.v); op.textContent = o.l; if (String(o.v) === val) op.selected = true; sel.appendChild(op); });
+                sel.addEventListener('change', function () { items[i] = sel.value; onChange(); });
+                var rm = el('button', 'bws-btn');
+                rm.type = 'button'; rm.textContent = '×'; rm.disabled = items.length <= 1;
+                rm.addEventListener('click', function () { items.splice(i, 1); paint(); onChange(); });
+                line.appendChild(sel); line.appendChild(rm);
+                box.appendChild(line);
+            });
+            add.hidden = items.length >= (field.max || 99);
+        }
+        add.addEventListener('click', function () { items.push(String(field.addValue != null ? field.addValue : (opts[0] && opts[0].v))); paint(); onChange(); });
+        paint();
+        return {
+            key: field.key,
+            node: row,
+            read: function () {
+                if (!items.length) return { remove: true };
+                return { value: items.map(function (x) { return typeof (opts[0] && opts[0].v) === 'number' ? Number(x) : x; }) };
+            },
+        };
+    }
+
     function buildRow(field, onChange) {
+        if (field.type === 'select-list') return buildSelectListRow(field, onChange);
         if (field.type === 'colour-counts') return buildColourCountsRow(field, onChange);
         var eff = effective(field);
         var row = el('div', 'bws-row');

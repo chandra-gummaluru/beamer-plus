@@ -208,6 +208,7 @@ const isTemplateField = (f) => f?.type === 'textarea' && f.blanks && typeof f.bl
 // whichever surface configured it.
 function buildFieldRow(field, item, variant) {
     if (field.type === 'colour-counts') return buildColourCountsRow(field, item);
+    if (field.type === 'select-list')   return buildSelectListRow(field, item);
     if (isListField(field))     return buildListRow(field, item);
     if (isTemplateField(field)) return buildTemplateRow(field, item, variant);
 
@@ -1106,6 +1107,84 @@ function buildColourCountsRow(field, item) {
             if (!items.length) return { remove: true };
             const typed = v => (typeof opts[0]?.v === 'number' ? Number(v) : v);
             return { value: items.map(x => ({ c: typed(x.c), n: x.n })) };
+        },
+    };
+}
+
+/* ─── a list of choices: one dropdown per row, Add to add another ──── */
+// `type: "select-list"` — stored as an array of option values, e.g. a set of
+// dice [6, 6, 20]. Options are { v, l }; `max` caps the rows; `addValue` is
+// what a new row starts as.
+
+function buildSelectListRow(field, item) {
+    const opts = (field.options || []).map(o => (o && typeof o === 'object' ? { v: o.v, l: o.l ?? String(o.v) } : { v: o, l: String(o) }));
+    const maxRows = field.max || 99;
+    const row = document.createElement('div');
+    row.className = 'editor-prop-row wf-list-row';
+    row.appendChild(fieldLabel(field));
+    const list = document.createElement('div');
+    list.className = 'wf-list';
+    list.setAttribute('role', 'list');
+    row.appendChild(list);
+    const add = document.createElement('button');
+    add.type = 'button';
+    add.className = 'wf-list-add';
+    add.innerHTML = '<span aria-hidden="true">+</span> Add';
+    add.setAttribute('aria-label', 'Add ' + (field.itemLabel || 'item').toLowerCase());
+    row.appendChild(add);
+
+    const eff = fieldValue(item, field);
+    let items = (Array.isArray(eff) ? eff : []).map(String).filter(v => opts.some(o => String(o.v) === v));
+    const changed = () => list.dispatchEvent(new Event('input', { bubbles: true }));
+
+    function paint() {
+        list.textContent = '';
+        items.forEach((val, i) => {
+            const r = document.createElement('div');
+            r.className = 'wf-list-item';
+            r.setAttribute('role', 'listitem');
+            const num = document.createElement('span');
+            num.className = 'wf-list-num';
+            num.textContent = String(i + 1);
+            const sel = document.createElement('select');
+            sel.className = 'editor-prop-select wf-list-input';
+            sel.setAttribute('aria-label', `${field.itemLabel || 'Item'} ${i + 1}`);
+            for (const o of opts) {
+                const op = document.createElement('option');
+                op.value = String(o.v);
+                op.textContent = o.l;
+                if (String(o.v) === val) op.selected = true;
+                sel.appendChild(op);
+            }
+            sel.addEventListener('change', e => { e.stopPropagation(); items[i] = sel.value; changed(); });
+            const rm = document.createElement('button');
+            rm.type = 'button';
+            rm.className = 'wf-list-remove';
+            rm.title = 'Remove';
+            rm.setAttribute('aria-label', 'Remove');
+            rm.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+            rm.disabled = items.length <= 1;
+            rm.addEventListener('click', () => { items.splice(i, 1); paint(); changed(); });
+            r.append(num, sel, rm);
+            list.appendChild(r);
+        });
+        add.hidden = items.length >= maxRows;
+    }
+    add.addEventListener('click', () => {
+        items.push(String(field.addValue ?? items[items.length - 1] ?? opts[0]?.v));
+        paint(); changed();
+        list.lastElementChild?.querySelector('select')?.focus();
+    });
+    paint();
+
+    return {
+        key: field.key,
+        node: row,
+        wide: true,
+        read() {
+            if (!items.length) return { remove: true };
+            const typed = v => (typeof opts[0]?.v === 'number' ? Number(v) : v);
+            return { value: items.map(typed) };
         },
     };
 }
