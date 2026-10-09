@@ -1,0 +1,28 @@
+{
+  "widgets": [
+    {
+      "id": "widget_demo_poll",
+      "type": "audience-response",
+      "src": "",
+      "builtin": true,
+      "x": 0,
+      "y": 0,
+      "width": 1,
+      "height": 1,
+      "zIndex": 10,
+      "responseType": "choice",
+      "question": "A bat and a ball cost **110¢** in total. The bat costs **100¢ more** than the ball.\n\nHow much does the ball cost?",
+      "options": [
+        "10¢",
+        "5¢",
+        "1¢",
+        "55¢"
+      ],
+      "correctAnswer": 2,
+      "autoStart": true,
+      "timerMode": "down",
+      "timerSeconds": 45,
+      "layout": "side"
+    }
+  ]
+}

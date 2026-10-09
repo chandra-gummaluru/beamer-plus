@@ -1,0 +1,21 @@
+{
+  "widgets": [
+    {
+      "id": "widget_demo_kmap",
+      "type": "karnaugh-map",
+      "src": "",
+      "builtin": true,
+      "x": 0.47,
+      "y": 0.255,
+      "width": 0.51,
+      "height": 0.6,
+      "zIndex": 10,
+      "inputMode": "formula",
+      "expression": "A'*B*C + A*B'*C + A*B*C' + A*B*C",
+      "vars": "A,B,C",
+      "fnName": "F",
+      "mode": "sop",
+      "scale": "1"
+    }
+  ]
+}

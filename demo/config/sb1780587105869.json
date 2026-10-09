@@ -4,16 +4,16 @@
       "id": "widget_1780587115686",
       "type": "audience-response",
       "src": "",
+      "builtin": true,
       "x": 0,
       "y": 0,
       "width": 1,
       "height": 1,
       "zIndex": 10,
-      "builtin": true,
       "autoStart": true,
       "minResponses": 1,
       "numSummaries": 3,
-      "question": "What do you think about Beamer+?",
+      "question": "What would you use Beamer+ for in your own class?",
       "model": "claude",
       "responseType": "open"
     }

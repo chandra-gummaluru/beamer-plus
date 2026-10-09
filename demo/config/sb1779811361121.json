@@ -1,0 +1,16 @@
+{
+  "widgets": [
+    {
+      "id": "widget_demo_calc",
+      "type": "calculator",
+      "src": "",
+      "builtin": true,
+      "display": "overlay",
+      "x": 0.655,
+      "y": 0.17,
+      "width": 0.3,
+      "height": 0.6,
+      "zIndex": 10
+    }
+  ]
+}

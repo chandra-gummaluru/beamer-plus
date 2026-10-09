@@ -66,16 +66,46 @@ const STEPS = [
         body:  'Dims everything except a movable circle so your audience focuses exactly where you want. Drag the spotlight around the slide to move it.',
     },
     {
+        sel:   '#magnify-btn',
+        place: 'left',
+        title: 'Magnifier',
+        body:  'A round lens that follows the pointer and enlarges whatever is under it — slide, ink, live video and widgets. Scroll while it is active to zoom between 1.5× and 5×. Try it on the fine print on the ink slide.',
+    },
+    {
+        sel:   '#text-btn',
+        place: 'left',
+        title: 'Text boxes with LaTeX',
+        body:  'Click anywhere on a slide to type a note. Wrap math in $…$ and it is typeset as LaTeX, right on the slide.',
+    },
+    {
         sel:   '#edit-mode-btn',
         place: 'auto',
         title: 'Edit mode',
         body:  'Opens the editing panel where you can add videos, audio, 3D models, and interactive widgets to any slide. Drag and resize overlays freely.',
     },
     {
+        sel:   '#record-btn',
+        place: 'left',
+        title: 'Record the lecture',
+        body:  'Record this tab — slides, ink, widgets, your microphone and the tab\'s sound — as a video. Takes are saved every second, so a reload or crash loses nothing, and they are listed under the download button.',
+    },
+    {
+        sel:   '#mute-btn',
+        place: 'left',
+        title: 'Hide the slide',
+        body:  'Blank the stage for a moment (or press .) — handy for a question or a pause. You can keep moving through slides while it is hidden.',
+    },
+    {
         sel:   '#edit-save-btn',
         place: 'auto',
         title: 'Save your work',
         body:  'Download the presentation as a Beamer+ ZIP — your slides with all widgets, overlays, and annotations, to reload later — or as notes: one PDF with your annotations, widgets, media, and poll results drawn in.',
+    },
+    {
+        sel:   null,
+        place: 'center',
+        title: 'Now explore the demo',
+        body:  'Press → to step through the demo deck. Every slide is live: uncover a proof step by step, rotate a 3D heart and a 3D surface, flip switches on an SR latch, run Python with a memory diagram, and answer a live poll from your phone.',
     },
 ];
 

@@ -1,1 +1,22 @@
-{}
+{
+  "widgets": [
+    {
+      "id": "widget_demo_python",
+      "type": "python-workspace",
+      "src": "",
+      "builtin": true,
+      "x": 0,
+      "y": 0,
+      "width": 1,
+      "height": 1,
+      "zIndex": 10,
+      "layout": "grid-left",
+      "primary": "editor",
+      "secondary": "memory",
+      "filename": "aliasing.py",
+      "memoryMode": "trace",
+      "banner": false,
+      "code": "# Two names, one list\na = [1, 2, 3]\nb = a\nb.append(4)\nprint(a)    # what prints?\n\n# A slice makes a real copy\nc = a[:]\nc.append(5)\nprint(a, c)\n"
+    }
+  ]
+}
