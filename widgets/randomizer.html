@@ -355,28 +355,599 @@
    "options": [
     {
      "v": "jar",
-     "l": "Clear jar (you can see inside)"
+     "l": "Clear jar"
     },
     {
      "v": "bag",
-     "l": "Cloth bag (you can't)"
+     "l": "Cloth bag"
     }
    ]
   },
   {
-   "key": "balls",
-   "label": "Balls (colour and how many)",
-   "type": "textarea-lines",
-   "editor": "list",
-   "itemLabel": "colour",
-   "itemPlaceholder": "e.g. Red 3 —",
-   "default": [
-    "Red 3",
-    "Blue 2",
-    "Green 1"
-   ],
+   "key": "colourCount",
+   "label": "Number of colours",
+   "type": "select",
+   "default": "3",
    "showIf": {
     "mode": "bag"
+   },
+   "options": [
+    {
+     "v": "1",
+     "l": "1"
+    },
+    {
+     "v": "2",
+     "l": "2"
+    },
+    {
+     "v": "3",
+     "l": "3"
+    },
+    {
+     "v": "4",
+     "l": "4"
+    },
+    {
+     "v": "5",
+     "l": "5"
+    },
+    {
+     "v": "6",
+     "l": "6"
+    },
+    {
+     "v": "7",
+     "l": "7"
+    },
+    {
+     "v": "8",
+     "l": "8"
+    }
+   ]
+  },
+  {
+   "key": "ball1Colour",
+   "label": "Colour 1",
+   "type": "select",
+   "default": "0",
+   "showIf": {
+    "mode": "bag",
+    "colourCount": [
+     "1",
+     "2",
+     "3",
+     "4",
+     "5",
+     "6",
+     "7",
+     "8"
+    ]
+   },
+   "options": [
+    {
+     "v": "0",
+     "l": "Red"
+    },
+    {
+     "v": "1",
+     "l": "Blue"
+    },
+    {
+     "v": "2",
+     "l": "Green"
+    },
+    {
+     "v": "3",
+     "l": "Yellow"
+    },
+    {
+     "v": "4",
+     "l": "Purple"
+    },
+    {
+     "v": "5",
+     "l": "Teal"
+    },
+    {
+     "v": "6",
+     "l": "Pink"
+    },
+    {
+     "v": "7",
+     "l": "Grey"
+    }
+   ]
+  },
+  {
+   "key": "ball1Count",
+   "label": "How many",
+   "type": "number",
+   "min": 0,
+   "max": 40,
+   "step": 1,
+   "default": 3,
+   "showIf": {
+    "mode": "bag",
+    "colourCount": [
+     "1",
+     "2",
+     "3",
+     "4",
+     "5",
+     "6",
+     "7",
+     "8"
+    ]
+   }
+  },
+  {
+   "key": "ball2Colour",
+   "label": "Colour 2",
+   "type": "select",
+   "default": "1",
+   "showIf": {
+    "mode": "bag",
+    "colourCount": [
+     "2",
+     "3",
+     "4",
+     "5",
+     "6",
+     "7",
+     "8"
+    ]
+   },
+   "options": [
+    {
+     "v": "0",
+     "l": "Red"
+    },
+    {
+     "v": "1",
+     "l": "Blue"
+    },
+    {
+     "v": "2",
+     "l": "Green"
+    },
+    {
+     "v": "3",
+     "l": "Yellow"
+    },
+    {
+     "v": "4",
+     "l": "Purple"
+    },
+    {
+     "v": "5",
+     "l": "Teal"
+    },
+    {
+     "v": "6",
+     "l": "Pink"
+    },
+    {
+     "v": "7",
+     "l": "Grey"
+    }
+   ]
+  },
+  {
+   "key": "ball2Count",
+   "label": "How many",
+   "type": "number",
+   "min": 0,
+   "max": 40,
+   "step": 1,
+   "default": 2,
+   "showIf": {
+    "mode": "bag",
+    "colourCount": [
+     "2",
+     "3",
+     "4",
+     "5",
+     "6",
+     "7",
+     "8"
+    ]
+   }
+  },
+  {
+   "key": "ball3Colour",
+   "label": "Colour 3",
+   "type": "select",
+   "default": "2",
+   "showIf": {
+    "mode": "bag",
+    "colourCount": [
+     "3",
+     "4",
+     "5",
+     "6",
+     "7",
+     "8"
+    ]
+   },
+   "options": [
+    {
+     "v": "0",
+     "l": "Red"
+    },
+    {
+     "v": "1",
+     "l": "Blue"
+    },
+    {
+     "v": "2",
+     "l": "Green"
+    },
+    {
+     "v": "3",
+     "l": "Yellow"
+    },
+    {
+     "v": "4",
+     "l": "Purple"
+    },
+    {
+     "v": "5",
+     "l": "Teal"
+    },
+    {
+     "v": "6",
+     "l": "Pink"
+    },
+    {
+     "v": "7",
+     "l": "Grey"
+    }
+   ]
+  },
+  {
+   "key": "ball3Count",
+   "label": "How many",
+   "type": "number",
+   "min": 0,
+   "max": 40,
+   "step": 1,
+   "default": 1,
+   "showIf": {
+    "mode": "bag",
+    "colourCount": [
+     "3",
+     "4",
+     "5",
+     "6",
+     "7",
+     "8"
+    ]
+   }
+  },
+  {
+   "key": "ball4Colour",
+   "label": "Colour 4",
+   "type": "select",
+   "default": "3",
+   "showIf": {
+    "mode": "bag",
+    "colourCount": [
+     "4",
+     "5",
+     "6",
+     "7",
+     "8"
+    ]
+   },
+   "options": [
+    {
+     "v": "0",
+     "l": "Red"
+    },
+    {
+     "v": "1",
+     "l": "Blue"
+    },
+    {
+     "v": "2",
+     "l": "Green"
+    },
+    {
+     "v": "3",
+     "l": "Yellow"
+    },
+    {
+     "v": "4",
+     "l": "Purple"
+    },
+    {
+     "v": "5",
+     "l": "Teal"
+    },
+    {
+     "v": "6",
+     "l": "Pink"
+    },
+    {
+     "v": "7",
+     "l": "Grey"
+    }
+   ]
+  },
+  {
+   "key": "ball4Count",
+   "label": "How many",
+   "type": "number",
+   "min": 0,
+   "max": 40,
+   "step": 1,
+   "default": 2,
+   "showIf": {
+    "mode": "bag",
+    "colourCount": [
+     "4",
+     "5",
+     "6",
+     "7",
+     "8"
+    ]
+   }
+  },
+  {
+   "key": "ball5Colour",
+   "label": "Colour 5",
+   "type": "select",
+   "default": "4",
+   "showIf": {
+    "mode": "bag",
+    "colourCount": [
+     "5",
+     "6",
+     "7",
+     "8"
+    ]
+   },
+   "options": [
+    {
+     "v": "0",
+     "l": "Red"
+    },
+    {
+     "v": "1",
+     "l": "Blue"
+    },
+    {
+     "v": "2",
+     "l": "Green"
+    },
+    {
+     "v": "3",
+     "l": "Yellow"
+    },
+    {
+     "v": "4",
+     "l": "Purple"
+    },
+    {
+     "v": "5",
+     "l": "Teal"
+    },
+    {
+     "v": "6",
+     "l": "Pink"
+    },
+    {
+     "v": "7",
+     "l": "Grey"
+    }
+   ]
+  },
+  {
+   "key": "ball5Count",
+   "label": "How many",
+   "type": "number",
+   "min": 0,
+   "max": 40,
+   "step": 1,
+   "default": 2,
+   "showIf": {
+    "mode": "bag",
+    "colourCount": [
+     "5",
+     "6",
+     "7",
+     "8"
+    ]
+   }
+  },
+  {
+   "key": "ball6Colour",
+   "label": "Colour 6",
+   "type": "select",
+   "default": "5",
+   "showIf": {
+    "mode": "bag",
+    "colourCount": [
+     "6",
+     "7",
+     "8"
+    ]
+   },
+   "options": [
+    {
+     "v": "0",
+     "l": "Red"
+    },
+    {
+     "v": "1",
+     "l": "Blue"
+    },
+    {
+     "v": "2",
+     "l": "Green"
+    },
+    {
+     "v": "3",
+     "l": "Yellow"
+    },
+    {
+     "v": "4",
+     "l": "Purple"
+    },
+    {
+     "v": "5",
+     "l": "Teal"
+    },
+    {
+     "v": "6",
+     "l": "Pink"
+    },
+    {
+     "v": "7",
+     "l": "Grey"
+    }
+   ]
+  },
+  {
+   "key": "ball6Count",
+   "label": "How many",
+   "type": "number",
+   "min": 0,
+   "max": 40,
+   "step": 1,
+   "default": 2,
+   "showIf": {
+    "mode": "bag",
+    "colourCount": [
+     "6",
+     "7",
+     "8"
+    ]
+   }
+  },
+  {
+   "key": "ball7Colour",
+   "label": "Colour 7",
+   "type": "select",
+   "default": "6",
+   "showIf": {
+    "mode": "bag",
+    "colourCount": [
+     "7",
+     "8"
+    ]
+   },
+   "options": [
+    {
+     "v": "0",
+     "l": "Red"
+    },
+    {
+     "v": "1",
+     "l": "Blue"
+    },
+    {
+     "v": "2",
+     "l": "Green"
+    },
+    {
+     "v": "3",
+     "l": "Yellow"
+    },
+    {
+     "v": "4",
+     "l": "Purple"
+    },
+    {
+     "v": "5",
+     "l": "Teal"
+    },
+    {
+     "v": "6",
+     "l": "Pink"
+    },
+    {
+     "v": "7",
+     "l": "Grey"
+    }
+   ]
+  },
+  {
+   "key": "ball7Count",
+   "label": "How many",
+   "type": "number",
+   "min": 0,
+   "max": 40,
+   "step": 1,
+   "default": 2,
+   "showIf": {
+    "mode": "bag",
+    "colourCount": [
+     "7",
+     "8"
+    ]
+   }
+  },
+  {
+   "key": "ball8Colour",
+   "label": "Colour 8",
+   "type": "select",
+   "default": "7",
+   "showIf": {
+    "mode": "bag",
+    "colourCount": [
+     "8"
+    ]
+   },
+   "options": [
+    {
+     "v": "0",
+     "l": "Red"
+    },
+    {
+     "v": "1",
+     "l": "Blue"
+    },
+    {
+     "v": "2",
+     "l": "Green"
+    },
+    {
+     "v": "3",
+     "l": "Yellow"
+    },
+    {
+     "v": "4",
+     "l": "Purple"
+    },
+    {
+     "v": "5",
+     "l": "Teal"
+    },
+    {
+     "v": "6",
+     "l": "Pink"
+    },
+    {
+     "v": "7",
+     "l": "Grey"
+    }
+   ]
+  },
+  {
+   "key": "ball8Count",
+   "label": "How many",
+   "type": "number",
+   "min": 0,
+   "max": 40,
+   "step": 1,
+   "default": 2,
+   "showIf": {
+    "mode": "bag",
+    "colourCount": [
+     "8"
+    ]
    }
   },
   {
@@ -583,7 +1154,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
    they are fixed hues rather than tokens. Chosen to stay distinct on white
    and on the dark deck background alike. */
 :root {
-  --hue-0: #e5484d; --hue-1: #3e63dd; --hue-2: #30a46c; --hue-3: #f5a524;
+  --hue-0: #e5484d; --hue-1: #3e63dd; --hue-2: #30a46c; --hue-3: #f2c230;
   --hue-4: #8e4ec6; --hue-5: #12a594; --hue-6: #e93d82; --hue-7: #8b8d98;
 }
 
@@ -713,6 +1284,12 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 /* 3D canvases. */
 .dice3 canvas, .stage3d canvas { display: block; }
 .stage3d { position: relative; }
+/* A quiet count under the hat or the deck. */
+.count-note {
+  position: absolute; transform: translateX(-50%); white-space: nowrap; pointer-events: none;
+  font-family: var(--font-ui); font-size: calc(12px * var(--u)); color: var(--text-3); letter-spacing: 0.02em;
+}
+.count-note b { color: var(--text-2); font-weight: 600; font-variant-numeric: tabular-nums; }
 
 /* Dice and coins: the throw on the left, its chalkboard history beside it. */
 .play-row { display: flex; align-items: center; justify-content: center; gap: 30px; width: 100%; }
@@ -734,9 +1311,9 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 
 /* Cards: the deck, and every card drawn so far beside it. */
 .card-table { display: flex; align-items: center; justify-content: center; gap: calc(var(--sz) * 0.3); width: 100%; }
-.drawn { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: calc(var(--sz) * 0.06); flex: 0 0 auto; }
+.drawn { position: relative; flex: 0 0 auto; }
 .drawn-row { display: flex; align-items: center; }
-.drawn-card { flex: 0 0 auto; }
+.drawn .drawn-card { position: absolute; }
 .badge {
   position: absolute; right: calc(var(--sz) * -0.08); top: calc(var(--sz) * -0.08); z-index: 20;
   min-width: 2em; padding: 0.35em 0.6em; border-radius: 999px;
@@ -744,6 +1321,12 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   font-family: var(--font-mono); font-weight: 600; font-size: calc(10px + var(--sz) * 0.045); text-align: center; line-height: 1;
   box-shadow: 0 2px 6px rgba(0,0,0,0.25), 0 0 0 2px var(--bg);
 }
+.pcard.edge { background: #f4f2ec; border-color: #cfccc2; box-shadow: none; }
+.deck-note {
+  position: absolute; left: 50%; top: calc(100% + 12px); transform: translateX(-50%); white-space: nowrap;
+  font-family: var(--font-ui); font-size: calc(12px * var(--u)); color: var(--text-3); letter-spacing: 0.02em;
+}
+.deck-note b { color: var(--text-2); font-weight: 600; font-variant-numeric: tabular-nums; }
 .deck-empty {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   border: 2px dashed var(--border-med); border-radius: calc(var(--sz) * 0.06);
@@ -882,6 +1465,12 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 /* ── Jar of balls ────────────────────────────────────────── */
 .bag-row { display: flex; align-items: center; justify-content: center; gap: calc(var(--jar) * 0.18); width: 100%; }
 .jar { height: var(--jar); width: calc(var(--jar) * 0.77); flex: 0 0 auto; position: relative; z-index: 5; }
+/* The bag is two layers with a drawn ball between them: the bag behind,
+   its near lip in front, so the ball comes up out of the opening. */
+.jar.sack { z-index: auto; }
+.jar.sack > svg { position: relative; z-index: 1; }
+.jar.sack .bag-front { position: absolute; inset: 0; z-index: 6; pointer-events: none; }
+.jar.sack .bag-front svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .jar svg { width: 100%; height: 100%; overflow: visible; }
 .jar-count { text-align: center; font-family: var(--font-mono); font-size: var(--fs-chrome-sm); color: var(--text-3); margin-top: 4px; }
 .tray { display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 0; }
@@ -1097,7 +1686,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   const VERB      = { dice: 'Roll', coin: 'Flip', bag: 'Draw', spinner: 'Spin', cards: 'Draw',
                       number: 'Generate', list: 'Pick', dist: 'Sample' };
   const HUES      = 8;
-  const HUE_NAMES = ['Red', 'Blue', 'Green', 'Amber', 'Purple', 'Teal', 'Pink', 'Grey'];
+  const HUE_NAMES = ['Red', 'Blue', 'Green', 'Yellow', 'Purple', 'Teal', 'Pink', 'Grey'];
   const SUITS     = ['♠', '♥', '♦', '♣'];
   const RANKS     = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
@@ -1552,6 +2141,21 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     return out.length ? out : [{ c: 0, n: 3, label: 'Red' }, { c: 1, n: 2, label: 'Blue' }];
   }
 
+  const BALL_NAMES = ['Red', 'Blue', 'Green', 'Yellow', 'Purple', 'Teal', 'Pink', 'Grey'];
+  function bagFromConfig(c) {
+    const picked = c.colourCount != null || [1, 2, 3, 4, 5, 6, 7, 8].some(i => c['ball' + i + 'Colour'] != null || c['ball' + i + 'Count'] != null);
+    if (!picked && lines(c.balls).length) return parseBalls(lines(c.balls));
+    const n = numCfg(c.colourCount, 3, 1, 8, true), def = [3, 2, 1, 2, 2, 2, 2, 2];
+    const out = [];
+    for (let i = 1; i <= n; i++) {
+      const hue = numCfg(c['ball' + i + 'Colour'], i - 1, 0, 7, true);
+      const count = numCfg(c['ball' + i + 'Count'], def[i - 1], 0, 40, true);
+      // The same colour picked twice is one colour, counted together.
+      const same = out.find(b => b.c === hue);
+      if (same) same.n += count; else out.push({ c: hue, n: count, label: BALL_NAMES[hue] });
+    }
+    return out;
+  }
   function setupFromConfig(c) {
     const diceRows = lines(c.dice);
     const items = lines(c.items);
@@ -1569,7 +2173,9 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
                    .map(s => { const v = numCfg(String(s).replace(/^d/i, ''), 6, 2, 100, true); return [4, 6, 8, 10, 12, 20].includes(v) ? v : 6; }),
                  },
       coin:    { n: numCfg(c.coins, 1, 1, 20, true), p: numCfg(c.pHeads, 0.5, 0, 1) },
-      bag:     { balls: parseBalls(lines(c.balls).length ? lines(c.balls) : ['Red 3', 'Blue 2', 'Green 1']),
+      // One colour dropdown and count per colour; decks saved with the older
+      // typed "Red 3" lines still read.
+      bag:     { balls: bagFromConfig(c),
                  replace: !!c.bagReplace, k: numCfg(c.bagDraw, 1, 1, 20, true), look: c.bagLook === 'bag' ? 'bag' : 'jar' },
       spinner: { items: sectors.length ? sectors : ['A', 'B', 'C', 'D'] },
       cards:   { replace: !!c.cardsReplace, k: numCfg(c.cardsDraw, 1, 1, 13, true) },
@@ -1763,34 +2369,73 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   // The board itself: slate in a wooden frame, a ledge with chalk and a
   // duster, and the writing on it.
   function slateHtml(W, H, content) {
-    const ledge = 16;
+    const ledge = 18, F = 12;                       // ledge depth, frame width
+    const sx = F, sy = F, sw = Math.max(0, W - 2 * F), sh = Math.max(0, H - ledge - F - 6);
     // Speckle: chalk never covers the slate completely. A fixed tile of
     // dots punched out of the writing.
     let dots = '';
     for (let k = 0; k < 160; k++) {
       dots += `<circle cx="${((wob(k, 1) + 0.5) * 48).toFixed(1)}" cy="${((wob(k, 2) + 0.5) * 48).toFixed(1)}" r="${(0.35 + (wob(k, 3) + 0.5) * 0.75).toFixed(2)}"/>`;
     }
+    // Wood grain: fine wavy lines along each bar of the frame.
+    let grain = '';
+    for (let k = 0; k < 4; k++) {
+      const yT = 2 + k * 2.6, yB = sy + sh + 2 + k * 2.6;
+      const wave = (y, x0, x1) => `M${x0},${y} C${x0 + (x1 - x0) * 0.3},${y + 1.4 * wob(k, 1)} ${x0 + (x1 - x0) * 0.7},${y - 1.4 * wob(k, 2)} ${x1},${y + wob(k, 3)}`;
+      grain += `<path d="${wave(yT, 6, W - 6)}"/><path d="${wave(yB, 6, W - 6)}"/>`;
+      const xL = 2 + k * 2.6, xR = W - 3 - k * 2.6;
+      grain += `<path d="M${xL},8 C${xL + wob(k, 4) * 1.5},${H * 0.35} ${xL - wob(k, 5) * 1.5},${H * 0.65} ${xL},${H - ledge}"/>`;
+      grain += `<path d="M${xR},8 C${xR + wob(k, 6) * 1.5},${H * 0.35} ${xR - wob(k, 7) * 1.5},${H * 0.65} ${xR},${H - ledge}"/>`;
+    }
+    // Old writing, rubbed out: big faint swirls left by the duster.
+    const smudge = (cx, cy, rx, ry, rot) =>
+      `<ellipse cx="${cx.toFixed(0)}" cy="${cy.toFixed(0)}" rx="${rx.toFixed(0)}" ry="${ry.toFixed(0)}" transform="rotate(${rot} ${cx.toFixed(0)} ${cy.toFixed(0)})" fill="url(#smudge)"/>`;
+    const smudges = smudge(sx + sw * 0.3, sy + sh * 0.38, sw * 0.3, sh * 0.22, -10) +
+                    smudge(sx + sw * 0.72, sy + sh * 0.64, sw * 0.26, sh * 0.18, 8) +
+                    smudge(sx + sw * 0.55, sy + sh * 0.2, sw * 0.2, sh * 0.1, -4);
+    const eraserW = Math.min(52, W * 0.13), chalkW = Math.min(40, W * 0.1);
     return `<div class="board" style="width:${W}px;height:${H}px"><svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
       <defs>
         <pattern id="grainPat" width="48" height="48" patternUnits="userSpaceOnUse"><g fill="#000">${dots}</g></pattern>
         <mask id="grain" maskUnits="userSpaceOnUse" x="0" y="0" width="${W}" height="${H}">
           <rect width="${W}" height="${H}" fill="#fff"/><rect width="${W}" height="${H}" fill="url(#grainPat)"/>
         </mask>
-        <radialGradient id="dust" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffffff" stop-opacity="0.08"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient>
-        <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bf8c58"/><stop offset="1" stop-color="#7c5230"/></linearGradient>
-        <linearGradient id="slate" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b3832"/><stop offset="1" stop-color="#222d28"/></linearGradient>
+        <linearGradient id="woodV" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c79563"/><stop offset="0.5" stop-color="#a87443"/><stop offset="1" stop-color="#8a5b33"/></linearGradient>
+        <linearGradient id="ledgeTop" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d4a573"/><stop offset="1" stop-color="#b07c4a"/></linearGradient>
+        <linearGradient id="ledgeFront" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8f5f36"/><stop offset="1" stop-color="#6b4424"/></linearGradient>
+        <radialGradient id="slate" cx="45%" cy="40%" r="75%"><stop offset="0" stop-color="#34433c"/><stop offset="0.7" stop-color="#2a3731"/><stop offset="1" stop-color="#202a25"/></radialGradient>
+        <linearGradient id="inShadowT" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity="0.45"/><stop offset="1" stop-color="#000" stop-opacity="0"/></linearGradient>
+        <linearGradient id="inShadowL" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000" stop-opacity="0.3"/><stop offset="1" stop-color="#000" stop-opacity="0"/></linearGradient>
         <linearGradient id="stickG" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#d8d4c8"/></linearGradient>
+        <radialGradient id="smudge" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffffff" stop-opacity="0.055"/><stop offset="0.6" stop-color="#ffffff" stop-opacity="0.025"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient>
+        <linearGradient id="felt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5d5a55"/><stop offset="1" stop-color="#3e3c38"/></linearGradient>
       </defs>
-      <rect x="0" y="0" width="${W}" height="${H - ledge + 4}" rx="10" fill="url(#wood)"/>
-      <rect x="9" y="9" width="${Math.max(0, W - 18)}" height="${Math.max(0, H - ledge - 14)}" rx="4" fill="url(#slate)"/>
-      <ellipse cx="${W * 0.3}" cy="${H * 0.35}" rx="${W * 0.28}" ry="${H * 0.22}" fill="url(#dust)"/>
-      <ellipse cx="${W * 0.72}" cy="${H * 0.62}" rx="${W * 0.24}" ry="${H * 0.18}" fill="url(#dust)"/>
+      <!-- Frame -->
+      <rect x="0.5" y="0.5" width="${W - 1}" height="${H - ledge + 2}" rx="7" fill="url(#woodV)" stroke="#6b4424" stroke-width="1"/>
+      <g stroke="#5a3a1f" stroke-opacity="0.18" stroke-width="0.8" fill="none">${grain}</g>
+      <rect x="1.5" y="1.5" width="${W - 3}" height="${H - ledge}" rx="6" fill="none" stroke="#ffffff" stroke-opacity="0.22" stroke-width="1"/>
+      <!-- Slate, set into the frame -->
+      <rect x="${sx}" y="${sy}" width="${sw}" height="${sh}" rx="2" fill="url(#slate)"/>
+      <g>${smudges}</g>
+      <rect x="${sx}" y="${sy}" width="${sw}" height="10" fill="url(#inShadowT)"/>
+      <rect x="${sx}" y="${sy}" width="8" height="${sh}" fill="url(#inShadowL)"/>
+      <rect x="${sx}" y="${sy}" width="${sw}" height="${sh}" rx="2" fill="none" stroke="#000" stroke-opacity="0.35" stroke-width="1.2"/>
       <g class="chalk" mask="url(#grain)" fill="none" stroke-linecap="round" stroke-linejoin="round">${content}</g>
       <g class="stick" style="display:none"><g transform="rotate(32)"><rect x="-2.6" y="-1" width="6.2" height="24" rx="2.4" fill="url(#stickG)" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/></g></g>
-      <rect x="4" y="${H - ledge - 2}" width="${W - 8}" height="${ledge}" rx="3" fill="url(#wood)"/>
-      <rect x="${W * 0.66}" y="${H - ledge - 6}" width="${Math.min(46, W * 0.12)}" height="6" rx="3" fill="#f4f1e8"/>
-      <rect x="${W * 0.2}" y="${H - ledge - 9}" width="${Math.min(44, W * 0.11)}" height="9" rx="2" fill="#5a4a3a"/>
-      <rect x="${W * 0.2}" y="${H - ledge - 9}" width="${Math.min(44, W * 0.11)}" height="3" rx="1.5" fill="#cfc8b8"/>
+      <!-- Ledge, with a duster and some chalk on it -->
+      <rect x="2" y="${H - ledge - 4}" width="${W - 4}" height="7" rx="2" fill="url(#ledgeTop)"/>
+      <rect x="2" y="${H - ledge + 3}" width="${W - 4}" height="${ledge - 5}" rx="2" fill="url(#ledgeFront)"/>
+      <rect x="2" y="${H - ledge + 3}" width="${W - 4}" height="1" fill="#000" opacity="0.15"/>
+      <g transform="translate(${(W * 0.16).toFixed(0)} ${H - ledge - 13})">
+        <rect x="0" y="6" width="${eraserW}" height="5" rx="1.5" fill="url(#felt)"/>
+        <rect x="0" y="0" width="${eraserW}" height="7" rx="2" fill="#9b6b3e"/>
+        <rect x="0" y="0" width="${eraserW}" height="2" rx="1" fill="#c4935f"/>
+      </g>
+      <g transform="translate(${(W * 0.68).toFixed(0)} ${H - ledge - 8})">
+        <rect x="0" y="0" width="${chalkW}" height="5.5" rx="2.75" fill="#f6f3ea"/>
+        <rect x="0" y="0" width="${chalkW}" height="1.6" rx="0.8" fill="#ffffff"/>
+        <rect x="${chalkW + 6}" y="1" width="${chalkW * 0.45}" height="4.5" rx="2.25" fill="#f2e7a8"/>
+      </g>
     </svg></div>`;
   }
 
@@ -2431,34 +3076,27 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     hat.add(bow);
     // Slips standing in the hat.
     const slips = new T.Group(); slips.position.y = HAT.brimY; hat.add(slips);
-    // Tag on a string, from the brim.
-    const tag = new T.Mesh(new T.PlaneGeometry(0.42, 0.52), new T.MeshStandardMaterial({ map: tagTexture(0), transparent: true, roughness: 0.9, side: T.DoubleSide }));
-    tag.position.set(1.72, 1.75, 0.95); tag.rotation.set(-0.15, -0.35, 0.12); tag.castShadow = true;
-    hat.add(tag);
-    const string = new T.Mesh(new T.CylinderGeometry(0.008, 0.008, 0.62, 6), new T.MeshStandardMaterial({ color: 0xcdb57d }));
-    string.position.set(1.66, 2.27, 0.93); string.rotation.z = 0.25;
-    hat.add(string);
     const camera = new T.PerspectiveCamera(30, 1, 0.1, 100);
-    HT = { scene, camera, hat, slips, tag, tagN: -1, slipsN: -1, pick: null, pickKey: '', raf: 0 };
-    return HT;
-  }
-  function fillHat(n) {
-    if (HT.slipsN === n) return;
-    HT.slipsN = n;
-    while (HT.slips.children.length) HT.slips.remove(HT.slips.children[0]);
-    for (let k = 0; k < Math.min(n, 9); k++) {
+    // Nine slips are made once and shown or hidden one at a time, so the
+    // ones still in the hat never shuffle about between draws.
+    for (let k = 0; k < 9; k++) {
       const s = foldedSlip(0.46, 0.3);
       const a = k * 2.4, rad = 0.18 + (k % 3) * 0.2;
       s.position.set(Math.cos(a) * rad, 0.16 + wob(k, 4) * 0.08, Math.sin(a) * rad);
       s.rotation.set(wob(k, 5) * 0.5, a + wob(k, 6), wob(k, 7) * 0.4);
-      HT.slips.add(s);
+      s.userData.home = s.position.clone();
+      slips.add(s);
     }
-    if (HT.tagN !== n) {
-      HT.tagN = n;
-      HT.tag.material.map.dispose();
-      HT.tag.material.map = tagTexture(n);
-      HT.tag.material.needsUpdate = true;
-    }
+    HT = { scene, camera, hat, slips, pick: null, pickKey: null, raf: 0, extra: [] };
+    return HT;
+  }
+  // Show n slips in the hat (as many as fit; past nine it just looks full).
+  function fillHat(n) {
+    HT.slips.children.forEach((s, k) => { s.visible = k < Math.min(n, 9); s.position.copy(s.userData.home); });
+  }
+  function slipWorld(k) {
+    const s = HT.slips.children[Math.max(0, Math.min(8, k))];
+    return s.getWorldPosition(new T3.Vector3());
   }
   function frameHat(w, h) {
     const T = T3, cam = HT.camera;
@@ -2492,76 +3130,176 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     g.userData = { hinge, tex };
     return g;
   }
-  const PICK_AT = { x: 2.05, y: 1.85, z: 1.9 };
-  function setPick(name) {
-    if (HT.pick && HT.pickKey === name) return HT.pick;
-    if (HT.pick) { HT.scene.remove(HT.pick); HT.pick.userData.tex.dispose(); }
-    HT.pick = name == null ? null : buildPick(name);
-    HT.pickKey = name;
-    if (HT.pick) HT.scene.add(HT.pick);
-    return HT.pick;
+  function disposePick(p) {
+    if (!p) return;
+    HT.scene.remove(p);
+    p.userData.tex && p.userData.tex.dispose();
   }
-  function restPick() {
-    const p = HT.pick; if (!p) return;
+  // A crumpled paper ball: a lumpy sphere, flat-shaded so the creases show.
+  function paperBall() {
+    const T = T3, geo = new T.IcosahedronGeometry(0.3, 2), pos = geo.getAttribute('position');
+    const v = new T.Vector3();
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i);
+      const k = 0.78 + 0.32 * (wob(Math.round(v.x * 40), Math.round(v.y * 40 + v.z * 13)) + 0.5);
+      v.multiplyScalar(k);
+      pos.setXYZ(i, v.x, v.y, v.z);
+    }
+    geo.computeVertexNormals();
+    const m = new T.Mesh(geo, new T.MeshStandardMaterial({ color: PAPER, roughness: 0.95, flatShading: true }));
+    m.castShadow = true;
+    return m;
+  }
+  const PICK_AT = { x: 2.05, y: 1.85, z: 1.9 };
+  function pickRestQuat(p) {
     p.position.set(PICK_AT.x, PICK_AT.y, PICK_AT.z);
-    p.scale.setScalar(1);
     p.quaternion.identity();
     p.lookAt(HT.camera.position);
     p.rotateZ(-0.03);
+    return p.quaternion.clone();
+  }
+  function restPick() {
+    const p = HT.pick; if (!p) return;
+    pickRestQuat(p);
+    p.scale.setScalar(1);
     p.userData.hinge.rotation.x = 0;
+  }
+  // How many names are left, quietly, under the hat.
+  function hatCount(host, left) {
+    const T = T3, v = new T.Vector3(HAT.x, 0, 1.25).project(HT.camera);
+    const r = host.getBoundingClientRect();
+    host.insertAdjacentHTML('beforeend',
+      `<div class="count-note" style="left:${((v.x + 1) / 2 * r.width).toFixed(0)}px;top:${((1 - v.y) / 2 * r.height + 8).toFixed(0)}px"><b>${left}</b> ${left === 1 ? 'name' : 'names'} left</div>`);
   }
 
   function renderList3D(o, play, host, w, h, left) {
-    const T = T3;
+    const T = T3, remove = S.setup.list.remove;
     if (!HT) buildHat();
     const renderer = mountRenderer(host, w, h);
     frameHat(w, h);
     cancelAnimationFrame(HT.raf);
+    HT.extra.forEach(m => HT.scene.remove(m)); HT.extra = [];
     const draw = () => renderer.render(HT.scene, HT.camera);
-    // While a slip is coming out, the hat still holds it.
-    fillHat(play && S.setup.list.remove ? left + 1 : left);
-    setPick(o ? o.name : null);
+    // Slips in the hat: one fewer while a drawn one is out of it.
+    const inHat = n => (remove ? n : Math.max(0, n - (o ? 1 : 0)));
     HT.hat.rotation.set(0, 0, 0);
-    if (!play || !o) { restPick(); draw(); return 0; }
+    const name = o ? o.name : null;
+    if (!play || !o) {
+      hatCount(host, left);
+      if (HT.pickKey !== name) { disposePick(HT.pick); HT.pick = name == null ? null : buildPick(name); HT.pickKey = name; if (HT.pick) HT.scene.add(HT.pick); }
+      fillHat(inHat(left));
+      restPick(); draw();
+      return 0;
+    }
+    hatCount(host, remove ? left + 1 : left);
+    const note = host.querySelector('.count-note b');
 
-    const pick = HT.pick, hinge = pick.userData.hinge;
-    const DUR = 3000, t0 = performance.now();
-    const endQ = (() => { restPick(); return pick.quaternion.clone(); })();
-    const startQ = new T.Quaternion().setFromEuler(new T.Euler(0, 0.4, 0));
-    const mouth = new T.Vector3(HAT.x, HAT.brimY - 0.35, 0.05);
-    const above = new T.Vector3(HAT.x + 0.1, HAT.brimY + 1.25, 0.25);
-    const end = new T.Vector3(PICK_AT.x, PICK_AT.y, PICK_AT.z);
-    const k0 = 0.2;
+    // The slip already out goes first: back into the hat if names can come
+    // up again, otherwise screwed up and thrown away.
+    const old = HT.pick, oldBack = old && !remove;
+    const P0 = old ? (oldBack ? 1000 : 1150) : 0;
+    const pick = buildPick(name);
+    HT.pick = pick; HT.pickKey = name;
+    HT.scene.add(pick);
+    pick.visible = false;
+    const hinge = pick.userData.hinge;
+    const endQ = pickRestQuat(pick);
+    // The hat as it is before this draw: with the old slip back, if it's
+    // going back.
+    const before = remove ? left + 1 : (old ? left - 1 : left);
+    fillHat(before);
+    const takeK = Math.min(8, Math.max(0, (oldBack ? left : before) - 1));
+    const backK = Math.min(8, Math.max(0, left - 1));
+    const ball = old && !oldBack ? paperBall() : null;
+    if (ball) { ball.scale.setScalar(0.001); HT.scene.add(ball); HT.extra.push(ball); }
+    const oldStart = old ? { p: old.position.clone(), q: old.quaternion.clone() } : null;
+    const into = slipWorld(backK);
+    const spinQ = new T.Quaternion().setFromEuler(new T.Euler(0, 0.4, 0));
+    const ballSpin = new T.Euler();
+    const DUR = P0 + 2950, t0 = performance.now();
+    let pulled = false;
+
     const frame = now => {
       const t = now - t0;
-      // 0–0.7 s: a hand in the hat. Slips shuffle, the hat rocks.
-      const rustle = 1 - seg(t, 0, 750);
-      HT.hat.rotation.z = Math.sin(t / 55) * 0.035 * rustle;
-      HT.slips.children.forEach((s, i) => { s.position.y = 0.16 + wob(i, 4) * 0.08 + Math.sin(t / 40 + i * 1.7) * 0.05 * rustle; });
-      const rise = easeInOut(seg(t, 550, 1350)), carry = easeInOut(seg(t, 1350, 2250)), open = seg(t, 2150, 2950);
-      // Out of the hat, folded, small; carried round to face the room.
-      const p = new T.Vector3().lerpVectors(mouth, above, rise);
-      if (carry > 0) p.lerpVectors(above, end, carry).y += Math.sin(Math.PI * carry) * 0.45;
-      pick.position.copy(p);
-      pick.scale.setScalar(k0 + (1 - k0) * carry);
-      const sway = (1 - carry) * Math.sin(t / 180) * 0.12;
-      pick.quaternion.copy(startQ).slerp(endQ, carry);
-      pick.rotateZ(sway);
-      hinge.rotation.x = -Math.PI * 0.985 * (1 - easeOutBack(open));
-      // Once it's out, the hat has one fewer in it.
-      if (t > 1000 && S.setup.list.remove) fillHat(left);
+      // ── The old slip ──
+      if (old) {
+        if (oldBack) {
+          // Fold, lift over the hat, sink in where its slot is.
+          const fold = easeInOut(seg(t, 0, 380)), lift = easeInOut(seg(t, 300, 750)), sink = easeInOut(seg(t, 700, 1000));
+          old.userData.hinge.rotation.x = -Math.PI * 0.985 * fold;
+          const above = into.clone().add(new T.Vector3(0, 1.1, 0.1));
+          const p = oldStart.p.clone().lerp(above, lift);
+          p.y += Math.sin(Math.PI * lift) * 0.35;
+          if (sink > 0) p.lerpVectors(above, into, sink);
+          old.position.copy(p);
+          old.quaternion.copy(oldStart.q).slerp(spinQ, lift);
+          old.scale.setScalar(1 - 0.8 * lift);
+          if (t >= 1000 && old.parent) { disposePick(old); fillHat(left); }
+        } else {
+          // Crumple: the sheet scrunches as the ball grows in its place…
+          const crush = easeInOut(seg(t, 0, 420));
+          old.scale.set(1 - 0.93 * crush, 1 - 0.9 * crush, 1);
+          old.rotation.z += 0.04 * crush;
+          if (crush >= 1 && old.parent) disposePick(old);
+          // …then it's tossed: up, over and away off the right, spinning.
+          const toss = seg(t, 420, 1150);
+          if (ball) {
+            const s0 = oldStart.p;
+            ball.scale.setScalar(Math.max(0.001, crush));
+            ball.position.set(s0.x + toss * 3.6, s0.y + Math.sin(Math.PI * Math.min(1, toss * 1.15)) * 1.1 - toss * toss * 2.2, s0.z + toss * 1.2);
+            ballSpin.set(t / 120, t / 170, 0);
+            ball.rotation.copy(ballSpin);
+            if (toss >= 1) ball.visible = false;
+          }
+        }
+      }
+      // ── The new slip ──
+      const u = t - P0;
+      if (u >= 0) {
+        const rustle = 1 - seg(u, 0, 750);
+        HT.hat.rotation.z = Math.sin(u / 55) * 0.035 * rustle;
+        HT.slips.children.forEach((s, i) => { s.position.y = s.userData.home.y + Math.sin(u / 40 + i * 1.7) * 0.05 * rustle; });
+        if (u >= 450 && !pulled) {
+          pulled = true;
+          // It's that slip that comes out.
+          const from = slipWorld(takeK);
+          pick.userData.from = from;
+          HT.slips.children[takeK].visible = false;
+          pick.visible = true;
+          if (note) note.textContent = String(left);
+        }
+        if (pulled) {
+          const from = pick.userData.from;
+          const above = from.clone().add(new T.Vector3(0.05, 1.25, 0.2));
+          const end = new T.Vector3(PICK_AT.x, PICK_AT.y, PICK_AT.z);
+          const rise = easeInOut(seg(u, 450, 1250)), carry = easeInOut(seg(u, 1250, 2150)), open = seg(u, 2050, 2900);
+          const p = new T.Vector3().lerpVectors(from, above, rise);
+          if (carry > 0) { p.lerpVectors(above, end, carry); p.y += Math.sin(Math.PI * carry) * 0.45; }
+          pick.position.copy(p);
+          pick.scale.setScalar(0.2 + 0.8 * carry);
+          pick.quaternion.copy(spinQ).slerp(endQ, carry);
+          pick.rotateZ((1 - carry) * Math.sin(u / 180) * 0.12);
+          hinge.rotation.x = -Math.PI * 0.985 * (1 - easeOutBack(open));
+        } else {
+          hinge.rotation.x = -Math.PI * 0.985;
+        }
+      }
       draw();
       if (t < DUR) HT.raf = requestAnimationFrame(frame);
     };
-    // First frame now, so the slip is never seen where it last rested.
     frame(t0);
     return DUR;
   }
-  function settleList3D(left) {
+  function settleList3D() {
     if (!HT) return;
     cancelAnimationFrame(HT.raf);
+    HT.extra.forEach(m => HT.scene.remove(m)); HT.extra = [];
+    // Anything left mid-way (a slip on its way back, the old one) is tidied.
+    HT.scene.children.filter(c => c.userData && c.userData.hinge && c !== HT.pick).forEach(disposePick);
     HT.hat.rotation.set(0, 0, 0);
-    fillHat(left);
+    const st = S.setup.list, left = st.remove ? S.pool.list.length : st.items.length;
+    fillHat(st.remove ? left : Math.max(0, left - (HT.pick ? 1 : 0)));
+    if (HT.pick) HT.pick.visible = true;
     restPick();
     getRenderer().render(HT.scene, HT.camera);
   }
@@ -3116,12 +3854,22 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   }
 
   // An opaque cloth bag: you know how many are in it, not which.
-  function sackSvg(left) {
-    return `<svg viewBox="0 0 100 130"><defs>
-        <linearGradient id="sack" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2d2150"/><stop offset="0.42" stop-color="#5b44a0"/><stop offset="0.6" stop-color="#4a3689"/><stop offset="1" stop-color="#221838"/></linearGradient>
+  // `front`: only the parts in front of the opening (the near lip and
+  // everything below it), drawn over a ball coming out so it rises out of
+  // the hole rather than from behind the bag.
+  function sackSvg(left, front) {
+    const body = sackBody();
+    if (front) {
+      return `<svg viewBox="0 0 100 130"><defs>${SACK_DEFS}<clipPath id="nearSide"><rect x="0" y="21.5" width="100" height="110"/></clipPath></defs>` +
+        `<g clip-path="url(#nearSide)">${body.replace(/<ellipse cx="50" cy="21.5" rx="15" ry="4.2" fill="#130c24"/, '<ellipse cx="50" cy="21.5" rx="15" ry="4.2" fill="none"')}</g>${bagTag(left)}</svg>`;
+    }
+    return `<svg viewBox="0 0 100 130"><defs>${SACK_DEFS}</defs>${body}</svg>`;
+  }
+  const SACK_DEFS = `<linearGradient id="sack" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2d2150"/><stop offset="0.42" stop-color="#5b44a0"/><stop offset="0.6" stop-color="#4a3689"/><stop offset="1" stop-color="#221838"/></linearGradient>
         <radialGradient id="sackHi" cx="38%" cy="45%" r="55%"><stop offset="0" stop-color="#fff" stop-opacity="0.18"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
-        <linearGradient id="rope" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f0dca6"/><stop offset="1" stop-color="#b8975a"/></linearGradient>
-      </defs>
+        <linearGradient id="rope" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f0dca6"/><stop offset="1" stop-color="#b8975a"/></linearGradient>`;
+  function sackBody() {
+    return `
       <ellipse cx="50" cy="125" rx="38" ry="3.5" fill="rgba(0,0,0,0.25)"/>
       <path d="M33,38 C12,52 6,84 12,106 Q18,124 50,124 Q82,124 88,106 C94,84 88,52 67,38 Z" fill="url(#sack)"/>
       <path d="M33,38 C12,52 6,84 12,106 Q18,124 50,124 Q82,124 88,106 C94,84 88,52 67,38 Z" fill="url(#sackHi)"/>
@@ -3133,13 +3881,12 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       <path d="M32,36 Q50,41 68,36" stroke="url(#rope)" stroke-width="2.6" fill="none" stroke-linecap="round"/>
       <path d="M62,37.5 C66,44 70,50 67,58 M63,38 C60,46 61,52 58,58" stroke="url(#rope)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
       <circle cx="62.5" cy="37.8" r="2.4" fill="url(#rope)"/>
-      <circle cx="67" cy="58.5" r="1.6" fill="#b8975a"/><circle cx="58" cy="58.5" r="1.6" fill="#b8975a"/>
-    </svg>`;
+      <circle cx="67" cy="58.5" r="1.6" fill="#b8975a"/><circle cx="58" cy="58.5" r="1.6" fill="#b8975a"/>`;
   }
 
   // Where a ball leaves the container, in viewBox units (100 × 130): the
   // jar's neck or the bag's mouth, and where it starts from inside.
-  const MOUTH = { jar: { from: [50, 96], out: [50, 6] }, bag: { from: [50, 26], out: [50, 2] } };
+  const MOUTH = { jar: { from: [50, 96], out: [50, 6] }, bag: { from: [50, 31], out: [50, 2] } };
 
   // A hand-written sticky note taped to the container: how many are inside.
   function stickyHtml(left) {
@@ -3151,7 +3898,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   // `behindUntil` / `behindFrom`: the waypoint at which the ball comes out
   // from behind the container, or goes back behind it — so it rises from
   // inside, behind the glass and the label, rather than in front of them.
-  function flyBall(c, size, path, { duration = 1000, delay = 0, behindUntil = -1, behindFrom = Infinity, offsets = null } = {}) {
+  function flyBall(c, size, path, { duration = 1000, delay = 0, behindUntil = -1, behindFrom = Infinity, offsets = null, behindZ = 2 } = {}) {
     const fly = document.createElement('span');
     fly.className = 'ball flying';
     fly.style.cssText = `--c:var(--hue-${c});--sz:${size}px;left:0;top:0;`;
@@ -3160,9 +3907,9 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     path.forEach(([x, y, s, op], i) => {
       const k = { transform: `translate(${x - size / 2}px, ${y - size / 2}px) scale(${s})`, opacity: op == null ? 1 : op, offset: offsets ? offsets[i] : i / (path.length - 1) };
       const behind = i < behindUntil || i > behindFrom;
-      if (i === behindUntil) kf.push({ ...k, zIndex: 2 });
-      kf.push({ ...k, zIndex: behind ? 2 : 9 });
-      if (i === behindFrom) kf.push({ ...k, zIndex: 2 });
+      if (i === behindUntil) kf.push({ ...k, zIndex: behindZ });
+      kf.push({ ...k, zIndex: behind ? behindZ : 9 });
+      if (i === behindFrom) kf.push({ ...k, zIndex: behindZ });
     });
     const a = fly.animate(kf, { duration, delay, easing: 'ease-in-out', fill: 'both' });
     a.onfinish = () => fly.remove();
@@ -3204,9 +3951,9 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     const sz = Math.max(26, Math.min(jar * 0.26, 100));
     resultEl.style.setProperty('--sz', sz + 'px');
     const bw = Math.round(Math.min(sideW, jar * 1.45)), bh = Math.round(Math.min(jar * 0.85, bw * 0.72));
-    const svg = look === 'bag' ? sackSvg(left).replace('</svg>', bagTag(left) + '</svg>') : jarSvg(dots);
+    const svg = look === 'bag' ? sackSvg(left) + `<div class="bag-front">${sackSvg(left, true)}</div>` : jarSvg(dots);
     resultEl.innerHTML =
-      `<div class="bag-row" style="gap:${Math.round(jar * 0.45)}px"><div class="jar" id="container">${svg}${look === 'jar' ? stickyHtml(left) : ''}</div>` +
+      `<div class="bag-row" style="gap:${Math.round(jar * 0.45)}px"><div class="jar${look === 'bag' ? ' sack' : ''}" id="container">${svg}${look === 'jar' ? stickyHtml(left) : ''}</div>` +
       `<div class="bag-side">${boardHtml(S.hist.bag || [], bw, bh, !st.replace)}</div></div>`;
     if (!play || !drawnNow) return;
 
@@ -3231,13 +3978,13 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
         // Out, held up, and back in.
         path = [[fx, fy, small], [ox, oy - sz * 0.1, small * 1.2], [(ox + hx) / 2, peak, 0.8], [hx, hy, 1], [hx, hy, 1], [(ox + hx) / 2, peak, 0.8], [ox, oy, small * 1.2], [fx, fy, small]];
         offsets = [0, 0.12, 0.22, OUT, SHOW, 0.78, 0.9, 1];
-        opts = { behindUntil: 1, behindFrom: 6 };
+        opts = { behindUntil: 1, behindFrom: 6, behindZ: look === 'bag' ? 3 : 2 };
       } else {
         // Out, held up, then tossed away: off and down, spinning out of play.
         const tx = hx + sz * 2.2, ty = host.height + sz;
-        path = [[fx, fy, small], [ox, oy - sz * 0.1, small * 1.2], [(ox + hx) / 2, peak, 0.8], [hx, hy, 1], [hx, hy, 1], [hx + sz * 1.2, hy - sz * 0.7, 0.95], [tx, ty, 0.7, 0]];
+        path = [[fx, fy, small], [ox, oy - sz * 0.1, small * 1.2], [(ox + hx) / 2, peak, 0.8], [hx, hy, 1], [hx, hy, 1], [hx + sz * 1.2, hy - sz * 0.7, 0.95], [tx, ty, 0.9]];
         offsets = [0, 0.12, 0.22, OUT, SHOW, 0.76, 1];
-        opts = { behindUntil: 1 };
+        opts = { behindUntil: 1, behindZ: look === 'bag' ? 3 : 2 };
       }
       flights.push(flyBall(c, sz, path, { duration: EACH, delay, offsets, ...opts }));
       if (fresh[i]) { const d = drawSketch(fresh[i], delay + EACH * OUT + 80); extra.push(...d.anims); }
@@ -3283,35 +4030,34 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     resultEl.style.setProperty('--sz', sz + 'px');
     const cw = sz * 0.714;
 
-    // Every card drawn so far stays face up beside the deck, in fixed places
-    // worked out for 13 cards — so a new card is simply added and nothing
-    // already down moves. Only past 13, and again past 26, does it re-lay
-    // smaller to make room.
+    // Every card drawn so far stays face up beside the deck. The places are
+    // worked out once, for the whole deck, from the size of the widget alone
+    // — so a new card is only ever added, and nothing already down moves,
+    // not even when a new row starts. Cards overlap enough to fit 52, each
+    // still showing its corner.
     const areaW = Math.max(cw, W - cw - sz * 0.5), areaH = H * 0.86;
-    const n = drawn.length, cap = n > 26 ? 52 : n > 13 ? 26 : 13;
-    let hs = sz, perRow = 1, rows = 1;
-    for (let s = sz; s >= 34; s -= 2) {
-      const w = s * 0.714;
-      perRow = Math.max(1, Math.floor((areaW - w) / (w * 0.42)) + 1);
-      rows = Math.ceil(cap / perRow);
-      hs = s;
-      if (rows * s * 1.06 <= areaH) break;
-    }
+    // Four rows of thirteen, like a hand of patience laid out: each row
+    // overlaps the one above it, leaving its corners showing, so the cards
+    // can be big and there's still room for the whole deck.
+    const n = drawn.length, perRow = 13, rows = 4;
+    const hs = Math.max(40, Math.min(sz, areaH / (1 + (rows - 1) * 0.36), areaW / (0.714 * (1 + (perRow - 1) * 0.3))));
     const hw = hs * 0.714;
-    const step = perRow > 1 ? Math.min(hw + hs * 0.1, (areaW - hw) / (perRow - 1)) : 0;
-    let drawnHtml = '';
-    for (let r = 0; r < Math.ceil(n / perRow); r++) {
-      const row = drawn.slice(r * perRow, (r + 1) * perRow);
-      drawnHtml += `<div class="drawn-row">${row.map((id, i) =>
-        `<div class="slot-card drawn-card" style="margin-left:${i ? (step - hw).toFixed(1) : 0}px;z-index:${i + 1}"><div class="flip">${cardFace(id)}<div class="pcard back"></div></div></div>`).join('')}</div>`;
-    }
+    const stepX = Math.min(hw * 1.08, (areaW - hw) / (perRow - 1));
+    const stepY = Math.min(hs * 1.05, (areaH - hs) / (rows - 1));
+    const gridW = hw + stepX * (perRow - 1), gridH = hs + stepY * (rows - 1);
+    const drawnHtml = drawn.map((id, i) =>
+      `<div class="slot-card drawn-card" style="left:${((i % perRow) * stepX).toFixed(1)}px;top:${(Math.floor(i / perRow) * stepY).toFixed(1)}px;z-index:${i + 1}"><div class="flip">${cardFace(id)}<div class="pcard back"></div></div></div>`).join('');
 
-    const pile = Array.from({ length: Math.min(4, Math.ceil(deck.length / 13)) }, (_, i) =>
-      `<div class="pcard back" style="transform:translate(${-i * 2}px, ${-i * 2}px)"></div>`).join('');
-    const deckHtml = deck.length ? pile + `<span class="badge">${deck.length}</span>` : `<div class="deck-empty">empty</div>`;
+    // The deck's thickness shows how much is left: one layer of card edge
+    // for every few cards, and a quiet count underneath.
+    const layers = deck.length ? Math.max(1, Math.ceil(deck.length / 4)) : 0;
+    const pile = Array.from({ length: layers }, (_, i) =>
+      `<div class="pcard ${i === layers - 1 ? 'back' : 'edge'}" style="transform:translate(${(-i * 0.55).toFixed(2)}px, ${(-i * 0.7).toFixed(2)}px)"></div>`).join('');
+    const deckHtml = (deck.length ? pile : `<div class="deck-empty"></div>`) +
+      `<div class="deck-note"><b>${deck.length}</b> ${deck.length === 1 ? 'card' : 'cards'}</div>`;
     resultEl.innerHTML =
       `<div class="card-table"><div class="deck" id="deck">${deckHtml}</div>` +
-      `<div class="drawn" id="drawn" style="width:${areaW}px;height:${Math.min(areaH, rows * hs * 1.06)}px;--sz:${hs}px">${drawnHtml}</div></div>`;
+      `<div class="drawn" id="drawn" style="width:${gridW.toFixed(1)}px;height:${gridH.toFixed(1)}px;--sz:${hs}px">${drawnHtml}</div></div>`;
     if (shuffling && canAnimate()) return riffle();
     if (!play || !o || !o.cards.length) return;
 
@@ -3744,7 +4490,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       const w = Math.round(r.width - 30), h = Math.round(r.height - 20);
       resultEl.innerHTML = `<div class="stage3d" id="stage3d" style="width:${w}px;height:${h}px"></div>`;
       const dur = renderList3D(o && o.type === 'pick' ? o : null, play, $('stage3d'), w, h, left);
-      if (dur) hold(dur + 30, () => settleList3D(left));
+      if (dur) hold(dur + 30, settleList3D);
       return;
     }
     const r = resultEl.getBoundingClientRect();
