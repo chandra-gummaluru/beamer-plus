@@ -604,7 +604,8 @@ function buildListRow(field, item) {
     const add = document.createElement('button');
     add.type = 'button';
     add.className = 'wf-list-add';
-    add.innerHTML = '<span aria-hidden="true">+</span> Add ' + escText((field.itemLabel || 'option').toLowerCase());
+    add.innerHTML = '<span aria-hidden="true">+</span> Add';
+    add.setAttribute('aria-label', 'Add ' + (field.itemLabel || 'option').toLowerCase());
     row.appendChild(add);
 
     const initial = fieldValue(item, field);
@@ -966,7 +967,8 @@ function buildColourCountsRow(field, item) {
     const add = document.createElement('button');
     add.type = 'button';
     add.className = 'wf-list-add wf-cc-add';
-    add.innerHTML = '<span aria-hidden="true">+</span> Add ' + escText((field.itemLabel || 'colour').toLowerCase());
+    add.innerHTML = '<span aria-hidden="true">+</span> Add';
+    add.setAttribute('aria-label', 'Add ' + (field.itemLabel || 'colour').toLowerCase());
     row.appendChild(add);
 
     const eff = fieldValue(item, field);
@@ -1002,12 +1004,14 @@ function buildColourCountsRow(field, item) {
         for (const o of opts) {
             const b = document.createElement('button');
             b.type = 'button';
-            b.className = 'wf-cc-choice';
-            b.style.setProperty('--sw', o.hex);
+            // The same swatch as the pen colours.
+            b.className = 'custom-modal-pen-swatch wf-cc-choice';
+            b.style.background = o.hex;
             b.title = o.l;
             b.setAttribute('aria-label', o.l);
             const cur = String(o.v) === items[idx].c;
             b.setAttribute('aria-selected', cur ? 'true' : 'false');
+            b.classList.toggle('is-selected', cur);
             if (used.has(String(o.v))) { b.disabled = true; b.title = o.l + ' (already used)'; }
             b.addEventListener('click', () => {
                 items[idx].c = String(o.v);
@@ -1037,8 +1041,8 @@ function buildColourCountsRow(field, item) {
             r.className = 'wf-cc-item';
             const sw = document.createElement('button');
             sw.type = 'button';
-            sw.className = 'wf-cc-swatch';
-            sw.style.setProperty('--sw', o.hex);
+            sw.className = 'custom-modal-pen-swatch wf-cc-swatch';
+            sw.style.background = o.hex;
             sw.title = o.l + ' — click to change';
             sw.setAttribute('aria-label', 'Colour: ' + o.l);
             sw.setAttribute('aria-haspopup', 'listbox');

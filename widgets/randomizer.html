@@ -322,7 +322,7 @@
   },
   {
    "key": "coins",
-   "label": "Coins",
+   "label": "Number of coins",
    "type": "number",
    "min": 1,
    "max": 20,
@@ -433,7 +433,7 @@
   },
   {
    "key": "bagDraw",
-   "label": "Balls per draw",
+   "label": "Per draw",
    "type": "number",
    "min": 1,
    "max": 20,
@@ -444,10 +444,10 @@
    }
   },
   {
-   "key": "bagReplace",
-   "label": "Put the last balls back before each draw",
+   "key": "bagNoRepeats",
+   "label": "No repeats",
    "type": "checkbox",
-   "default": false,
+   "default": true,
    "showIf": {
     "mode": "bag"
    }
@@ -471,7 +471,7 @@
   },
   {
    "key": "cardsDraw",
-   "label": "Cards per draw",
+   "label": "Per draw",
    "type": "number",
    "min": 1,
    "max": 13,
@@ -482,10 +482,10 @@
    }
   },
   {
-   "key": "cardsReplace",
-   "label": "Put each card straight back into the deck",
+   "key": "cardsNoRepeats",
+   "label": "No repeats",
    "type": "checkbox",
-   "default": false,
+   "default": true,
    "showIf": {
     "mode": "cards"
    }
@@ -546,7 +546,7 @@
   },
   {
    "key": "removePicked",
-   "label": "Don't pick the same name twice",
+   "label": "No repeats",
    "type": "checkbox",
    "default": true,
    "showIf": {
@@ -555,9 +555,9 @@
   },
   {
    "key": "seed",
-   "label": "Seed (same results every time)",
+   "label": "Seed",
    "type": "text",
-   "placeholder": "Blank = truly random"
+   "placeholder": "Random seed"
   },
   {
    "key": "animate",
@@ -1536,9 +1536,9 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       // One colour dropdown and count per colour; decks saved with the older
       // typed "Red 3" lines still read.
       bag:     { balls: bagFromConfig(c),
-                 replace: !!c.bagReplace, k: numCfg(c.bagDraw, 1, 1, 20, true), look: c.bagLook === 'bag' ? 'bag' : 'jar' },
+                 replace: c.bagNoRepeats != null ? c.bagNoRepeats === false : !!c.bagReplace, k: numCfg(c.bagDraw, 1, 1, 20, true), look: c.bagLook === 'bag' ? 'bag' : 'jar' },
       spinner: { items: sectors.length ? sectors : ['A', 'B', 'C', 'D'] },
-      cards:   { replace: !!c.cardsReplace, k: numCfg(c.cardsDraw, 1, 1, 13, true) },
+      cards:   { replace: c.cardsNoRepeats != null ? c.cardsNoRepeats === false : !!c.cardsReplace, k: numCfg(c.cardsDraw, 1, 1, 13, true) },
       number:  { digits, min: Math.min(min, max), max: Math.max(min, max), decimals: 0, unique: !!c.numUnique },
       list:    { items: (items.length ? items : ['Ada', 'Grace', 'Alan', 'Katherine', 'Edsger', 'Barbara', 'Donald', 'Margaret']).slice(0, 1000),
                  remove: c.removePicked !== false },
