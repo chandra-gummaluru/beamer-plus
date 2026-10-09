@@ -1,1 +1,22 @@
-{}
+{
+  "widgets": [
+    {
+      "id": "widget_demo_plot",
+      "type": "function-plotter",
+      "src": "",
+      "builtin": true,
+      "display": "overlay",
+      "x": 0.49,
+      "y": 0.25,
+      "width": 0.48,
+      "height": 0.62,
+      "zIndex": 10,
+      "mode": "3d",
+      "functions": [
+        "a*x^2 - y^2",
+        "a = 1"
+      ],
+      "range": 3
+    }
+  ]
+}

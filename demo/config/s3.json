@@ -1,14 +1,14 @@
 {
-  "videos": [
+  "models": [
     {
-      "path": "video/ballfeather2.mp4",
-      "x": 0.42,
-      "y": 0.245,
-      "width": 0.485,
-      "height": 0.49,
+      "path": "models/heart.glb",
+      "x": 0.55,
+      "y": 0.31,
+      "width": 0.4,
+      "height": 0.4,
       "zIndex": 5,
-      "playMode": "click",
-      "volume": 1
+      "autoRotate": true,
+      "animate": true
     }
   ]
 }

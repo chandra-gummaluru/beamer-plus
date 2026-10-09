@@ -15,7 +15,7 @@ const STEPS = [
         sel:   null,
         place: 'center',
         title: 'Welcome to Beamer+',
-        body:  'Beamer+ is an interactive presentation tool that lets you annotate slides, embed live widgets, 3D models, video, and audio, and sync everything to a viewer page in real time.',
+        body:  'Beamer+ is an interactive presentation tool that turns a PDF slide deck into a live lecture: draw on your slides, and drop in videos, 3D models, live polls and interactive widgets.',
     },
     {
         sel:   '#upload-presentation-btn',
@@ -57,7 +57,7 @@ const STEPS = [
         sel:   '#floating-annotation-toolbar',
         place: 'left',
         title: 'Annotation tools',
-        body:  'Draw on slides in real time. Choose from the hand pointer, spotlight, pen, or eraser. Pen strokes are synced live to the viewer page. Undo, redo, or clear all at any time.',
+        body:  'Draw on slides in real time. Choose from the hand pointer, spotlight, pen, or eraser. Undo, redo, or clear all at any time.',
     },
     {
         sel:   '#spotlight-btn',
@@ -69,7 +69,7 @@ const STEPS = [
         sel:   '#magnify-btn',
         place: 'left',
         title: 'Magnifier',
-        body:  'A round lens that follows the pointer and enlarges whatever is under it — slide, ink, live video and widgets. Scroll while it is active to zoom between 1.5× and 5×. Try it on the fine print on the ink slide.',
+        body:  'A round lens that follows the pointer and enlarges whatever is under it, including ink, video and widgets. Scroll while it is active to zoom between 1.5× and 5×. Try it on the fine print on the ink slide.',
     },
     {
         sel:   '#text-btn',
@@ -87,13 +87,13 @@ const STEPS = [
         sel:   '#record-btn',
         place: 'left',
         title: 'Record the lecture',
-        body:  'Record this tab — slides, ink, widgets, your microphone and the tab\'s sound — as a video. Takes are saved every second, so a reload or crash loses nothing, and they are listed under the download button.',
+        body:  'Record this tab as a video: slides, ink, widgets, your microphone and the tab\'s sound. Takes are saved every second, so a reload or crash loses nothing, and they are listed under the download button.',
     },
     {
         sel:   '#mute-btn',
         place: 'left',
         title: 'Hide the slide',
-        body:  'Blank the stage for a moment (or press .) — handy for a question or a pause. You can keep moving through slides while it is hidden.',
+        body:  'Blank the stage for a moment (or press .), handy for a question or a pause. You can keep moving through slides while it is hidden.',
     },
     {
         sel:   '#edit-save-btn',
@@ -105,7 +105,7 @@ const STEPS = [
         sel:   null,
         place: 'center',
         title: 'Now explore the demo',
-        body:  'Press → to step through the demo deck. Every slide is live: uncover a proof step by step, rotate a 3D heart and a 3D surface, flip switches on an SR latch, run Python with a memory diagram, and answer a live poll from your phone.',
+        body:  'Press → to step through the demo deck. Every slide is live: uncover a proof step by step, play a video that grows to fill the slide, rotate a 3D heart, drag a slider on a 3D surface, flip switches on an SR latch, run Python, and answer a live poll from your phone.',
     },
 ];
 

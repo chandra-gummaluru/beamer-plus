@@ -5,11 +5,17 @@
 {
   "label": "Function Plotter",
   "category": "Mathematics",
+  "modes": ["full", "overlay"],
+  "overlaySize": { "width": 0.45, "height": 0.55 },
   "fields": [
     { "key": "mode", "label": "Open in", "type": "select",
       "options": [{ "v": "2d", "l": "2D — curves y = f(x)" },
                   { "v": "3d", "l": "3D — surfaces z = f(x, y)" }],
-      "default": "2d" }
+      "default": "2d" },
+    { "key": "functions", "expand": true, "label": "Functions to plot", "type": "textarea-lines", "rows": 3, "mono": true,
+      "placeholder": "a*x^2 - y^2\na = 1",
+      "note": "one per line; a = 1 adds a slider" },
+    { "key": "range", "label": "Axes run from -r to r", "type": "number", "min": 0.5, "step": 0.5, "default": 10 }
   ]
 }
 </script>
@@ -379,6 +385,41 @@ body.mode-3d #plot-canvas.dragging { cursor: grabbing; }
 }
 .zoom-btn:hover { background: var(--bg-subtle); border-color: var(--border-med); color: var(--text); }
 
+/* ── Overlay: just the graph ─────────────────────────────── */
+/* Placed over part of a content slide, the plotter is a figure: no bar, no
+   expression list, no zoom buttons. The functions come from the slide's
+   settings; a legend names them, and any sliders stay draggable. */
+body.bw-overlay #toolbar,
+body.bw-overlay #expr-panel,
+body.bw-overlay .split-handle,
+body.bw-overlay #zoom-btns,
+body.bw-overlay #coord-display { display: none !important; }
+
+#ov-legend {
+  position: absolute; top: 8px; left: 8px;
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 4px 8px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+  font-family: var(--font-mono); font-size: calc(11px * var(--u)); color: var(--text);
+  pointer-events: none; max-width: 70%;
+}
+#ov-legend:empty { display: none; }
+.ov-item { display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ov-dot  { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+
+#ov-sliders {
+  position: absolute; left: 8px; bottom: 8px;
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 5px 9px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+  font-family: var(--font-mono); font-size: calc(11px * var(--u)); color: var(--text-2);
+  width: min(70%, 260px);
+}
+#ov-sliders:empty { display: none; }
+.ov-slider { display: flex; align-items: center; gap: 8px; }
+.ov-slider input { flex: 1; min-width: 0; accent-color: var(--text); }
+.ov-slider .ov-val { min-width: 4.5ch; text-align: right; font-variant-numeric: tabular-nums; color: var(--text); }
+
 /* The audience gets the graph, nothing to press. */
 #viewer-toast { display: none !important; }
 body.is-viewer #mode-seg,
@@ -429,6 +470,8 @@ body.is-viewer #trace-tip { display: none !important; }
       <canvas id="plot-canvas"></canvas>
       <div id="coord-display">x: 0.00&ensp;y: 0.00</div>
       <div id="trace-tip"></div>
+      <div id="ov-legend" class="bw-overlay-only"></div>
+      <div id="ov-sliders" class="bw-overlay-only"></div>
       <div id="zoom-btns">
         <button class="zoom-btn" id="btn-zin"  title="Zoom in">+</button>
         <button class="zoom-btn" id="btn-zout" title="Zoom out">−</button>
@@ -566,6 +609,7 @@ function onExprInput(id, val) {
   row.type      = detectType(val);
   if (row.type === 'slider') row.sliderVal = extractSliderVal(val);
   if (row.type !== oldType) renderList();
+  else renderOverlay();
   plot();
   emitState();
 }
@@ -675,6 +719,49 @@ function toggleVisible(id) {
   emitState();
 }
 
+// ── Overlay view: legend + sliders ───────────────────────
+// Rebuilt whenever the expression list is; a slider moved here drives the
+// same row as the one in the full view's list.
+function renderOverlay() {
+  const legend  = document.getElementById('ov-legend');
+  const sliders = document.getElementById('ov-sliders');
+  if (!legend || !sliders) return;
+  legend.textContent = '';
+  sliders.textContent = '';
+  for (const row of expressions) {
+    if (!row.expr.trim() || !row.visible) continue;
+    if (row.type === 'slider') {
+      const name = row.expr.match(/^\s*([a-zA-Z])/)?.[1] || 'a';
+      const wrap = document.createElement('label');
+      wrap.className = 'ov-slider';
+      const lbl = document.createElement('span');
+      lbl.textContent = name;
+      const rng = document.createElement('input');
+      Object.assign(rng, { type: 'range', min: row.sliderMin, max: row.sliderMax,
+                           step: (row.sliderMax - row.sliderMin) / 400, value: row.sliderVal,
+                           disabled: IS_VIEWER });
+      const out = document.createElement('span');
+      out.className = 'ov-val';
+      out.id = `ov-sv-${row.id}`;
+      out.textContent = (+row.sliderVal).toFixed(2);
+      rng.addEventListener('input', () => onSliderMove(row.id, rng.value));
+      wrap.append(lbl, rng, out);
+      sliders.appendChild(wrap);
+    } else {
+      const item = document.createElement('div');
+      item.className = 'ov-item';
+      const dot = document.createElement('span');
+      dot.className = 'ov-dot';
+      dot.style.background = row.color;
+      const txt = document.createElement('span');
+      const e = row.expr.trim().replace(/\*/g, '·');
+      txt.textContent = (e.includes('=') || row.type === 'point' ? '' : mode === '3d' ? 'z = ' : 'y = ') + e;
+      item.append(dot, txt);
+      legend.appendChild(item);
+    }
+  }
+}
+
 function onSliderMove(id, val) {
   const row = expressions.find(e => e.id === id);
   if (!row) return;
@@ -686,6 +773,10 @@ function onSliderMove(id, val) {
   if (inp) inp.value = newExpr;
   const lbl = document.getElementById(`sv-${id}`);
   if (lbl) lbl.textContent = row.sliderVal.toFixed(3);
+  const ov = document.getElementById(`ov-sv-${id}`);
+  if (ov) ov.textContent = row.sliderVal.toFixed(2);
+  const rngFull = document.getElementById(`sr-${id}`);
+  if (rngFull && rngFull.value !== String(val)) rngFull.value = row.sliderVal;
   plot();
   emitState();
 }
@@ -708,6 +799,7 @@ function onSliderBound(id, which, val) {
 // Render expression list
 // ─────────────────────────────────────────────────────────
 function renderList() {
+  renderOverlay();
   const list = document.getElementById('expr-list');
   list.innerHTML = '';
 
@@ -1743,6 +1835,7 @@ function applyState(s) {
 // ─────────────────────────────────────────────────────────
 // Beamer+ config / postMessage bridge
 // ─────────────────────────────────────────────────────────
+let appliedFunctions = null, appliedRange = null;
 function applyConfig(cfg) {
   if (!cfg) return;
   if (cfg.viewer || IS_VIEWER) {
@@ -1755,6 +1848,29 @@ function applyConfig(cfg) {
       const color = (cfg.colors || [])[i] || null;
       addExpression(e, color);
     });
+  }
+  // "Functions to plot" from the slide's settings. Applied only when it
+  // changes, so re-sent config (any other setting edited) doesn't wipe what
+  // the presenter has typed since; a saved state still wins, as it arrives
+  // after the config.
+  const fnLines = (Array.isArray(cfg.functions) ? cfg.functions : String(cfg.functions ?? '').split('\n'))
+    .map(l => String(l).trim()).filter(Boolean);
+  const fnKey = JSON.stringify(fnLines);
+  if (fnLines.length && fnKey !== appliedFunctions) {
+    appliedFunctions = fnKey;
+    expressions = [];
+    fnLines.forEach(e => {
+      const id = addExpression(e);
+      const row = expressions.find(r => r.id === id);
+      // Keep a slider's range around its starting value.
+      if (row?.type === 'slider' && Math.abs(row.sliderVal) <= 2) { row.sliderMin = -2; row.sliderMax = 2; }
+    });
+    renderList();
+  }
+  const r = parseFloat(cfg.range);
+  if (r > 0 && cfg.range !== appliedRange) {
+    appliedRange = cfg.range;
+    xmin = -r; xmax = r; ymin = -r; ymax = r;
   }
   if (cfg.xmin != null) { xmin = cfg.xmin; xmax = cfg.xmax; ymin = cfg.ymin; ymax = cfg.ymax; }
   if (cfg.showGrid   != null) { showGrid   = cfg.showGrid;   document.getElementById('btn-grid').classList.toggle('is-active', showGrid); }

@@ -54,26 +54,26 @@ export async function renderMedia(config, container, rect, isRight, slideKey = n
             // the slide, then snaps back to its placed size when paused/ended.
             let _expandTimer = null;
             function _expandVideo() {
+                if (!video.isConnected || video.paused) return;
                 const cr = container.getBoundingClientRect();
+                video.dataset.expanded = '1';
                 Object.assign(video.style, { left: '0px', top: '0px', width: `${cr.width}px`, height: `${cr.height}px`, zIndex: '500' });
             }
             function _collapseVideo() {
                 clearTimeout(_expandTimer); _expandTimer = null;
+                delete video.dataset.expanded;
                 const cr = container.getBoundingClientRect();
                 const vz = video.dataset.videoZIndex;
                 Object.assign(video.style, { left: `${v.x*cr.width}px`, top: `${v.y*cr.height}px`, width: `${v.width*cr.width}px`, height: `${v.height*cr.height}px`, zIndex: vz });
             }
+            const _expands = !isRight && v.expandDelay != null && v.expandDelay !== '' && !isNaN(+v.expandDelay);
             video.addEventListener('play', () => {
-                if (!isRight && v.expandDelay != null && _expandTimer === null) {
-                    _expandTimer = setTimeout(_expandVideo, v.expandDelay * 1000);
+                if (_expands && _expandTimer === null && !video.dataset.expanded) {
+                    _expandTimer = setTimeout(_expandVideo, Math.max(0, +v.expandDelay) * 1000);
                 }
             });
-            video.addEventListener('pause', () => {
-                if (!isRight && v.expandDelay != null) _collapseVideo();
-            });
-            video.addEventListener('ended', () => {
-                if (!isRight && v.expandDelay != null) _collapseVideo();
-            });
+            video.addEventListener('pause', () => { if (_expands) _collapseVideo(); });
+            video.addEventListener('ended', () => { if (_expands) _collapseVideo(); });
             video.addEventListener('click', (e) => { video.paused ? video.play() : video.pause(); e.stopPropagation(); });
             container.appendChild(video);
         }
@@ -136,6 +136,8 @@ export function updateMediaPositions(container) {
         const y = parseFloat(el.dataset.videoY);
         const w = parseFloat(el.dataset.videoWidth);
         const h = parseFloat(el.dataset.videoHeight);
+        // A video grown to fill the slide while playing stays full size.
+        const full = el.dataset.expanded === '1';
         if (![x, y, w, h].some(isNaN)) {
             // Videos carry a permanent inline `transition` used for the
             // expand-on-play animation (see renderMedia). Left as-is, it also
@@ -146,10 +148,10 @@ export function updateMediaPositions(container) {
             // restore it so expand-on-play still animates normally.
             const savedTransition = el.style.transition;
             el.style.transition = 'none';
-            el.style.left   = `${x * rect.width}px`;
-            el.style.top    = `${y * rect.height}px`;
-            el.style.width  = `${w * rect.width}px`;
-            el.style.height = `${h * rect.height}px`;
+            el.style.left   = full ? '0px' : `${x * rect.width}px`;
+            el.style.top    = full ? '0px' : `${y * rect.height}px`;
+            el.style.width  = `${(full ? 1 : w) * rect.width}px`;
+            el.style.height = `${(full ? 1 : h) * rect.height}px`;
             void el.offsetWidth; // force reflow so `transition: none` takes effect before restoring
             el.style.transition = savedTransition;
         }

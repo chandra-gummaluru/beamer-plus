@@ -122,6 +122,10 @@ function buildPropsHTML(arrKey, item) {
                 <div class="editor-prop-label">Volume (0–1)</div>
                 <input class="editor-prop-input" type="number" min="0" max="1" step="0.05" id="prop-volume" value="${item.volume ?? 1}">
             </div>
+            <div class="editor-prop-row">
+                <div class="editor-prop-label">Grow to full slide while playing</div>
+                <select class="editor-prop-select" id="prop-expandDelay">${expandDelayOptions(item.expandDelay)}</select>
+            </div>
         `;
     } else if (arrKey === 'audios') {
         html += `
@@ -165,6 +169,18 @@ function buildPropsHTML(arrKey, item) {
     return html;
 }
 
+// Expand-on-play delays offered for a video (seconds; '' = never). A delay
+// saved by hand that isn't in the list still shows, so opening the panel
+// can't silently change it.
+const EXPAND_DELAYS = [0, 2, 3, 5, 10];
+function expandDelayOptions(current) {
+    const cur = current == null || current === '' ? '' : Number(current);
+    const vals = EXPAND_DELAYS.includes(cur) || cur === '' ? EXPAND_DELAYS : [...EXPAND_DELAYS, cur].sort((x, y) => x - y);
+    const label = (v) => v === 0 ? 'As soon as it plays' : `After ${v} s of playing`;
+    return [`<option value="" ${cur === '' ? 'selected' : ''}>Never</option>`,
+            ...vals.map(v => `<option value="${v}" ${cur === v ? 'selected' : ''}>${label(v)}</option>`)].join('');
+}
+
 export function syncPropertiesPosition() {
     const { arrKey, index } = ctx.selectedOverlay || {};
     if (!arrKey) return;
@@ -204,6 +220,9 @@ export function applyPropertiesQuiet() {
     if (arrKey === 'videos') {
         item.playMode = get('prop-playMode')?.value ?? 'click';
         item.volume   = num('prop-volume');
+        const ed = get('prop-expandDelay')?.value ?? '';
+        if (ed === '') delete item.expandDelay;
+        else item.expandDelay = parseFloat(ed);
     } else if (arrKey === 'audios') {
         item.playMode = get('prop-playMode')?.value ?? 'click';
     } else if (arrKey === 'models') {
