@@ -168,7 +168,7 @@
   },
   {
    "key": "cardsReplace",
-   "label": "Put the last cards back before each draw",
+   "label": "Put each card straight back into the deck",
    "type": "checkbox",
    "default": false,
    "showIf": {
@@ -394,6 +394,10 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 }
 .bag-side { display: flex; align-items: center; justify-content: center; min-width: 0; }
 .spot { display: flex; gap: calc(var(--sz) * 0.2); align-items: center; justify-content: center; min-height: var(--sz); }
+/* Dice and coins: the throw on the left, its chalkboard history beside it. */
+.play-row { display: flex; align-items: center; justify-content: center; gap: 30px; width: 100%; }
+.play { display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+
 /* The chalkboard drawn balls are recorded on. */
 .board { flex: 0 0 auto; filter: drop-shadow(0 6px 12px rgba(0,0,0,0.2)); }
 .board svg { display: block; overflow: visible; }
@@ -408,26 +412,11 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 }
 .ball-tray .ball { box-shadow: inset 0 calc(var(--sz) * -0.06) calc(var(--sz) * 0.12) rgba(0,0,0,0.25), 0 calc(var(--sz) * 0.05) calc(var(--sz) * 0.06) rgba(0,0,0,0.35); }
 
-/* Cards: deck, hand, discard pile. */
+/* Cards: the deck, and every card drawn so far beside it. */
 .card-table { display: flex; align-items: center; justify-content: center; gap: calc(var(--sz) * 0.3); width: 100%; }
-.hand { display: flex; align-items: center; justify-content: center; }
-.in-hand { flex: 0 0 auto; transition: transform 0.15s; }
-.in-hand:hover { transform: translateY(-6%); z-index: 50 !important; }
-.cact {
-  position: absolute; left: 50%; top: calc(var(--sz) * -0.16); transform: translateX(-50%);
-  display: flex; gap: 6px; opacity: 0; transition: opacity 0.15s; z-index: 3;
-}
-.in-hand:hover .cact { opacity: 1; }
-.cact button {
-  width: 30px; height: 30px; border-radius: 50%; border: 0; cursor: pointer;
-  background: #1f1f23; color: #fff; font-size: 14px; line-height: 1;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
-}
-.cact button:hover { background: #3a3a40; }
-.discard { position: relative; width: calc(var(--sz) * 0.714); height: var(--sz); flex: 0 0 auto; }
-.discard:empty { border: 2px dashed var(--border); border-radius: calc(var(--sz) * 0.06); }
-.pile-card { position: absolute; inset: 0; }
-.pile-card .pcard { position: absolute; inset: 0; }
+.drawn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(var(--sz) * 0.06); }
+.drawn-row { display: flex; align-items: center; }
+.drawn-card { flex: 0 0 auto; }
 .badge {
   position: absolute; right: calc(var(--sz) * -0.08); top: calc(var(--sz) * -0.08); z-index: 20;
   min-width: 2em; padding: 0.35em 0.6em; border-radius: 999px;
@@ -755,6 +744,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     runs: 1,
     setup:   null,          // from the settings panel — see setupFromConfig()
     pool:    { bag: null, cards: null, number: [], list: null },
+    hist:    { dice: [], coin: [] },   // what's been written on the chalkboard
     last:    {},            // mode → last outcome (shape depends on mode)
     stats:   {},            // mode → { sig, counts, total, sum, sumsq }
     rng:     0,             // PRNG state, so a seeded demo continues where it was
@@ -820,13 +810,13 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   function fullList() { return S.setup.list.items.slice(); }
   function refill(mode) {
     if (mode === 'bag')    { S.pool.bag = fullBag(); S.pool.bagOut = []; }
-    if (mode === 'cards')  { S.pool.cards = shuffle(fullDeck()); S.pool.hand = []; S.pool.discard = []; }
+    if (mode === 'cards')  { S.pool.cards = shuffle(fullDeck()); S.pool.hand = []; }
     if (mode === 'number') S.pool.number = [];
     if (mode === 'list')   S.pool.list   = fullList();
   }
   function ensurePools() {
     if (!Array.isArray(S.pool.bag) || S.pool.bag.length !== S.setup.bag.balls.length || !Array.isArray(S.pool.bagOut)) refill('bag');
-    if (!Array.isArray(S.pool.cards) || !Array.isArray(S.pool.hand) || !Array.isArray(S.pool.discard)) refill('cards');
+    if (!Array.isArray(S.pool.cards) || !Array.isArray(S.pool.hand)) refill('cards');
     if (!Array.isArray(S.pool.number)) S.pool.number = [];
     if (!Array.isArray(S.pool.list))   S.pool.list   = fullList();
   }
@@ -1029,14 +1019,14 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       return { i, label: sec[i].label, frac: 0.1 + 0.8 * rand() };
     }
     if (mode === 'cards') {
-      const deck = S.pool.cards, hand = S.pool.hand;
-      // With replacement, the last cards go back in (shuffled in) first.
-      const back = st.replace ? hand.splice(0) : [];
-      back.forEach(id => deck.splice(randInt(0, deck.length), 0, id));
+      const deck = S.pool.cards, drawn = S.pool.hand;
       const cards = [];
       for (let i = 0; i < st.k && deck.length; i++) cards.push(deck.pop());   // off the top
-      hand.push(...cards);
-      return cards.length ? { cards, back } : null;
+      // Either the cards go straight back in at random depths, or they stay
+      // out with everything drawn so far until the next shuffle.
+      if (st.replace) cards.forEach(id => deck.splice(randInt(0, deck.length), 0, id));
+      else drawn.push(...cards);
+      return cards.length ? { cards } : null;
     }
     if (mode === 'number') {
       const { min, max, decimals, unique } = st;
@@ -1093,11 +1083,19 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     }
     if (!out) { S.last[mode] = { empty: true }; S.rollId++; render(); emitState(true); return; }
     out.runs = done;
+    if (mode === 'dice') pushHist('dice', out.faces.map((f, i) => ({ f, s: S.setup.dice.sides[i] })));
+    if (mode === 'coin') pushHist('coin', out.faces.slice());
     if (mode === 'spinner') S.spin = targetAngle(out);
     S.last[mode] = out;
     S.rollId++;
     render(done === 1);
     emitState(true);
+  }
+
+  function pushHist(kind, entry) {
+    const h = S.hist[kind] || (S.hist[kind] = []);
+    h.push(entry);
+    if (h.length > 300) h.splice(0, h.length - 300);
   }
 
   function pickName() {
@@ -1142,6 +1140,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     refill(S.mode);
     delete S.last[S.mode];
     delete S.stats[S.mode];
+    if (S.hist[S.mode]) S.hist[S.mode] = [];
     if (S.mode === 'cards') { S.shuffleId = (S.shuffleId || 0) + 1; pendingShuffle = true; }
     S.rng = freshSeed();
     S.rollId++;
@@ -1218,7 +1217,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     for (const m of MODES) {
       const changed = drawSig(m, S.setup[m]) !== drawSig(m, next[m]);
       S.setup[m] = next[m];
-      if (changed && setupAdopted) { refill(m); delete S.last[m]; }
+      if (changed && setupAdopted) { refill(m); delete S.last[m]; if (S.hist[m]) S.hist[m] = []; }
     }
     setupAdopted = true;
     ensurePools();
@@ -1240,7 +1239,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   function isExhausted() {
     ensurePools();
     if (S.mode === 'bag') return S.pool.bag.reduce((s, x) => s + x, 0) + (S.setup.bag.replace ? S.pool.bagOut.length : 0) <= 0;
-    if (S.mode === 'cards') return S.pool.cards.length + (S.setup.cards.replace ? S.pool.hand.length : 0) === 0;
+    if (S.mode === 'cards') return S.pool.cards.length === 0;
     if (S.mode === 'list') return S.setup.list.remove ? !S.pool.list.length : !S.setup.list.items.length;
     if (S.mode === 'number' && S.setup.number.unique)
       return S.pool.number.length >= S.setup.number.max - S.setup.number.min + 1;
@@ -1249,9 +1248,9 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 
   // Largest item size that fits n items in the result area, trying every row
   // count — two rows of five dice beat one row of ten tiny ones.
-  function fitSize(n, aspect = 1, reserve = 0.3, maxPx = 260) {
+  function fitSize(n, aspect = 1, reserve = 0.3, maxPx = 260, availW) {
     const r = resultEl.getBoundingClientRect();
-    const W = Math.max(60, r.width - 40), H = Math.max(60, (r.height - 40) * (1 - reserve));
+    const W = Math.max(60, availW != null ? availW : r.width - 40), H = Math.max(60, (r.height - 40) * (1 - reserve));
     let best = 0;
     for (let rows = 1; rows <= n; rows++) {
       const cols = Math.ceil(n / rows);
@@ -1298,6 +1297,154 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   function hold(ms, done, extra) {
     anim = { done, ...extra };
     anim.timer = setTimeout(() => finishAnim(), ms);
+  }
+
+  // ── Chalkboard history (dice, coins) ────────────────────────────────────────
+  // Each roll or flip is written up on the board in chalk, in order, left to
+  // right. Positions are worked out from the first entry on, so nothing on
+  // the board moves once it's written; when the board is full, it's wiped
+  // and the next entry starts a fresh one.
+  const CHALK = '#f1eee4';
+
+  function wobblyPath(points, closed) {
+    return points.map((p, k) => `${k ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join('') + (closed ? 'Z' : '');
+  }
+  function chalkSquare(cx, cy, h, i) {
+    // A quick rounded square, ends overlapping a touch.
+    const pts = [], N = 36, r = h * 0.16;
+    for (let k = 0; k <= N + 3; k++) {
+      const t = (k / N) % 1, side = Math.floor(t * 4), f = (t * 4) % 1;
+      const a = h / 2 - r, corners = [[1, -1], [1, 1], [-1, 1], [-1, -1]];
+      const [sx, sy] = corners[side], [nx, ny] = corners[(side + 1) % 4];
+      let x = cx + (sx + (nx - sx) * f) * a, y = cy + (sy + (ny - sy) * f) * a;
+      const ox = sx === nx ? sx : 0, oy = sy === ny ? sy : 0;
+      x += ox * r + wob(i, k) * h * 0.03; y += oy * r + wob(i, k + 50) * h * 0.03;
+      pts.push([x, y]);
+    }
+    return pts;
+  }
+  function chalkCircle(cx, cy, r, i) {
+    const pts = [], start = wob(i, 1) * Math.PI, N = 30;
+    for (let k = 0; k <= N; k++) {
+      const a = start + (k / N) * 1.1 * 2 * Math.PI;
+      const rr = r * (1 + 0.05 * Math.sin(k * 0.9 + i) + 0.04 * wob(i, k));
+      pts.push([cx + rr * Math.cos(a), cy + rr * Math.sin(a)]);
+    }
+    return pts;
+  }
+  const stroke = (cls, d, w) => `<path class="${cls}" d="${d}" stroke="${CHALK}" stroke-width="${w.toFixed(1)}"/>`;
+
+  // One die or coin in chalk, centred on (cx, cy), about u across.
+  function chalkDie(v, sides, cx, cy, u, i, uid) {
+    const h = u * 0.74, w = Math.max(1.6, u * 0.05);
+    if (sides === 6) {
+      let g = stroke('ring', wobblyPath(chalkSquare(cx, cy, h, i)), w);
+      (PIPS[v] || []).forEach(([px, py], k) => {
+        const x = cx + (px - 50) / 100 * h, y = cy + (py - 50) / 100 * h, pr = h * 0.075;
+        g += stroke('hatch', wobblyPath(chalkCircle(x, y, pr, i * 7 + k)), w * 1.3);
+      });
+      return g;
+    }
+    // Other dice: the number, written in, with a small d-mark under it.
+    const fs = u * (String(v).length > 2 ? 0.42 : 0.58);
+    return `<clipPath id="cw${uid}"><rect class="wipe" x="${(cx - u / 2).toFixed(1)}" y="${(cy - u / 2).toFixed(1)}" width="${u.toFixed(1)}" height="${u.toFixed(1)}"/></clipPath>` +
+      `<g clip-path="url(#cw${uid})"><text class="ctext" x="${cx.toFixed(1)}" y="${(cy + fs * 0.12).toFixed(1)}" font-size="${fs.toFixed(1)}" text-anchor="middle" dominant-baseline="central" fill="${CHALK}">${v}</text>` +
+      `<text x="${cx.toFixed(1)}" y="${(cy + u * 0.42).toFixed(1)}" font-size="${(u * 0.17).toFixed(1)}" text-anchor="middle" fill="${CHALK}" opacity="0.6">d${sides}</text></g>`;
+  }
+  function chalkCoin(heads, cx, cy, u, i) {
+    const r = u * 0.37, w = Math.max(1.6, u * 0.05), L = r * 0.46;
+    let g = stroke('ring', wobblyPath(chalkCircle(cx, cy, r, i)), w);
+    const j = k => wob(i, k) * u * 0.02;
+    if (heads) {
+      g += stroke('hatch', `M${cx - L * 0.7 + j(1)},${cy - L}L${cx - L * 0.7 + j(2)},${cy + L}`, w * 1.2);
+      g += stroke('hatch', `M${cx + L * 0.7 + j(3)},${cy - L}L${cx + L * 0.7 + j(4)},${cy + L}`, w * 1.2);
+      g += stroke('hatch', `M${cx - L * 0.7},${cy + j(5)}L${cx + L * 0.7},${cy + j(6)}`, w * 1.2);
+    } else {
+      g += stroke('hatch', `M${cx - L * 0.8},${cy - L + j(1)}L${cx + L * 0.8},${cy - L + j(2)}`, w * 1.2);
+      g += stroke('hatch', `M${cx + j(3)},${cy - L}L${cx + j(4)},${cy + L}`, w * 1.2);
+    }
+    return g;
+  }
+
+  /** Board for the dice or coin history; the newest entry is `.sketch.newest`. */
+  function historyBoardHtml(kind, entries, W, H) {
+    const pad = 20, ledge = 16;
+    const iw = W - pad * 2, ih = H - pad * 2 - ledge;
+    const u = Math.max(22, Math.min(64, Math.floor(Math.sqrt(iw * ih / 22))));
+    const gap = u * 0.45, rowH = u * 1.12;
+    // Lay every entry out from the start; keep only the current board's worth.
+    let x = 0, y = 0, page = [], placed = [];
+    entries.forEach((e, idx) => {
+      const n = e.length, w = n * u + (n - 1) * u * 0.1;
+      if (x > 0 && x + w > iw) { x = 0; y += rowH; }
+      if (y + rowH > ih + 0.5) { x = 0; y = 0; page = []; }
+      page.push({ e, idx, x, y, w });
+      x += w + gap;
+    });
+    placed = page;
+    let body = '';
+    placed.forEach(({ e, idx, x: ex, y: ey }) => {
+      let g = '';
+      e.forEach((v, k) => {
+        const cx = pad + ex + k * u * 1.1 + u / 2, cy = pad + ey + rowH / 2;
+        g += kind === 'coin' ? chalkCoin(!!v, cx, cy, u, idx * 13 + k)
+                             : chalkDie(v.f, v.s, cx, cy, u, idx * 13 + k, `${idx}_${k}`);
+      });
+      body += `<g class="sketch${idx === entries.length - 1 ? ' newest' : ''}">${g}</g>`;
+    });
+    return `<div class="board" style="width:${W}px;height:${H}px"><svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
+      <defs>
+        <filter id="chalk" x="-10%" y="-10%" width="120%" height="120%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="3" result="n"/>
+          <feDisplacementMap in="SourceGraphic" in2="n" scale="2.2" xChannelSelector="R" yChannelSelector="G" result="d"/>
+          <feComposite in="d" in2="n" operator="arithmetic" k1="0" k2="1" k3="-0.25" k4="0.06"/>
+        </filter>
+        <radialGradient id="dust" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffffff" stop-opacity="0.07"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient>
+        <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b98652"/><stop offset="1" stop-color="#7f5530"/></linearGradient>
+      </defs>
+      <rect x="0" y="0" width="${W}" height="${H - ledge + 4}" rx="10" fill="url(#wood)"/>
+      <rect x="9" y="9" width="${W - 18}" height="${H - ledge - 14}" rx="4" fill="#26332d"/>
+      <ellipse cx="${W * 0.3}" cy="${H * 0.35}" rx="${W * 0.28}" ry="${H * 0.22}" fill="url(#dust)"/>
+      <ellipse cx="${W * 0.72}" cy="${H * 0.62}" rx="${W * 0.24}" ry="${H * 0.18}" fill="url(#dust)"/>
+      <g class="chalk" filter="url(#chalk)" fill="none" stroke-linecap="round" stroke-linejoin="round" font-family="'Segoe Print','Bradley Hand','Marker Felt','Comic Sans MS',cursive" font-weight="700">${body}</g>
+      <rect x="4" y="${H - ledge - 2}" width="${W - 8}" height="${ledge}" rx="3" fill="url(#wood)"/>
+      <rect x="${W * 0.66}" y="${H - ledge - 6}" width="${Math.min(46, W * 0.12)}" height="6" rx="3" fill="#f4f1e8"/>
+      <rect x="${W * 0.2}" y="${H - ledge - 7}" width="${Math.min(40, W * 0.1)}" height="7" rx="2" fill="#5a4a3a"/>
+    </svg></div>`;
+  }
+
+  // Lay out the thing being thrown beside its board: returns the width the
+  // dice or coins may use, and the board's size.
+  function boardSplit() {
+    const r = resultEl.getBoundingClientRect();
+    const W = r.width - 40, H = r.height - 30;
+    const bw = Math.round(Math.min(W * 0.42, H * 1.35, 520)), bh = Math.round(Math.min(H * 0.82, bw * 0.78));
+    return { playW: W - bw - 30, bw, bh };
+  }
+
+  // Hide the newest entry until the throw lands, then write it in.
+  function prepNewest() {
+    const g = resultEl.querySelector('.sketch.newest');
+    if (!g) return null;
+    g.querySelectorAll('.ring, .hatch').forEach(p => { p.style.strokeDasharray = '1 100000'; p.style.strokeDashoffset = '1'; });
+    g.querySelectorAll('.wipe').forEach(rc => { rc.style.transform = 'scaleX(0)'; rc.style.transformBox = 'fill-box'; });
+    return g;
+  }
+  function writeNewest(g, delay) {
+    if (!g) return { anims: [], end: delay };
+    const d = drawSketch(g, delay);
+    let t = d.end;
+    g.querySelectorAll('.wipe').forEach(rc => {
+      d.anims.push(rc.animate([{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }],
+        { duration: 420, delay: t, easing: 'ease-in-out', fill: 'both' }));
+      t += 440;
+    });
+    return { anims: d.anims, end: t };
+  }
+  function settleNewest(g) {
+    if (!g) return;
+    g.querySelectorAll('.ring, .hatch').forEach(p => { p.style.strokeDasharray = ''; p.style.strokeDashoffset = ''; });
+    g.querySelectorAll('.wipe').forEach(rc => { rc.style.transform = ''; });
   }
 
   // ── Dice ────────────────────────────────────────────────────────────────────
@@ -1404,15 +1551,16 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     const n = sides.length, anyCube = sides.includes(6);
     // A cube in perspective, tilted, takes more room than its face size,
     // and it needs headroom to be thrown into.
-    const sz = anyCube ? fitSize(n, 1.3, 0.42, 160) : fitSize(n, 1.05, 0.34, 190);
+    const sp = boardSplit();
+    const sz = anyCube ? fitSize(n, 1.3, 0.42, 150, sp.playW) : fitSize(n, 1.05, 0.34, 170, sp.playW);
     resultEl.style.setProperty('--sz', sz + 'px');
     const col = dieColor(6);
     ['face', 'hi', 'lo', 'pip'].forEach(k => resultEl.style.setProperty(`--d-${k}`, col[k]));
     resultEl.style.setProperty('--d-pip-hi', col.pipHi);
     play = play && fresh;
     resultEl.innerHTML =
-      `<div class="items${fresh ? '' : ' ghost'}">${faces.map((f, i) => (sides[i] === 6 ? cubeHtml(i) : polyHtml(i, f, sides[i]))).join('')}</div>` +
-      '';
+      `<div class="play-row"><div class="play" style="width:${sp.playW}px"><div class="items${fresh ? '' : ' ghost'}">${faces.map((f, i) => (sides[i] === 6 ? cubeHtml(i) : polyHtml(i, f, sides[i]))).join('')}</div></div>` +
+      historyBoardHtml('dice', S.hist.dice, sp.bw, sp.bh) + '</div>';
 
     const cap = $('cap');
     const cubes = [...resultEl.querySelectorAll('.die3d')];
@@ -1434,8 +1582,11 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     polys.forEach(el => { el.classList.add('tossing'); el.querySelector('svg').style.animationDelay = (+el.dataset.i * 70) + 'ms'; });
     const tick = polys.length ? setInterval(() => polys.forEach(el => { const s = sides[+el.dataset.i]; setPolyFace(el, jiggle(1, s), s); }), 75) : null;
     if (cap) cap.style.visibility = 'hidden';
-    hold((cubes.length ? 1150 : 900) + n * 70, () => {
+    const roll = (cubes.length ? 1150 : 900) + n * 70;
+    const g = prepNewest(), w = writeNewest(g, roll - 150);
+    hold(Math.max(roll, w.end) + 30, () => {
       clearInterval(tick);
+      w.anims.forEach(a => a.cancel()); settleNewest(g);
       cubes.forEach(el => { el.classList.remove('tossing'); el.querySelector('.cube').style.transition = 'none'; });
       polys.forEach(el => { const i = +el.dataset.i; el.classList.remove('tossing'); setPolyFace(el, faces[i], sides[i]); });
       if (cap) { cap.style.visibility = ''; cap.classList.add('fade'); }
@@ -1494,13 +1645,15 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 
   function renderCoins(o, play) {
     const st = S.setup.coin, n = o ? o.faces.length : 1;
-    const sz = fitSize(n, 1.05, 0.42, 190);
+    const sp = boardSplit();
+    const sz = fitSize(n, 1.05, 0.42, 180, sp.playW);
     resultEl.style.setProperty('--sz', sz + 'px');
     const faces = o ? o.faces : [1];
     resultEl.innerHTML =
       `<div class="items${o ? '' : ' ghost'}">${faces.map((_, i) =>
-        `<div class="coin3d" data-i="${i}"><div class="ground"></div><div class="coin"><div class="cface heads">${coinFace(true)}</div><div class="cedge"></div><div class="cface tails">${coinFace(false)}</div></div></div>`).join('')}</div>` +
-      '';
+        `<div class="coin3d" data-i="${i}"><div class="ground"></div><div class="coin"><div class="cface heads">${coinFace(true)}</div><div class="cedge"></div><div class="cface tails">${coinFace(false)}</div></div></div>`).join('')}</div>`;
+    resultEl.innerHTML = `<div class="play-row"><div class="play" style="width:${sp.playW}px">${resultEl.innerHTML}</div>` +
+      historyBoardHtml('coin', S.hist.coin, sp.bw, sp.bh) + '</div>';
     const els = [...resultEl.querySelectorAll('.coin3d')];
     els.forEach((el, i) => {
       const coin = el.querySelector('.coin');
@@ -1518,7 +1671,10 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     if (play) {
       const cap = $('cap');
       if (cap) cap.style.visibility = 'hidden';
-      hold(1300 + n * 60, () => {
+      const flip = 1300 + n * 60;
+      const g = prepNewest(), w = writeNewest(g, flip - 150);
+      hold(Math.max(flip, w.end) + 30, () => {
+        w.anims.forEach(a => a.cancel()); settleNewest(g);
         els.forEach(el => { el.classList.remove('tossing'); el.querySelector('.coin').style.transition = 'none'; });
         if (cap) { cap.style.visibility = ''; cap.classList.add('fade'); }
       });
@@ -1659,7 +1815,9 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   function boardHtml(out, W, H) {
     const pad = 22, ledge = 16;
     const iw = W - pad * 2, ih = H - pad * 2 - ledge;
-    const n = Math.max(1, out.length);
+    // Laid out for a jar's worth from the start, so a sketch never moves
+    // once it's drawn.
+    const n = Math.max(1, out.length, fullBag().reduce((a, b) => a + b, 0));
     let cell = 16;
     for (let s = Math.min(96, ih); s >= 16; s -= 1) {
       if (Math.floor(iw / s) * Math.floor(ih / s) >= n) { cell = s; break; }
@@ -1852,123 +2010,96 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 
   function renderCards(o, play) {
     const st = S.setup.cards;
-    const deck = S.pool.cards, hand = S.pool.hand, discard = S.pool.discard;
+    const deck = S.pool.cards, drawn = S.pool.hand;
     const shuffling = pendingShuffle; pendingShuffle = false;
     const rr = resultEl.getBoundingClientRect();
     const W = rr.width - 50, H = rr.height - 30;
-    const sz = Math.max(50, Math.min(260, H * 0.72, W / (0.714 * 4.4 + 0.6)));
+    const sz = Math.max(50, Math.min(260, H * 0.72, W / (0.714 * 3.6 + 0.5)));
     resultEl.style.setProperty('--sz', sz + 'px');
     const cw = sz * 0.714;
-    // The hand fans out to fit: full gaps while there's room, overlapping
-    // like a hand of cards once there isn't.
-    const handW = Math.max(cw, W - cw * 2 - sz * 0.9);
-    const natural = cw + sz * 0.1;
-    const step = hand.length > 1 ? Math.min(natural, (handW - cw) / (hand.length - 1)) : natural;
 
-    const pile = (n, cls) => Array.from({ length: Math.min(4, Math.ceil(n / 13)) }, (_, i) =>
-      `<div class="pcard ${cls}" style="transform:translate(${-i * 2}px, ${-i * 2}px)"></div>`).join('');
-    const deckHtml = deck.length
-      ? pile(deck.length, 'back') + `<span class="badge">${deck.length}</span>`
-      : `<div class="deck-empty">empty</div>`;
-    const actions = IS_VIEWER ? '' :
-      `<div class="cact"><button data-card-act="back" title="Put it back in the deck">↩</button><button data-card-act="discard" title="Discard it">✕</button></div>`;
-    const handHtml = hand.map((id, i) =>
-      `<div class="slot-card in-hand" data-id="${id}" style="margin-left:${i ? (step - cw).toFixed(1) : 0}px;z-index:${i + 1}"><div class="flip">${cardFace(id)}<div class="pcard back"></div></div>${actions}</div>`).join('');
-    const discardHtml = discard.length
-      ? `<div class="discard" id="discard">${discard.slice(-3).map((id, i) => `<div class="pile-card" style="transform:translate(${i * 2}px, ${i * 2}px) rotate(${((id * 37) % 9) - 4}deg)">${cardFace(id)}</div>`).join('')}<span class="badge">${discard.length}</span></div>`
-      : `<div class="discard" id="discard"></div>`;
+    // Every card drawn so far stays face up beside the deck. They overlap,
+    // and then shrink into more rows, so a whole deck's worth still fits.
+    const areaW = Math.max(cw, W - cw - sz * 0.5), areaH = H * 0.86;
+    const n = drawn.length;
+    let hs = sz, perRow = n || 1, rows = 1;
+    for (let s = sz; s >= 34; s -= 2) {
+      const w = s * 0.714;
+      perRow = Math.max(1, Math.floor((areaW - w) / (w * 0.4)) + 1);
+      rows = Math.ceil(Math.max(1, n) / perRow);
+      hs = s;
+      if (rows * s * 1.06 <= areaH) break;
+    }
+    const hw = hs * 0.714;
+    const inRow = Math.min(perRow, Math.max(1, n));
+    const step = inRow > 1 ? Math.min(hw + hs * 0.1, (areaW - hw) / (inRow - 1)) : 0;
+    let drawnHtml = '';
+    for (let r = 0; r < rows && n; r++) {
+      const row = drawn.slice(r * perRow, (r + 1) * perRow);
+      drawnHtml += `<div class="drawn-row">${row.map((id, i) =>
+        `<div class="slot-card drawn-card" style="margin-left:${i ? (step - hw).toFixed(1) : 0}px;z-index:${i + 1}"><div class="flip">${cardFace(id)}<div class="pcard back"></div></div></div>`).join('')}</div>`;
+    }
+
+    const pile = Array.from({ length: Math.min(4, Math.ceil(deck.length / 13)) }, (_, i) =>
+      `<div class="pcard back" style="transform:translate(${-i * 2}px, ${-i * 2}px)"></div>`).join('');
+    const deckHtml = deck.length ? pile + `<span class="badge">${deck.length}</span>` : `<div class="deck-empty">empty</div>`;
     resultEl.innerHTML =
       `<div class="card-table"><div class="deck" id="deck">${deckHtml}</div>` +
-      `<div class="hand" id="hand" style="width:${handW}px">${handHtml}</div>${discardHtml}</div>`;
+      `<div class="drawn" id="drawn" style="width:${areaW}px;--sz:${hs}px">${drawnHtml}</div></div>`;
     if (shuffling && canAnimate()) return riffle();
-    if (!play || !o) return;
+    if (!play || !o || !o.cards.length) return;
 
     const host = resultEl.getBoundingClientRect();
-    const topCard = () => { const cs = $('deck').querySelectorAll('.pcard'); return (cs[cs.length - 1] || $('deck')).getBoundingClientRect(); };
-    const dk = topCard();
+    const topOf = () => { const cs = $('deck').querySelectorAll(':scope > .pcard'); return (cs[cs.length - 1] || $('deck')).getBoundingClientRect(); };
+    const dk = topOf();
     const anims = [], clones = [];
-    const fresh = [...resultEl.querySelectorAll('.hand .slot-card')].slice(hand.length - o.cards.length);
 
-    // With replacement, the last cards go back first: each turns face down
-    // and slides onto the deck.
-    const back = o.back || [];
-    back.forEach((id, i) => {
-      const ref = (fresh[i] || fresh[0] || $('hand')).getBoundingClientRect();
+    if (!st.replace) {
+      // The deal: each card comes off the top of the deck face down, lifts,
+      // and turns over as it lands with the others.
+      const slots = [...resultEl.querySelectorAll('.drawn-card')].slice(-o.cards.length);
+      slots.forEach((slot, i) => {
+        const el = slot.querySelector('.flip'), t = el.getBoundingClientRect();
+        // Centre to centre, scaled from the deck's card size to the hand's.
+        const dx = dk.left + dk.width / 2 - (t.left + t.width / 2), dy = dk.top + dk.height / 2 - (t.top + t.height / 2);
+        const k = dk.width / t.width;
+        const tf = (x, y, a, sc) => `translate(${x}px, ${y}px) rotateY(${a}deg) scale(${sc})`;
+        anims.push(el.animate([
+          { transform: tf(dx, dy, 180, k), offset: 0 },
+          { transform: tf(dx + dk.width * 0.12, dy - dk.height * 0.18, 180, k * 1.04), offset: 0.2 },
+          { transform: tf(dx * 0.4, -t.height * 0.16, 150, (k + 1) / 2 * 1.06), offset: 0.6 },
+          { transform: tf(0, 0, 0, 1), offset: 1 },
+        ], { duration: 900, delay: i * 320, easing: 'cubic-bezier(0.3, 0.6, 0.3, 1)', fill: 'both' }));
+      });
+      hold(900 + (slots.length - 1) * 320 + 30, () => anims.forEach(a => a.cancel()));
+      return;
+    }
+
+    // Put straight back: each card comes off the top, turns over so the
+    // room can see it, waits a moment, then turns back down and slides into
+    // the deck at a random depth.
+    const show = 1500;
+    o.cards.forEach((id, i) => {
       const c = document.createElement('div');
       c.className = 'slot-card flying-card';
-      c.style.cssText = `left:${ref.left - host.left}px;top:${ref.top - host.top}px;`;
+      c.style.cssText = `left:${dk.left - host.left}px;top:${dk.top - host.top}px;`;
       c.innerHTML = `<div class="flip">${cardFace(id)}<div class="pcard back"></div></div>`;
       resultEl.appendChild(c);
       clones.push(c);
-      const dx = dk.left - ref.left, dy = dk.top - ref.top;
+      const gap = cw * 1.15;
+      const tx = dk.width * 1.4 + i * gap, ty = 0;
+      const depth = -dk.height * 0.04;
+      const tf = (x, y, a, sc) => `translate(${x}px, ${y}px) rotateY(${a}deg) scale(${sc})`;
       anims.push(c.querySelector('.flip').animate([
-        { transform: 'none' },
-        { transform: `translate(${dx * 0.4}px, ${-ref.height * 0.15}px) rotateY(120deg) scale(1.05)`, offset: 0.45 },
-        { transform: `translate(${dx}px, ${dy}px) rotateY(180deg)` },
-      ], { duration: 650, delay: i * 120, easing: 'cubic-bezier(0.3, 0.6, 0.3, 1)', fill: 'both' }));
+        { transform: tf(0, 0, 180, 1), offset: 0 },
+        { transform: tf(dk.width * 0.15, -dk.height * 0.18, 180, 1.04), offset: 0.08 },
+        { transform: tf(tx, ty, 0, 1.05), offset: 0.24 },
+        { transform: tf(tx, ty, 0, 1.05), offset: 0.76 },
+        { transform: tf(tx * 0.4, -dk.height * 0.12, 150, 1.03), offset: 0.9 },
+        { transform: tf(dk.width * 0.06, depth, 180, 1), offset: 1 },
+      ], { duration: 2400 + show - 1500, delay: i * 200, easing: 'cubic-bezier(0.3, 0.6, 0.3, 1)', fill: 'both' }));
     });
-    const after = back.length ? 650 + (back.length - 1) * 120 + 60 : 0;
-
-    // Then the deal: each card comes off the top of the deck face down,
-    // lifts, and turns over as it lands in the hand.
-    fresh.forEach((slot, i) => {
-      const el = slot.querySelector('.flip'), t = el.getBoundingClientRect();
-      const dx = dk.left - t.left, dy = dk.top - t.top;
-      anims.push(el.animate([
-        { transform: `translate(${dx}px, ${dy}px) rotateY(180deg)`, offset: 0 },
-        { transform: `translate(${dx + t.width * 0.12}px, ${dy - t.height * 0.18}px) rotateY(180deg) scale(1.04)`, offset: 0.2 },
-        { transform: `translate(${dx * 0.4}px, ${-t.height * 0.16}px) rotateY(150deg) scale(1.07)`, offset: 0.6 },
-        { transform: `translate(0, ${-t.height * 0.04}px) rotateY(8deg) scale(1.02)`, offset: 0.88 },
-        { transform: 'none', offset: 1 },
-      ], { duration: 900, delay: after + i * 320, easing: 'cubic-bezier(0.3, 0.6, 0.3, 1)', fill: 'both' }));
-    });
-    const total = Math.max(after, after + (fresh.length ? 900 + (fresh.length - 1) * 320 : 0)) + 30;
-    hold(total, () => { anims.forEach(a => a.cancel()); clones.forEach(c => c.remove()); });
-  }
-
-  // Put one card from the hand back in the deck (somewhere in it, at
-  // random) or onto the discard pile, and show it going there.
-  function moveCard(id, act) {
-    if (IS_VIEWER) return;
-    finishAnim();
-    const hand = S.pool.hand, i = hand.indexOf(id);
-    if (i < 0) return;
-    const fromEl = resultEl.querySelector(`.in-hand[data-id="${id}"]`);
-    const from = fromEl && fromEl.getBoundingClientRect();
-    hand.splice(i, 1);
-    if (act === 'back') S.pool.cards.splice(randInt(0, S.pool.cards.length), 0, id);
-    else S.pool.discard.push(id);
-    S.rollId++;
-    render(); emitState(true);
-    if (!from || !canAnimate()) return;
-    const host = resultEl.getBoundingClientRect();
-    // Until the card lands, the pile it's heading for looks as it did
-    // before: its new top card hidden, its count not yet updated.
-    const dest = act === 'back' ? $('deck') : $('discard');
-    const piles = dest.querySelectorAll(act === 'back' ? ':scope > .pcard' : '.pile-card');
-    const top = piles[piles.length - 1];
-    const target = (top || dest).getBoundingClientRect();
-    const badge = dest.querySelector('.badge');
-    const count = act === 'back' ? S.pool.cards.length : S.pool.discard.length;
-    if (act === 'discard' && top) top.style.visibility = 'hidden';
-    if (badge) { badge.textContent = String(count - 1); badge.style.visibility = count - 1 > 0 ? '' : 'hidden'; }
-    const tilt = act === 'discard' ? ((id * 37) % 9) - 4 : 0;
-    const c = document.createElement('div');
-    c.className = 'slot-card flying-card';
-    c.style.cssText = `left:${from.left - host.left}px;top:${from.top - host.top}px;`;
-    c.innerHTML = `<div class="flip">${cardFace(id)}<div class="pcard back"></div></div>`;
-    resultEl.appendChild(c);
-    const dx = target.left - from.left, dy = target.top - from.top, turn = act === 'back' ? 180 : 0;
-    const a = c.querySelector('.flip').animate([
-      { transform: 'none' },
-      { transform: `translate(${dx * 0.5}px, ${dy * 0.5 - from.height * 0.15}px) rotateY(${turn * 0.6}deg) rotateZ(${tilt * 0.5}deg) scale(1.05)`, offset: 0.5 },
-      { transform: `translate(${dx}px, ${dy}px) rotateY(${turn}deg) rotateZ(${tilt}deg)` },
-    ], { duration: 600, easing: 'cubic-bezier(0.3, 0.6, 0.3, 1)', fill: 'both' });
-    hold(620, () => {
-      a.cancel(); c.remove();
-      if (top) top.style.visibility = '';
-      if (badge) { badge.textContent = String(count); badge.style.visibility = ''; }
-    });
+    hold(2400 + (o.cards.length - 1) * 200 + 40, () => { anims.forEach(a => a.cancel()); clones.forEach(c => c.remove()); });
   }
 
   // A riffle shuffle: cut the deck in two, pull the halves apart, let the
@@ -2281,7 +2412,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   function getState() {
     return JSON.parse(JSON.stringify({
       v: 2, mode: S.mode, runs: S.runs, setup: S.setup, pool: S.pool,
-      last: S.last, stats: S.stats, rng: S.rng, rollId: S.rollId, spin: S.spin, shuffleId: S.shuffleId || 0,
+      last: S.last, stats: S.stats, hist: S.hist, rng: S.rng, rollId: S.rollId, spin: S.spin, shuffleId: S.shuffleId || 0,
     }));
   }
 
@@ -2299,6 +2430,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     if ([1, 10, 100, 1000].includes(s.runs)) S.runs = s.runs;
     if (s.pool && typeof s.pool === 'object') S.pool = { ...S.pool, ...s.pool };
     if (s.last && typeof s.last === 'object') S.last = s.last;
+    if (s.hist && typeof s.hist === 'object') S.hist = { dice: Array.isArray(s.hist.dice) ? s.hist.dice : [], coin: Array.isArray(s.hist.coin) ? s.hist.coin : [] };
     if (s.stats && typeof s.stats === 'object') S.stats = s.stats;
     if (typeof s.rng === 'number') S.rng = s.rng >>> 0;
     if (typeof s.spin === 'number') S.spin = s.spin;
@@ -2356,11 +2488,8 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   // ── Event wiring ────────────────────────────────────────────────────────────
   resultEl.addEventListener('click', e => {
     if (IS_VIEWER) return;
-    const act = e.target.closest('[data-card-act]');
-    if (act) { moveCard(+act.closest('.in-hand').dataset.id, act.dataset.cardAct); return; }
-    // Cards in the hand and the discard pile aren't the deck; the list views
-    // are for reading.
-    if (e.target.closest('.in-hand, .discard, .order, .groups') || isExhausted()) return;
+    // The list views are for reading, not another pick.
+    if (e.target.closest('.order, .groups') || isExhausted()) return;
     go();
   });
   deckBtn.addEventListener('click', shuffleDeck);
