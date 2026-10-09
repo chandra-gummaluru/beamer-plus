@@ -1428,3 +1428,94 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 .vs-preset:hover { color: var(--ink-1); border-color: oklch(76% 0.006 260); }
 .vs-preset.is-active { color: var(--ink-1); background: var(--surface-paper); border-color: var(--ink-1); }
 .vs-preset.is-active .vs-mini i { background: var(--ink-1); }
+
+/* ─── Number steppers ─────────────────────────────────────────── */
+/* [ − ]  value  [ + ] — editor/number-stepper.js wraps every number field
+   in the panel. Click ± (hold to repeat), scroll over it, or click the
+   number to type. */
+.num-stepper {
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+    min-height: 30px;
+    box-sizing: border-box;
+    border: 1px solid oklch(86% 0.005 260);
+    border-radius: var(--r-sm);
+    background: var(--surface-paper);
+    transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+    overflow: hidden;
+}
+#editor-widget .num-stepper { min-height: 32px; }
+.num-stepper:hover { border-color: oklch(78% 0.005 260); }
+.num-stepper:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px oklch(45% 0.005 260 / 0.12);
+}
+.num-stepper-field {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: text;
+}
+.num-stepper .editor-prop-input,
+.wp-num .num-stepper .editor-prop-input {
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    min-height: 0;
+    width: 100%;
+    padding: 0 2px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    cursor: text;
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+.num-stepper .editor-prop-input:focus { box-shadow: none; }
+.num-stepper .editor-prop-input::-webkit-outer-spin-button,
+.num-stepper .editor-prop-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.num-stepper .editor-prop-input::placeholder { color: var(--ink-4); }
+/* With a unit, the number and its unit centre together. */
+.num-stepper-field:has(.num-stepper-unit) .editor-prop-input { width: auto; field-sizing: content; min-width: 2ch; text-align: right; padding-right: 1px; }
+@supports not (field-sizing: content) {
+    .num-stepper-field:has(.num-stepper-unit) .editor-prop-input { width: 4ch; }
+}
+.wp-num.has-stepper i.num-stepper-unit,
+.num-stepper-unit {
+    position: static;
+    transform: none;
+    font-style: normal;
+    font-size: var(--fs-xs);
+    color: var(--ink-3);
+    pointer-events: none;
+}
+.num-stepper-btn {
+    flex: 0 0 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink-3);
+    cursor: pointer;
+    user-select: none;
+    transition: background var(--dur-fast), color var(--dur-fast);
+}
+.num-stepper-btn:hover  { background: var(--surface-cream-2); color: var(--ink-1); }
+.num-stepper-btn:active { background: oklch(90% 0.005 260); }
+.num-stepper.is-readonly { opacity: 0.55; }
+.num-stepper.is-readonly .num-stepper-btn { visibility: hidden; }
+.num-stepper.is-readonly .num-stepper-field { cursor: default; }
+
+/* ─── Snap guides while dragging a box on the slide ────────────── */
+/* editor/overlays.js — hold Alt while dragging to place freely. */
+.edit-snap-guide {
+    position: absolute;
+    z-index: 1000;
+    pointer-events: none;
+    background: oklch(62% 0.21 350);
+}
+.edit-snap-guide--v { top: 0; bottom: 0; width: 1px; margin-left: -0.5px; }
+.edit-snap-guide--h { left: 0; right: 0; height: 1px; margin-top: -0.5px; }
+.edit-snap-guide--center.edit-snap-guide--v { background: repeating-linear-gradient(to bottom, oklch(62% 0.21 350) 0 6px, transparent 6px 10px); }
+.edit-snap-guide--center.edit-snap-guide--h { background: repeating-linear-gradient(to right,  oklch(62% 0.21 350) 0 6px, transparent 6px 10px); }

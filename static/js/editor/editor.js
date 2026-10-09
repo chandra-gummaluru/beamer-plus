@@ -21,6 +21,7 @@ import { showViewConfig, hideViewConfig } from './view-config.js';
 import { applySlideReorder, removeSlideReorder } from './reorder.js';
 import { initWidgetSettings } from './widget-settings.js';
 import { openDownloadMenu } from './download-menu.js';
+import { initNumberSteppers } from './number-stepper.js';
 import { realSlideCount } from '../slides/structure.js';
 import { PAPER_STYLES, PAPER_SPACING, PAPER_THICKNESS, PAPER_COLORS, normalizePaper } from '../slides/paper.js';
 
@@ -67,6 +68,7 @@ export function initEditor(state) {
     fileInput?.addEventListener('change', () => onMediaFileSelected(fileInput));
 
     initWidgetSettings();
+    initNumberSteppers();
     wireDeselect();
     // The split's divider moved (the view panel's picker, or a drag on
     // stage): the slide under the edit boxes changed size — redraw them.

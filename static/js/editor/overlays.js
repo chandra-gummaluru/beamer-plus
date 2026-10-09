@@ -163,15 +163,31 @@ function startMove(e, div, arrKey, index, container, onEnd) {
     const sx = e.clientX, sy = e.clientY;
     let moved = false;
 
+    let targets = null;
+
     const onMove = (e) => {
         if (div.dataset.locked === 'true') return;   // pinned full-slide widget
         if (!moved && Math.hypot(e.clientX - sx, e.clientY - sy) < 4) return;
         moved = true;
         const cr = container.getBoundingClientRect();
-        div.style.left = `${Math.max(0, Math.min(cr.width  - div.offsetWidth,  e.clientX - cr.left - offX))}px`;
-        div.style.top  = `${Math.max(0, Math.min(cr.height - div.offsetHeight, e.clientY - cr.top  - offY))}px`;
+        const w = div.offsetWidth, h = div.offsetHeight;
+        let left = Math.max(0, Math.min(cr.width  - w, e.clientX - cr.left - offX));
+        let top  = Math.max(0, Math.min(cr.height - h, e.clientY - cr.top  - offY));
+        // Snap to the slide's edges and centre lines and to the other boxes'
+        // edges and centres. Alt held: place freely.
+        if (e.altKey) clearSnapGuides(container);
+        else {
+            targets ??= snapTargets(div, container, cr);
+            const sx2 = snapAxis(left, w, targets.x), sy2 = snapAxis(top, h, targets.y);
+            left = Math.max(0, Math.min(cr.width  - w, left + sx2.d));
+            top  = Math.max(0, Math.min(cr.height - h, top  + sy2.d));
+            drawSnapGuides(container, sx2.hits, sy2.hits);
+        }
+        div.style.left = `${left}px`;
+        div.style.top  = `${top}px`;
     };
     const onUp = () => {
+        clearSnapGuides(container);
         const cr = container.getBoundingClientRect();
         const item = getOrCreateConfig()?.[arrKey]?.[index];
         if (item && moved) {
@@ -186,6 +202,57 @@ function startMove(e, div, arrKey, index, container, onEnd) {
     };
     div.addEventListener('pointermove', onMove);
     div.addEventListener('pointerup',   onUp);
+}
+
+/* ─── snap guides ───────────────────────────────────────────── */
+// Lines a moving box's left / centre / right (and top / middle / bottom)
+// pull to within SNAP_PX: the slide's edges and centre, and every other
+// box's edges and centre. Snapped lines are drawn while dragging.
+
+const SNAP_PX = 6;
+
+function snapTargets(self, container, cr) {
+    const x = [{ at: 0 }, { at: cr.width / 2, center: true }, { at: cr.width }];
+    const y = [{ at: 0 }, { at: cr.height / 2, center: true }, { at: cr.height }];
+    container.querySelectorAll('.edit-overlay').forEach(o => {
+        if (o === self || o.dataset.locked === 'true') return;
+        const r = o.getBoundingClientRect();
+        if (!r.width) return;
+        const l = r.left - cr.left, t = r.top - cr.top;
+        x.push({ at: l }, { at: l + r.width / 2 }, { at: l + r.width });
+        y.push({ at: t }, { at: t + r.height / 2 }, { at: t + r.height });
+    });
+    return { x, y };
+}
+
+// Best shift `d` along one axis, and every target line the box then sits on.
+function snapAxis(pos, size, targets) {
+    const offs = [0, size / 2, size];
+    let best = null;
+    for (const t of targets) for (const o of offs) {
+        const d = t.at - (pos + o);
+        if (Math.abs(d) <= SNAP_PX && (!best || Math.abs(d) < Math.abs(best))) best = d;
+    }
+    const d = best ?? 0;
+    const hits = best == null ? [] : targets.filter(t => offs.some(o => Math.abs(t.at - (pos + d + o)) < 0.5));
+    return { d, hits };
+}
+
+function drawSnapGuides(container, xs, ys) {
+    clearSnapGuides(container);
+    const line = (dir, t) => {
+        const g = document.createElement('div');
+        g.className = `edit-snap-guide edit-snap-guide--${dir}` + (t.center ? ' edit-snap-guide--center' : '');
+        g.style[dir === 'v' ? 'left' : 'top'] = `${t.at}px`;
+        container.appendChild(g);
+    };
+    const seen = new Set();
+    for (const t of xs) { const k = 'v' + Math.round(t.at); if (!seen.has(k)) { seen.add(k); line('v', t); } }
+    for (const t of ys) { const k = 'h' + Math.round(t.at); if (!seen.has(k)) { seen.add(k); line('h', t); } }
+}
+
+function clearSnapGuides(container) {
+    container.querySelectorAll('.edit-snap-guide').forEach(g => g.remove());
 }
 
 /* ─── resize — aspect ratio locked for video/model ──────────── */
