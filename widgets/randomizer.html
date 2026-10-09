@@ -1073,37 +1073,6 @@
    }
   },
   {
-   "key": "groupBy",
-   "label": "Make groups by",
-   "type": "select",
-   "default": "count",
-   "showIf": {
-    "mode": "list"
-   },
-   "options": [
-    {
-     "v": "count",
-     "l": "Number of groups"
-    },
-    {
-     "v": "size",
-     "l": "Group size"
-    }
-   ]
-  },
-  {
-   "key": "groupN",
-   "label": "Groups / size",
-   "type": "number",
-   "min": 1,
-   "max": 100,
-   "step": 1,
-   "default": 3,
-   "showIf": {
-    "mode": "list"
-   }
-  },
-  {
    "key": "seed",
    "label": "Seed (same results every time)",
    "type": "text",
@@ -1291,13 +1260,9 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 }
 .count-note b { color: var(--text-2); font-weight: 600; font-variant-numeric: tabular-nums; }
 
-/* Dice and coins: the throw on the left, its chalkboard history beside it. */
+/* Dice and coins. */
 .play-row { display: flex; align-items: center; justify-content: center; gap: 30px; width: 100%; }
 .play { display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
-
-/* The chalkboard drawn balls are recorded on. */
-.board { flex: 0 0 auto; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,0.18); }
-.board svg { display: block; overflow: visible; }
 
 /* The tray drawn balls collect in: a wooden rim around green felt. */
 .ball-tray {
@@ -1519,75 +1484,6 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 .slot .strip { display: block; }
 .slot .strip div { height: 1.3em; line-height: 1.3em; text-align: center; white-space: nowrap; }
 
-/* Running order: numbered paper slips. */
-.lineup { display: grid; gap: 12px 18px; align-content: center; max-height: 100%; }
-.lslip {
-  display: flex; align-items: center; gap: calc(var(--fs) * 0.6); height: var(--h); min-width: 0;
-  padding: 0 calc(var(--fs) * 0.8) 0 calc(var(--h) * 0.14);
-  background: linear-gradient(175deg, #fffdf7, #f4efe1);
-  border-radius: 4px;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.12), 0 4px 10px rgba(0,0,0,0.08);
-  transform: rotate(var(--r));
-}
-.lslip b {
-  flex: 0 0 auto; width: calc(var(--h) * 0.68); height: calc(var(--h) * 0.68); border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  background: #22304d; color: #fff; font-family: var(--font-ui); font-weight: 700; font-size: calc(var(--fs) * 0.82);
-  font-variant-numeric: tabular-nums;
-}
-.lslip span {
-  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  color: #22304d; font-size: var(--fs); font-weight: 700;
-  font-family: 'Segoe Print', 'Bradley Hand', 'Marker Felt', 'Comic Sans MS', cursive;
-}
-/* Groups: index cards with a coloured tab. */
-.groupset { display: grid; gap: 16px; align-content: center; max-height: 100%; }
-.gcard {
-  min-width: 0; border-radius: 6px; overflow: hidden;
-  background:
-    linear-gradient(90deg, transparent 22px, rgba(214, 64, 76, 0.35) 22px, rgba(214, 64, 76, 0.35) 23.5px, transparent 23.5px),
-    repeating-linear-gradient(180deg, transparent 0, transparent calc(var(--fs) * 1.55 - 1px), rgba(70, 120, 200, 0.18) calc(var(--fs) * 1.55 - 1px), rgba(70, 120, 200, 0.18) calc(var(--fs) * 1.55)),
-    #fffdf7;
-  background-position: 0 0, 0 calc(var(--fs) * 0.3), 0 0;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.12), 0 8px 20px rgba(0,0,0,0.1);
-  transform: rotate(var(--r));
-}
-.gtab {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  padding: 8px 12px 8px 30px;
-  background: var(--c); color: #fff;
-  font-family: var(--font-ui); font-weight: 700; font-size: max(13px, calc(var(--fs) * 0.62)); letter-spacing: 0.02em;
-}
-.gtab i { font-style: normal; font-weight: 600; opacity: 0.85; font-variant-numeric: tabular-nums; }
-.gcard ul { list-style: none; margin: 0; padding: calc(var(--fs) * 0.3) 12px calc(var(--fs) * 0.6) 32px; }
-.gcard li {
-  height: calc(var(--fs) * 1.55); line-height: calc(var(--fs) * 1.55); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  color: #22304d; font-size: var(--fs); font-weight: 700;
-  font-family: 'Segoe Print', 'Bradley Hand', 'Marker Felt', 'Comic Sans MS', cursive;
-}
-@keyframes deal-in {
-  from { opacity: 0; transform: translateY(-18px) rotate(calc(var(--r) * -3)) scale(0.96); }
-  to   { opacity: 1; transform: rotate(var(--r)); }
-}
-.dealt .lslip { animation: deal-in 0.42s cubic-bezier(0.2, 0.7, 0.3, 1) both; animation-delay: calc(var(--i) * 45ms); }
-.dealt .gcard { animation: deal-in 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) both; animation-delay: calc(var(--i) * 110ms); }
-@media (prefers-reduced-motion: reduce) { .dealt .lslip, .dealt .gcard { animation: none; } }
-
-/* Lists: shuffled order and groups */
-.order {
-  columns: auto calc(170px * var(--u)); column-gap: 28px;
-  max-width: 100%; max-height: 100%; overflow: auto;
-  font-size: var(--fs-body); color: var(--text);
-}
-.order li { list-style: none; break-inside: avoid; padding: 2px 0; }
-.order li span { display: inline-block; min-width: 2.2em; color: var(--text-3); font-family: var(--font-mono); font-size: 0.85em; }
-.groups {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(calc(150px * var(--u)), 1fr));
-  gap: 10px; width: 100%; max-height: 100%; overflow: auto; align-content: center;
-}
-.group h4 { font-size: var(--fs-chrome-sm); font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin-bottom: 4px; }
-.group div { font-size: var(--fs-body); color: var(--text); line-height: 1.35; }
-
 #viewer-badge {
   position: absolute; right: 10px; bottom: 8px;
   font-size: var(--fs-chrome-sm); color: var(--text-3); pointer-events: none;
@@ -1658,8 +1554,6 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   <div id="toolbar" class="bw-toolbar" data-bw-topbar>
     <span class="bw-toolbar-title">Randomizer</span>
     <div class="bw-spacer"></div>
-    <button class="bw-btn" id="shuffle-btn" title="Show the whole list in a random order">Shuffle order</button>
-    <button class="bw-btn" id="groups-btn" title="Split the list into random groups">Make groups</button>
     <button class="bw-btn" id="deck-btn" title="Put every card back and shuffle">Shuffle</button>
   </div>
 
@@ -1693,8 +1587,6 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   // ── DOM ─────────────────────────────────────────────────────────────────────
   const $ = id => document.getElementById(id);
   const deckBtn    = $('deck-btn');
-  const shuffleBtn = $('shuffle-btn');
-  const groupsBtn  = $('groups-btn');
   const resultEl   = $('result');
 
   // ── State ───────────────────────────────────────────────────────────────────
@@ -2071,28 +1963,6 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     render(true); emitState(true);
   }
 
-  function shuffleList() {
-    if (IS_VIEWER) return;
-    finishAnim();
-    S.last.list = { type: 'order', list: shuffle(S.setup.list.items.slice()) };
-    S.rollId++;
-    render(true); emitState(true);
-  }
-
-  function makeGroups() {
-    if (IS_VIEWER) return;
-    finishAnim();
-    const st = S.setup.list, items = shuffle(st.items.slice());
-    const g = st.groupBy === 'count'
-      ? Math.max(1, Math.min(items.length, st.groupN))
-      : Math.max(1, Math.ceil(items.length / Math.max(1, st.groupN)));
-    const groups = Array.from({ length: g }, () => []);
-    items.forEach((x, i) => groups[i % g].push(x));
-    S.last.list = { type: 'groups', groups };
-    S.rollId++;
-    render(true); emitState(true);
-  }
-
   // The shared bar's Reset: clear this mode's results, put back whatever was
   // drawn, and re-seed — with a seed set, the demo then replays exactly.
   function reset() {
@@ -2181,8 +2051,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       cards:   { replace: !!c.cardsReplace, k: numCfg(c.cardsDraw, 1, 1, 13, true) },
       number:  { digits, min: Math.min(min, max), max: Math.max(min, max), decimals: 0, unique: !!c.numUnique },
       list:    { items: (items.length ? items : ['Ada', 'Grace', 'Alan', 'Katherine', 'Edsger', 'Barbara', 'Donald', 'Margaret']).slice(0, 1000),
-                 remove: c.removePicked !== false, groupBy: c.groupBy === 'size' ? 'size' : 'count',
-                 groupN: numCfg(c.groupN, 3, 1, 100, true) },
+                 remove: c.removePicked !== false },
       dist:    { kind: ['normal', 'uniform', 'exponential', 'binomial', 'poisson'].includes(c.distKind) ? c.distKind : 'normal',
                  mu: numCfg(c.distMu, 0, -1e6, 1e6), sigma: numCfg(c.distSigma, 1, 0.001, 1e6),
                  a: Math.min(a, b), b: Math.max(b, a + (a === b ? 1 : 0)),
@@ -2209,7 +2078,6 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   // ── Render ──────────────────────────────────────────────────────────────────
   function render(animate) {
     deckBtn.style.display = S.mode === 'cards' && !IS_VIEWER ? '' : 'none';
-    shuffleBtn.style.display = groupsBtn.style.display = S.mode === 'list' && !IS_VIEWER ? '' : 'none';
     // The thing itself is the button: click the dice, the coin, the jar…
     resultEl.classList.toggle('clickable', !IS_VIEWER && !isExhausted());
     resultEl.title = IS_VIEWER ? '' : `${VERB[S.mode]} (click or Space)`;
@@ -2281,281 +2149,13 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     anim.timer = setTimeout(() => finishAnim(), ms);
   }
 
-  // ── Chalkboard ──────────────────────────────────────────────────────────────
-  // Everything on the board is drawn as strokes and written in one stroke at
-  // a time, with a stick of chalk travelling along the tip: numbers and
-  // letters from a small single-stroke hand, balls as a quick ring and some
-  // shading. Chalk texture is a fixed speckle mask (no per-frame filters,
-  // so the writing stays smooth).
-  const CHALK = '#f1eee4';
+  // ── Colours ─────────────────────────────────────────────────────────────────
   function hueHex(c) {
     return getComputedStyle(document.documentElement).getPropertyValue(`--hue-${c}`).trim() || '#888888';
   }
   // Small deterministic wobble, so a sketch looks the same on every redraw.
   const wob = (i, k) => { const x = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453; return x - Math.floor(x) - 0.5; };
 
-  // Single-stroke handwriting, in a box 0.62 wide and 1 tall (y down).
-  const GLYPHS = {
-    0: ['M0.33,0.01 C0.08,0.0 0.0,0.3 0.01,0.52 C0.02,0.78 0.12,1.0 0.32,0.99 C0.53,0.98 0.62,0.74 0.61,0.48 C0.6,0.22 0.5,0.0 0.3,0.03'],
-    1: ['M0.1,0.2 C0.2,0.13 0.28,0.07 0.35,0.0 C0.34,0.35 0.33,0.7 0.34,1.0'],
-    2: ['M0.04,0.24 C0.08,0.04 0.32,-0.03 0.48,0.06 C0.66,0.17 0.58,0.4 0.42,0.56 C0.3,0.69 0.14,0.84 0.02,0.99 C0.22,0.98 0.42,0.98 0.62,0.99'],
-    3: ['M0.06,0.11 C0.22,-0.03 0.56,-0.02 0.56,0.22 C0.56,0.4 0.38,0.46 0.24,0.47 C0.46,0.46 0.63,0.58 0.6,0.77 C0.57,1.0 0.22,1.04 0.02,0.88'],
-    4: ['M0.47,0.99 C0.47,0.66 0.47,0.33 0.47,0.0 C0.31,0.24 0.15,0.46 0.0,0.69 C0.2,0.69 0.41,0.69 0.62,0.68'],
-    5: ['M0.57,0.01 C0.41,0.01 0.25,0.01 0.11,0.01 C0.09,0.15 0.08,0.3 0.06,0.45 C0.26,0.33 0.6,0.37 0.6,0.68 C0.6,1.0 0.22,1.04 0.02,0.86'],
-    6: ['M0.54,0.05 C0.22,-0.04 0.02,0.28 0.02,0.62 C0.02,0.9 0.16,1.0 0.32,1.0 C0.5,1.0 0.61,0.86 0.6,0.67 C0.59,0.47 0.45,0.38 0.3,0.39 C0.15,0.4 0.05,0.5 0.03,0.62'],
-    7: ['M0.02,0.02 C0.22,0.01 0.42,0.01 0.61,0.01 C0.46,0.32 0.32,0.66 0.2,0.99'],
-    8: ['M0.32,0.47 C0.08,0.42 0.07,0.02 0.31,0.02 C0.56,0.02 0.55,0.41 0.32,0.47 C0.05,0.53 0.03,0.98 0.31,0.98 C0.6,0.98 0.58,0.53 0.32,0.47'],
-    9: ['M0.58,0.34 C0.55,0.56 0.42,0.62 0.29,0.62 C0.12,0.61 0.02,0.49 0.02,0.32 C0.02,0.12 0.15,0.01 0.31,0.01 C0.5,0.01 0.6,0.15 0.58,0.38 C0.56,0.6 0.52,0.8 0.47,0.99'],
-    H: ['M0.05,0.0 C0.05,0.33 0.04,0.66 0.05,1.0', 'M0.58,0.0 C0.58,0.33 0.58,0.66 0.57,1.0', 'M0.05,0.51 C0.23,0.5 0.4,0.5 0.58,0.49'],
-    T: ['M0.0,0.03 C0.2,0.02 0.42,0.01 0.62,0.0', 'M0.31,0.02 C0.31,0.35 0.31,0.68 0.32,1.0'],
-  };
-  const GLYPH_ADV = 0.8;   // advance per character, × height
-
-  // Transform a glyph's unit path into place: scale, a slight slant, and a
-  // wobble of its own so repeated digits don't look stamped.
-  function glyphD(d, x, y, h, slant, seed) {
-    let k = 0;
-    return d.replace(/(-?\d*\.?\d+),(-?\d*\.?\d+)/g, (_, gx, gy) => {
-      gx = +gx; gy = +gy; k++;
-      const px = x + (gx + (1 - gy) * slant) * h + wob(seed, k) * h * 0.025;
-      const py = y + gy * h + wob(seed, k + 31) * h * 0.025;
-      return `${px.toFixed(1)},${py.toFixed(1)}`;
-    });
-  }
-  // One chalk stroke: the line itself and a faint halo of dust around it.
-  function chalkStroke(d, color, w) {
-    return `<g class="st" data-c="${color}"><path class="ce" d="${d}" stroke="${color}" stroke-width="${(w * 2.1).toFixed(1)}" opacity="0.16"/>` +
-           `<path class="cm" d="${d}" stroke="${color}" stroke-width="${w.toFixed(1)}" opacity="0.92"/></g>`;
-  }
-  // A word or number, centred on (cx, cy), h tall.
-  function chalkText(text, cx, cy, h, seed) {
-    const chars = [...String(text)], w = Math.max(1, h * 0.065);
-    const total = h * (chars.length * GLYPH_ADV - (GLYPH_ADV - 0.62));
-    let x = cx - total / 2, out = '';
-    chars.forEach((ch, i) => {
-      (GLYPHS[ch] || []).forEach((d, j) => {
-        out += chalkStroke(glyphD(d, x, cy - h / 2, h, 0.12 + wob(seed, i) * 0.06, seed * 17 + i * 5 + j), CHALK, w);
-      });
-      x += h * GLYPH_ADV;
-    });
-    return out;
-  }
-  function wobblyPath(points) {
-    return points.map((p, k) => `${k ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join('');
-  }
-  function chalkCircle(cx, cy, r, i) {
-    const pts = [], start = wob(i, 1) * Math.PI, N = 30;
-    for (let k = 0; k <= N; k++) {
-      const a = start + (k / N) * 1.1 * 2 * Math.PI;
-      const rr = r * (1 + 0.05 * Math.sin(k * 0.9 + i) + 0.04 * wob(i, k));
-      pts.push([cx + rr * Math.cos(a), cy + rr * Math.sin(a)]);
-    }
-    return pts;
-  }
-  // A ball: a ring in its colour, then a few strokes of shading.
-  function sketchSvg(i, cx, cy, r, c) {
-    const col = mixHex(hueHex(c), '#ffffff', 0.32), w = Math.max(1.8, r * 0.12);
-    let out = chalkStroke(wobblyPath(chalkCircle(cx, cy, r, i)), col, w);
-    const n = 4;
-    for (let k = 0; k < n; k++) {
-      const off = (k - (n - 1) / 2) * r * 0.42;
-      const half = Math.sqrt(Math.max(0, (r * 0.78) ** 2 - off * off));
-      const mx = cx + Math.SQRT1_2 * off, my = cy + Math.SQRT1_2 * off, j = wob(i, k + 40) * r * 0.08;
-      out += chalkStroke(`M${(mx - Math.SQRT1_2 * half + j).toFixed(1)},${(my + Math.SQRT1_2 * half).toFixed(1)}L${(mx + Math.SQRT1_2 * half).toFixed(1)},${(my - Math.SQRT1_2 * half + j).toFixed(1)}`, col, w * 0.8);
-    }
-    return `<g class="sketch" data-i="${i}" data-cx="${cx.toFixed(1)}" data-cy="${cy.toFixed(1)}">${out}</g>`;
-  }
-
-  // The board itself: slate in a wooden frame, a ledge with chalk and a
-  // duster, and the writing on it.
-  function slateHtml(W, H, content) {
-    const ledge = 18, F = 12;                       // ledge depth, frame width
-    const sx = F, sy = F, sw = Math.max(0, W - 2 * F), sh = Math.max(0, H - ledge - F - 6);
-    // Speckle: chalk never covers the slate completely. A fixed tile of
-    // dots punched out of the writing.
-    let dots = '';
-    for (let k = 0; k < 160; k++) {
-      dots += `<circle cx="${((wob(k, 1) + 0.5) * 48).toFixed(1)}" cy="${((wob(k, 2) + 0.5) * 48).toFixed(1)}" r="${(0.35 + (wob(k, 3) + 0.5) * 0.75).toFixed(2)}"/>`;
-    }
-    // Wood grain: fine wavy lines along each bar of the frame.
-    let grain = '';
-    for (let k = 0; k < 4; k++) {
-      const yT = 2 + k * 2.6, yB = sy + sh + 2 + k * 2.6;
-      const wave = (y, x0, x1) => `M${x0},${y} C${x0 + (x1 - x0) * 0.3},${y + 1.4 * wob(k, 1)} ${x0 + (x1 - x0) * 0.7},${y - 1.4 * wob(k, 2)} ${x1},${y + wob(k, 3)}`;
-      grain += `<path d="${wave(yT, 6, W - 6)}"/><path d="${wave(yB, 6, W - 6)}"/>`;
-      const xL = 2 + k * 2.6, xR = W - 3 - k * 2.6;
-      grain += `<path d="M${xL},8 C${xL + wob(k, 4) * 1.5},${H * 0.35} ${xL - wob(k, 5) * 1.5},${H * 0.65} ${xL},${H - ledge}"/>`;
-      grain += `<path d="M${xR},8 C${xR + wob(k, 6) * 1.5},${H * 0.35} ${xR - wob(k, 7) * 1.5},${H * 0.65} ${xR},${H - ledge}"/>`;
-    }
-    // Old writing, rubbed out: big faint swirls left by the duster.
-    const smudge = (cx, cy, rx, ry, rot) =>
-      `<ellipse cx="${cx.toFixed(0)}" cy="${cy.toFixed(0)}" rx="${rx.toFixed(0)}" ry="${ry.toFixed(0)}" transform="rotate(${rot} ${cx.toFixed(0)} ${cy.toFixed(0)})" fill="url(#smudge)"/>`;
-    const smudges = smudge(sx + sw * 0.3, sy + sh * 0.38, sw * 0.3, sh * 0.22, -10) +
-                    smudge(sx + sw * 0.72, sy + sh * 0.64, sw * 0.26, sh * 0.18, 8) +
-                    smudge(sx + sw * 0.55, sy + sh * 0.2, sw * 0.2, sh * 0.1, -4);
-    const eraserW = Math.min(52, W * 0.13), chalkW = Math.min(40, W * 0.1);
-    return `<div class="board" style="width:${W}px;height:${H}px"><svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
-      <defs>
-        <pattern id="grainPat" width="48" height="48" patternUnits="userSpaceOnUse"><g fill="#000">${dots}</g></pattern>
-        <mask id="grain" maskUnits="userSpaceOnUse" x="0" y="0" width="${W}" height="${H}">
-          <rect width="${W}" height="${H}" fill="#fff"/><rect width="${W}" height="${H}" fill="url(#grainPat)"/>
-        </mask>
-        <linearGradient id="woodV" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c79563"/><stop offset="0.5" stop-color="#a87443"/><stop offset="1" stop-color="#8a5b33"/></linearGradient>
-        <linearGradient id="ledgeTop" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d4a573"/><stop offset="1" stop-color="#b07c4a"/></linearGradient>
-        <linearGradient id="ledgeFront" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8f5f36"/><stop offset="1" stop-color="#6b4424"/></linearGradient>
-        <radialGradient id="slate" cx="45%" cy="40%" r="75%"><stop offset="0" stop-color="#34433c"/><stop offset="0.7" stop-color="#2a3731"/><stop offset="1" stop-color="#202a25"/></radialGradient>
-        <linearGradient id="inShadowT" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity="0.45"/><stop offset="1" stop-color="#000" stop-opacity="0"/></linearGradient>
-        <linearGradient id="inShadowL" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000" stop-opacity="0.3"/><stop offset="1" stop-color="#000" stop-opacity="0"/></linearGradient>
-        <linearGradient id="stickG" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#d8d4c8"/></linearGradient>
-        <radialGradient id="smudge" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffffff" stop-opacity="0.055"/><stop offset="0.6" stop-color="#ffffff" stop-opacity="0.025"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient>
-        <linearGradient id="felt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5d5a55"/><stop offset="1" stop-color="#3e3c38"/></linearGradient>
-      </defs>
-      <!-- Frame -->
-      <rect x="0.5" y="0.5" width="${W - 1}" height="${H - ledge + 2}" rx="7" fill="url(#woodV)" stroke="#6b4424" stroke-width="1"/>
-      <g stroke="#5a3a1f" stroke-opacity="0.18" stroke-width="0.8" fill="none">${grain}</g>
-      <rect x="1.5" y="1.5" width="${W - 3}" height="${H - ledge}" rx="6" fill="none" stroke="#ffffff" stroke-opacity="0.22" stroke-width="1"/>
-      <!-- Slate, set into the frame -->
-      <rect x="${sx}" y="${sy}" width="${sw}" height="${sh}" rx="2" fill="url(#slate)"/>
-      <g>${smudges}</g>
-      <rect x="${sx}" y="${sy}" width="${sw}" height="10" fill="url(#inShadowT)"/>
-      <rect x="${sx}" y="${sy}" width="8" height="${sh}" fill="url(#inShadowL)"/>
-      <rect x="${sx}" y="${sy}" width="${sw}" height="${sh}" rx="2" fill="none" stroke="#000" stroke-opacity="0.35" stroke-width="1.2"/>
-      <g class="chalk" mask="url(#grain)" fill="none" stroke-linecap="round" stroke-linejoin="round">${content}</g>
-      <g class="stick" style="display:none"><g transform="rotate(32)"><rect x="-2.6" y="-1" width="6.2" height="24" rx="2.4" fill="url(#stickG)" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/></g></g>
-      <!-- Ledge, with a duster and some chalk on it -->
-      <rect x="2" y="${H - ledge - 4}" width="${W - 4}" height="7" rx="2" fill="url(#ledgeTop)"/>
-      <rect x="2" y="${H - ledge + 3}" width="${W - 4}" height="${ledge - 5}" rx="2" fill="url(#ledgeFront)"/>
-      <rect x="2" y="${H - ledge + 3}" width="${W - 4}" height="1" fill="#000" opacity="0.15"/>
-      <g transform="translate(${(W * 0.16).toFixed(0)} ${H - ledge - 13})">
-        <rect x="0" y="6" width="${eraserW}" height="5" rx="1.5" fill="url(#felt)"/>
-        <rect x="0" y="0" width="${eraserW}" height="7" rx="2" fill="#9b6b3e"/>
-        <rect x="0" y="0" width="${eraserW}" height="2" rx="1" fill="#c4935f"/>
-      </g>
-      <g transform="translate(${(W * 0.68).toFixed(0)} ${H - ledge - 8})">
-        <rect x="0" y="0" width="${chalkW}" height="5.5" rx="2.75" fill="#f6f3ea"/>
-        <rect x="0" y="0" width="${chalkW}" height="1.6" rx="0.8" fill="#ffffff"/>
-        <rect x="${chalkW + 6}" y="1" width="${chalkW * 0.45}" height="4.5" rx="2.25" fill="#f2e7a8"/>
-      </g>
-    </svg></div>`;
-  }
-
-  /** Board for the dice or coin history; the newest entry is `.sketch.newest`. */
-  function historyBoardHtml(kind, entries, W, H) {
-    const pad = 22, ledge = 16;
-    const iw = W - pad * 2, ih = H - pad * 2 - ledge;
-    const u = Math.max(22, Math.min(64, Math.floor(Math.sqrt(iw * ih / 22))));
-    const gap = u * 0.55, rowH = u * 1.25;
-    // Dice are written up as just the total; coins as their letters, HTH.
-    const textOf = e => (kind === 'dice' ? String(e.reduce((a, d) => a + d.f, 0)) : e.map(v => (v ? 'H' : 'T')).join(''));
-    const widthOf = e => u * 0.78 * (textOf(e).length * GLYPH_ADV);
-    // Lay every entry out from the start; keep only the current board's worth.
-    let x = 0, y = 0, page = [];
-    entries.forEach((e, idx) => {
-      const w = widthOf(e);
-      if (x > 0 && x + w > iw) { x = 0; y += rowH; }
-      if (y + rowH > ih + 0.5) { x = 0; y = 0; page = []; }
-      page.push({ e, idx, x, y, w });
-      x += w + gap;
-    });
-    const body = page.map(({ e, idx, x: ex, y: ey, w: ew }) =>
-      `<g class="sketch${idx === entries.length - 1 ? ' newest' : ''}">${chalkText(textOf(e), pad + ex + ew / 2, pad + ey + rowH / 2, u * 0.78, idx + 1)}</g>`).join('');
-    return slateHtml(W, H, body);
-  }
-
-  // `oneJar`: without replacement the board is laid out for exactly a jar's
-  // worth. With replacement there's no end, so it's laid out in fixed
-  // cells and wiped when full. Either way a sketch never moves once drawn.
-  function boardHtml(all, W, H, oneJar) {
-    const pad = 22, ledge = 16;
-    const iw = W - pad * 2, ih = H - pad * 2 - ledge;
-    const n = oneJar ? Math.max(1, all.length, fullBag().reduce((a, b) => a + b, 0)) : 24;
-    let cell = 16;
-    for (let s = Math.min(96, ih); s >= 16; s -= 1) {
-      if (Math.floor(iw / s) * Math.floor(ih / s) >= n) { cell = s; break; }
-    }
-    const cols = Math.max(1, Math.floor(iw / cell));
-    const rows = Math.ceil(n / cols);
-    const cap = Math.max(1, cols * Math.max(rows, Math.floor(ih / cell)));
-    const page = oneJar ? 0 : Math.floor(Math.max(0, all.length - 1) / cap);
-    const out = all.slice(page * cap);
-    const x0 = pad + (iw - Math.min(n, cols) * cell) / 2, y0 = pad + (ih - (oneJar ? rows : Math.floor(ih / cell)) * cell) / 2;
-    const sketches = out.map((b, i) => {
-      const cx = x0 + (i % cols + 0.5) * cell + wob(i, 7) * cell * 0.08;
-      const cy = y0 + (Math.floor(i / cols) + 0.5) * cell + wob(i, 9) * cell * 0.08;
-      return sketchSvg(i, cx, cy, cell * 0.34, b.c);
-    }).join('');
-    return slateHtml(W, H, sketches);
-  }
-
-  // Lay out the thing being thrown beside its board: returns the width the
-  // dice or coins may use, and the board's size.
-  function boardSplit() {
-    const r = resultEl.getBoundingClientRect();
-    const W = r.width - 40, H = r.height - 30;
-    const bw = Math.round(Math.min(W * 0.42, H * 1.35, 520)), bh = Math.round(Math.min(H * 0.82, bw * 0.78));
-    return { playW: W - bw - 30, bw, bh };
-  }
-
-  // ── Writing ─────────────────────────────────────────────────────────────────
-  // Hidden outright, not a zero-length dash: a round cap would still leave a dot.
-  const hideStroke = st => { st.style.visibility = 'hidden'; st.querySelectorAll('path').forEach(p => { p.style.strokeDasharray = '0 100000'; }); };
-  const showStroke = st => { st.style.visibility = ''; st.querySelectorAll('path').forEach(p => { p.style.strokeDasharray = ''; p.style.strokeDashoffset = ''; }); };
-  function hideSketch(g) { if (g) g.querySelectorAll('.st').forEach(hideStroke); }
-
-  // Write a sketch in, one stroke after another at a steady hand speed, the
-  // chalk stick riding the tip and lifting between strokes. One rAF loop;
-  // returns { anims: [{ cancel }], end } so it fits with the other timings.
-  function drawSketch(g, delay) {
-    if (!g) return { anims: [], end: delay };
-    const svg = g.ownerSVGElement, stick = svg && svg.querySelector('.stick');
-    const plan = [];
-    let t = delay;
-    g.querySelectorAll('.st').forEach(st => {
-      const p = st.querySelector('.cm'), len = p.getTotalLength();
-      const dur = Math.max(110, Math.min(700, len * 5.5));
-      plan.push({ st, paths: [...st.querySelectorAll('path')], p, len, start: t, dur });
-      hideStroke(st);
-      t += dur + 70;
-    });
-    const t0 = performance.now();
-    let raf = 0, finished = false;
-    const ease = x => (x < 0.5 ? 2 * x * x : 1 - (-2 * x + 2) ** 2 / 2);
-    const finish = () => {
-      if (finished) return;
-      finished = true;
-      cancelAnimationFrame(raf);
-      plan.forEach(s => showStroke(s.st));
-      if (stick) stick.style.display = 'none';
-    };
-    const step = now => {
-      const el = now - t0;
-      let tip = null;
-      plan.forEach(s => {
-        const f = Math.max(0, Math.min(1, (el - s.start) / s.dur));
-        if (f <= 0) return;
-        const drawn = s.len * ease(f);
-        s.st.style.visibility = '';
-        s.paths.forEach(p => { p.style.strokeDasharray = `${drawn.toFixed(1)} 100000`; });
-        if (f < 1) tip = s.p.getPointAtLength(drawn);
-      });
-      if (stick) {
-        if (tip) { stick.style.display = ''; stick.setAttribute('transform', `translate(${tip.x.toFixed(1)},${tip.y.toFixed(1)})`); }
-        else stick.style.display = 'none';
-      }
-      if (el < t) raf = requestAnimationFrame(step); else finish();
-    };
-    raf = requestAnimationFrame(step);
-    return { anims: [{ cancel: finish }], end: t };
-  }
-
-  // Hide the newest entry until the throw lands, then write it in.
-  function prepNewest() {
-    const g = resultEl.querySelector('.sketch.newest');
-    hideSketch(g);
-    return g;
-  }
-  function writeNewest(g, delay) { return drawSketch(g, delay); }
-  function settleNewest(g) { if (g) g.querySelectorAll('.st').forEach(showStroke); }
 
   // ── Dice ────────────────────────────────────────────────────────────────────
   const DIE_COLORS = {
@@ -3304,6 +2904,417 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     getRenderer().render(HT.scene, HT.camera);
   }
 
+  // ── Spinner (3D) ────────────────────────────────────────────────────────────
+  // A carnival prize wheel on a stand: lacquered sectors, a brass rim with a
+  // peg at every sector line, and a leather flapper at the top that the pegs
+  // knock aside as they pass.
+  let SP = null;
+  function wheelFaceTexture(sec) {
+    const cv = document.createElement('canvas'), N = 2048, c = N / 2, R = N / 2 - 6;
+    cv.width = cv.height = N;
+    const ctx = cv.getContext('2d');
+    const tot = sec.reduce((s, x) => s + x.w, 0);
+    let a0 = 0;
+    sec.forEach((s, i) => {
+      const a1 = a0 + s.w / tot * Math.PI * 2;
+      // Clockwise from 12 o'clock, matching how the pointer reads.
+      const base = hueHex(i % HUES);
+      const g = ctx.createRadialGradient(c, c, R * 0.1, c, c, R);
+      g.addColorStop(0, mixHex(base, '#ffffff', 0.18)); g.addColorStop(0.75, base); g.addColorStop(1, mixHex(base, '#000000', 0.18));
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.moveTo(c, c);
+      ctx.arc(c, c, R, a0 - Math.PI / 2, a1 - Math.PI / 2);
+      ctx.closePath(); ctx.fill();
+      // Divider.
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.moveTo(c, c); ctx.lineTo(c + R * Math.sin(a0), c - R * Math.cos(a0)); ctx.stroke();
+      // Label, along the radius, reading outward.
+      const mid = (a0 + a1) / 2, span = a1 - a0;
+      if (sec.length <= 24 && span > 0.12) {
+        ctx.save();
+        ctx.translate(c, c);
+        ctx.rotate(mid - Math.PI / 2);
+        const flip = mid > Math.PI;
+        let label = s.label.length > 16 ? s.label.slice(0, 15) + '…' : s.label;
+        let fs = Math.min(150, R * span * 0.42, 1300 / Math.max(3, label.length + 1));
+        ctx.font = `800 ${fs}px "DM Sans", "Segoe UI", system-ui, sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 3;
+        ctx.translate(R * 0.6, 0);
+        if (flip) ctx.rotate(Math.PI);
+        ctx.fillText(label, 0, 0);
+        ctx.restore();
+      }
+      a0 = a1;
+    });
+    // Gloss.
+    const gl = ctx.createRadialGradient(c * 0.7, c * 0.55, 0, c, c, R);
+    gl.addColorStop(0, 'rgba(255,255,255,0.22)'); gl.addColorStop(0.5, 'rgba(255,255,255,0.03)'); gl.addColorStop(1, 'rgba(0,0,0,0.12)');
+    ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(c, c, R, 0, Math.PI * 2); ctx.fill();
+    return canvasTex(cv);
+  }
+  const WHEEL = { R: 2, y: 2.75 };
+  function buildSpinner() {
+    const T = T3, scene = new T.Scene();
+    stageLights(scene, { shadowBox: 6 });
+    const brass = new T.MeshStandardMaterial({ color: 0xd8aa48, metalness: 1, roughness: 0.28 });
+    const lacquer = new T.MeshPhysicalMaterial({ color: 0x1d1d22, roughness: 0.3, clearcoat: 1 });
+    const wood = new T.MeshStandardMaterial({ color: 0x7b4a27, roughness: 0.55 });
+    const add = (geo, mat, parent = scene) => { const m = new T.Mesh(geo, mat); m.castShadow = true; m.receiveShadow = true; parent.add(m); return m; };
+    // Stand: a base and a post behind the wheel.
+    add(new T.BoxGeometry(2.6, 0.3, 1.4), wood).position.set(0, 0.15, -0.2);
+    add(new T.CylinderGeometry(0.12, 0.16, WHEEL.y, 20), lacquer).position.set(0, WHEEL.y / 2, -0.35);
+    // The wheel.
+    const wheel = new T.Group();
+    wheel.position.set(0, WHEEL.y, 0);
+    scene.add(wheel);
+    const body = add(new T.CylinderGeometry(WHEEL.R, WHEEL.R, 0.16, 128), lacquer, wheel);
+    body.rotation.x = Math.PI / 2;
+    const face = add(new T.CircleGeometry(WHEEL.R * 0.97, 128), new T.MeshPhysicalMaterial({ roughness: 0.35, clearcoat: 0.8, clearcoatRoughness: 0.2 }), wheel);
+    face.position.z = 0.081;
+    add(new T.TorusGeometry(WHEEL.R * 0.985, 0.07, 16, 160), brass, wheel).position.z = 0.08;
+    const pegs = new T.Group(); wheel.add(pegs);
+    const hub = add(new T.SphereGeometry(0.22, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), brass, wheel);
+    hub.rotation.x = Math.PI / 2; hub.position.z = 0.09;
+    // Flapper at the top, hinged above the rim.
+    const flap = new T.Group();
+    flap.position.set(0, WHEEL.y + WHEEL.R + 0.32, 0.18);
+    scene.add(flap);
+    const leather = new T.MeshPhysicalMaterial({ color: 0xc0262f, roughness: 0.45, clearcoat: 0.5 });
+    const tab = add(new T.CylinderGeometry(0.0, 0.15, 0.62, 3), leather, flap);
+    tab.rotation.z = Math.PI; tab.position.y = -0.31; tab.scale.z = 0.35;
+    add(new T.CylinderGeometry(0.07, 0.07, 0.3, 16), brass, flap).rotation.x = Math.PI / 2;
+    const camera = new T.PerspectiveCamera(28, 1, 0.1, 100);
+    SP = { scene, camera, wheel, face, pegs, flap, sig: '', raf: 0, bounds: [] };
+    return SP;
+  }
+  function dressWheel(sec) {
+    const T = T3, sig = JSON.stringify(sec);
+    if (SP.sig === sig) return;
+    SP.sig = sig;
+    if (SP.face.material.map) SP.face.material.map.dispose();
+    SP.face.material.map = wheelFaceTexture(sec);
+    SP.face.material.needsUpdate = true;
+    while (SP.pegs.children.length) SP.pegs.remove(SP.pegs.children[0]);
+    const tot = sec.reduce((s, x) => s + x.w, 0), brass = new T.MeshStandardMaterial({ color: 0xf0d27a, metalness: 1, roughness: 0.2 });
+    SP.bounds = [];
+    let a = 0;
+    sec.forEach(s => {
+      SP.bounds.push(a);
+      if (sec.length > 1) {
+        // Clockwise from the top, as on the face.
+        const peg = new T.Mesh(new T.CylinderGeometry(0.05, 0.05, 0.22, 12), brass);
+        peg.rotation.x = Math.PI / 2;
+        peg.position.set(Math.sin(a) * WHEEL.R * 0.9, Math.cos(a) * WHEEL.R * 0.9, 0.18);
+        peg.castShadow = true;
+        SP.pegs.add(peg);
+      }
+      a += s.w / tot * Math.PI * 2;
+    });
+  }
+  function frameSpinner(w, h) {
+    const T = T3, cam = SP.camera;
+    cam.aspect = w / h;
+    const vf = T.MathUtils.degToRad(cam.fov) / 2, hf = Math.atan(Math.tan(vf) * cam.aspect);
+    const dist = Math.max(2.5 / Math.tan(hf), 2.75 / Math.tan(vf)) * 1.06;
+    cam.position.set(0, 2.6 + dist * 0.12, dist);
+    cam.lookAt(0, 2.55, 0);
+    cam.updateProjectionMatrix();
+  }
+  const sectorAt = deg => { const a = ((deg % 360) + 360) % 360 * Math.PI / 180; let k = 0; SP.bounds.forEach((b, i) => { if (a >= b) k = i; }); return k; };
+
+  function renderSpinner3D(play, host, w, h) {
+    if (!SP) buildSpinner();
+    const renderer = mountRenderer(host, w, h);
+    frameSpinner(w, h);
+    cancelAnimationFrame(SP.raf);
+    dressWheel(spinnerSectors());
+    const draw = () => renderer.render(SP.scene, SP.camera);
+    const to = S.spin;
+    if (!play) { SP.wheel.rotation.z = to * Math.PI / 180; SP.flap.rotation.z = 0; draw(); SP.at = to; return 0; }
+    const from = SP.at != null ? SP.at : to - 1440;
+    const DUR = 4800, t0 = performance.now();
+    let lastK = sectorAt(from), kick = 0, lastT = t0;
+    // Spin: a hard push, then friction — fast at first, creeping at the end.
+    const ease = x => 1 - Math.pow(1 - x, 3.2);
+    const frame = now => {
+      const t = Math.min(1, (now - t0) / DUR), dt = Math.min(0.05, (now - lastT) / 1000);
+      lastT = now;
+      const deg = from + (to - from) * ease(t);
+      SP.wheel.rotation.z = deg * Math.PI / 180;
+      const k = sectorAt(deg);
+      if (k !== lastK && SP.bounds.length > 1) { kick = 1; lastK = k; }
+      // The flapper is knocked aside and springs back.
+      kick = Math.max(0, kick - dt * 7);
+      SP.flap.rotation.z = -0.45 * Math.sin(kick * Math.PI / 2);
+      draw();
+      if (t < 1) SP.raf = requestAnimationFrame(frame);
+      else SP.at = to;
+    };
+    frame(t0);
+    return DUR;
+  }
+  function settleSpinner3D() {
+    if (!SP) return;
+    cancelAnimationFrame(SP.raf);
+    SP.wheel.rotation.z = S.spin * Math.PI / 180;
+    SP.flap.rotation.z = 0;
+    SP.at = S.spin;
+    getRenderer().render(SP.scene, SP.camera);
+  }
+
+  // ── Bag of balls (3D) ───────────────────────────────────────────────────────
+  // A glass jar with the balls really piled up inside it (they settle, and
+  // shift when one is taken), or a velvet drawstring bag you can't see into.
+  // A drawn ball comes up out of the opening and is held up beside it.
+  let BG = null;
+  const JAR = { R: 0.95, floor: 0.12, mouthY: 3.0, x: -1.25, ball: 0.24 };
+  function ballMat(hue) {
+    return new T3.MeshPhysicalMaterial({ color: hueHex(hue), roughness: 0.18, clearcoat: 1, clearcoatRoughness: 0.08 });
+  }
+  function noteTexture(n, kind) {
+    const cv = document.createElement('canvas');
+    cv.width = 320; cv.height = 300;
+    const ctx = cv.getContext('2d');
+    const hand = s => `700 ${s}px 'Segoe Print', 'Bradley Hand', 'Marker Felt', 'Comic Sans MS', cursive`;
+    if (kind === 'sticky') {
+      const g = ctx.createLinearGradient(0, 0, 0, 300);
+      g.addColorStop(0, '#fff3a3'); g.addColorStop(1, '#f7da62');
+      ctx.fillStyle = g; ctx.fillRect(0, 20, 320, 280);
+      ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.fillRect(90, 0, 140, 44);
+    } else {
+      ctx.fillStyle = '#d7b98a';
+      ctx.beginPath(); ctx.moveTo(50, 20); ctx.lineTo(270, 20); ctx.lineTo(310, 70); ctx.lineTo(310, 300); ctx.lineTo(10, 300); ctx.lineTo(10, 70); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#3a2a1a'; ctx.beginPath(); ctx.arc(160, 60, 14, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = '#3b2f1d'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = hand(130); ctx.fillText(String(n), 160, kind === 'sticky' ? 140 : 170);
+    ctx.font = hand(42); ctx.fillText(n === 1 ? 'ball' : 'balls', 160, kind === 'sticky' ? 245 : 265);
+    return canvasTex(cv);
+  }
+  function buildBagScene() {
+    const T = T3, scene = new T.Scene();
+    stageLights(scene, { shadowBox: 6 });
+    // Glass jar: body, shoulder, neck and a rolled lip.
+    const jar = new T.Group(); jar.position.x = JAR.x; scene.add(jar);
+    const prof = [[0.0, 0.0], [0.86, 0.0], [1.0, 0.1], [1.04, 0.35], [1.04, 2.2], [1.0, 2.5], [0.8, 2.75], [0.62, 2.85], [0.6, 2.98], [0.66, 3.02], [0.66, 3.06], [0.58, 3.06]]
+      .map(([x, y]) => new T.Vector2(x, y));
+    // Clear glass: the far wall then the near one, each faint, with strong
+    // reflections — reads as glass without the cost of real refraction.
+    const jarGeo = new T.LatheGeometry(prof, 96);
+    const glassMat = (side, op) => {
+      const m = new T.MeshPhysicalMaterial({ color: 0xeef6ff, roughness: 0.03, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.02,
+        transparent: true, opacity: op, side, depthWrite: false, envMapIntensity: 0.55 });
+      // Glass is clear face-on and dense at its edges (Fresnel): darken and
+      // thicken it where the surface turns away, so its outline reads even
+      // against a white slide.
+      m.onBeforeCompile = sh => {
+        sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>', `
+          float fres = pow(1.0 - abs(dot(normalize(vNormal), normalize(vViewPosition))), 2.2);
+          gl_FragColor = vec4(mix(outgoingLight, vec3(0.42, 0.52, 0.6), fres * 0.6), clamp(diffuseColor.a + fres * 0.6, 0.0, 1.0));
+        `);
+      };
+      return m;
+    };
+    const back = new T.Mesh(jarGeo, glassMat(T.BackSide, 0.06)); back.renderOrder = 1;
+    const front = new T.Mesh(jarGeo, glassMat(T.FrontSide, 0.1)); front.renderOrder = 3;
+    jar.add(back, front);
+    // A bright rim where the glass is seen edge-on.
+    const lip = new T.Mesh(new T.TorusGeometry(0.63, 0.035, 12, 64), glassMat(T.FrontSide, 0.45));
+    lip.rotation.x = Math.PI / 2; lip.position.y = 3.05; lip.renderOrder = 3; jar.add(lip);
+    const note = new T.Mesh(new T.PlaneGeometry(1.05, 0.98), new T.MeshStandardMaterial({ map: noteTexture(0, 'sticky'), roughness: 0.9, transparent: true, toneMapped: false }));
+    note.position.set(0, 1.85, 1.07); note.rotation.z = -0.07; note.rotation.x = -0.03; note.renderOrder = 4;
+    jar.add(note);
+    // Velvet drawstring bag.
+    const sack = new T.Group(); sack.position.x = JAR.x; scene.add(sack);
+    const sp = [[0.0, 0.02], [0.75, 0.04], [1.15, 0.3], [1.32, 0.85], [1.28, 1.5], [1.05, 2.05], [0.6, 2.45], [0.42, 2.62], [0.46, 2.8], [0.58, 3.0], [0.62, 3.05]]
+      .map(([x, y]) => new T.Vector2(x, y));
+    const sgeo = new T.LatheGeometry(sp, 120, 0, Math.PI * 2);
+    // Folds: the fabric gathers in toward the neck.
+    const pos = sgeo.getAttribute('position'), v = new T.Vector3();
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i);
+      const th = Math.atan2(v.z, v.x), gather = Math.max(0, Math.min(1, (v.y - 1.0) / 1.6));
+      const k = 1 + (0.025 + 0.06 * gather) * Math.sin(th * 9 + v.y * 2.2);
+      pos.setXYZ(i, v.x * k, v.y, v.z * k);
+    }
+    sgeo.computeVertexNormals();
+    const velvet = new T.MeshPhysicalMaterial({ color: 0x4b3591, roughness: 0.75, sheen: 1, sheenRoughness: 0.4, sheenColor: new T.Color(0xb7a4ff), side: T.DoubleSide });
+    const sackMesh = new T.Mesh(sgeo, velvet); sackMesh.castShadow = true; sack.add(sackMesh);
+    const hole = new T.Mesh(new T.CircleGeometry(0.56, 48), new T.MeshBasicMaterial({ color: 0x0d0818 }));
+    hole.rotation.x = -Math.PI / 2; hole.position.y = 2.96; sack.add(hole);
+    const rope = new T.MeshStandardMaterial({ color: 0xd9c08a, roughness: 0.8 });
+    const tie = new T.Mesh(new T.TorusGeometry(0.47, 0.035, 10, 64), rope); tie.rotation.x = Math.PI / 2; tie.position.y = 2.6; sack.add(tie);
+    const cords = new T.CatmullRomCurve3([new T.Vector3(0.34, 2.6, 0.34), new T.Vector3(0.62, 2.3, 0.72), new T.Vector3(0.82, 2.0, 1.08)]);
+    sack.add(new T.Mesh(new T.TubeGeometry(cords, 20, 0.025, 8), rope));
+    const tag = new T.Mesh(new T.PlaneGeometry(0.62, 0.58), new T.MeshStandardMaterial({ map: noteTexture(0, 'tag'), roughness: 0.9, transparent: true, side: T.DoubleSide }));
+    tag.position.set(0.86, 1.72, 1.2); tag.rotation.set(-0.12, 0.42, 0.1); tag.castShadow = true;
+    sack.add(tag);
+    // Balls inside the jar, in the jar's frame.
+    const inside = new T.Group(); inside.position.x = JAR.x; scene.add(inside);
+    const camera = new T.PerspectiveCamera(28, 1, 0.1, 100);
+    BG = { scene, camera, jar, sack, note, tag, inside, balls: [], counts: '', noteN: -1, tagN: -1, raf: 0, extra: [], geo: new T.SphereGeometry(JAR.ball, 32, 20) };
+    return BG;
+  }
+  function addJarBall(hue, p) {
+    const m = new T3.Mesh(BG.geo, ballMat(hue));
+    m.castShadow = true;
+    BG.inside.add(m);
+    const b = { hue, m, p: p || new T3.Vector3(wob(BG.balls.length, 1) * 0.6, 1.6 + BG.balls.length * 0.08, wob(BG.balls.length, 2) * 0.6), v: new T3.Vector3() };
+    BG.balls.push(b);
+    m.position.copy(b.p);
+    return b;
+  }
+  function removeJarBall(b) {
+    BG.inside.remove(b.m); b.m.material.dispose();
+    BG.balls.splice(BG.balls.indexOf(b), 1);
+  }
+  // Same little physics as the cage: gravity, the floor and wall of the
+  // jar, and balls pushing each other apart.
+  function stepJar(dt) {
+    const r = JAR.ball, Rin = JAR.R - r - 0.02, d = new T3.Vector3();
+    BG.balls.forEach(b => {
+      b.v.y -= 9.8 * dt;
+      b.p.addScaledVector(b.v, dt);
+      if (b.p.y < JAR.floor + r) { b.p.y = JAR.floor + r; if (b.v.y < 0) b.v.y *= -0.25; b.v.x *= 0.9; b.v.z *= 0.9; }
+      const rad = Math.hypot(b.p.x, b.p.z);
+      if (rad > Rin) { b.p.x *= Rin / rad; b.p.z *= Rin / rad; b.v.x *= -0.3; b.v.z *= -0.3; }
+    });
+    for (let i = 0; i < BG.balls.length; i++) for (let j = i + 1; j < BG.balls.length; j++) {
+      const a = BG.balls[i], b = BG.balls[j];
+      d.subVectors(b.p, a.p);
+      const dist = d.length();
+      if (dist > 0 && dist < 2 * r) {
+        d.divideScalar(dist);
+        const push = (2 * r - dist) / 2;
+        a.p.addScaledVector(d, -push); b.p.addScaledVector(d, push);
+        const rel = b.v.clone().sub(a.v).dot(d);
+        if (rel < 0) { a.v.addScaledVector(d, rel * 0.6); b.v.addScaledVector(d, -rel * 0.6); }
+      }
+    }
+    BG.balls.forEach(b => { b.m.position.copy(b.p); b.v.multiplyScalar(0.995); });
+  }
+  // Make the jar's contents match the pool (up to 60 balls shown), letting
+  // newcomers fall in and settle.
+  function syncJar(pool, settle) {
+    const st = S.setup.bag, want = [];
+    pool.forEach((n, j) => { for (let i = 0; i < n && want.length < 60; i++) want.push(st.balls[j].c); });
+    const have = {}; BG.balls.forEach(b => { have[b.hue] = (have[b.hue] || 0) + 1; });
+    const need = {}; want.forEach(h => { need[h] = (need[h] || 0) + 1; });
+    Object.keys(have).forEach(h => { let extra = have[h] - (need[h] || 0); for (let k = BG.balls.length - 1; k >= 0 && extra > 0; k--) if (String(BG.balls[k].hue) === h) { removeJarBall(BG.balls[k]); extra--; } });
+    Object.keys(need).forEach(h => { for (let k = have[h] || 0; k < need[h]; k++) addJarBall(+h); });
+    if (settle) for (let i = 0; i < 240; i++) stepJar(1 / 60);
+  }
+  function frameBag(w, h) {
+    const T = T3, cam = BG.camera;
+    cam.aspect = w / h;
+    const vf = T.MathUtils.degToRad(cam.fov) / 2, hf = Math.atan(Math.tan(vf) * cam.aspect);
+    // The container and the spot a drawn ball is held up at, centred together.
+    const dist = Math.max(2.3 / Math.tan(hf), 2.2 / Math.tan(vf)) * 1.08;
+    cam.position.set(0.65, 1.7 + dist * 0.28, dist);
+    cam.lookAt(0.65, 1.75, 0);
+    cam.updateProjectionMatrix();
+  }
+  const HOLD = { x: 1.45, y: 3.0, z: 0.6 };
+
+  function renderBag3D(o, play, host, w, h, look) {
+    const T = T3, st = S.setup.bag;
+    if (!BG) buildBagScene();
+    const renderer = mountRenderer(host, w, h);
+    frameBag(w, h);
+    cancelAnimationFrame(BG.raf);
+    BG.extra.forEach(m => BG.scene.remove(m)); BG.extra = [];
+    const draw = () => renderer.render(BG.scene, BG.camera);
+    const isJar = look === 'jar';
+    BG.jar.visible = BG.inside.visible = isJar;
+    BG.sack.visible = !isJar;
+    const pool = S.pool.bag.slice();
+    // While animating, the balls about to come out are still in there.
+    if (play && o && o.idx && !st.replace) o.idx.forEach(j => { pool[j] = (pool[j] || 0) + 1; });
+    const setCount = n => {
+      const key = isJar ? 'noteN' : 'tagN', mesh = isJar ? BG.note : BG.tag;
+      if (BG[key] === n) return;
+      BG[key] = n;
+      mesh.material.map && mesh.material.map.dispose();
+      mesh.material.map = noteTexture(n, isJar ? 'sticky' : 'tag');
+      mesh.material.needsUpdate = true;
+    };
+    const total = pool.reduce((a, b) => a + b, 0);
+    setCount(total);
+    if (isJar) syncJar(pool, !play);
+    if (!play || !o || !o.balls.length) { draw(); return 0; }
+
+    // Each ball in turn: up out of the opening, held up beside it, then
+    // back in (with replacement) or thrown away (without).
+    const EACH = 2300, GAP = 1400, OUT = 0.3, SHOW = 0.66;
+    const mouth = new T.Vector3(JAR.x, JAR.mouthY, 0);
+    const flights = o.balls.map((hue, i) => {
+      const m = new T.Mesh(BG.geo, ballMat(hue)); m.castShadow = true; m.visible = false;
+      BG.scene.add(m); BG.extra.push(m);
+      return { hue, m, start: i * GAP, from: null, taken: false };
+    });
+    const t0 = performance.now();
+    let lastT = t0, left = total;
+    const DUR = (o.balls.length - 1) * GAP + EACH;
+    const frame = now => {
+      const t = now - t0, dt = Math.min(0.033, Math.max(0, (now - lastT) / 1000));
+      lastT = now;
+      if (isJar) for (let k = 0; k < 2; k++) stepJar(dt / 2);
+      flights.forEach(f => {
+        const u = (t - f.start) / EACH;
+        if (u < 0 || u > 1.2) return;
+        if (!f.taken) {
+          f.taken = true;
+          // It's a ball of that colour from the top of the pile that comes up.
+          if (isJar) {
+            const cand = BG.balls.filter(b => b.hue === f.hue).sort((a, b) => b.p.y - a.p.y)[0];
+            f.from = cand ? cand.p.clone().add(new T.Vector3(JAR.x, 0, 0)) : new T.Vector3(JAR.x, 1.2, 0);
+            if (cand) removeJarBall(cand);
+          } else f.from = new T.Vector3(JAR.x, 2.4, 0);
+          f.m.visible = true;
+          if (!st.replace) setCount(--left);
+        }
+        const p = new T.Vector3();
+        const hold = new T.Vector3(HOLD.x, HOLD.y, HOLD.z);
+        if (u <= OUT) {
+          // Straight up and out of the mouth, then across.
+          const a = easeInOut(seg(u, 0, OUT * 0.55)), b = easeInOut(seg(u, OUT * 0.55, OUT));
+          p.lerpVectors(f.from, mouth.clone().add(new T.Vector3(0, 0.45, 0)), a);
+          if (b > 0) { p.lerpVectors(mouth.clone().add(new T.Vector3(0, 0.45, 0)), hold, b); p.y += Math.sin(Math.PI * b) * 0.4; }
+        } else if (u <= SHOW) {
+          p.copy(hold); p.y += Math.sin((u - OUT) * 9) * 0.02;
+        } else if (st.replace) {
+          // Back over and down into the opening, where it drops in.
+          const b = easeInOut(seg(u, SHOW, 0.84)), c = easeInOut(seg(u, 0.84, 1));
+          const top = mouth.clone().add(new T.Vector3(0, 0.45, 0));
+          p.lerpVectors(hold, top, b); p.y += Math.sin(Math.PI * b) * 0.4;
+          if (c > 0) p.lerpVectors(top, new T.Vector3(JAR.x, 2.2, 0), c);
+          if (u >= 1 && f.m.visible) {
+            f.m.visible = false;
+            if (isJar) addJarBall(f.hue, new T.Vector3(0, 2.3, 0)).v.set(0, -1, 0);
+          }
+        } else {
+          // Tossed: up and over to the right, falling out of the bottom of the picture.
+          const b = seg(u, SHOW, 1.15);
+          p.set(HOLD.x + b * 2.6, HOLD.y + Math.sin(Math.PI * Math.min(1, b * 1.4)) * 0.8 - b * b * 6, HOLD.z + b * 1.2);
+          f.m.rotation.x += 0.2; f.m.rotation.z += 0.15;
+        }
+        f.m.position.copy(p);
+      });
+      draw();
+      if (t < DUR + 300) BG.raf = requestAnimationFrame(frame);
+    };
+    frame(t0);
+    return DUR;
+  }
+  function settleBag3D() {
+    if (!BG) return;
+    cancelAnimationFrame(BG.raf);
+    BG.extra.forEach(m => BG.scene.remove(m)); BG.extra = [];
+    renderResult(false);
+  }
+
   // ── 3D dice ─────────────────────────────────────────────────────────────────
   // Real polyhedra (three.js 0.160, vendored by the Beamer+ server and loaded
   // on first use): numbered faces, lit and shadowed on a table, thrown so
@@ -3656,25 +3667,23 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     const n = sides.length, anyCube = sides.includes(6);
     // A cube in perspective, tilted, takes more room than its face size,
     // and it needs headroom to be thrown into.
-    const sp = boardSplit();
+    const rr = resultEl.getBoundingClientRect(), sp = { playW: Math.round(rr.width - 40) };
     if (!T3 && !t3Failed) {
-      resultEl.innerHTML = `<div class="play-row"><div class="play" style="width:${sp.playW}px"></div>${historyBoardHtml('dice', S.hist.dice, sp.bw, sp.bh)}</div>`;
+      resultEl.innerHTML = '';
       loadThree().then(() => { if (S.mode === 'dice' && !anim) renderResult(false); });
       return;
     }
     if (T3) {
       // Real dice. The canvas is kept and moved into each new layout.
       const r = resultEl.getBoundingClientRect();
-      const h = Math.round(Math.max(140, Math.min(r.height - 40, sp.playW * 0.8)));
-      resultEl.innerHTML = `<div class="play-row"><div class="play dice3" id="dice3" style="width:${sp.playW}px;height:${h}px"></div>` +
-        historyBoardHtml('dice', S.hist.dice, sp.bw, sp.bh) + '</div>';
+      const h = Math.round(Math.max(140, r.height - 30));
+      resultEl.innerHTML = `<div class="play dice3" id="dice3" style="width:${sp.playW}px;height:${h}px"></div>`;
       const d = ensureScene();
       $('dice3').appendChild(d.renderer.domElement);
       const play3 = play && fresh;
       const roll = renderDice3D(o, play3, sides, fresh ? faces : [], Math.round(sp.playW), h);
       if (!play3) return;
-      const g = prepNewest(), w = writeNewest(g, roll + 120);
-      hold(Math.max(roll, w.end) + 30, () => { w.anims.forEach(a => a.cancel()); settleNewest(g); settleDice3D(faces); });
+      hold(roll + 30, () => settleDice3D(faces));
       return;
     }
     const sz = anyCube ? fitSize(n, 1.3, 0.42, 150, sp.playW) : fitSize(n, 1.05, 0.34, 170, sp.playW);
@@ -3684,8 +3693,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     resultEl.style.setProperty('--d-pip-hi', col.pipHi);
     play = play && fresh;
     resultEl.innerHTML =
-      `<div class="play-row"><div class="play" style="width:${sp.playW}px"><div class="items${fresh ? '' : ' ghost'}">${faces.map((f, i) => (sides[i] === 6 ? cubeHtml(i) : polyHtml(i, f, sides[i]))).join('')}</div></div>` +
-      historyBoardHtml('dice', S.hist.dice, sp.bw, sp.bh) + '</div>';
+      `<div class="items${fresh ? '' : ' ghost'}">${faces.map((f, i) => (sides[i] === 6 ? cubeHtml(i) : polyHtml(i, f, sides[i]))).join('')}</div>`;
 
     const cap = $('cap');
     const cubes = [...resultEl.querySelectorAll('.die3d')];
@@ -3708,10 +3716,8 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     const tick = polys.length ? setInterval(() => polys.forEach(el => { const s = sides[+el.dataset.i]; setPolyFace(el, jiggle(1, s), s); }), 75) : null;
     if (cap) cap.style.visibility = 'hidden';
     const roll = (cubes.length ? 1150 : 900) + n * 70;
-    const g = prepNewest(), w = writeNewest(g, roll + 120);
-    hold(Math.max(roll, w.end) + 30, () => {
+    hold(roll + 30, () => {
       clearInterval(tick);
-      w.anims.forEach(a => a.cancel()); settleNewest(g);
       cubes.forEach(el => { el.classList.remove('tossing'); el.querySelector('.cube').style.transition = 'none'; });
       polys.forEach(el => { const i = +el.dataset.i; el.classList.remove('tossing'); setPolyFace(el, faces[i], sides[i]); });
       if (cap) { cap.style.visibility = ''; cap.classList.add('fade'); }
@@ -3770,15 +3776,12 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 
   function renderCoins(o, play) {
     const st = S.setup.coin, n = o ? o.faces.length : 1;
-    const sp = boardSplit();
-    const sz = fitSize(n, 1.05, 0.42, 180, sp.playW);
+    const sz = fitSize(n, 1.05, 0.42, 200);
     resultEl.style.setProperty('--sz', sz + 'px');
     const faces = o ? o.faces : [1];
     resultEl.innerHTML =
       `<div class="items${o ? '' : ' ghost'}">${faces.map((_, i) =>
         `<div class="coin3d" data-i="${i}"><div class="ground"></div><div class="coin"><div class="cface heads">${coinFace(true)}</div><div class="cedge"></div><div class="cface tails">${coinFace(false)}</div></div></div>`).join('')}</div>`;
-    resultEl.innerHTML = `<div class="play-row"><div class="play" style="width:${sp.playW}px">${resultEl.innerHTML}</div>` +
-      historyBoardHtml('coin', S.hist.coin, sp.bw, sp.bh) + '</div>';
     const els = [...resultEl.querySelectorAll('.coin3d')];
     els.forEach((el, i) => {
       const coin = el.querySelector('.coin');
@@ -3797,9 +3800,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       const cap = $('cap');
       if (cap) cap.style.visibility = 'hidden';
       const flip = 1300 + n * 60;
-      const g = prepNewest(), w = writeNewest(g, flip + 120);
-      hold(Math.max(flip, w.end) + 30, () => {
-        w.anims.forEach(a => a.cancel()); settleNewest(g);
+      hold(flip + 30, () => {
         els.forEach(el => { el.classList.remove('tossing'); el.querySelector('.coin').style.transition = 'none'; });
         if (cap) { cap.style.visibility = ''; cap.classList.add('fade'); }
       });
@@ -3930,6 +3931,21 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   }
 
   function renderBag(o, play) {
+    if (!T3 && !t3Failed) { resultEl.innerHTML = ''; loadThree().then(() => { if (S.mode === 'bag' && !anim) renderResult(false); }); return; }
+    if (T3) {
+      const st = S.setup.bag, look = st.look === 'bag' ? 'bag' : 'jar';
+      const r = resultEl.getBoundingClientRect();
+      const W = r.width - 30, H = r.height - 20;
+      const w = Math.round(W), h = Math.round(H);
+      resultEl.innerHTML = `<div class="stage3d" id="stage3d" style="width:${w}px;height:${h}px"></div>`;
+      const n = o && !o.empty ? o.balls.length : 0;
+      const dur = renderBag3D(o, play && n > 0, $('stage3d'), w, h, look);
+      if (dur) hold(dur + 60, settleBag3D);
+      return;
+    }
+    return renderBagSvg(o, play);
+  }
+  function renderBagSvg(o, play) {
     const st = S.setup.bag, look = st.look === 'bag' ? 'bag' : 'jar';
     const pool = S.pool.bag;
     const drawnNow = o && !o.empty ? o.balls.length : 0;
@@ -3954,19 +3970,16 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     const svg = look === 'bag' ? sackSvg(left) + `<div class="bag-front">${sackSvg(left, true)}</div>` : jarSvg(dots);
     resultEl.innerHTML =
       `<div class="bag-row" style="gap:${Math.round(jar * 0.45)}px"><div class="jar${look === 'bag' ? ' sack' : ''}" id="container">${svg}${look === 'jar' ? stickyHtml(left) : ''}</div>` +
-      `<div class="bag-side">${boardHtml(S.hist.bag || [], bw, bh, !st.replace)}</div></div>`;
+      `<div class="bag-side" style="width:${bw}px;height:${bh}px"></div></div>`;
     if (!play || !drawnNow) return;
 
     const host = resultEl.getBoundingClientRect(), box = $('container').getBoundingClientRect();
     const at = ([x, y]) => [box.left - host.left + x / 100 * box.width, box.top - host.top + y / 130 * box.height];
     const [fx, fy] = at(MOUTH[look].from), [ox, oy] = at(MOUTH[look].out);
-    const board = resultEl.querySelector('.board').getBoundingClientRect();
+    const board = resultEl.querySelector('.bag-side').getBoundingClientRect();
     // Where a ball is held up for the room to see: between the container
     // and the board, a little above the middle.
     const hx = (box.right + board.left) / 2 - host.left, hy = box.top - host.top + box.height * 0.32;
-    const sketches = [...resultEl.querySelectorAll('.board .sketch')];
-    const fresh = sketches.slice(Math.max(0, sketches.length - drawnNow));
-    fresh.forEach(hideSketch);
     const flights = [], extra = [];
     const small = Math.max(0.25, Math.min(0.6, jar * 0.12 / sz));
     const EACH = 2300, OUT = 0.3, SHOW = 0.66;
@@ -3987,12 +4000,10 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
         opts = { behindUntil: 1, behindZ: look === 'bag' ? 3 : 2 };
       }
       flights.push(flyBall(c, sz, path, { duration: EACH, delay, offsets, ...opts }));
-      if (fresh[i]) { const d = drawSketch(fresh[i], delay + EACH * OUT + 80); extra.push(...d.anims); }
     });
     hold((o.balls.length - 1) * 1400 + EACH + 40, () => {
       flights.forEach(f => { f.a.cancel(); f.fly.remove(); });
       extra.forEach(a => a.cancel());
-      fresh.forEach(settleNewest);
       // Without replacement the container is now one ball lighter.
       if (!st.replace) renderBag(o, false);
     });
@@ -4021,6 +4032,16 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   }
 
   function renderCards(o, play) {
+    if (!T3 && !t3Failed) { pendingShuffle = false; resultEl.innerHTML = ''; loadThree().then(() => { if (S.mode === 'cards' && !anim) renderResult(false); }); return; }
+    if (!T3) return renderCardsDom(o, play);
+    const shuffling = pendingShuffle && canAnimate(); pendingShuffle = false;
+    const r = resultEl.getBoundingClientRect();
+    const w = Math.round(r.width - 30), h = Math.round(r.height - 20);
+    resultEl.innerHTML = `<div class="stage3d" id="stage3d" style="width:${w}px;height:${h}px"></div>`;
+    const dur = renderCards3D(o, play, $('stage3d'), w, h, shuffling);
+    if (dur) hold(dur + 30, settleCards3D);
+  }
+  function renderCardsDom(o, play) {
     const st = S.setup.cards;
     const deck = S.pool.cards, drawn = S.pool.hand;
     const shuffling = pendingShuffle; pendingShuffle = false;
@@ -4163,11 +4184,528 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   }
   const cardName = id => `${['Ace', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'Jack', 'Queen', 'King'][id % 13]} of ${['spades', 'hearts', 'diamonds', 'clubs'][Math.floor(id / 13)]}`;
 
+  // ── Cards (3D) ──────────────────────────────────────────────────────────────
+  // A real deck on a felt mat. Drawn cards are dealt off the top and laid out
+  // in a patience grid — four rows of thirteen, each place fixed, so nothing
+  // already down ever moves. Put-back mode holds the card up to the room and
+  // then slides it back into the deck somewhere in the middle.
+  let CD = null;
+  const CARD = { w: 0.64, h: 0.9, r: 0.045, th: 0.0042 };
+  const MAT_Y = 0.03;
+  const DECK3 = { x: -0.78, z: 0 };
+  const GRID = { x0: 0.24, z0: -0.56, sx: 0.36, sz: 0.37, cols: 13 };
+  const CARD_EL = 1.16;                       // camera elevation, radians (~66°)
+
+  function roundedShape(w, h, r) {
+    const s = new T3.Shape(), x = -w / 2, y = -h / 2;
+    s.moveTo(x + r, y);
+    s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r);
+    s.lineTo(x + w, y + h - r); s.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    s.lineTo(x + r, y + h); s.quadraticCurveTo(x, y + h, x, y + h - r);
+    s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y);
+    return s;
+  }
+  // A flat rounded slab lying on the table, 1 unit tall (scaled to height),
+  // its top and bottom mapped 0…1 across the shape so a texture fits.
+  function slabGeometry(w, h, r, bevel) {
+    const T = T3;
+    const geo = new T.ExtrudeGeometry(roundedShape(w, h, r), {
+      depth: 1, bevelEnabled: !!bevel, bevelSize: bevel || 0, bevelThickness: bevel || 0, bevelSegments: 3, curveSegments: 6,
+    });
+    const pos = geo.getAttribute('position'), uv = geo.getAttribute('uv');
+    const caps = geo.groups[0];
+    for (let i = caps.start; i < caps.start + caps.count; i++) uv.setXY(i, pos.getX(i) / w + 0.5, pos.getY(i) / h + 0.5);
+    geo.rotateX(-Math.PI / 2);                // shape top → away from the camera, depth → up
+    return geo;
+  }
+
+  // ── Card faces, drawn once each ──
+  // Suits as shapes, not font glyphs, so they look the same everywhere.
+  function suitPath(ctx, s, x, y, size, down) {
+    ctx.save();
+    ctx.translate(x, y);
+    if (down) ctx.rotate(Math.PI);
+    ctx.scale(size, size);
+    ctx.beginPath();
+    const heart = () => {
+      ctx.moveTo(0, 0.45);
+      ctx.bezierCurveTo(-0.16, 0.3, -0.5, 0.1, -0.5, -0.15);
+      ctx.bezierCurveTo(-0.5, -0.37, -0.33, -0.48, -0.22, -0.48);
+      ctx.bezierCurveTo(-0.1, -0.48, -0.02, -0.4, 0, -0.29);
+      ctx.bezierCurveTo(0.02, -0.4, 0.1, -0.48, 0.22, -0.48);
+      ctx.bezierCurveTo(0.33, -0.48, 0.5, -0.37, 0.5, -0.15);
+      ctx.bezierCurveTo(0.5, 0.1, 0.16, 0.3, 0, 0.45);
+    };
+    const stem = () => {
+      ctx.moveTo(-0.03, 0.08);
+      ctx.quadraticCurveTo(-0.04, 0.38, -0.2, 0.5);
+      ctx.lineTo(0.2, 0.5);
+      ctx.quadraticCurveTo(0.04, 0.38, 0.03, 0.08);
+      ctx.closePath();
+    };
+    if (s === '♥') heart();
+    else if (s === '♦') {
+      ctx.moveTo(0, -0.5);
+      ctx.quadraticCurveTo(0.14, -0.18, 0.38, 0);
+      ctx.quadraticCurveTo(0.14, 0.18, 0, 0.5);
+      ctx.quadraticCurveTo(-0.14, 0.18, -0.38, 0);
+      ctx.quadraticCurveTo(-0.14, -0.18, 0, -0.5);
+    } else if (s === '♠') {
+      ctx.moveTo(0, -0.5);
+      ctx.bezierCurveTo(-0.14, -0.33, -0.48, -0.14, -0.48, 0.09);
+      ctx.bezierCurveTo(-0.48, 0.27, -0.33, 0.35, -0.21, 0.35);
+      ctx.bezierCurveTo(-0.1, 0.35, -0.03, 0.29, 0, 0.21);
+      ctx.bezierCurveTo(0.03, 0.29, 0.1, 0.35, 0.21, 0.35);
+      ctx.bezierCurveTo(0.33, 0.35, 0.48, 0.27, 0.48, 0.09);
+      ctx.bezierCurveTo(0.48, -0.14, 0.14, -0.33, 0, -0.5);
+      ctx.closePath();
+      stem();
+    } else {
+      ctx.arc(0, -0.25, 0.2, 0, Math.PI * 2);
+      ctx.moveTo(-0.04, 0.08); ctx.arc(-0.24, 0.08, 0.2, 0, Math.PI * 2);
+      ctx.moveTo(0.44, 0.08); ctx.arc(0.24, 0.08, 0.2, 0, Math.PI * 2);
+      ctx.moveTo(0.12, 0.02); ctx.arc(0, 0.02, 0.12, 0, Math.PI * 2);
+      stem();
+    }
+    ctx.fill();
+    ctx.restore();
+  }
+  function roundRectPath(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+  const CARD_PX = { w: 448, h: 630 };
+  function cardFaceTexture(id) {
+    const cv = document.createElement('canvas'), W = CARD_PX.w, H = CARD_PX.h;
+    cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d');
+    const ri = id % 13, rank = RANKS[ri], s = SUITS[Math.floor(id / 13)], red = s === '♥' || s === '♦';
+    const ink = red ? '#c4122f' : '#18181b';
+    // Paper.
+    const g = ctx.createLinearGradient(0, 0, W, H);
+    g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#f3f1ea');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    roundRectPath(ctx, 3, 3, W - 6, H - 6, W * 0.06);
+    ctx.strokeStyle = '#d3d0c6'; ctx.lineWidth = 4; ctx.stroke();
+    ctx.fillStyle = ink;
+    // Corner indices.
+    const corner = () => {
+      ctx.save();
+      ctx.font = `600 ${H * 0.15}px Georgia, "Times New Roman", serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+      const cx = W * 0.12;
+      if (rank === '10') { ctx.translate(cx, 0); ctx.scale(0.78, 1); ctx.fillText(rank, 0, H * 0.155); }
+      else ctx.fillText(rank, cx, H * 0.155);
+      ctx.restore();
+      suitPath(ctx, s, W * 0.12, H * 0.215, H * 0.09);
+    };
+    corner();
+    ctx.save(); ctx.translate(W, H); ctx.rotate(Math.PI); corner(); ctx.restore();
+    // Middle.
+    if (ri === 0) suitPath(ctx, s, W / 2, H / 2, H * 0.36);
+    else if (ri >= 10) {
+      // Court: a framed panel with the letter, a suit in two of its corners.
+      const px = W * 0.23, py = H * 0.15, pw = W - 2 * px, ph = H - 2 * py;
+      const pg = ctx.createLinearGradient(px, py, px + pw, py + ph);
+      pg.addColorStop(0, red ? '#fbe9ea' : '#ecedf6'); pg.addColorStop(1, '#f7f1df');
+      roundRectPath(ctx, px, py, pw, ph, W * 0.03);
+      ctx.fillStyle = pg; ctx.fill();
+      ctx.strokeStyle = ink; ctx.lineWidth = 3.5; ctx.stroke();
+      roundRectPath(ctx, px + 9, py + 9, pw - 18, ph - 18, W * 0.02);
+      ctx.strokeStyle = '#c9a54a'; ctx.lineWidth = 2.5; ctx.stroke();
+      ctx.fillStyle = ink;
+      ctx.font = `600 ${H * 0.3}px Georgia, "Times New Roman", serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(rank, W / 2, H / 2 + H * 0.01);
+      suitPath(ctx, s, px + pw * 0.17, py + ph * 0.1, H * 0.07);
+      suitPath(ctx, s, px + pw * 0.83, py + ph * 0.9, H * 0.07, true);
+    } else {
+      const x0 = W * 0.3, x1 = W * 0.7, y0 = H * 0.17, y1 = H * 0.83;
+      CARD_PIPS[ri + 1].forEach(([px, py]) =>
+        suitPath(ctx, s, x0 + (x1 - x0) * px / 100, y0 + (y1 - y0) * py / 100, H * 0.125, py > 50));
+    }
+    return canvasTex(cv);
+  }
+  function cardBackTexture() {
+    const cv = document.createElement('canvas'), W = CARD_PX.w, H = CARD_PX.h;
+    cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+    const m = W * 0.06;
+    const g = ctx.createLinearGradient(0, 0, W, H);
+    g.addColorStop(0, '#3253b6'); g.addColorStop(1, '#1d3176');
+    roundRectPath(ctx, m, m, W - 2 * m, H - 2 * m, W * 0.03);
+    ctx.fillStyle = g; ctx.fill();
+    ctx.save(); ctx.clip();
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 3;
+    for (let k = -H; k < W + H; k += 22) {
+      ctx.beginPath(); ctx.moveTo(k, 0); ctx.lineTo(k + H, H); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(k, H); ctx.lineTo(k + H, 0); ctx.stroke();
+    }
+    ctx.restore();
+    roundRectPath(ctx, m + 10, m + 10, W - 2 * m - 20, H - 2 * m - 20, W * 0.02);
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 3; ctx.stroke();
+    roundRectPath(ctx, 3, 3, W - 6, H - 6, W * 0.06);
+    ctx.strokeStyle = '#cfccc2'; ctx.lineWidth = 4; ctx.stroke();
+    return canvasTex(cv);
+  }
+  // The edge of a stack of cards: fine light and dark lines.
+  function deckEdgeTexture() {
+    const cv = document.createElement('canvas');
+    cv.width = 8; cv.height = 8;
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = '#f6f4ee'; ctx.fillRect(0, 0, 8, 8);
+    ctx.fillStyle = '#cfcbc0'; ctx.fillRect(0, 5, 8, 2);
+    const t = canvasTex(cv);
+    t.wrapS = t.wrapT = T3.RepeatWrapping;
+    t.magFilter = T3.LinearFilter;
+    return t;
+  }
+  function feltTexture(w, d) {
+    const cv = document.createElement('canvas'), W = 1024, H = Math.round(1024 * d / w);
+    cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d');
+    const g = ctx.createRadialGradient(W / 2, H * 0.45, 0, W / 2, H / 2, W * 0.6);
+    g.addColorStop(0, '#286a49'); g.addColorStop(1, '#1d4f37');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    // Fibres.
+    const img = ctx.getImageData(0, 0, W, H), px = img.data;
+    for (let i = 0; i < px.length; i += 4) {
+      const n = (wob(i, 3) + wob(i >> 3, 7) * 0.5) * 16;
+      px[i] += n; px[i + 1] += n; px[i + 2] += n;
+    }
+    ctx.putImageData(img, 0, 0);
+    // A stitched border.
+    const inset = W * 0.018;
+    roundRectPath(ctx, inset, inset, W - 2 * inset, H - 2 * inset, W * 0.025);
+    ctx.setLineDash([10, 8]); ctx.strokeStyle = 'rgba(214,196,140,0.55)'; ctx.lineWidth = 3; ctx.stroke();
+    return canvasTex(cv);
+  }
+
+  function buildCards() {
+    const T = T3, scene = new T.Scene();
+    stageLights(scene, { shadowBox: 6 });
+    const faceGeo = new T.ShapeGeometry(roundedShape(CARD.w, CARD.h, CARD.r), 6);
+    { const pos = faceGeo.getAttribute('position'), uv = faceGeo.getAttribute('uv');
+      for (let i = 0; i < pos.count; i++) uv.setXY(i, pos.getX(i) / CARD.w + 0.5, pos.getY(i) / CARD.h + 0.5); }
+    const backGeo = faceGeo.clone();
+    faceGeo.rotateX(-Math.PI / 2);            // facing up, top away
+    backGeo.rotateX(Math.PI / 2);             // facing down
+    const backTex = cardBackTexture();
+    const backMat = new T.MeshStandardMaterial({ map: backTex, roughness: 0.42 });
+    const edgeTex = deckEdgeTexture();
+    const edgeMat = new T.MeshStandardMaterial({ map: edgeTex, roughness: 0.8 });
+    const slabGeo = slabGeometry(CARD.w, CARD.h, CARD.r);
+    const deck = new T.Mesh(slabGeo, [backMat, edgeMat]);
+    deck.castShadow = true; deck.receiveShadow = true;
+    deck.position.set(DECK3.x, MAT_Y, DECK3.z);
+    scene.add(deck);
+    // Mats: a long one for the laid-out grid, a small one when cards go back.
+    const mats = {};
+    const mkMat = (key, cx, cz, w, d) => {
+      const geo = slabGeometry(w, d, 0.16);
+      const tex = feltTexture(w, d);
+      const m = new T.Mesh(geo, [new T.MeshStandardMaterial({ map: tex, roughness: 1 }), new T.MeshStandardMaterial({ color: 0x1c4a34, roughness: 1 })]);
+      m.scale.y = MAT_Y;
+      m.position.set(cx, 0, cz);
+      m.receiveShadow = true;
+      m.visible = false;
+      scene.add(m);
+      mats[key] = { m, cx, cz, w, d };
+    };
+    const gx1 = GRID.x0 + GRID.sx * (GRID.cols - 1) + CARD.w / 2, gx0 = DECK3.x - CARD.w / 2;
+    mkMat('grid', (gx0 + gx1) / 2, 0, gx1 - gx0 + 0.5, 2 * 1.0 + 0.42);
+    mkMat('back', DECK3.x, DECK3.z, 2.3, 1.75);
+    const camera = new T.PerspectiveCamera(30, 1, 0.1, 100);
+    CD = { scene, camera, faceGeo, backGeo, backMat, edgeMat, slabGeo, deck, mats, tex: new Map(), table: [], fly: [], raf: 0, mode: '' };
+    return CD;
+  }
+  function faceMat(id) {
+    let m = CD.tex.get(id);
+    if (!m) { m = new T3.MeshStandardMaterial({ map: cardFaceTexture(id), roughness: 0.55, color: 0xeeeeee, envMapIntensity: 0.7 }); CD.tex.set(id, m); }
+    return m;
+  }
+  function makeCard(id) {
+    const T = T3, g = new T.Group();
+    const f = new T.Mesh(CD.faceGeo, faceMat(id)), b = new T.Mesh(CD.backGeo, CD.backMat);
+    f.position.y = 0.0004; b.position.y = -0.0004;
+    f.castShadow = b.castShadow = true;
+    g.add(f, b);
+    g.userData.id = id;
+    CD.scene.add(g);
+    return g;
+  }
+  function dropCard(c) { if (c && c.parent) c.parent.remove(c); }
+  function setDeck(n) {
+    CD.deck.visible = n > 0;
+    CD.deck.scale.y = Math.max(0.0001, n * CARD.th);
+    CD.edgeMat.map.repeat.set(1, Math.max(1, n / 2));
+    CD.deckN = n;
+  }
+  const deckTop = n => MAT_Y + n * CARD.th;
+  function slotPose(i) {
+    const col = i % GRID.cols, row = Math.floor(i / GRID.cols);
+    return {
+      p: new T3.Vector3(GRID.x0 + col * GRID.sx + wob(i, 1) * 0.012, MAT_Y + 0.0015 + i * 0.0011, GRID.z0 + row * GRID.sz + wob(i, 2) * 0.012),
+      yaw: wob(i, 3) * 0.035,
+    };
+  }
+  function frameCards(w, h, mode) {
+    const T = T3, cam = CD.camera, mat = CD.mats[mode];
+    cam.aspect = w / h;
+    cam.updateProjectionMatrix();
+    Object.values(CD.mats).forEach(m => { m.m.visible = m === mat; });
+    // Fit the mat (and, when cards are held up, the space above it) to the
+    // view, leaving room under it for the count.
+    const tgt = new T.Vector3(mat.cx, 0.1, mat.cz + (mode === 'back' ? -0.1 : 0.05));
+    const dir = new T.Vector3(0, Math.sin(CARD_EL), Math.cos(CARD_EL));
+    const pts = [];
+    [-1, 1].forEach(sx => [-1, 1].forEach(sz => pts.push(new T.Vector3(mat.cx + sx * mat.w / 2, 0, mat.cz + sz * mat.d / 2))));
+    if (mode === 'back') pts.push(new T.Vector3(mat.cx, 1.85, mat.cz + 0.4));
+    let dist = 8;
+    for (let k = 0; k < 6; k++) {
+      cam.position.copy(tgt).addScaledVector(dir, dist);
+      cam.lookAt(tgt);
+      cam.updateMatrixWorld();
+      let mx = 0, my = 0, minY = 1;
+      pts.forEach(p => { const v = p.clone().project(cam); mx = Math.max(mx, Math.abs(v.x)); my = Math.max(my, Math.abs(v.y)); minY = Math.min(minY, v.y); });
+      // Under the mat: ~30px for the count.
+      const room = 1 - 60 / h;
+      dist *= Math.max(mx / 0.95, my / 0.95, -minY / room);
+    }
+    cam.position.copy(tgt).addScaledVector(dir, dist);
+    cam.lookAt(tgt);
+    cam.updateMatrixWorld();
+  }
+  function deckCount(host, n) {
+    const mat = CD.mats[CD.mode];
+    const v = new T3.Vector3(DECK3.x, 0, mat.cz + mat.d / 2).project(CD.camera);
+    const r = host.getBoundingClientRect();
+    host.insertAdjacentHTML('beforeend',
+      `<div class="count-note" style="left:${((v.x + 1) / 2 * r.width).toFixed(0)}px;top:${((1 - v.y) / 2 * r.height + 8).toFixed(0)}px"><b>${n}</b> ${n === 1 ? 'card' : 'cards'}</div>`);
+    return host.querySelector('.count-note b');
+  }
+  function layTable(hand) {
+    // Keep the cards already down exactly where they are.
+    hand.forEach((id, i) => {
+      let c = CD.table[i];
+      if (!c || c.userData.id !== id) { dropCard(c); c = CD.table[i] = makeCard(id); }
+      const s = slotPose(i);
+      c.visible = true;
+      c.position.copy(s.p); c.rotation.set(0, s.yaw, 0); c.scale.setScalar(1);
+    });
+    CD.table.slice(hand.length).forEach(dropCard);
+    CD.table.length = hand.length;
+  }
+  function clearFly() { CD.fly.forEach(dropCard); CD.fly = []; }
+
+  function renderCards3D(o, play, host, w, h, shuffling) {
+    const T = T3, st = S.setup.cards, mode = st.replace ? 'back' : 'grid';
+    if (!CD) buildCards();
+    const renderer = mountRenderer(host, w, h);
+    cancelAnimationFrame(CD.raf);
+    clearFly();
+    CD.mode = mode;
+    frameCards(w, h, mode);
+    const draw = () => renderer.render(CD.scene, CD.camera);
+    const deckN = S.pool.cards.length, hand = st.replace ? [] : S.pool.hand;
+    const note = deckCount(host, deckN);
+    const say = n => { if (note) note.textContent = String(n); };
+
+    if (shuffling) return shuffle3D(deckN, note, draw);
+    const k = play && o ? o.cards.length : 0;
+    if (!k) { layTable(hand); setDeck(deckN); draw(); return 0; }
+
+    if (!st.replace) {
+      // The deal: off the top face down, an arc over, turned up as it lands.
+      layTable(hand);
+      const first = hand.length - k, EACH = 950, GAP = 330;
+      const cards = CD.table.slice(first);
+      const from = cards.map((_, j) => new T.Vector3(DECK3.x, deckTop(deckN + k - j) + 0.0005, DECK3.z));
+      const to = cards.map((_, j) => slotPose(first + j));
+      cards.forEach(c => { c.visible = false; });
+      setDeck(deckN + k); say(deckN + k);
+      const DUR = (k - 1) * GAP + EACH, t0 = performance.now();
+      const frame = now => {
+        const t = now - t0;
+        let onDeck = deckN + k;
+        cards.forEach((c, j) => {
+          const u = seg(t, j * GAP, j * GAP + EACH);
+          if (t < j * GAP) return;
+          onDeck--;
+          c.visible = true;
+          const e = easeInOut(u);
+          c.position.lerpVectors(from[j], to[j].p, e);
+          c.position.y += Math.sin(Math.PI * u) * 0.42;
+          // Slid a little off the top before it lifts.
+          c.position.x += Math.sin(Math.PI * seg(u, 0, 0.3)) * 0.05;
+          const flip = easeInOut(seg(u, 0.18, 0.85));
+          c.rotation.set(0, to[j].yaw * e + Math.sin(Math.PI * u) * 0.22, Math.PI * (1 - flip));
+        });
+        setDeck(onDeck); say(onDeck);
+        draw();
+        if (t < DUR) CD.raf = requestAnimationFrame(frame);
+      };
+      frame(t0);
+      return DUR;
+    }
+
+    // Put back: off the top, turned up to the room, held, then turned down
+    // and slid into the deck at some depth.
+    layTable([]);
+    setDeck(deckN);
+    const EACH = 2700, GAP = 240, SC = 1.25;
+    const tilt = Math.PI / 2 - CARD_EL;
+    const camDist = CD.camera.position.distanceTo(new T.Vector3(DECK3.x, 1, DECK3.z + 0.5));
+    const availW = 2 * Math.tan(T.MathUtils.degToRad(CD.camera.fov) / 2) * CD.camera.aspect * camDist * 0.88;
+    const step = Math.min(CARD.w * SC * 1.08, (availW - CARD.w * SC) / Math.max(1, k - 1));
+    const cards = o.cards.map(id => makeCard(id));
+    CD.fly = cards;
+    const show = cards.map((_, j) => new T.Vector3(DECK3.x + (j - (k - 1) / 2) * step, 0.85, DECK3.z + 0.35 + j * 0.004));
+    const depth = cards.map((_, j) => 0.15 + 0.7 * (wob(S.rollId, j + 11) + 0.5));
+    cards.forEach(c => { c.visible = false; });
+    const DUR = (k - 1) * GAP + EACH, t0 = performance.now();
+    const frame = now => {
+      const t = now - t0;
+      let out = 0;
+      cards.forEach((c, j) => {
+        const u = (t - j * GAP) / EACH;
+        if (u < 0 || u >= 1) { c.visible = false; return; }
+        out++;
+        c.visible = true;
+        const top = new T.Vector3(DECK3.x, deckTop(deckN - 1) + 0.0005, DECK3.z);
+        const lifted = top.clone().add(new T.Vector3(0.12, 0.3, 0.08));
+        const side = new T.Vector3(DECK3.x + CARD.w * 1.05, MAT_Y + depth[j] * (deckN - 1) * CARD.th, DECK3.z);
+        const slot = side.clone(); slot.x = DECK3.x;
+        let face = 0, tl = 0, sc = 1;
+        if (u < 0.12) { c.position.lerpVectors(top, lifted, easeInOut(u / 0.12)); }
+        else if (u < 0.34) {
+          const e = easeInOut(seg(u, 0.12, 0.34));
+          c.position.lerpVectors(lifted, show[j], e);
+          face = e; tl = e; sc = 1 + (SC - 1) * e;
+        } else if (u < 0.74) {
+          c.position.copy(show[j]); c.position.y += Math.sin((u - 0.34) * 9) * 0.012;
+          face = 1; tl = 1; sc = SC;
+        } else if (u < 0.88) {
+          const e = easeInOut(seg(u, 0.74, 0.88));
+          c.position.lerpVectors(show[j], side, e);
+          c.position.y += Math.sin(Math.PI * e) * 0.15;
+          face = 1 - e; tl = 1 - e; sc = SC + (1 - SC) * e;
+        } else {
+          c.position.lerpVectors(side, slot, easeInOut(seg(u, 0.88, 1)));
+        }
+        c.rotation.set(tilt * tl, 0, Math.PI * (1 - face));
+        c.scale.setScalar(sc);
+      });
+      setDeck(deckN - out); say(deckN - out);
+      draw();
+      if (t < DUR) CD.raf = requestAnimationFrame(frame);
+      else { clearFly(); setDeck(deckN); say(deckN); draw(); }
+    };
+    frame(t0);
+    return DUR;
+  }
+
+  // Shuffle: whatever is on the table is gathered back onto the deck, then
+  // the deck is riffled — cut, the halves pulled apart, the cards falling
+  // back in turn, squared up.
+  function shuffle3D(deckN, note, draw) {
+    const T = T3;
+    const say = n => { if (note) note.textContent = String(n); };
+    const out = CD.table.filter(c => c.parent && c.visible).reverse();
+    CD.table = [];
+    const n0 = Math.max(0, deckN - out.length);
+    const stag = out.length ? Math.min(30, 650 / out.length) : 0;
+    const G = out.length ? 520 + (out.length - 1) * stag : 0;
+    const from = out.map(c => ({ p: c.position.clone(), yaw: c.rotation.y }));
+    setDeck(n0); say(n0);
+    // The riffle, in sixteen packets of cards.
+    const N = 16, th = deckN * CARD.th / N;
+    const sideMat = CD.edgeMat.clone();
+    sideMat.map = CD.edgeMat.map.clone(); sideMat.map.needsUpdate = true;
+    sideMat.map.repeat.set(1, Math.max(1, deckN / N / 2));
+    const slabs = [];
+    for (let i = 0; i < N; i++) {
+      const m = new T.Mesh(CD.slabGeo, [CD.backMat, sideMat]);
+      m.castShadow = true;
+      m.scale.y = th;
+      m.visible = false;
+      CD.scene.add(m);
+      slabs.push(m);
+    }
+    CD.fly = [...out, ...slabs];
+    // Bottom half goes right, top half left; they fall back alternately.
+    const half = N / 2, order = [];
+    for (let k = 0; k < half; k++) order.push(k, half + k);
+    const fallAt = i => order.indexOf(i);
+    const R0 = G + 60, D = 1750, DUR = R0 + D, t0 = performance.now();
+    const spread = CARD.w * 0.58;
+    const frame = now => {
+      const t = now - t0;
+      // Gather.
+      let back = 0;
+      out.forEach((c, j) => {
+        const u = seg(t, j * stag, j * stag + 520);
+        if (u >= 1) { c.visible = false; back++; return; }
+        const e = easeInOut(u), dst = new T.Vector3(DECK3.x, deckTop(n0 + j) + 0.001, DECK3.z);
+        c.position.lerpVectors(from[j].p, dst, e);
+        c.position.y += Math.sin(Math.PI * u) * 0.3;
+        c.rotation.set(0, from[j].yaw * (1 - e), Math.PI * easeInOut(seg(u, 0.1, 0.8)));
+      });
+      if (t < R0) { setDeck(n0 + back); say(n0 + back); draw(); CD.raf = requestAnimationFrame(frame); return; }
+      // Riffle.
+      setDeck(0); say(deckN);
+      const r = t - R0;
+      const apart = easeInOut(seg(r, 0, 380)), together = easeInOut(seg(r, 1250, 1600));
+      slabs.forEach((m, i) => {
+        m.visible = r < D;
+        const top = i >= half, s = top ? -1 : 1, j = top ? i - half : i;
+        const k = fallAt(i), fall = easeInOut(seg(r, 420 + k * 48, 420 + k * 48 + 170));
+        // In its half: lifted at the inner edge, ready to let go.
+        const hx = DECK3.x + s * spread * apart, hy = MAT_Y + j * th + (top ? th * half * (1 - apart) : 0);
+        const tiltZ = -s * 0.16 * apart;
+        // Fallen: in the new order, still a little to its side until squared.
+        const fx = DECK3.x + s * spread * 0.2 * (1 - together), fy = MAT_Y + k * th;
+        m.position.set(hx + (fx - hx) * fall, hy + (fy - hy) * fall + Math.sin(Math.PI * fall) * 0.03, DECK3.z + wob(i, 5) * 0.03 * fall * (1 - together));
+        m.rotation.set(0, wob(i, 6) * 0.05 * fall * (1 - together), tiltZ * (1 - fall));
+      });
+      if (r >= D) { clearFly(); setDeck(deckN); sideMat.map.dispose(); sideMat.dispose(); }
+      draw();
+      if (t < DUR) CD.raf = requestAnimationFrame(frame);
+    };
+    frame(t0);
+    return DUR;
+  }
+  function settleCards3D() {
+    if (!CD) return;
+    cancelAnimationFrame(CD.raf);
+    clearFly();
+    const st = S.setup.cards;
+    layTable(st.replace ? [] : S.pool.hand);
+    setDeck(S.pool.cards.length);
+    const note = document.querySelector('#stage3d .count-note b');
+    if (note) note.textContent = String(S.pool.cards.length);
+    getRenderer().render(CD.scene, CD.camera);
+  }
+
   // ── Spinner ─────────────────────────────────────────────────────────────────
   // The wheel element persists across renders so its rotation can transition;
   // it is rebuilt only when the sectors (or the size) change.
   let wheelBuiltFor = '';
   function renderSpinner(play) {
+    if (!T3 && !t3Failed) { resultEl.innerHTML = ''; loadThree().then(() => { if (S.mode === 'spinner' && !anim) renderResult(false); }); return; }
+    if (T3) {
+      const r = resultEl.getBoundingClientRect();
+      const w = Math.round(r.width - 30), h = Math.round(r.height - 20);
+      resultEl.innerHTML = `<div class="stage3d" id="stage3d" style="width:${w}px;height:${h}px"></div>`;
+      const dur = renderSpinner3D(play && S.last.spinner && !S.last.spinner.empty, $('stage3d'), w, h);
+      if (dur) hold(dur + 30, settleSpinner3D, { kind: 'spin3d' });
+      return;
+    }
+    return renderSpinnerSvg(play);
+  }
+  function renderSpinnerSvg(play) {
     const sec = spinnerSectors(), sig = JSON.stringify(sec);
     const o = S.last.spinner;
     const sz = fitSize(1, 0.8, 0.02, 640);
@@ -4446,43 +4984,8 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       `<div class="half bot"><div class="face"><span>${t}</span></div><div class="back"></div></div></div>`;
   }
 
-  // ── Running order: numbered slips laid out in reading order ─────────────────
-  function renderLineup(list, play) {
-    const r = resultEl.getBoundingClientRect();
-    const W = r.width - 48, H = r.height - 40, n = Math.max(1, list.length);
-    // As many columns as keeps each slip a comfortable shape, and a size
-    // that fits them all without scrolling.
-    let cols = Math.max(1, Math.min(n, Math.round(Math.sqrt(n * (W / H) / 3.4))));
-    const rows = Math.ceil(n / cols), gap = 12;
-    const itemH = Math.max(26, Math.min(70, (H - (rows - 1) * gap) / rows));
-    const fs = itemH * 0.44;
-    resultEl.innerHTML = `<div class="lineup${play ? ' dealt' : ''}" style="grid-template-columns:repeat(${cols}, minmax(0, 1fr));--h:${itemH.toFixed(1)}px;--fs:${fs.toFixed(1)}px;width:${W}px">` +
-      list.map((x, i) => `<div class="lslip" style="--i:${i};--r:${(wob(i, 3) * 1.6).toFixed(2)}deg"><b>${i + 1}</b><span>${escHtml(x)}</span></div>`).join('') + `</div>`;
-  }
-
-  // ── Groups: one index card per group ────────────────────────────────────────
-  function renderGroups(groups, play) {
-    const r = resultEl.getBoundingClientRect();
-    const W = r.width - 48, H = r.height - 40, g = Math.max(1, groups.length);
-    const most = Math.max(1, ...groups.map(x => x.length));
-    let best = { cols: 1, fs: 10 };
-    for (let cols = 1; cols <= g; cols++) {
-      const rows = Math.ceil(g / cols), cw = (W - (cols - 1) * 16) / cols, ch = (H - (rows - 1) * 16) / rows;
-      if (cw < 120) break;
-      const fs = Math.min(30, (ch - 46) / (most * 1.55), cw / 9);
-      if (fs > best.fs) best = { cols, fs };
-    }
-    const fs = Math.max(11, best.fs);
-    resultEl.innerHTML = `<div class="groupset${play ? ' dealt' : ''}" style="grid-template-columns:repeat(${best.cols}, minmax(0, 1fr));--fs:${fs.toFixed(1)}px;width:${W}px">` +
-      groups.map((list, i) => `<div class="gcard" style="--i:${i};--c:var(--hue-${i % HUES});--r:${(wob(i, 5) * 1.4).toFixed(2)}deg">` +
-        `<div class="gtab"><span>Group ${i + 1}</span><i>${list.length}</i></div>` +
-        `<ul>${list.map(x => `<li>${escHtml(x)}</li>`).join('')}</ul></div>`).join('') + `</div>`;
-  }
-
   function renderList(o, play) {
     const st = S.setup.list;
-    if (o && o.type === 'order') return renderLineup(o.list, play);
-    if (o && o.type === 'groups') return renderGroups(o.groups, play);
     const left = st.remove ? S.pool.list.length : st.items.length;
     if (!T3 && !t3Failed) { resultEl.innerHTML = ''; loadThree().then(() => { if (S.mode === 'list' && !anim) renderResult(false); }); return; }
     if (T3) {
@@ -4654,8 +5157,10 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     if (D3) cancelAnimationFrame(D3.raf);
     if (CG) cancelAnimationFrame(CG.raf);
     if (HT) cancelAnimationFrame(HT.raf);
+    if (SP) cancelAnimationFrame(SP.raf);
+    if (BG) cancelAnimationFrame(BG.raf);
     if (R3) { try { R3.renderer.dispose(); } catch (_) { /* already gone */ } }
-    D3 = CG = HT = R3 = null;
+    D3 = CG = HT = SP = BG = R3 = null;
     clearTimeout(syncTimer);
     clearTimeout(resizeTimer);
     if (ro) ro.disconnect();
@@ -4677,13 +5182,10 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   // ── Event wiring ────────────────────────────────────────────────────────────
   resultEl.addEventListener('click', e => {
     if (IS_VIEWER) return;
-    // The list views are for reading, not another pick.
-    if (e.target.closest('.lineup, .groupset') || isExhausted()) return;
+    if (isExhausted()) return;
     go();
   });
   deckBtn.addEventListener('click', shuffleDeck);
-  shuffleBtn.addEventListener('click', shuffleList);
-  groupsBtn.addEventListener('click', makeGroups);
 
 
   // Space / Enter goes, S toggles stats — from anywhere except a field.
