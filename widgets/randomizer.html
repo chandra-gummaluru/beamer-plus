@@ -734,7 +734,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 
 /* Cards: the deck, and every card drawn so far beside it. */
 .card-table { display: flex; align-items: center; justify-content: center; gap: calc(var(--sz) * 0.3); width: 100%; }
-.drawn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(var(--sz) * 0.06); }
+.drawn { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: calc(var(--sz) * 0.06); flex: 0 0 auto; }
 .drawn-row { display: flex; align-items: center; }
 .drawn-card { flex: 0 0 auto; }
 .badge {
@@ -929,6 +929,60 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 .slot::after  { bottom: 0; background: linear-gradient(transparent, var(--bg)); }
 .slot .strip { display: block; }
 .slot .strip div { height: 1.3em; line-height: 1.3em; text-align: center; white-space: nowrap; }
+
+/* Running order: numbered paper slips. */
+.lineup { display: grid; gap: 12px 18px; align-content: center; max-height: 100%; }
+.lslip {
+  display: flex; align-items: center; gap: calc(var(--fs) * 0.6); height: var(--h); min-width: 0;
+  padding: 0 calc(var(--fs) * 0.8) 0 calc(var(--h) * 0.14);
+  background: linear-gradient(175deg, #fffdf7, #f4efe1);
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.12), 0 4px 10px rgba(0,0,0,0.08);
+  transform: rotate(var(--r));
+}
+.lslip b {
+  flex: 0 0 auto; width: calc(var(--h) * 0.68); height: calc(var(--h) * 0.68); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: #22304d; color: #fff; font-family: var(--font-ui); font-weight: 700; font-size: calc(var(--fs) * 0.82);
+  font-variant-numeric: tabular-nums;
+}
+.lslip span {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: #22304d; font-size: var(--fs); font-weight: 700;
+  font-family: 'Segoe Print', 'Bradley Hand', 'Marker Felt', 'Comic Sans MS', cursive;
+}
+/* Groups: index cards with a coloured tab. */
+.groupset { display: grid; gap: 16px; align-content: center; max-height: 100%; }
+.gcard {
+  min-width: 0; border-radius: 6px; overflow: hidden;
+  background:
+    linear-gradient(90deg, transparent 22px, rgba(214, 64, 76, 0.35) 22px, rgba(214, 64, 76, 0.35) 23.5px, transparent 23.5px),
+    repeating-linear-gradient(180deg, transparent 0, transparent calc(var(--fs) * 1.55 - 1px), rgba(70, 120, 200, 0.18) calc(var(--fs) * 1.55 - 1px), rgba(70, 120, 200, 0.18) calc(var(--fs) * 1.55)),
+    #fffdf7;
+  background-position: 0 0, 0 calc(var(--fs) * 0.3), 0 0;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.12), 0 8px 20px rgba(0,0,0,0.1);
+  transform: rotate(var(--r));
+}
+.gtab {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 8px 12px 8px 30px;
+  background: var(--c); color: #fff;
+  font-family: var(--font-ui); font-weight: 700; font-size: max(13px, calc(var(--fs) * 0.62)); letter-spacing: 0.02em;
+}
+.gtab i { font-style: normal; font-weight: 600; opacity: 0.85; font-variant-numeric: tabular-nums; }
+.gcard ul { list-style: none; margin: 0; padding: calc(var(--fs) * 0.3) 12px calc(var(--fs) * 0.6) 32px; }
+.gcard li {
+  height: calc(var(--fs) * 1.55); line-height: calc(var(--fs) * 1.55); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: #22304d; font-size: var(--fs); font-weight: 700;
+  font-family: 'Segoe Print', 'Bradley Hand', 'Marker Felt', 'Comic Sans MS', cursive;
+}
+@keyframes deal-in {
+  from { opacity: 0; transform: translateY(-18px) rotate(calc(var(--r) * -3)) scale(0.96); }
+  to   { opacity: 1; transform: rotate(var(--r)); }
+}
+.dealt .lslip { animation: deal-in 0.42s cubic-bezier(0.2, 0.7, 0.3, 1) both; animation-delay: calc(var(--i) * 45ms); }
+.dealt .gcard { animation: deal-in 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) both; animation-delay: calc(var(--i) * 110ms); }
+@media (prefers-reduced-motion: reduce) { .dealt .lslip, .dealt .gcard { animation: none; } }
 
 /* Lists: shuffled order and groups */
 .order {
@@ -1728,7 +1782,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
         <linearGradient id="stickG" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#d8d4c8"/></linearGradient>
       </defs>
       <rect x="0" y="0" width="${W}" height="${H - ledge + 4}" rx="10" fill="url(#wood)"/>
-      <rect x="9" y="9" width="${W - 18}" height="${H - ledge - 14}" rx="4" fill="url(#slate)"/>
+      <rect x="9" y="9" width="${Math.max(0, W - 18)}" height="${Math.max(0, H - ledge - 14)}" rx="4" fill="url(#slate)"/>
       <ellipse cx="${W * 0.3}" cy="${H * 0.35}" rx="${W * 0.28}" ry="${H * 0.22}" fill="url(#dust)"/>
       <ellipse cx="${W * 0.72}" cy="${H * 0.62}" rx="${W * 0.24}" ry="${H * 0.18}" fill="url(#dust)"/>
       <g class="chalk" mask="url(#grain)" fill="none" stroke-linecap="round" stroke-linejoin="round">${content}</g>
@@ -2097,14 +2151,16 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     handle.rotation.z = Math.PI / 2;
     // Chute: from the bottom of the cage, down and forward to the right.
     const chute = new T.CatmullRomCurve3([
-      new T.Vector3(0.15, cy - R - 0.05, 0.35), new T.Vector3(0.9, 0.62, 0.95), new T.Vector3(1.9, 0.5, 1.35), new T.Vector3(2.7, 0.45, 1.5),
+      new T.Vector3(0.15, cy - R - 0.02, 0.35), new T.Vector3(0.9, 0.74, 0.95), new T.Vector3(1.9, 0.64, 1.38), new T.Vector3(2.72, 0.6, 1.56),
     ]);
     [-0.13, 0.13].forEach(off => {
       const pts = chute.getPoints(30).map(p => p.clone().add(new T.Vector3(-off * 0.35, -0.12, off)));
       add(new T.TubeGeometry(new T.CatmullRomCurve3(pts), 40, 0.022, 8), brass);
     });
-    add(new T.TorusGeometry(0.2, 0.03, 10, 32), brass, 2.78, 0.33, 1.52).rotation.x = Math.PI / 2;
-    add(new T.CylinderGeometry(0.03, 0.03, 0.2, 8), darkBrass, 2.78, 0.22, 1.52);
+    // The cup the drawn ball comes to rest in.
+    const cupProfile = [[0, 0], [0.2, 0], [0.21, 0.03], [0.07, 0.07], [0.055, 0.2], [0.1, 0.25], [0.19, 0.32], [0.235, 0.42], [0.215, 0.425], [0.17, 0.35], [0.0, 0.3]]
+      .map(([x, y]) => new T.Vector2(x, y));
+    add(new T.LatheGeometry(cupProfile, 48), brass, CUP.x, CUP.y, CUP.z);
     // Balls inside: in the cage's frame, but not turning with it.
     const inner = new T.Group();
     inner.position.set(0, cy, 0);
@@ -2115,7 +2171,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       inner.add(b);
       balls.push({ m: b, p: new T.Vector3((wob(k, 1)) * 1.4, -0.6 + wob(k, 2) * 0.4, wob(k, 3) * 1.2), v: new T.Vector3() });
     }
-    const camera = new T.PerspectiveCamera(30, 1, 0.1, 100);
+    const camera = new T.PerspectiveCamera(28, 1, 0.1, 100);
     CG = { scene, camera, cage, inner, balls, chute, shown: null, shownKey: '', raf: 0, spinAngle: 0 };
     // Let the balls settle into a pile before anyone sees them.
     for (let i = 0; i < 180; i++) stepBalls(1 / 60, 0);
@@ -2160,18 +2216,35 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     });
   }
 
-  function frameCage(w, h) {
+  // Two camera framings: the whole cage, and close in on the cup so the
+  // number can be read from the back of the room.
+  const CUP = { x: 2.98, y: 0.0, z: 1.62 };
+  const cupTop = () => CUP.y + 0.42;
+  const ballRest = () => new T3.Vector3(CUP.x, cupTop() + CAGE.ball * 0.55, CUP.z);
+  function cageViews(w, h) {
     const T = T3, cam = CG.camera;
-    cam.aspect = w / h;
-    // Fit the cage and the presented ball: about x −2.4 … 4.
-    const vf = T.MathUtils.degToRad(cam.fov) / 2, hf = Math.atan(Math.tan(vf) * cam.aspect);
-    const dist = Math.max(3.35 / Math.tan(hf), 2.35 / Math.tan(vf)) * 1.05;
-    cam.position.set(0.85, 1.55 + dist * 0.32, dist);
-    cam.lookAt(0.85, 1.5, 0.4);
-    cam.updateProjectionMatrix();
+    const vf = T.MathUtils.degToRad(cam.fov) / 2, hf = Math.atan(Math.tan(vf) * (w / h));
+    // Wide: the cage and the cup, about x −2.4 … 3.5.
+    const dist = Math.max(3.3 / Math.tan(hf), 2.45 / Math.tan(vf)) * 1.08;
+    const wide = { pos: new T.Vector3(0.6, 1.9 + dist * 0.3, dist), look: new T.Vector3(0.6, 1.95, 0.4) };
+    // Close: the ball in its cup filling about half the height, the cage
+    // still there behind it.
+    const b = ballRest();
+    const near = Math.max(2.2, (CAGE.ball * 3.3) / Math.tan(vf));
+    const dir = new T.Vector3(0.12, 0.34, 1).normalize();
+    const close = { pos: b.clone().addScaledVector(dir, near), look: b.clone().add(new T.Vector3(-0.28, -0.1, 0)) };
+    return { wide, close };
   }
-  // Where the drawn ball is held up: to the right, toward the room.
-  const SHOW = { x: 3.0, y: 1.75, z: 1.9, scale: 2.5 };
+  function setCam(v) { CG.camera.position.copy(v.pos); CG.camera.lookAt(v.look); }
+  function lerpCam(a, b, t) {
+    const pos = a.pos.clone().lerp(b.pos, t), look = a.look.clone().lerp(b.look, t);
+    CG.camera.position.copy(pos); CG.camera.lookAt(look);
+  }
+  function frameCage(w, h) {
+    CG.camera.aspect = w / h;
+    CG.camera.updateProjectionMatrix();
+    CG.views = cageViews(w, h);
+  }
 
   function presentBall(text, hue) {
     const key = text + '|' + hue;
@@ -2182,12 +2255,14 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     CG.scene.add(CG.shown);
     return CG.shown;
   }
+  // The ball sitting in its cup, number turned to the camera.
   function restShown() {
     const b = CG.shown; if (!b) return;
-    b.position.set(SHOW.x, SHOW.y, SHOW.z);
-    b.scale.setScalar(SHOW.scale);
+    b.visible = true;
+    b.position.copy(ballRest());
+    b.scale.setScalar(1);
     b.quaternion.identity();
-    b.lookAt(CG.camera.position);
+    b.lookAt(CG.views.close.pos);
   }
 
   function renderNumber3D(o, play, host, w, h) {
@@ -2198,45 +2273,59 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     cancelAnimationFrame(CG.raf);
     const st = S.setup.number;
     const draw = () => renderer.render(CG.scene, CG.camera);
+    const hadBall = !!CG.shown;
     if (o) presentBall(String(o.v).padStart(st.digits, '0'), o.v % 6);
     else if (CG.shown) { CG.scene.remove(CG.shown); CG.shown = null; CG.shownKey = ''; }
-    if (!play || !o) { restShown(); draw(); return 0; }
+    if (!play || !o) {
+      restShown();
+      setCam(o ? CG.views.close : CG.views.wide);
+      draw();
+      return 0;
+    }
 
-    // 0–1.7 s: the crank turns, the balls tumble. 1.7–2.5 s: the ball drops
-    // out and rolls down the chute. 2.5–3.2 s: it's lifted up to the room.
-    const DUR = 3200, t0 = performance.now();
+    // 0–0.6 s: pull back to see the cage. 0.4–2.1 s: the crank turns and
+    // the balls tumble. 2.1–3.0 s: the ball drops out and rolls down the
+    // chute into the cup. 3.0–3.9 s: move in to read it.
+    const DUR = 3900, t0 = performance.now(), V = CG.views;
     const ball = CG.shown;
     ball.visible = false;
+    const endQ = (() => { restShown(); return ball.quaternion.clone(); })();
+    ball.visible = false;
+    const from = hadBall ? V.close : V.wide;
     let last = t0;
-    const quatEnd = (() => { const q = ball.quaternion.clone(); ball.position.set(SHOW.x, SHOW.y, SHOW.z); ball.lookAt(CG.camera.position); const r = ball.quaternion.clone(); ball.quaternion.copy(q); return r; })();
-    const spin = new T.Quaternion(), axis = new T.Vector3();
+    const spinQ = new T.Quaternion(), axis = new T.Vector3();
+    const chuteEnd = CG.chute.getPointAt(1), rest = ballRest();
     const frame = now => {
-      const t = now - t0, dt = Math.min(0.033, (now - last) / 1000);
+      const t = now - t0, dt = Math.min(0.033, Math.max(0, (now - last) / 1000));
       last = now;
+      // Camera.
+      if (t < 600) lerpCam(from, V.wide, easeInOut(seg(t, 0, 600)));
+      else if (t < 3000) setCam(V.wide);
+      else lerpCam(V.wide, V.close, easeInOut(seg(t, 3000, 3900)));
       // Crank: speeds up, holds, slows to a stop.
-      const s = t / 1700;
-      const omega = s < 1 ? 9 * Math.sin(Math.PI * s) ** 0.6 : 0;
+      const s = seg(t, 400, 2100);
+      const omega = s > 0 && s < 1 ? 9 * Math.sin(Math.PI * s) ** 0.6 : 0;
       CG.cage.rotation.x -= omega * dt;
       for (let k = 0; k < 2; k++) stepBalls(dt / 2, -omega);
-      if (t > 1700) {
+      if (t > 2100) {
         ball.visible = true;
-        const roll = seg(t, 1700, 2500), lift = seg(t, 2500, 3200);
-        if (lift <= 0) {
+        const roll = seg(t, 2100, 2850), drop = seg(t, 2850, 3050);
+        if (drop <= 0) {
           const p = CG.chute.getPointAt(easeInOut(roll));
           ball.position.set(p.x, p.y + CAGE.ball * 0.2, p.z);
-          ball.scale.setScalar(1);
-          // Rolling: turn about the axis across its direction of travel.
           const tan = CG.chute.getTangentAt(Math.min(0.999, roll));
           axis.set(tan.z, 0, -tan.x).normalize();
-          spin.setFromAxisAngle(axis, roll * 9);
-          ball.quaternion.copy(spin);
+          spinQ.setFromAxisAngle(axis, roll * 10);
+          ball.quaternion.copy(spinQ);
         } else {
-          const e = easeInOut(lift);
-          const end = CG.chute.getPointAt(1);
-          ball.position.set(end.x + (SHOW.x - end.x) * e, end.y + (SHOW.y - end.y) * e + Math.sin(Math.PI * lift) * 0.5, end.z + (SHOW.z - end.z) * e);
-          ball.scale.setScalar(1 + (SHOW.scale - 1) * e);
-          ball.quaternion.slerp(quatEnd, Math.min(1, e * 1.2));
+          // Off the end of the chute and into the cup, with a small bounce.
+          const e = easeInOut(drop);
+          ball.position.set(chuteEnd.x + (rest.x - chuteEnd.x) * e,
+                            chuteEnd.y + CAGE.ball * 0.2 + (rest.y - chuteEnd.y - CAGE.ball * 0.2) * e + Math.sin(Math.PI * drop) * 0.12,
+                            chuteEnd.z + (rest.z - chuteEnd.z) * e);
+          ball.quaternion.copy(spinQ).slerp(endQ, e);
         }
+        if (t > 3050) { ball.position.copy(rest); ball.position.y += Math.abs(Math.sin(seg(t, 3050, 3350) * Math.PI * 2)) * 0.05 * (1 - seg(t, 3050, 3350)); ball.quaternion.copy(endQ); }
       }
       draw();
       if (t < DUR) CG.raf = requestAnimationFrame(frame);
@@ -2247,8 +2336,8 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   function settleNumber3D() {
     if (!CG) return;
     cancelAnimationFrame(CG.raf);
-    if (CG.shown) CG.shown.visible = true;
     restShown();
+    setCam(CG.shown ? CG.views.close : CG.views.wide);
     getRenderer().render(CG.scene, CG.camera);
   }
 
@@ -2830,7 +2919,11 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     // A cube in perspective, tilted, takes more room than its face size,
     // and it needs headroom to be thrown into.
     const sp = boardSplit();
-    if (!T3 && !t3Failed) loadThree().then(() => { if (T3 && S.mode === 'dice' && !anim) renderResult(false); });
+    if (!T3 && !t3Failed) {
+      resultEl.innerHTML = `<div class="play-row"><div class="play" style="width:${sp.playW}px"></div>${historyBoardHtml('dice', S.hist.dice, sp.bw, sp.bh)}</div>`;
+      loadThree().then(() => { if (S.mode === 'dice' && !anim) renderResult(false); });
+      return;
+    }
     if (T3) {
       // Real dice. The canvas is kept and moved into each new layout.
       const r = resultEl.getBoundingClientRect();
@@ -3190,23 +3283,24 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     resultEl.style.setProperty('--sz', sz + 'px');
     const cw = sz * 0.714;
 
-    // Every card drawn so far stays face up beside the deck. They overlap,
-    // and then shrink into more rows, so a whole deck's worth still fits.
+    // Every card drawn so far stays face up beside the deck, in fixed places
+    // worked out for 13 cards — so a new card is simply added and nothing
+    // already down moves. Only past 13, and again past 26, does it re-lay
+    // smaller to make room.
     const areaW = Math.max(cw, W - cw - sz * 0.5), areaH = H * 0.86;
-    const n = drawn.length;
-    let hs = sz, perRow = n || 1, rows = 1;
+    const n = drawn.length, cap = n > 26 ? 52 : n > 13 ? 26 : 13;
+    let hs = sz, perRow = 1, rows = 1;
     for (let s = sz; s >= 34; s -= 2) {
       const w = s * 0.714;
-      perRow = Math.max(1, Math.floor((areaW - w) / (w * 0.4)) + 1);
-      rows = Math.ceil(Math.max(1, n) / perRow);
+      perRow = Math.max(1, Math.floor((areaW - w) / (w * 0.42)) + 1);
+      rows = Math.ceil(cap / perRow);
       hs = s;
       if (rows * s * 1.06 <= areaH) break;
     }
     const hw = hs * 0.714;
-    const inRow = Math.min(perRow, Math.max(1, n));
-    const step = inRow > 1 ? Math.min(hw + hs * 0.1, (areaW - hw) / (inRow - 1)) : 0;
+    const step = perRow > 1 ? Math.min(hw + hs * 0.1, (areaW - hw) / (perRow - 1)) : 0;
     let drawnHtml = '';
-    for (let r = 0; r < rows && n; r++) {
+    for (let r = 0; r < Math.ceil(n / perRow); r++) {
       const row = drawn.slice(r * perRow, (r + 1) * perRow);
       drawnHtml += `<div class="drawn-row">${row.map((id, i) =>
         `<div class="slot-card drawn-card" style="margin-left:${i ? (step - hw).toFixed(1) : 0}px;z-index:${i + 1}"><div class="flip">${cardFace(id)}<div class="pcard back"></div></div></div>`).join('')}</div>`;
@@ -3217,7 +3311,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     const deckHtml = deck.length ? pile + `<span class="badge">${deck.length}</span>` : `<div class="deck-empty">empty</div>`;
     resultEl.innerHTML =
       `<div class="card-table"><div class="deck" id="deck">${deckHtml}</div>` +
-      `<div class="drawn" id="drawn" style="width:${areaW}px;--sz:${hs}px">${drawnHtml}</div></div>`;
+      `<div class="drawn" id="drawn" style="width:${areaW}px;height:${Math.min(areaH, rows * hs * 1.06)}px;--sz:${hs}px">${drawnHtml}</div></div>`;
     if (shuffling && canAnimate()) return riffle();
     if (!play || !o || !o.cards.length) return;
 
@@ -3490,7 +3584,10 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   }
 
   function renderNumber(o, play) {
-    if (!T3 && !t3Failed) loadThree().then(() => { if (T3 && S.mode === 'number' && !anim) renderResult(false); });
+    // Until the 3D engine is ready the stage stays empty, rather than
+    // flashing the flat drawing first; the flat one is only for when 3D
+    // can't run at all.
+    if (!T3 && !t3Failed) { resultEl.innerHTML = ''; loadThree().then(() => { if (S.mode === 'number' && !anim) renderResult(false); }); return; }
     if (!T3) return renderNumberSvg(o, play);
     const st = S.setup.number;
     const r = resultEl.getBoundingClientRect();
@@ -3603,19 +3700,45 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       `<div class="half bot"><div class="face"><span>${t}</span></div><div class="back"></div></div></div>`;
   }
 
+  // ── Running order: numbered slips laid out in reading order ─────────────────
+  function renderLineup(list, play) {
+    const r = resultEl.getBoundingClientRect();
+    const W = r.width - 48, H = r.height - 40, n = Math.max(1, list.length);
+    // As many columns as keeps each slip a comfortable shape, and a size
+    // that fits them all without scrolling.
+    let cols = Math.max(1, Math.min(n, Math.round(Math.sqrt(n * (W / H) / 3.4))));
+    const rows = Math.ceil(n / cols), gap = 12;
+    const itemH = Math.max(26, Math.min(70, (H - (rows - 1) * gap) / rows));
+    const fs = itemH * 0.44;
+    resultEl.innerHTML = `<div class="lineup${play ? ' dealt' : ''}" style="grid-template-columns:repeat(${cols}, minmax(0, 1fr));--h:${itemH.toFixed(1)}px;--fs:${fs.toFixed(1)}px;width:${W}px">` +
+      list.map((x, i) => `<div class="lslip" style="--i:${i};--r:${(wob(i, 3) * 1.6).toFixed(2)}deg"><b>${i + 1}</b><span>${escHtml(x)}</span></div>`).join('') + `</div>`;
+  }
+
+  // ── Groups: one index card per group ────────────────────────────────────────
+  function renderGroups(groups, play) {
+    const r = resultEl.getBoundingClientRect();
+    const W = r.width - 48, H = r.height - 40, g = Math.max(1, groups.length);
+    const most = Math.max(1, ...groups.map(x => x.length));
+    let best = { cols: 1, fs: 10 };
+    for (let cols = 1; cols <= g; cols++) {
+      const rows = Math.ceil(g / cols), cw = (W - (cols - 1) * 16) / cols, ch = (H - (rows - 1) * 16) / rows;
+      if (cw < 120) break;
+      const fs = Math.min(30, (ch - 46) / (most * 1.55), cw / 9);
+      if (fs > best.fs) best = { cols, fs };
+    }
+    const fs = Math.max(11, best.fs);
+    resultEl.innerHTML = `<div class="groupset${play ? ' dealt' : ''}" style="grid-template-columns:repeat(${best.cols}, minmax(0, 1fr));--fs:${fs.toFixed(1)}px;width:${W}px">` +
+      groups.map((list, i) => `<div class="gcard" style="--i:${i};--c:var(--hue-${i % HUES});--r:${(wob(i, 5) * 1.4).toFixed(2)}deg">` +
+        `<div class="gtab"><span>Group ${i + 1}</span><i>${list.length}</i></div>` +
+        `<ul>${list.map(x => `<li>${escHtml(x)}</li>`).join('')}</ul></div>`).join('') + `</div>`;
+  }
+
   function renderList(o, play) {
     const st = S.setup.list;
-    if (o && o.type === 'order') {
-      resultEl.innerHTML = `<ol class="order fade">${o.list.map((x, i) => `<li><span>${i + 1}</span>${escHtml(x)}</li>`).join('')}</ol>`;
-      return;
-    }
-    if (o && o.type === 'groups') {
-      resultEl.innerHTML = `<div class="groups fade">${o.groups.map((g, i) =>
-        `<div class="group bw-card"><h4>Group ${i + 1}</h4>${g.map(x => `<div>${escHtml(x)}</div>`).join('')}</div>`).join('')}</div>`;
-      return;
-    }
+    if (o && o.type === 'order') return renderLineup(o.list, play);
+    if (o && o.type === 'groups') return renderGroups(o.groups, play);
     const left = st.remove ? S.pool.list.length : st.items.length;
-    if (!T3 && !t3Failed) loadThree().then(() => { if (T3 && S.mode === 'list' && !anim) renderResult(false); });
+    if (!T3 && !t3Failed) { resultEl.innerHTML = ''; loadThree().then(() => { if (S.mode === 'list' && !anim) renderResult(false); }); return; }
     if (T3) {
       const r = resultEl.getBoundingClientRect();
       const w = Math.round(r.width - 30), h = Math.round(r.height - 20);
@@ -3809,7 +3932,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   resultEl.addEventListener('click', e => {
     if (IS_VIEWER) return;
     // The list views are for reading, not another pick.
-    if (e.target.closest('.order, .groups') || isExhausted()) return;
+    if (e.target.closest('.lineup, .groupset') || isExhausted()) return;
     go();
   });
   deckBtn.addEventListener('click', shuffleDeck);
@@ -3844,6 +3967,9 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   }
 
   // ── Boot ────────────────────────────────────────────────────────────────────
+  // Start fetching the 3D engine straight away, so it's ready by the time
+  // anyone looks at dice, the cage or the hat.
+  loadThree();
   S.rng = freshSeed();
   initSocket(CFG0.socketUrl);
   applyConfig(CFG0);
