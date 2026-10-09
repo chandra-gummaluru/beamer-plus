@@ -137,6 +137,10 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 .legend .l-exp i { height: 0; border-top: 2.5px solid var(--warn); vertical-align: 3px; }
 
 /* ── Result area ────────────────────────────────────────── */
+/* The things on the table — dice, coins, cards, the wheel, the jar — are
+   physical objects and keep their own colours in either theme, the way a
+   real die is ivory whatever the slide behind it. Only the chrome around
+   them follows the deck's tokens. */
 #result {
   flex: 1 1 auto;
   min-height: 0;
@@ -144,75 +148,191 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: calc(10px * var(--u));
-  padding: 16px 20px 8%;     /* bias slightly above true centre */
+  gap: calc(14px * var(--u));
+  padding: 16px 20px 7%;     /* bias slightly above true centre */
   overflow: hidden;
   --sz: 120px;
 }
-.items { display: flex; flex-wrap: wrap; justify-content: center; align-content: center; gap: calc(var(--sz) * 0.16); }
-.caption { font-family: var(--font-mono); font-size: var(--fs-lead); color: var(--text-2); text-align: center; }
-.caption strong { color: var(--text); font-weight: 500; }
-.big {
-  font-family: var(--font-mono); font-weight: 500; line-height: 1; letter-spacing: -0.02em;
-  color: var(--text); text-align: center; word-break: break-word;
+.items { display: flex; flex-wrap: wrap; justify-content: center; align-content: center; gap: calc(var(--sz) * 0.28) calc(var(--sz) * 0.24); }
+.caption { font-size: var(--fs-lead); color: var(--text-2); text-align: center; font-variant-numeric: tabular-nums; }
+.caption strong { color: var(--text); font-weight: 600; }
+.die3d ~ .caption, .items + .caption { margin-top: calc(var(--sz) * 0.12); }
+.caption .note { color: var(--text-3); font-size: 0.8em; }
+.msg { font-size: var(--fs-body); color: var(--text-2); text-align: center; max-width: 34em; }
+.ghost { opacity: 0.28; filter: saturate(0.4); }
+
+/* Soft contact shadow under anything resting on the table. */
+.ground {
+  position: absolute; left: 12%; right: 12%; bottom: -14%; height: 16%;
+  background: radial-gradient(ellipse at center, rgba(0,0,0,0.32), rgba(0,0,0,0) 70%);
+  filter: blur(2px);
+  pointer-events: none;
 }
-.big.name { font-family: var(--font-ui); letter-spacing: -0.01em; line-height: 1.1; }
 
-/* Dice */
-.die { width: var(--sz); height: var(--sz); }
-.die svg { width: 100%; height: 100%; overflow: visible; }
-.die .body { fill: var(--bg); stroke: var(--text); stroke-width: 4; stroke-linejoin: round; }
-.die .pip  { fill: var(--text); }
-.die .num  { fill: var(--text); font-family: var(--font-mono); font-weight: 500; text-anchor: middle; dominant-baseline: central; }
-.die .kind { fill: var(--text-3); font-family: var(--font-mono); font-size: 11px; text-anchor: middle; }
+/* ── d6: a real cube ──────────────────────────────────────── */
+.die3d { position: relative; width: var(--sz); height: var(--sz); perspective: calc(var(--sz) * 5); }
+.cube {
+  position: absolute; inset: 0;
+  transform-style: preserve-3d;
+  transition: transform 1.15s cubic-bezier(0.18, 0.75, 0.22, 1);
+}
+.cube .face {
+  position: absolute; inset: 0;
+  border-radius: 16%;
+  background: radial-gradient(circle at 28% 22%, var(--d-hi), var(--d-face) 55%, var(--d-lo));
+  box-shadow: inset 0 0 calc(var(--sz) * 0.05) rgba(0,0,0,0.22);
+  backface-visibility: hidden;
+}
+/* Three planes through the middle fill what the rounded corners leave open. */
+.cube .core { position: absolute; inset: 1.5%; background: var(--d-lo); }
+.cube .cx { transform: rotateY(90deg); }
+.cube .cy { transform: rotateX(90deg); }
+.f1 { transform: translateZ(calc(var(--sz) / 2)); }
+.f6 { transform: rotateY(180deg) translateZ(calc(var(--sz) / 2)); }
+.f2 { transform: rotateY(90deg)  translateZ(calc(var(--sz) / 2)); }
+.f5 { transform: rotateY(-90deg) translateZ(calc(var(--sz) / 2)); }
+.f3 { transform: rotateX(90deg)  translateZ(calc(var(--sz) / 2)); }
+.f4 { transform: rotateX(-90deg) translateZ(calc(var(--sz) / 2)); }
+.pip {
+  position: absolute; width: 19%; height: 19%; border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle at 45% 40%, var(--d-pip-hi), var(--d-pip) 70%);
+  box-shadow: inset 0 calc(var(--sz) * 0.012) calc(var(--sz) * 0.02) rgba(0,0,0,0.55), 0 calc(var(--sz) * -0.006) 0 rgba(255,255,255,0.35);
+}
+.pip.one { width: 25%; height: 25%; background: radial-gradient(circle at 45% 40%, #e2404e, #a3121f 70%); }
 
-/* Coins */
+/* ── d4 … d20: faceted polyhedra ──────────────────────────── */
+.poly { position: relative; width: var(--sz); height: var(--sz); }
+.poly svg { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 calc(var(--sz) * 0.03) calc(var(--sz) * 0.035) rgba(0,0,0,0.3)); }
+.poly .pnum { font-family: var(--font-ui); font-weight: 700; text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke-width: 1.4; stroke-linejoin: round; }
+.poly .kind { font-family: var(--font-mono); font-size: 8px; text-anchor: middle; fill: var(--text-3); }
+
+/* ── Coins ───────────────────────────────────────────────── */
+.coin3d { position: relative; width: var(--sz); height: var(--sz); perspective: calc(var(--sz) * 4); }
 .coin {
-  width: var(--sz); height: var(--sz); border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-mono); font-weight: 600; font-size: calc(var(--sz) * 0.42);
-  border: calc(var(--sz) * 0.04) solid var(--text);
-  user-select: none;
+  position: absolute; inset: 0;
+  transform-style: preserve-3d;
+  transition: transform 1.3s cubic-bezier(0.25, 0.6, 0.3, 1);
 }
-.coin.h { background: var(--text); color: var(--bg); }
-.coin.t { background: var(--bg);   color: var(--text); }
+.cface { position: absolute; inset: 0; backface-visibility: hidden; border-radius: 50%; }
+.cface svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.cface.tails { transform: rotateX(180deg); }
+.coin3d .ground { bottom: -16%; }
 
-/* Balls */
-.ball {
-  width: var(--sz); height: var(--sz); border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.45), rgba(255,255,255,0) 45%), var(--c);
-  box-shadow: inset 0 -4px 10px rgba(0,0,0,0.18);
-}
-.bag {
-  display: flex; flex-wrap: wrap; justify-content: center; gap: 5px;
-  max-width: min(560px, 90%);
-  padding: 9px 12px; border: 1px dashed var(--border-med); border-radius: 18px;
-}
-.bag .ball { --sz: calc(14px * var(--u)); box-shadow: none; }
-.bag-empty { font-size: var(--fs-small); color: var(--text-3); }
-
-/* Cards */
-.card {
-  width: calc(var(--sz) * 0.72); height: var(--sz);
-  border: 2px solid var(--text); border-radius: calc(var(--sz) * 0.07);
-  background: var(--bg);
-  display: grid; grid-template-rows: auto 1fr auto; padding: calc(var(--sz) * 0.05) calc(var(--sz) * 0.07);
-  font-family: var(--font-ui); font-weight: 600; color: var(--text); user-select: none;
-}
-.card.red { color: var(--red); }
-.card .corner { font-size: calc(var(--sz) * 0.16); line-height: 1; }
-.card .corner.b { transform: rotate(180deg); }
-.card .mid { display: flex; align-items: center; justify-content: center; font-size: calc(var(--sz) * 0.38); line-height: 1; }
-
-/* Spinner */
-#wheel-wrap { position: relative; width: var(--sz); height: var(--sz); }
+/* ── Spinner ─────────────────────────────────────────────── */
+#wheel-wrap { position: relative; height: var(--sz); width: calc(var(--sz) * 0.8); }
 #wheel-wrap svg { width: 100%; height: 100%; overflow: visible; }
 #wheel { transform-origin: 50px 50px; }
-#wheel.spinning { transition: transform 3.4s cubic-bezier(0.12, 0.7, 0.12, 1); }
-#wheel .seg   { stroke: var(--bg); stroke-width: 0.6; }
-#wheel text   { fill: #fff; font-family: var(--font-ui); font-weight: 600; text-anchor: middle; dominant-baseline: central; }
-.pointer      { fill: var(--text); }
-.hub          { fill: var(--bg); stroke: var(--text); stroke-width: 1.2; }
+#wheel.spinning { transition: transform 4.4s cubic-bezier(0.1, 0.68, 0.1, 1); }
+#wheel .lbl { fill: #fff; font-family: var(--font-ui); font-weight: 700; text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: rgba(0,0,0,0.35); stroke-width: 0.9; stroke-linejoin: round; }
+#ptr { transform-origin: 50px -6px; transition: transform 0.14s ease-out; }
+.spin-result { display: inline-flex; align-items: center; gap: 0.4em; }
+.spin-result i { width: 0.7em; height: 0.7em; border-radius: 50%; display: inline-block; }
+
+/* ── Playing cards ───────────────────────────────────────── */
+.table-row { display: flex; align-items: center; justify-content: center; gap: calc(var(--sz) * 0.32); max-width: 100%; }
+.hand { gap: calc(var(--sz) * 0.12); flex-wrap: nowrap; }
+.items:has(> .die3d) { gap: calc(var(--sz) * 0.3) calc(var(--sz) * 0.42); }
+.slot-card { position: relative; width: calc(var(--sz) * 0.714); height: var(--sz); perspective: calc(var(--sz) * 4); }
+.flip { position: absolute; inset: 0; transform-style: preserve-3d; }
+.pcard {
+  position: absolute; inset: 0;
+  border-radius: calc(var(--sz) * 0.06);
+  background: linear-gradient(160deg, #ffffff, #f4f3ef);
+  border: 1px solid #d6d4cc;
+  box-shadow: 0 calc(var(--sz) * 0.012) calc(var(--sz) * 0.03) rgba(0,0,0,0.18), 0 calc(var(--sz) * 0.04) calc(var(--sz) * 0.09) rgba(0,0,0,0.12);
+  color: #1b1b1d;
+  font-family: Georgia, 'Times New Roman', serif;
+  backface-visibility: hidden;
+  user-select: none;
+}
+.pcard.red { color: #c8102e; }
+.pcard .ci { position: absolute; display: flex; flex-direction: column; align-items: center; line-height: 0.95; }
+.pcard .ci b { font-size: calc(var(--sz) * 0.15); font-weight: 600; letter-spacing: -0.04em; }
+.pcard .ci i { font-style: normal; font-size: calc(var(--sz) * 0.12); }
+.pcard .tl { left: 5.5%; top: 3.5%; }
+.pcard .br { right: 5.5%; bottom: 3.5%; transform: rotate(180deg); }
+.pcard .pips { position: absolute; inset: 15% 28%; }
+.pcard .pips span { position: absolute; transform: translate(-50%, -50%); font-size: calc(var(--sz) * 0.15); line-height: 1; }
+.pcard .pips span.dn { transform: translate(-50%, -50%) rotate(180deg); }
+.pcard .ace { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: calc(var(--sz) * 0.44); }
+.pcard .court {
+  position: absolute; inset: 15% 23%;
+  border: calc(var(--sz) * 0.008) solid currentColor; border-radius: calc(var(--sz) * 0.02);
+  display: flex; align-items: center; justify-content: center;
+  font-size: calc(var(--sz) * 0.34); font-weight: 600;
+  background: linear-gradient(135deg, rgba(200,16,46,0.07), rgba(40,60,140,0.08));
+}
+.pcard .court::before, .pcard .court::after { content: attr(data-s); position: absolute; font-size: calc(var(--sz) * 0.1); }
+.pcard .court::before { left: 6%; top: 3%; }
+.pcard .court::after  { right: 6%; bottom: 3%; transform: rotate(180deg); }
+.pcard.back {
+  background:
+    repeating-linear-gradient(45deg,  rgba(255,255,255,0.16) 0 2px, transparent 2px 9px),
+    repeating-linear-gradient(-45deg, rgba(255,255,255,0.16) 0 2px, transparent 2px 9px),
+    linear-gradient(160deg, #2f4fb0, #1f347c);
+  box-shadow: inset 0 0 0 calc(var(--sz) * 0.035) #fff, inset 0 0 0 calc(var(--sz) * 0.04) #c9cfe0,
+              0 calc(var(--sz) * 0.012) calc(var(--sz) * 0.03) rgba(0,0,0,0.2);
+}
+.flip .pcard.back { transform: rotateY(180deg); }
+.deck { position: relative; width: calc(var(--sz) * 0.714); height: var(--sz); flex: 0 0 auto; }
+.deck .pcard { transition: transform 0.2s; }
+.deck-count {
+  position: absolute; left: 50%; bottom: calc(var(--sz) * -0.2); transform: translateX(-50%);
+  font-family: var(--font-mono); font-size: var(--fs-chrome-sm); color: var(--text-3); white-space: nowrap;
+}
+.deck-empty { position: absolute; inset: 0; border: 2px dashed var(--border-med); border-radius: calc(var(--sz) * 0.06); }
+
+/* ── Jar of balls ────────────────────────────────────────── */
+.bag-row { display: flex; align-items: center; justify-content: center; gap: calc(var(--jar) * 0.18); width: 100%; }
+.jar { height: var(--jar); width: calc(var(--jar) * 0.77); flex: 0 0 auto; position: relative; }
+.jar svg { width: 100%; height: 100%; overflow: visible; }
+.jar-count { text-align: center; font-family: var(--font-mono); font-size: var(--fs-chrome-sm); color: var(--text-3); margin-top: 4px; }
+.tray { display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 0; }
+.ball {
+  position: relative;
+  width: var(--sz); height: var(--sz); border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 27%, rgba(255,255,255,0.85) 0, rgba(255,255,255,0.25) 14%, rgba(255,255,255,0) 32%),
+    radial-gradient(circle at 50% 120%, rgba(0,0,0,0.35), rgba(0,0,0,0) 60%),
+    var(--c);
+  box-shadow: inset 0 calc(var(--sz) * -0.06) calc(var(--sz) * 0.12) rgba(0,0,0,0.25),
+              0 calc(var(--sz) * 0.06) calc(var(--sz) * 0.08) rgba(0,0,0,0.22);
+}
+
+/* ── Number reels (number + distribution) ────────────────── */
+.odo { display: inline-flex; align-items: center; font-family: var(--font-mono); font-weight: 500; line-height: 1; user-select: none; }
+.reel {
+  position: relative; display: inline-block;
+  height: 1.2em; width: 0.8em; margin: 0 0.035em; overflow: hidden;
+  border-radius: 0.12em;
+  background: linear-gradient(180deg, #3b3b40 0%, #1f1f23 46%, #151518 54%, #2e2e33 100%);
+  color: #f6f5ef;
+  box-shadow: inset 0 0.06em 0.14em rgba(0,0,0,0.7), 0 0.03em 0.08em rgba(0,0,0,0.3);
+}
+.reel::after {   /* the gloss and the seam across the middle */
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0) 40%, rgba(0,0,0,0.35) 49.5%, rgba(255,255,255,0.06) 50.5%, rgba(0,0,0,0) 62%, rgba(0,0,0,0.25));
+}
+.reel .strip { display: block; will-change: transform; }
+.reel .strip span { display: block; height: 1.2em; line-height: 1.2em; text-align: center; }
+.odo .sym { display: inline-block; width: 0.42em; text-align: center; color: var(--text); }
+
+/* ── Name slot ───────────────────────────────────────────── */
+.slot {
+  position: relative; display: inline-block;
+  height: 1.3em; padding: 0 0.45em; overflow: hidden;
+  border-radius: 0.18em;
+  background: var(--bg);
+  border: 1px solid var(--border-med);
+  box-shadow: inset 0 0.08em 0.25em rgba(0,0,0,0.12);
+  font-weight: 600; letter-spacing: -0.01em; color: var(--text);
+}
+.slot::before, .slot::after { content: ''; position: absolute; left: 0; right: 0; height: 0.14em; z-index: 1; pointer-events: none; }
+.slot::before { top: 0;    background: linear-gradient(var(--bg), transparent); }
+.slot::after  { bottom: 0; background: linear-gradient(transparent, var(--bg)); }
+.slot .strip { display: block; }
+.slot .strip div { height: 1.3em; line-height: 1.3em; text-align: center; white-space: nowrap; }
 
 /* Lists: shuffled order and groups */
 .order {
@@ -228,8 +348,6 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 }
 .group h4 { font-size: var(--fs-chrome-sm); font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin-bottom: 4px; }
 .group div { font-size: var(--fs-body); color: var(--text); line-height: 1.35; }
-
-.msg { font-size: var(--fs-body); color: var(--text-2); text-align: center; max-width: 34em; }
 
 /* ── History ────────────────────────────────────────────── */
 #history {
@@ -270,27 +388,63 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 }
 
 /* ── Motion ─────────────────────────────────────────────── */
-@keyframes tumble {
-  0%   { transform: rotate(0deg)   translateY(0); }
-  25%  { transform: rotate(-14deg) translateY(-6%); }
-  50%  { transform: rotate(10deg)  translateY(0); }
-  75%  { transform: rotate(-6deg)  translateY(-3%); }
-  100% { transform: rotate(0deg)   translateY(0); }
+/* A throw: up, a bounce, settle. The rotation itself is a transition on the
+   cube/coin so it can end exactly on the face that was drawn. */
+@keyframes toss {
+  0%   { transform: translateY(0); }
+  30%  { transform: translateY(-30%); }
+  62%  { transform: translateY(0); }
+  76%  { transform: translateY(-7%); }
+  88%, 100% { transform: translateY(0); }
 }
-@keyframes flip { from { transform: rotateY(0); } to { transform: rotateY(1080deg); } }
-@keyframes pop  { 0% { transform: translateY(-40%) scale(0.2); opacity: 0; } 70% { transform: translateY(4%) scale(1.06); opacity: 1; } 100% { transform: none; } }
-@keyframes deal { from { transform: translateY(-18%) rotateY(90deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes toss-shadow {
+  0%, 62%, 88%, 100% { transform: scale(1); opacity: 1; }
+  30% { transform: scale(0.55); opacity: 0.45; }
+  76% { transform: scale(0.9); opacity: 0.9; }
+}
+@keyframes coin-toss {
+  0%   { transform: translateY(0); }
+  45%  { transform: translateY(-48%); }
+  86%  { transform: translateY(0); }
+  93%  { transform: translateY(-4%); }
+  100% { transform: translateY(0); }
+}
+@keyframes coin-shadow {
+  0%, 86%, 100% { transform: scale(1); opacity: 1; }
+  45% { transform: scale(0.45); opacity: 0.35; }
+}
+@keyframes tumble {
+  0%   { transform: translateY(0) rotate(0deg) scale(1); }
+  20%  { transform: translateY(-30%) rotate(-160deg) scale(0.92); }
+  45%  { transform: translateY(0) rotate(-300deg) scale(1); }
+  60%  { transform: translateY(-9%) rotate(-345deg); }
+  75%, 100% { transform: translateY(0) rotate(-360deg); }
+}
+@keyframes deal {
+  from { transform: translate(calc(var(--from, -120%)), -6%) rotateY(180deg) rotateZ(-8deg); }
+  to   { transform: none; }
+}
+@keyframes drop-in {
+  0%   { transform: translate(-90%, -70%) scale(0.35); opacity: 0; }
+  55%  { transform: translate(0, 6%) scale(1.04); opacity: 1; }
+  75%  { transform: translate(0, -4%) scale(0.99); }
+  100% { transform: none; }
+}
 @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-.anim .die  { animation: tumble 0.16s linear infinite; }
-.anim .coin { animation: flip 0.75s cubic-bezier(0.3, 0.6, 0.4, 1) both; }
-.drop .items .ball { animation: pop 0.38s ease-out both; }
-.drop .card { animation: deal 0.32s ease-out both; }
-.fade       { animation: fade 0.25s ease-out both; }
+.die3d.tossing                { animation: toss 1.15s ease-out both; }
+.die3d.tossing .ground        { animation: toss-shadow 1.15s ease-out both; }
+.coin3d.tossing               { animation: coin-toss 1.3s cubic-bezier(0.3, 0.55, 0.4, 1) both; }
+.coin3d.tossing .ground       { animation: coin-shadow 1.3s ease-out both; }
+.poly.tossing svg             { animation: tumble 0.95s cubic-bezier(0.25, 0.6, 0.3, 1) both; }
+.slot-card.dealing .flip      { animation: deal 0.6s cubic-bezier(0.2, 0.7, 0.25, 1) both; }
+.tray .ball.dropping          { animation: drop-in 0.6s cubic-bezier(0.25, 0.7, 0.3, 1) both; }
+.fade                         { animation: fade 0.25s ease-out both; }
 @media (prefers-reduced-motion: reduce) {
-  .anim .die, .anim .coin, .drop .items .ball, .drop .card, .fade { animation: none !important; }
-  #wheel.spinning { transition-duration: 0.01s; }
+  .tossing, .tossing *, .dealing .flip, .dropping, .fade { animation: none !important; }
+  .cube, .coin, #wheel.spinning, .reel .strip, .slot .strip { transition-duration: 0.01s !important; }
 }
 </style>
+
 </head>
 <body>
 <div id="shell" class="bw-shell">
@@ -400,8 +554,8 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     runs: 1,
     showStats: false,
     setup: {
-      dice:    { n: 2, sides: 6 },
-      coin:    { n: 1, p: 0.5 },
+      dice:    { n: 2, sides: 6, color: 'auto' },
+      coin:    { n: 1, p: 0.5, metal: 'gold' },
       bag:     { balls: [{ c: 0, n: 3 }, { c: 1, n: 2 }, { c: 2, n: 1 }], replace: false, k: 1 },
       spinner: { text: 'A, B, C, D' },
       cards:   { replace: false, k: 1 },
@@ -625,7 +779,10 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 
   function statsFor(mode) {
     if (mode === 'list') return null;
-    const sig = JSON.stringify(mode === 'spinner' ? spinnerSectors() : S.setup[mode]);
+    // Looks (die colour, coin metal) don't change the experiment, so they
+    // don't clear the tally.
+    const { color, metal, ...exp } = S.setup[mode];
+    const sig = JSON.stringify(mode === 'spinner' ? spinnerSectors() : exp);
     let st = S.stats[mode];
     if (!st || st.sig !== sig) {
       const m = model(mode);
@@ -839,6 +996,9 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   function num(label, key, obj, lo, hi, step = 1, after) {
     return { html: `<label>${escHtml(label)} <input class="bw-input" type="number" data-k="${key}" min="${lo}" max="${hi}" step="${step}" value="${escHtml(obj[key])}"></label>`, key, lo, hi, after };
   }
+  function sel(label, key, obj, opts) {
+    return { html: `<label>${escHtml(label)} <select class="bw-select" data-k="${key}">${opts.map(([v, l]) => `<option value="${v}" ${obj[key] === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>` };
+  }
   function check(label, key, obj) {
     return { html: `<label><input type="checkbox" data-k="${key}" ${obj[key] ? 'checked' : ''}> ${escHtml(label)}</label>` };
   }
@@ -854,9 +1014,11 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       parts.push({ html: `<label>Sides <select class="bw-select" data-k="sides">${[4, 6, 8, 10, 12, 20].map(s =>
         `<option value="${s}" ${st.sides === s ? 'selected' : ''}>d${s}</option>`).join('')}<option value="custom" ${[4, 6, 8, 10, 12, 20].includes(st.sides) ? '' : 'selected'}>other…</option></select></label>` });
       if (![4, 6, 8, 10, 12, 20].includes(st.sides)) parts.push(num('', 'sides', st, 2, 100));
+      parts.push(sel('Colour', 'color', st, [['auto', 'Classic'], ['ivory', 'Ivory'], ['ruby', 'Ruby'], ['sapphire', 'Sapphire'], ['emerald', 'Emerald'], ['onyx', 'Onyx']]));
     } else if (S.mode === 'coin') {
       parts.push(num('Coins', 'n', st, 1, 20));
       parts.push(num('P(heads)', 'p', st, 0, 1, 0.05));
+      parts.push(sel('Metal', 'metal', st, [['gold', 'Gold'], ['silver', 'Silver'], ['copper', 'Copper']]));
     } else if (S.mode === 'bag') {
       parts.push({ html: st.balls.map((b, i) =>
         `<span class="chip" title="${HUE_NAMES[b.c]}"><span class="sw" style="background:var(--hue-${b.c})"></span>` +
@@ -917,7 +1079,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     const k = el.dataset.k, st = S.setup[S.mode];
     let rebuild = false;
     if (el.type === 'checkbox') { st[k] = el.checked; rebuild = true; }
-    else if (k === 'text' || k === 'groupBy' || k === 'kind') { st[k] = el.value; rebuild = k !== 'text'; }
+    else if (['text', 'groupBy', 'kind', 'color', 'metal'].includes(k)) { st[k] = el.value; rebuild = k === 'groupBy' || k === 'kind'; }
     else if (k === 'sides' && el.tagName === 'SELECT') {
       st.sides = el.value === 'custom' ? (st.sides in { 4: 1, 6: 1, 8: 1, 10: 1, 12: 1, 20: 1 } ? 7 : st.sides) : +el.value;
       rebuild = true;
@@ -1038,181 +1200,509 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   function placeholder(text) {
     return `<div class="bw-hint">${escHtml(text)}</div>`;
   }
+  const runsNote = o => (o && o.runs > 1 ? ` <span class="note">· last of ${o.runs}</span>` : '');
+  function canAnimate() {
+    if (cfg.animate === false) return false;
+    try { return !matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return true; }
+  }
+  // Cosmetic only — how a die tumbles or a reel scrolls. Outcomes always
+  // come from rand(), so this never touches the seeded sequence.
+  const jiggle = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
+  const reflow = el => void el.getBoundingClientRect();
 
   function renderResult(animate) {
     finishAnim(true);
-    const mode = S.mode, o = S.last[mode], st = S.setup[mode];
-    const canAnim = animate && cfg.animate !== false;
-    let html = '', sz = 120, drop = false;
-
-    if (mode === 'spinner') return renderSpinner(animate);
-    wheelBuiltFor = '';
-
+    const mode = S.mode, o = S.last[mode];
+    const play = !!(animate && canAnimate() && o && !o.empty && (o.runs === 1 || mode === 'list'));
+    if (mode !== 'spinner') wheelBuiltFor = '';
     if (o && o.empty) {
-      const why = { bag: 'The bag is empty.', cards: 'The deck is empty.', list: 'Everyone has been picked.',
+      const why = { bag: 'The jar is empty.', cards: 'The deck is empty.', list: 'Everyone has been picked.',
                     number: 'Every number in the range has been used.' }[mode] || 'Nothing left.';
-      html = `<div class="msg">${why}${IS_VIEWER ? '' : ' Reset, or put them back, to start again.'}</div>`;
-    } else if (mode === 'dice') {
-      const faces = o ? o.faces : Array.from({ length: st.n }, () => null);
-      sz = fitSize(faces.length);
-      html = `<div class="items">${faces.map(f => dieSvg(f, st.sides)).join('')}</div>` +
-        (o && faces.length > 1 ? `<div class="caption">Σ <strong>${faces.reduce((s, x) => s + x, 0)}</strong>${runsNote(o)}</div>` :
-         o ? (runsNote(o) ? `<div class="caption">${runsNote(o).slice(3)}</div>` : '') : placeholder(`Press ${VERB[mode]}`));
-    } else if (mode === 'coin') {
-      const faces = o ? o.faces : [];
-      sz = fitSize(Math.max(1, faces.length), 1, 0.25, 220);
-      const h = faces.reduce((s, x) => s + x, 0);
-      html = o ? `<div class="items">${faces.map(f => `<div class="coin ${f ? 'h' : 't'}">${f ? 'H' : 'T'}</div>`).join('')}</div>` +
-                 `<div class="caption">${faces.length > 1 ? `<strong>${h}</strong> heads, <strong>${faces.length - h}</strong> tails` : (faces[0] ? '<strong>Heads</strong>' : '<strong>Tails</strong>')}${runsNote(o)}</div>`
-               : `<div class="items"><div class="coin t" style="opacity:.35">?</div></div>${placeholder('Press Flip')}`;
-    } else if (mode === 'bag') {
-      const pool = st.replace ? fullBag() : S.pool.bag;
-      const left = pool.reduce((s, x) => s + x, 0);
-      const dots = [];
-      pool.forEach((n, j) => { for (let i = 0; i < n && dots.length < 120; i++) dots.push(st.balls[j].c); });
-      const balls = o ? o.balls : [];
-      sz = fitSize(Math.max(1, balls.length), 1, 0.45, 200);
-      html = `<div class="bag">${dots.length ? dots.map(c => `<span class="ball" style="--c:var(--hue-${c})"></span>`).join('') : '<span class="bag-empty">empty</span>'}</div>` +
-             `<div class="bw-hint">${left} in the bag${st.replace ? ' · drawn with replacement' : ''}</div>` +
-             (o ? `<div class="items">${balls.map(c => `<span class="ball" style="--c:var(--hue-${c})" title="${HUE_NAMES[c]}"></span>`).join('')}</div>` +
-                  (runsNote(o) ? `<div class="caption">${runsNote(o).slice(3)}</div>` : '')
-                : placeholder('Press Draw'));
-      drop = true;
-    } else if (mode === 'cards') {
-      const cards = o ? o.cards : [];
-      sz = fitSize(Math.max(1, cards.length), 0.72, 0.2, 280);
-      html = (o ? `<div class="items">${cards.map(cardHtml).join('')}</div>`
-                : `<div class="items"><div class="card" style="opacity:.25"><span></span><span class="mid">?</span><span></span></div></div>`) +
-             `<div class="bw-hint">${st.replace ? 'drawn with replacement' : `${S.pool.cards.length} left in the deck`}${o && o.runs > 1 ? ` · last of ${o.runs}` : ''}</div>`;
-      drop = true;
-    } else if (mode === 'number') {
-      html = o ? `<div class="big" id="big">${escHtml(String(o.v))}</div>${o.runs > 1 ? `<div class="caption">last of ${o.runs}</div>` : ''}`
-               : `<div class="big" style="color:var(--text-3)">?</div>${placeholder(`${st.min} – ${st.max}`)}`;
-      if (st.unique && st.decimals === 0) html += `<div class="bw-hint">${S.pool.number.length} used of ${st.max - st.min + 1}</div>`;
-    } else if (mode === 'list') {
-      if (!o) html = `<div class="big name" style="color:var(--text-3)">?</div>${placeholder(`${st.items.length} names · press Pick`)}`;
-      else if (o.type === 'pick') html = `<div class="big name" id="big">${escHtml(o.name)}</div>` +
-        (st.remove ? `<div class="bw-hint">${S.pool.list.length} left to pick</div>` : '');
-      else if (o.type === 'order') html = `<ol class="order">${o.list.map((x, i) => `<li><span>${i + 1}</span>${escHtml(x)}</li>`).join('')}</ol>`;
-      else if (o.type === 'groups') html = `<div class="groups">${o.groups.map((g, i) =>
-        `<div class="group bw-card"><h4>Group ${i + 1}</h4>${g.map(x => `<div>${escHtml(x)}</div>`).join('')}</div>`).join('')}</div>`;
-    } else if (mode === 'dist') {
-      const m = model('dist');
-      html = o ? `<div class="big" id="big">${escHtml(fmtDist(o.v))}</div><div class="caption">${escHtml(m.title)}${o.runs > 1 ? ` · last of ${o.runs}` : ''}</div>`
-               : `<div class="big" style="color:var(--text-3)">?</div><div class="caption">${escHtml(m.title)}</div>`;
+      resultEl.innerHTML = `<div class="msg">${why}${IS_VIEWER ? '' : ' Reset, or put them back, to start again.'}</div>`;
+      return;
     }
-
-    resultEl.style.setProperty('--sz', sz + 'px');
-    const big = mode === 'number' || mode === 'dist' || (mode === 'list' && (!o || o.type === 'pick'));
-    resultEl.innerHTML = html;
-    if (big) sizeBig();
-    resultEl.classList.toggle('drop', !!(canAnim && drop && o && o.runs === 1));
-    if (canAnim && o && !o.empty && (o.runs === 1 || mode === 'list')) startAnim(mode, o);
+    if (mode === 'dice')    return renderDice(o, play);
+    if (mode === 'coin')    return renderCoins(o, play);
+    if (mode === 'bag')     return renderBag(o, play);
+    if (mode === 'spinner') return renderSpinner(play);
+    if (mode === 'cards')   return renderCards(o, play);
+    if (mode === 'number')  return renderNumber(o, play);
+    if (mode === 'list')    return renderList(o, play);
+    if (mode === 'dist')    return renderDist(o, play);
   }
 
-  const runsNote = o => (o && o.runs > 1 ? ` · last of ${o.runs}` : '');
-
-  // A single value as large as the area allows, by measuring rather than guessing.
-  function sizeBig() {
-    const el = resultEl.querySelector('.big');
-    if (!el) return;
-    const r = resultEl.getBoundingClientRect();
-    let fs = Math.min(r.height * 0.42, 220);
-    el.style.fontSize = fs + 'px';
-    for (let i = 0; i < 12 && (el.scrollWidth > r.width - 40 || el.scrollHeight > r.height * 0.6) && fs > 18; i++) {
-      fs *= 0.85; el.style.fontSize = fs + 'px';
-    }
+  /** Run `done` after `ms`, or sooner if the animation is cut short. */
+  function hold(ms, done, extra) {
+    anim = { done, ...extra };
+    anim.timer = setTimeout(() => finishAnim(), ms);
   }
 
-  // ── Dice, cards ─────────────────────────────────────────────────────────────
-  const PIPS = { 1: [[50, 50]], 2: [[28, 28], [72, 72]], 3: [[28, 28], [50, 50], [72, 72]],
-                 4: [[28, 28], [72, 28], [28, 72], [72, 72]], 5: [[28, 28], [72, 28], [50, 50], [28, 72], [72, 72]],
-                 6: [[28, 26], [72, 26], [28, 50], [72, 50], [28, 74], [72, 74]] };
-  const SHAPES = {
-    4:  '50,6 95,88 5,88',
-    8:  '50,4 95,50 50,96 5,50',
-    10: '50,4 94,40 50,96 6,40',
-    12: '50,5 93,36 77,90 23,90 7,36',
-    20: '50,4 91,27 91,73 50,96 9,73 9,27',
+  // ── Dice ────────────────────────────────────────────────────────────────────
+  const DIE_COLORS = {
+    ivory:    { face: '#f7f3ea', hi: '#ffffff', lo: '#d9d0bd', ink: '#1c1c1e', pip: '#151517', pipHi: '#4a4a4f' },
+    ruby:     { face: '#c92a3a', hi: '#f0606c', lo: '#7d1220', ink: '#ffffff', pip: '#fbf7ef', pipHi: '#ffffff' },
+    sapphire: { face: '#2f5fd0', hi: '#6c95f0', lo: '#173581', ink: '#ffffff', pip: '#fbf7ef', pipHi: '#ffffff' },
+    emerald:  { face: '#1d9461', hi: '#4fcb91', lo: '#0c5636', ink: '#ffffff', pip: '#fbf7ef', pipHi: '#ffffff' },
+    onyx:     { face: '#2e2e33', hi: '#5a5a62', lo: '#111114', ink: '#ffffff', pip: '#f2efe6', pipHi: '#ffffff' },
   };
-  function dieSvg(v, sides) {
-    let body, inner = '';
-    if (sides === 6) {
-      body = '<rect class="body" x="4" y="4" width="92" height="92" rx="16"/>';
-      if (v) inner = PIPS[v].map(([x, y]) => `<circle class="pip" cx="${x}" cy="${y}" r="8.5"/>`).join('');
-    } else {
-      body = SHAPES[sides] ? `<polygon class="body" points="${SHAPES[sides]}"/>` : '<rect class="body" x="4" y="4" width="92" height="92" rx="16"/>';
-      const y = sides === 4 ? 62 : 52;
-      const fs = String(v || '').length > 2 ? 26 : 34;
-      inner = `<text class="num" x="50" y="${y}" font-size="${fs}">${v == null ? '?' : v}</text>`;
-      if (!SHAPES[sides]) inner += `<text class="kind" x="50" y="88">d${sides}</text>`;
+  function dieColor() {
+    const c = S.setup.dice.color;
+    return DIE_COLORS[c] || (S.setup.dice.sides === 6 ? DIE_COLORS.ivory : DIE_COLORS.sapphire);
+  }
+
+  const PIPS = { 1: [[50, 50]], 2: [[27, 27], [73, 73]], 3: [[27, 27], [50, 50], [73, 73]],
+                 4: [[27, 27], [73, 27], [27, 73], [73, 73]], 5: [[27, 27], [73, 27], [50, 50], [27, 73], [73, 73]],
+                 6: [[27, 25], [73, 25], [27, 50], [73, 50], [27, 75], [73, 75]] };
+  // Cube rotation that brings each face to the front. Opposite faces sum to
+  // seven, as on a real die.
+  const CUBE_ROT = { 1: [0, 0], 6: [0, 180], 2: [0, -90], 5: [0, 90], 3: [-90, 0], 4: [90, 0] };
+  const diceTurns = [];
+
+  function cubeHtml(i) {
+    const faces = [1, 2, 3, 4, 5, 6].map(v =>
+      `<div class="face f${v}">${PIPS[v].map(([x, y]) => `<span class="pip${v === 1 && S.setup.dice.color !== 'onyx' && dieColor() === DIE_COLORS.ivory ? ' one' : ''}" style="left:${x}%;top:${y}%"></span>`).join('')}</div>`).join('');
+    return `<div class="die3d" data-i="${i}"><div class="ground"></div><div class="cube">${faces}<div class="core"></div><div class="core cx"></div><div class="core cy"></div></div></div>`;
+  }
+  function cubeTransform(t) {
+    const [fx, fy] = CUBE_ROT[t.f] || [0, 0];
+    // A slight three-quarter view, so it reads as a cube rather than a square.
+    return `rotateX(-11deg) rotateY(13deg) rotateX(${t.x * 360 + fx}deg) rotateY(${t.y * 360 + fy}deg) rotateZ(${t.z * 360}deg)`;
+  }
+
+  // Facets for a polyhedral die seen face-on: the face that carries the
+  // number in the middle, the neighbouring faces around it, each shaded by
+  // which way it leans relative to a light from the top left.
+  const ngon = (n, r, rot = -90, cy = 50) => Array.from({ length: n }, (_, i) => {
+    const a = (rot + i * 360 / n) * Math.PI / 180;
+    return [50 + r * Math.cos(a), cy + r * Math.sin(a)];
+  });
+  const POLY = {
+    4:  { outer: [[50, 4], [96, 88], [4, 88]],                         inner: [[50, 34], [74, 78], [26, 78]], ty: 63, fs: 24 },
+    8:  { outer: ngon(6, 47),                                         inner: ngon(3, 31, -90, 55),          ty: 60, fs: 24 },
+    10: { outer: [[50, 2], [94, 40], [87, 67], [50, 98], [13, 67], [6, 40]], inner: [[50, 15], [74, 47], [50, 80], [26, 47]], ty: 48, fs: 22 },
+    12: { outer: ngon(10, 48),                                        inner: ngon(5, 26, -90, 52),          ty: 53, fs: 20 },
+    20: { outer: ngon(6, 48),                                         inner: ngon(3, 30, -90, 54),          ty: 59, fs: 20 },
+  };
+  function polyShape(sides) {
+    if (POLY[sides]) return POLY[sides];
+    return POLY[sides <= 4 ? 4 : sides <= 8 ? 8 : sides <= 10 ? 10 : sides <= 12 ? 12 : 20];
+  }
+  function facets(shape) {
+    const { outer, inner } = shape, out = [];
+    const near = (p, set) => set.reduce((b, q) => (Math.hypot(q[0] - p[0], q[1] - p[1]) < Math.hypot(b[0] - p[0], b[1] - p[1]) ? q : b));
+    for (let i = 0; i < outer.length; i++) {
+      const a = outer[i], b = outer[(i + 1) % outer.length];
+      out.push([a, b, near([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], inner)]);
     }
-    if (v == null && sides === 6) inner = '<text class="num" x="50" y="52" font-size="34">?</text>';
-    return `<div class="die"><svg viewBox="0 0 100 100">${body}${inner}</svg></div>`;
+    for (let i = 0; i < inner.length; i++) {
+      const a = inner[i], b = inner[(i + 1) % inner.length];
+      out.push([a, b, near([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], outer)]);
+    }
+    return out;
   }
-  function cardHtml(id) {
-    const r = RANKS[id % 13], s = SUITS[Math.floor(id / 13)], red = s === '♥' || s === '♦';
-    return `<div class="card${red ? ' red' : ''}"><span class="corner">${r}${s}</span><span class="mid">${s}</span><span class="corner b">${r}${s}</span></div>`;
+  function mixHex(a, b, t) {
+    const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+    const A = p(a), B = p(b);
+    return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, '0')).join('');
   }
+  function polyHtml(i, v, sides) {
+    const col = dieColor(), shape = polyShape(sides);
+    const pts = ps => ps.map(p => p.map(n => n.toFixed(2)).join(',')).join(' ');
+    let svg = `<polygon points="${pts(shape.outer)}" fill="${col.lo}" stroke="${col.lo}" stroke-width="2" stroke-linejoin="round"/>`;
+    facets(shape).forEach(tri => {
+      const cx = (tri[0][0] + tri[1][0] + tri[2][0]) / 3 - 50, cy = (tri[0][1] + tri[1][1] + tri[2][1]) / 3 - 50;
+      const len = Math.hypot(cx, cy) || 1, lit = (cx * -0.55 + cy * -0.83) / len;
+      const fill = lit > 0 ? mixHex(col.face, col.hi, lit * 0.6) : mixHex(col.face, col.lo, -lit * 0.75);
+      svg += `<polygon points="${pts(tri)}" fill="${fill}" stroke="rgba(255,255,255,0.22)" stroke-width="0.6" stroke-linejoin="round"/>`;
+    });
+    svg += `<polygon points="${pts(shape.inner)}" fill="${mixHex(col.face, col.hi, 0.18)}" stroke="rgba(255,255,255,0.3)" stroke-width="0.6" stroke-linejoin="round"/>`;
+    const txt = v == null ? '?' : String(v);
+    const fs = shape.fs * (txt.length > 2 ? 0.7 : txt.length > 1 ? 0.92 : 1.1);
+    const strokeCol = col.ink === '#ffffff' ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.5)';
+    svg += `<text class="pnum" x="50" y="${shape.ty}" font-size="${fs.toFixed(1)}" fill="${col.ink}" stroke="${strokeCol}">${txt}</text>`;
+    // 6 and 9 are underlined on real polyhedral dice, so they can't be confused.
+    const underline = (v === 6 || v === 9) && sides >= 8;
+    svg += `<rect class="uline" x="${50 - fs * 0.28}" y="${shape.ty + fs * 0.5}" width="${fs * 0.56}" height="${fs * 0.07}" rx="${fs * 0.03}" fill="${col.ink}" style="display:${underline ? '' : 'none'}"/>`;
+    if (!POLY[sides]) svg += `<text class="kind" x="50" y="${shape.outer.reduce((m, p) => Math.max(m, p[1]), 0) + 11}">d${sides}</text>`;
+    return `<div class="poly" data-i="${i}"><svg viewBox="0 0 100 100">${svg}</svg></div>`;
+  }
+  function setPolyFace(el, v, sides) {
+    const t = el.querySelector('.pnum'), u = el.querySelector('.uline');
+    if (t) t.textContent = String(v);
+    if (u) u.style.display = (v === 6 || v === 9) && sides >= 8 ? '' : 'none';
+  }
+
+  function renderDice(o, play) {
+    const st = S.setup.dice, n = o ? o.faces.length : st.n;
+    const faces = o ? o.faces : Array.from({ length: n }, (_, i) => (st.sides === 6 ? 1 + (i * 3) % 6 : null));
+    // A cube in perspective, tilted, takes more room than its face size,
+    // and it needs headroom to be thrown into.
+    const sz = st.sides === 6 ? fitSize(n, 1.3, 0.42, 160) : fitSize(n, 1.05, 0.34, 190);
+    resultEl.style.setProperty('--sz', sz + 'px');
+    const col = dieColor();
+    ['face', 'hi', 'lo', 'pip'].forEach(k => resultEl.style.setProperty(`--d-${k}`, col[k]));
+    resultEl.style.setProperty('--d-pip-hi', col.pipHi);
+    const sum = faces.reduce((s, x) => s + (x || 0), 0);
+    resultEl.innerHTML =
+      `<div class="items${o ? '' : ' ghost'}">${faces.map((f, i) => (st.sides === 6 ? cubeHtml(i) : polyHtml(i, f, st.sides))).join('')}</div>` +
+      (o ? `<div class="caption" id="cap">${n > 1 ? `Σ <strong>${sum}</strong>` : `<strong>${faces[0]}</strong>`}${runsNote(o)}</div>` : placeholder('Press Roll'));
+
+    const cap = $('cap');
+    if (st.sides === 6) {
+      const cubes = [...resultEl.querySelectorAll('.die3d')];
+      cubes.forEach((el, i) => {
+        const cube = el.querySelector('.cube');
+        const t = diceTurns[i] || (diceTurns[i] = { x: 0, y: 0, z: 0, f: faces[i] || 1 });
+        cube.style.transition = 'none';
+        if (!play) { t.f = faces[i] || 1; cube.style.transform = cubeTransform(t); return; }
+        cube.style.transform = cubeTransform(t);
+        reflow(cube);
+        t.x += jiggle(2, 3); t.y += jiggle(1, 2); t.z += jiggle(0, 1); t.f = faces[i];
+        cube.style.transition = '';
+        cube.style.transitionDelay = el.style.animationDelay = (i * 70) + 'ms';
+        cube.style.transform = cubeTransform(t);
+        el.classList.add('tossing');
+      });
+      if (play) {
+        if (cap) cap.style.visibility = 'hidden';
+        hold(1150 + n * 70, () => {
+          cubes.forEach(el => { el.classList.remove('tossing'); const c = el.querySelector('.cube'); c.style.transition = 'none'; });
+          if (cap) { cap.style.visibility = ''; cap.classList.add('fade'); }
+        });
+      }
+    } else if (play) {
+      const els = [...resultEl.querySelectorAll('.poly')];
+      els.forEach((el, i) => { el.classList.add('tossing'); el.querySelector('svg').style.animationDelay = (i * 70) + 'ms'; });
+      if (cap) cap.style.visibility = 'hidden';
+      const tick = setInterval(() => els.forEach(el => setPolyFace(el, jiggle(1, st.sides), st.sides)), 75);
+      hold(900 + n * 70, () => {
+        clearInterval(tick);
+        els.forEach((el, i) => { el.classList.remove('tossing'); setPolyFace(el, faces[i], st.sides); });
+        if (cap) { cap.style.visibility = ''; cap.classList.add('fade'); }
+      });
+    }
+  }
+
+  // ── Coins ───────────────────────────────────────────────────────────────────
+  const METALS = {
+    gold:   { hi: '#fbe7a1', mid: '#d8a83e', lo: '#8a5f12', ink: '#7a520c' },
+    silver: { hi: '#ffffff', mid: '#c3c7cf', lo: '#6c717b', ink: '#5b606a' },
+    copper: { hi: '#ffd2b0', mid: '#c77b4a', lo: '#7a3e1d', ink: '#6e3416' },
+  };
+  let coinUid = 0;
+  function coinFace(heads) {
+    const m = METALS[S.setup.coin.metal] || METALS.gold, id = 'cn' + (++coinUid);
+    // Relief: the same shape three times — shadow down-right, highlight
+    // up-left, metal on top — reads as struck into the coin.
+    const emboss = (shape) =>
+      `<g fill="${m.lo}" opacity="0.55" transform="translate(0.7 0.9)">${shape}</g>` +
+      `<g fill="${m.hi}" opacity="0.9" transform="translate(-0.5 -0.6)">${shape}</g>` +
+      `<g fill="url(#${id}e)">${shape}</g>`;
+    let emblem;
+    if (heads) {
+      emblem = `<text x="50" y="59" font-family="Georgia, 'Times New Roman', serif" font-size="34" font-weight="700" text-anchor="middle">H</text>` +
+               `<path d="M50 66.5l1.4 2.9 3.2.4-2.3 2.2.6 3.1-2.9-1.5-2.9 1.5.6-3.1-2.3-2.2 3.2-.4z"/>`;
+    } else {
+      let leaves = '';
+      for (const side of [-1, 1]) {
+        for (let k = 0; k < 7; k++) {
+          const th = (side < 0 ? 112 + k * 19 : 68 - k * 19) * Math.PI / 180;
+          const x = 50 + 25 * Math.cos(th), y = 51 + 25 * Math.sin(th);
+          const rot = th * 180 / Math.PI + (side < 0 ? 60 : 120);
+          leaves += `<ellipse cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" rx="4.6" ry="1.9" transform="rotate(${rot.toFixed(1)} ${x.toFixed(2)} ${y.toFixed(2)})"/>`;
+        }
+      }
+      emblem = leaves + `<text x="50" y="62" font-family="Georgia, 'Times New Roman', serif" font-size="30" font-weight="700" text-anchor="middle">T</text>`;
+    }
+    const word = heads ? 'HEADS' : 'TAILS';
+    return `<svg viewBox="0 0 100 100"><defs>
+      <radialGradient id="${id}f" cx="36%" cy="30%" r="80%"><stop offset="0" stop-color="${m.hi}"/><stop offset="0.55" stop-color="${m.mid}"/><stop offset="1" stop-color="${m.lo}"/></radialGradient>
+      <linearGradient id="${id}r" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${m.hi}"/><stop offset="0.5" stop-color="${m.mid}"/><stop offset="1" stop-color="${m.lo}"/></linearGradient>
+      <linearGradient id="${id}e" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${m.mid}"/><stop offset="1" stop-color="${mixHex(m.mid, m.lo, 0.35)}"/></linearGradient>
+      <path id="${id}a" d="M 20.5,50 A 29.5,29.5 0 0,1 79.5,50"/>
+    </defs>
+    <circle cx="50" cy="50" r="49.6" fill="${m.lo}"/>
+    <circle cx="50" cy="50" r="48.4" fill="url(#${id}r)"/>
+    <circle cx="50" cy="50" r="47.3" fill="none" stroke="${m.lo}" stroke-width="2" stroke-dasharray="0.7 1.1" opacity="0.55"/>
+    <circle cx="50" cy="50" r="41.5" fill="url(#${id}f)" stroke="${m.lo}" stroke-opacity="0.55" stroke-width="1"/>
+    <circle cx="50" cy="50" r="38" fill="none" stroke="${m.lo}" stroke-opacity="0.5" stroke-width="1.3" stroke-linecap="round" stroke-dasharray="0.1 2.35"/>
+    ${emboss(`<text font-family="Georgia, 'Times New Roman', serif" font-size="7.2" font-weight="700" letter-spacing="2.4"><textPath href="#${id}a" startOffset="50%" text-anchor="middle">${word}</textPath></text>`)}
+    ${emboss(emblem)}
+    </svg>`;
+  }
+  const coinTurns = [];
+  const coinTransform = t => `rotateX(${t.turns * 360 + (t.heads ? 0 : 180)}deg)`;
+
+  function renderCoins(o, play) {
+    const st = S.setup.coin, n = o ? o.faces.length : 1;
+    const sz = fitSize(n, 1.05, 0.42, 190);
+    resultEl.style.setProperty('--sz', sz + 'px');
+    const faces = o ? o.faces : [1];
+    const h = faces.reduce((s, x) => s + x, 0);
+    resultEl.innerHTML =
+      `<div class="items${o ? '' : ' ghost'}">${faces.map((_, i) =>
+        `<div class="coin3d" data-i="${i}"><div class="ground"></div><div class="coin"><div class="cface heads">${coinFace(true)}</div><div class="cface tails">${coinFace(false)}</div></div></div>`).join('')}</div>` +
+      (o ? `<div class="caption" id="cap">${n > 1 ? `<strong>${h}</strong> heads, <strong>${n - h}</strong> tails` : `<strong>${faces[0] ? 'Heads' : 'Tails'}</strong>`}${runsNote(o)}</div>`
+         : placeholder('Press Flip'));
+    const els = [...resultEl.querySelectorAll('.coin3d')];
+    els.forEach((el, i) => {
+      const coin = el.querySelector('.coin');
+      const t = coinTurns[i] || (coinTurns[i] = { turns: 0, heads: true });
+      coin.style.transition = 'none';
+      if (!play) { t.heads = !!faces[i]; coin.style.transform = coinTransform(t); return; }
+      coin.style.transform = coinTransform(t);
+      reflow(coin);
+      t.turns += jiggle(4, 6); t.heads = !!faces[i];
+      coin.style.transition = '';
+      coin.style.transitionDelay = el.style.animationDelay = (i * 60) + 'ms';
+      coin.style.transform = coinTransform(t);
+      el.classList.add('tossing');
+    });
+    if (play) {
+      const cap = $('cap');
+      if (cap) cap.style.visibility = 'hidden';
+      hold(1300 + n * 60, () => {
+        els.forEach(el => { el.classList.remove('tossing'); el.querySelector('.coin').style.transition = 'none'; });
+        if (cap) { cap.style.visibility = ''; cap.classList.add('fade'); }
+      });
+    }
+  }
+
+  // ── Jar of balls ────────────────────────────────────────────────────────────
+  function jarSvg(dots) {
+    // Pack the balls into the bottom of the jar in staggered rows, largest
+    // size that still fits them all.
+    const W = 74, H = 74, x0 = 13, yBottom = 119;
+    let r = 9;
+    for (; r > 1.6; r -= 0.25) {
+      const cols = Math.floor(W / (2 * r)), rows = Math.ceil(dots.length / Math.max(1, cols));
+      if (cols >= 1 && 2 * r + (rows - 1) * r * 1.74 <= H) break;
+    }
+    const cols = Math.max(1, Math.floor(W / (2 * r)));
+    let balls = '';
+    dots.forEach((c, i) => {
+      const row = Math.floor(i / cols), col = i % cols;
+      const off = row % 2 ? r : 0;
+      const usable = row % 2 ? cols - 1 : cols;
+      if (row % 2 && col >= usable) return;
+      const x = x0 + r + off + col * 2 * r + ((i * 37) % 7 - 3) * 0.08;
+      const y = yBottom - r - row * r * 1.74;
+      balls += `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="${(r * 0.97).toFixed(2)}" fill="url(#jb${c})"/>`;
+    });
+    const grads = Array.from({ length: HUES }, (_, h) => {
+      const base = getComputedStyle(document.documentElement).getPropertyValue(`--hue-${h}`).trim() || '#888888';
+      return `<radialGradient id="jb${h}" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="${mixHex(base, '#ffffff', 0.6)}"/><stop offset="0.45" stop-color="${base}"/><stop offset="1" stop-color="${mixHex(base, '#000000', 0.45)}"/></radialGradient>`;
+    }).join('');
+    return `<svg viewBox="0 0 100 130"><defs>${grads}
+        <linearGradient id="lid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a7adb6"/><stop offset="0.5" stop-color="#7b818b"/><stop offset="1" stop-color="#555a62"/></linearGradient>
+        <linearGradient id="glass" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="rgba(160,190,220,0.22)"/><stop offset="0.5" stop-color="rgba(160,190,220,0.06)"/><stop offset="1" stop-color="rgba(160,190,220,0.18)"/></linearGradient>
+        <clipPath id="jarclip"><path d="M30,20 L30,24 C12,28 9,38 9,50 L9,112 Q9,123 20,123 L80,123 Q91,123 91,112 L91,50 C91,38 88,28 70,24 L70,20 Z"/></clipPath>
+      </defs>
+      <ellipse cx="50" cy="126" rx="40" ry="3.2" fill="rgba(0,0,0,0.22)"/>
+      <path d="M30,20 L30,24 C12,28 9,38 9,50 L9,112 Q9,123 20,123 L80,123 Q91,123 91,112 L91,50 C91,38 88,28 70,24 L70,20 Z" fill="url(#glass)"/>
+      <g clip-path="url(#jarclip)">${balls}</g>
+      <path d="M30,20 L30,24 C12,28 9,38 9,50 L9,112 Q9,123 20,123 L80,123 Q91,123 91,112 L91,50 C91,38 88,28 70,24 L70,20 Z" fill="none" stroke="rgba(130,145,160,0.75)" stroke-width="1.3"/>
+      <path d="M16,54 L16,104" stroke="rgba(255,255,255,0.55)" stroke-width="3" stroke-linecap="round"/>
+      <path d="M21,46 Q22,38 30,33" stroke="rgba(255,255,255,0.4)" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M84,62 L84,96" stroke="rgba(255,255,255,0.22)" stroke-width="2" stroke-linecap="round"/>
+      <rect x="25" y="8" width="50" height="13" rx="2.5" fill="url(#lid)"/>
+      <path d="M27,11 H73 M27,14.5 H73 M27,18 H73" stroke="rgba(0,0,0,0.18)" stroke-width="0.6"/>
+    </svg>`;
+  }
+
+  function renderBag(o, play) {
+    const st = S.setup.bag;
+    const pool = st.replace ? fullBag() : S.pool.bag;
+    const left = pool.reduce((s, x) => s + x, 0);
+    // Shuffle the colours into the jar deterministically, so the same jar
+    // looks the same on every screen and doesn't reshuffle on a resize.
+    const dots = [];
+    pool.forEach((n, j) => { for (let i = 0; i < n && dots.length < 200; i++) dots.push(st.balls[j].c); });
+    dots.forEach((_, i) => { const j = (i * 7919 + 13) % dots.length; [dots[i], dots[j]] = [dots[j], dots[i]]; });
+    const r = resultEl.getBoundingClientRect();
+    const jar = Math.max(90, Math.min(r.height * 0.78, r.width * 0.45 / 0.77, 420));
+    const balls = o ? o.balls : [];
+    const trayW = Math.max(80, r.width - jar * 0.77 - jar * 0.18 - 60);
+    const sz = Math.max(28, Math.min(jar * 0.42, trayW / (Math.min(balls.length, 4) * 1.25 || 1), 170));
+    resultEl.style.setProperty('--jar', jar + 'px');
+    resultEl.style.setProperty('--sz', sz + 'px');
+    const trayItems = o ? `<div class="items" style="gap:${Math.round(sz * 0.18)}px">${balls.map((c, i) =>
+      `<span class="ball${play ? ' dropping' : ''}" style="--c:var(--hue-${c});animation-delay:${i * 110}ms" title="${HUE_NAMES[c]}"></span>`).join('')}</div>` +
+      `<div class="caption" id="cap">${balls.length === 1 ? `<strong>${HUE_NAMES[balls[0]]}</strong>` : balls.map(c => HUE_NAMES[c]).join(', ')}${runsNote(o)}</div>`
+      : placeholder('Press Draw');
+    resultEl.innerHTML =
+      `<div class="bag-row"><div><div class="jar">${jarSvg(dots)}</div>` +
+      `<div class="jar-count">${left} in the jar${st.replace ? ' · with replacement' : ''}</div></div>` +
+      `<div class="tray">${trayItems}</div></div>`;
+    if (play) hold(600 + balls.length * 110, () => resultEl.querySelectorAll('.dropping').forEach(b => b.classList.remove('dropping')));
+  }
+
+  // ── Cards ───────────────────────────────────────────────────────────────────
+  const CARD_PIPS = {
+    2: [[50, 0], [50, 100]], 3: [[50, 0], [50, 50], [50, 100]],
+    4: [[0, 0], [100, 0], [0, 100], [100, 100]],
+    5: [[0, 0], [100, 0], [50, 50], [0, 100], [100, 100]],
+    6: [[0, 0], [100, 0], [0, 50], [100, 50], [0, 100], [100, 100]],
+    7: [[0, 0], [100, 0], [50, 25], [0, 50], [100, 50], [0, 100], [100, 100]],
+    8: [[0, 0], [100, 0], [50, 25], [0, 50], [100, 50], [50, 75], [0, 100], [100, 100]],
+    9: [[0, 0], [100, 0], [0, 33.3], [100, 33.3], [50, 50], [0, 66.7], [100, 66.7], [0, 100], [100, 100]],
+    10: [[0, 0], [100, 0], [50, 16.7], [0, 33.3], [100, 33.3], [0, 66.7], [100, 66.7], [50, 83.3], [0, 100], [100, 100]],
+  };
+  function cardFace(id) {
+    const ri = id % 13, r = RANKS[ri], s = SUITS[Math.floor(id / 13)], red = s === '♥' || s === '♦';
+    let mid;
+    if (ri === 0) mid = `<div class="ace">${s}</div>`;
+    else if (ri >= 10) mid = `<div class="court" data-s="${s}">${r}</div>`;
+    else mid = `<div class="pips">${CARD_PIPS[ri + 1].map(([x, y]) =>
+      `<span${y > 50 ? ' class="dn"' : ''} style="left:${x}%;top:${y}%">${s}</span>`).join('')}</div>`;
+    return `<div class="pcard${red ? ' red' : ''}"><div class="ci tl"><b>${r}</b><i>${s}</i></div>${mid}<div class="ci br"><b>${r}</b><i>${s}</i></div></div>`;
+  }
+
+  function renderCards(o, play) {
+    const st = S.setup.cards;
+    const cards = o ? o.cards : [];
+    const left = st.replace ? 52 : S.pool.cards.length;
+    // One row: the deck, then the hand. Sized to fit across, not wrapped,
+    // so a dealt hand reads left to right like one on a table.
+    const rr = resultEl.getBoundingClientRect();
+    const k = Math.max(1, cards.length);
+    const sz = Math.max(40, Math.min(270, (rr.height - 40) * 0.62, (rr.width - 50) / ((k + 1) * 0.714 + k * 0.12 + 0.32)));
+    resultEl.style.setProperty('--sz', sz + 'px');
+    const stack = left
+      ? Array.from({ length: Math.min(4, Math.ceil(left / 13)) }, (_, i) =>
+          `<div class="pcard back" style="transform:translate(${-i * 2}px, ${-i * 2}px)"></div>`).join('')
+      : '<div class="deck-empty"></div>';
+    const hand = o
+      ? cards.map((id, i) => `<div class="slot-card${play ? ' dealing' : ''}"><div class="flip" style="animation-delay:${i * 130}ms;--from:${-(i + 1) * 105 - 30}%">${cardFace(id)}<div class="pcard back"></div></div></div>`).join('')
+      : `<div class="slot-card ghost"><div class="pcard back"></div></div>`;
+    resultEl.innerHTML =
+      `<div class="table-row"><div class="deck">${stack}<div class="deck-count">${st.replace ? 'full deck · with replacement' : `${left} left`}</div></div>` +
+      `<div class="items hand">${hand}</div></div>` +
+      (o ? `<div class="caption" id="cap" style="margin-top:calc(var(--sz) * 0.12)">${cards.length === 1 ? `<strong>${cardName(cards[0])}</strong>` : `${cards.length} cards`}${runsNote(o)}</div>`
+         : `<div style="margin-top:calc(var(--sz) * 0.12)">${placeholder('Press Draw')}</div>`);
+    if (play) hold(600 + cards.length * 130, () => resultEl.querySelectorAll('.dealing').forEach(c => c.classList.remove('dealing')));
+  }
+  const cardName = id => `${['Ace', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'Jack', 'Queen', 'King'][id % 13]} of ${['spades', 'hearts', 'diamonds', 'clubs'][Math.floor(id / 13)]}`;
 
   // ── Spinner ─────────────────────────────────────────────────────────────────
   // The wheel element persists across renders so its rotation can transition;
-  // it is rebuilt only when the sectors change.
+  // it is rebuilt only when the sectors (or the size) change.
   let wheelBuiltFor = '';
-  function renderSpinner(animate) {
+  function renderSpinner(play) {
     const sec = spinnerSectors(), sig = JSON.stringify(sec);
     const o = S.last.spinner;
-    const sz = fitSize(1, 1, 0.2, 520);
+    const sz = fitSize(1, 0.8, 0.02, 640);
     resultEl.style.setProperty('--sz', sz + 'px');
     if (wheelBuiltFor !== sig || !$('wheel')) {
       wheelBuiltFor = sig;
       const tot = sec.reduce((s, x) => s + x.w, 0);
-      let a0 = 0, paths = '';
+      let a0 = 0, segs = '', pegs = '';
       sec.forEach((s, i) => {
         const a1 = a0 + s.w / tot * 360;
-        paths += sectorPath(a0, a1, i, s.label, sec.length);
+        segs += sectorPath(a0, a1, i, s.label, sec.length);
+        if (sec.length > 1) pegs += pegAt(a0);
         a0 = a1;
       });
       resultEl.innerHTML =
-        `<div id="wheel-wrap"><svg viewBox="-4 -10 108 114">` +
-        `<g id="wheel" style="transform:rotate(${-S.spin}deg)">${paths}</g>` +
-        `<circle class="hub" cx="50" cy="50" r="5"/>` +
-        `<polygon class="pointer" points="44,-8 56,-8 50,6"/></svg></div>` +
+        `<div id="wheel-wrap"><svg viewBox="-6 -16 112 140"><defs>
+          <radialGradient id="sheen" cx="38%" cy="32%" r="70%"><stop offset="0" stop-color="#fff" stop-opacity="0.38"/><stop offset="0.55" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.18"/></radialGradient>
+          <radialGradient id="hubg" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#ffffff"/><stop offset="0.5" stop-color="#c4c8cf"/><stop offset="1" stop-color="#5e636c"/></radialGradient>
+          <linearGradient id="rimg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4a4a52"/><stop offset="1" stop-color="#1c1c20"/></linearGradient>
+          <linearGradient id="standg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2a2a2f"/><stop offset="0.5" stop-color="#55555d"/><stop offset="1" stop-color="#2a2a2f"/></linearGradient>
+          <filter id="wsh" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="1.6" stdDeviation="1.8" flood-color="#000" flood-opacity="0.32"/></filter>
+        </defs>
+        <ellipse cx="50" cy="121" rx="30" ry="2.6" fill="rgba(0,0,0,0.2)"/>
+        <path d="M45,92 L41,118 L59,118 L55,92 Z" fill="url(#standg)"/>
+        <rect x="28" y="116" width="44" height="5.5" rx="2.7" fill="url(#standg)"/>
+        <circle cx="50" cy="50" r="50" fill="url(#rimg)" filter="url(#wsh)"/>
+        <g id="wheel" style="transform:rotate(${-S.spin}deg)">${segs}${pegs}</g>
+        <circle cx="50" cy="50" r="46" fill="url(#sheen)" pointer-events="none"/>
+        <circle cx="50" cy="50" r="8.2" fill="url(#hubg)" stroke="#4a4e55" stroke-width="0.5" filter="url(#wsh)"/>
+        <circle cx="50" cy="50" r="2.4" fill="#4a4e55"/>
+        <g id="ptr" filter="url(#wsh)">
+          <path d="M50,10 C46,3 43.2,-1 43.2,-6 A6.8,6.8 0 1 1 56.8,-6 C56.8,-1 54,3 50,10 Z" fill="#d7263d" stroke="#fff" stroke-width="1.1"/>
+          <circle cx="50" cy="-6" r="2.1" fill="#fff"/>
+        </g></svg></div>` +
         `<div class="caption" id="spin-label"></div>`;
     }
     const wheel = $('wheel'), label = $('spin-label');
-    const showLabel = () => { label.innerHTML = o && !o.empty ? `<strong>${escHtml(o.label)}</strong>${runsNote(o)}` : placeholder('Press Spin'); };
-    if (animate && cfg.animate !== false && o && o.runs === 1) {
+    const showLabel = () => {
+      label.innerHTML = o && !o.empty
+        ? `<span class="spin-result"><i style="background:var(--hue-${o.i % HUES})"></i><strong>${escHtml(o.label)}</strong></span>${runsNote(o)}`
+        : placeholder('Press Spin');
+    };
+    if (play) {
       label.innerHTML = '&nbsp;';
       wheel.classList.add('spinning');
-      void wheel.getBoundingClientRect();
+      reflow(wheel);
       wheel.style.transform = `rotate(${-S.spin}deg)`;
-      anim = { kind: 'spin', done: showLabel };
-      wheel.addEventListener('transitionend', function te() { wheel.removeEventListener('transitionend', te); finishAnim(); }, { once: true });
-      anim.timer = setTimeout(() => finishAnim(), 3600);
+      const stopTick = tickPointer(wheel, sec);
+      const stop = () => { stopTick(); wheel.classList.remove('spinning'); showLabel(); label.classList.add('fade'); };
+      wheel.addEventListener('transitionend', function te(e) { if (e.target === wheel) { wheel.removeEventListener('transitionend', te); finishAnim(); } });
+      hold(4700, stop, { kind: 'spin' });
     } else {
       wheel.classList.remove('spinning');
       wheel.style.transform = `rotate(${-S.spin}deg)`;
       showLabel();
     }
   }
+
+  // The pointer flicks each time a peg passes under it, which is most of
+  // what makes a prize wheel feel like one.
+  function tickPointer(wheel, sec) {
+    const ptr = $('ptr'); if (!ptr) return () => {};
+    const tot = sec.reduce((s, x) => s + x.w, 0);
+    const bounds = []; let a = 0;
+    sec.forEach(s => { bounds.push(a); a += s.w / tot * 360; });
+    let last = null, raf = 0, alive = true;
+    const angleNow = () => {
+      const m = getComputedStyle(wheel).transform;
+      if (!m || m === 'none') return 0;
+      const v = m.match(/matrix\(([^)]+)\)/); if (!v) return 0;
+      const [ma, mb] = v[1].split(',').map(parseFloat);
+      return ((-Math.atan2(mb, ma) * 180 / Math.PI) % 360 + 360) % 360;
+    };
+    const sectorOf = ang => { let k = 0; for (let i = 0; i < bounds.length; i++) if (ang >= bounds[i]) k = i; return k; };
+    const loop = () => {
+      if (!alive) return;
+      const k = sectorOf(angleNow());
+      if (last !== null && k !== last && bounds.length > 1) {
+        ptr.style.transition = 'none';
+        ptr.style.transform = 'rotate(-24deg)';
+        reflow(ptr);
+        ptr.style.transition = '';
+        ptr.style.transform = '';
+      }
+      last = k;
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => { alive = false; cancelAnimationFrame(raf); ptr.style.transform = ''; };
+  }
+
   function sectorPath(a0, a1, i, label, n) {
     // Angles clockwise from 12 o'clock, so the pointer at the top reads the
     // sector the wheel stops under.
     const pt = (a, r) => [50 + r * Math.sin(a * Math.PI / 180), 50 - r * Math.cos(a * Math.PI / 180)];
-    const [x0, y0] = pt(a0, 48), [x1, y1] = pt(a1, 48);
+    const [x0, y0] = pt(a0, 46), [x1, y1] = pt(a1, 46);
     const large = a1 - a0 > 180 ? 1 : 0;
     const d = a1 - a0 >= 359.99
-      ? 'M50,2 A48,48 0 1,1 49.99,2 Z'
-      : `M50,50 L${x0.toFixed(2)},${y0.toFixed(2)} A48,48 0 ${large},1 ${x1.toFixed(2)},${y1.toFixed(2)} Z`;
+      ? 'M50,4 A46,46 0 1,1 49.99,4 Z'
+      : `M50,50 L${x0.toFixed(2)},${y0.toFixed(2)} A46,46 0 ${large},1 ${x1.toFixed(2)},${y1.toFixed(2)} Z`;
     let text = '';
-    if (n <= 16 && a1 - a0 >= 12) {
-      const mid = (a0 + a1) / 2, [tx, ty] = pt(mid, 31);
-      const fs = Math.max(3.2, Math.min(7.5, 70 / Math.max(4, label.length + 2), (a1 - a0) / 5));
+    if (n <= 20 && a1 - a0 >= 9) {
+      // Labels run along the radius, reading outward, like a real wheel.
+      const mid = (a0 + a1) / 2, [tx, ty] = pt(mid, 28);
       const short = label.length > 14 ? label.slice(0, 13) + '…' : label;
-      text = `<text x="${tx.toFixed(2)}" y="${ty.toFixed(2)}" font-size="${fs.toFixed(2)}">${escHtml(short)}</text>`;
+      const fs = Math.max(3.2, Math.min(8, 62 / Math.max(3.5, short.length + 1.5), (a1 - a0) / 3.6));
+      const rot = mid <= 180 ? mid - 90 : mid + 90;
+      text = `<text class="lbl" x="${tx.toFixed(2)}" y="${ty.toFixed(2)}" font-size="${fs.toFixed(2)}" transform="rotate(${rot.toFixed(1)} ${tx.toFixed(2)} ${ty.toFixed(2)})">${escHtml(short)}</text>`;
     }
-    return `<path class="seg" d="${d}" style="fill:var(--hue-${i % HUES})"/>${text}`;
+    return `<path d="${d}" style="fill:var(--hue-${i % HUES})" stroke="rgba(255,255,255,0.55)" stroke-width="0.5"/>${text}`;
+  }
+  function pegAt(a) {
+    const x = 50 + 48 * Math.sin(a * Math.PI / 180), y = 50 - 48 * Math.cos(a * Math.PI / 180);
+    return `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="1.5" fill="#f1f1ee" stroke="#8b8b90" stroke-width="0.35"/>`;
   }
   // The wheel turns by -angle; the pointer then reads the sector at `angle`
   // (mod 360). Always spin forward several turns to land there.
@@ -1221,58 +1711,112 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     let a0 = 0;
     for (let i = 0; i < o.i; i++) a0 += sec[i].w / tot * 360;
     const at = a0 + o.frac * sec[o.i].w / tot * 360;
-    const base = Math.ceil(S.spin / 360) * 360 + 360 * 4;
-    return base + at;
+    return Math.ceil(S.spin / 360) * 360 + 360 * 5 + at;
+  }
+
+  // ── Number reels ────────────────────────────────────────────────────────────
+  function odoHtml(text) {
+    return `<div class="odo" id="odo">${[...text].map(ch => /\d/.test(ch)
+      ? `<span class="reel"><span class="strip" data-d="${ch}">${'0123456789'.repeat(3).split('').map(d => `<span>${d}</span>`).join('')}</span></span>`
+      : `<span class="sym">${escHtml(ch)}</span>`).join('')}</div>`;
+  }
+  function fitOdo(len) {
+    const r = resultEl.getBoundingClientRect();
+    const units = len * 0.88 + 0.4;
+    const fs = Math.max(20, Math.min(r.height * 0.36, (r.width - 60) / units, 190));
+    $('odo').style.fontSize = fs + 'px';
+  }
+  function spinReels(play) {
+    const strips = [...resultEl.querySelectorAll('.reel .strip')];
+    let longest = 0;
+    strips.forEach((s, i) => {
+      const d = +s.dataset.d;
+      if (!play) { s.style.transition = 'none'; s.style.transform = `translateY(-${(20 + d) * 1.2}em)`; return; }
+      s.style.transition = 'none';
+      s.style.transform = `translateY(-${jiggle(0, 9) * 1.2}em)`;
+      reflow(s);
+      const dur = 0.9 + i * 0.16;
+      longest = Math.max(longest, dur);
+      s.style.transition = `transform ${dur}s cubic-bezier(0.15, 0.8, 0.25, 1)`;
+      s.style.transform = `translateY(-${(20 + d) * 1.2}em)`;
+    });
+    return longest * 1000;
+  }
+  function renderReelValue(text, captionHtml, play, emptyHint) {
+    if (text == null) {
+      resultEl.innerHTML = `<div class="ghost">${odoHtml('0')}</div>${emptyHint}`;
+      fitOdo(3);
+      spinReels(false);
+      return;
+    }
+    resultEl.innerHTML = odoHtml(text) + (captionHtml ? `<div class="caption" id="cap">${captionHtml}</div>` : '');
+    fitOdo(text.length);
+    const ms = spinReels(play);
+    if (play) hold(ms + 50, () => resultEl.querySelectorAll('.reel .strip').forEach(s => { s.style.transition = 'none'; }));
+  }
+
+  function renderNumber(o, play) {
+    const st = S.setup.number;
+    let note = o && o.runs > 1 ? `<span class="note">last of ${o.runs}</span>` : '';
+    if (st.unique && st.decimals === 0) note += `${note ? ' ' : ''}<span class="note">${S.pool.number.length} of ${st.max - st.min + 1} used</span>`;
+    renderReelValue(o ? String(o.v) : null, note, play, placeholder(`${st.min} – ${st.max}`));
+  }
+
+  function renderDist(o, play) {
+    const m = model('dist');
+    renderReelValue(o ? fmtDist(o.v) : null, `${escHtml(m.title)}${o && o.runs > 1 ? ` <span class="note">· last of ${o.runs}</span>` : ''}`,
+                    play, `<div class="caption">${escHtml(m.title)}</div>`);
+  }
+
+  // ── Name slot ───────────────────────────────────────────────────────────────
+  function renderList(o, play) {
+    const st = S.setup.list;
+    if (o && o.type === 'order') {
+      resultEl.innerHTML = `<ol class="order fade">${o.list.map((x, i) => `<li><span>${i + 1}</span>${escHtml(x)}</li>`).join('')}</ol>`;
+      return;
+    }
+    if (o && o.type === 'groups') {
+      resultEl.innerHTML = `<div class="groups fade">${o.groups.map((g, i) =>
+        `<div class="group bw-card"><h4>Group ${i + 1}</h4>${g.map(x => `<div>${escHtml(x)}</div>`).join('')}</div>`).join('')}</div>`;
+      return;
+    }
+    const name = o ? o.name : '?';
+    const reel = play && st.items.length > 1
+      ? Array.from({ length: 26 }, () => st.items[jiggle(0, st.items.length - 1)]).concat([name])
+      : [name];
+    resultEl.innerHTML =
+      `<div class="slot${o ? '' : ' ghost'}" id="slot"><div class="strip">${reel.map(x => `<div>${escHtml(x)}</div>`).join('')}</div></div>` +
+      (o ? (st.remove ? `<div class="bw-hint">${S.pool.list.length} left to pick</div>` : '')
+         : placeholder(`${st.items.length} names · press Pick`));
+    // Size by the longest name the reel will show, so it doesn't jump.
+    const slot = $('slot'), r = resultEl.getBoundingClientRect();
+    let fs = Math.min(r.height * 0.3, 150);
+    slot.style.fontSize = fs + 'px';
+    for (let i = 0; i < 14 && slot.getBoundingClientRect().width > r.width - 50 && fs > 18; i++) { fs *= 0.88; slot.style.fontSize = fs + 'px'; }
+    const strip = slot.querySelector('.strip');
+    strip.style.transform = `translateY(-${(reel.length - 1) * 1.3}em)`;
+    if (play && reel.length > 1) {
+      strip.style.transition = 'none';
+      strip.style.transform = 'translateY(0)';
+      reflow(strip);
+      strip.style.transition = 'transform 1.7s cubic-bezier(0.12, 0.75, 0.18, 1)';
+      strip.style.transform = `translateY(-${(reel.length - 1) * 1.3}em)`;
+      hold(1750, () => { strip.style.transition = 'none'; });
+    }
   }
 
   // ── Animation ───────────────────────────────────────────────────────────────
   // Purely cosmetic: the outcome is already decided and in S, so cutting an
   // animation short (a second press, a mode switch) just shows it sooner.
   let anim = null;
-  function startAnim(mode, o) {
-    if (mode === 'dice') {
-      const items = resultEl.querySelector('.items'), cap = resultEl.querySelector('.caption');
-      items.classList.add('anim');
-      if (cap) cap.style.visibility = 'hidden';
-      const sides = S.setup.dice.sides;
-      const tick = setInterval(() => {
-        items.innerHTML = o.faces.map(() => dieSvg(1 + Math.floor(Math.random() * sides), sides)).join('');
-      }, 70);
-      anim = { kind: 'dice', done: () => {
-        clearInterval(tick);
-        items.classList.remove('anim');
-        items.innerHTML = o.faces.map(f => dieSvg(f, sides)).join('');
-        if (cap) cap.style.visibility = '';
-      } };
-      anim.timer = setTimeout(() => finishAnim(), 650);
-    } else if (mode === 'coin') {
-      const items = resultEl.querySelector('.items'), cap = resultEl.querySelector('.caption');
-      items.classList.add('anim');
-      if (cap) cap.style.visibility = 'hidden';
-      anim = { kind: 'coin', done: () => { items.classList.remove('anim'); if (cap) cap.style.visibility = ''; } };
-      anim.timer = setTimeout(() => finishAnim(), 780);
-    } else if (mode === 'number' || (mode === 'list' && o.type === 'pick')) {
-      const big = $('big'); if (!big) return;
-      const final = big.textContent;
-      const pool = mode === 'list' ? S.setup.list.items : null;
-      const st = S.setup.number;
-      const tick = setInterval(() => {
-        big.textContent = pool ? pool[Math.floor(Math.random() * pool.length)] || final
-          : st.decimals ? (st.min + Math.random() * (st.max - st.min)).toFixed(st.decimals)
-          : String(st.min + Math.floor(Math.random() * (st.max - st.min + 1)));
-      }, mode === 'list' ? 80 : 50);
-      big.style.opacity = '0.55';
-      anim = { kind: 'scramble', done: () => { clearInterval(tick); big.textContent = final; big.style.opacity = ''; big.classList.add('fade'); } };
-      anim.timer = setTimeout(() => finishAnim(), mode === 'list' ? 900 : 450);
-    } else if (mode === 'list' || mode === 'dist') {
-      resultEl.firstElementChild?.classList.add('fade');
-    }
-  }
   function finishAnim(silent) {
     if (!anim) return;
     const a = anim; anim = null;
     clearTimeout(a.timer);
-    if (a.kind === 'spin' && silent) { const w = $('wheel'); w && w.classList.remove('spinning'); }
+    if (silent && a.kind === 'spin') {
+      const w = $('wheel');
+      if (w) { w.classList.remove('spinning'); }
+    }
     a.done && a.done();
   }
 
