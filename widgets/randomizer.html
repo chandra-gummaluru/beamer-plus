@@ -43,18 +43,281 @@
    ]
   },
   {
-   "key": "dice",
-   "label": "Dice (number of sides)",
-   "type": "textarea-lines",
-   "editor": "list",
-   "itemLabel": "die",
-   "itemPlaceholder": "Sides, e.g. 6",
-   "default": [
-    "6",
-    "6"
-   ],
+   "key": "diceCount",
+   "label": "Number of dice",
+   "type": "select",
+   "default": "2",
    "showIf": {
     "mode": "dice"
+   },
+   "options": [
+    {
+     "v": "1",
+     "l": "1"
+    },
+    {
+     "v": "2",
+     "l": "2"
+    },
+    {
+     "v": "3",
+     "l": "3"
+    },
+    {
+     "v": "4",
+     "l": "4"
+    },
+    {
+     "v": "5",
+     "l": "5"
+    },
+    {
+     "v": "6",
+     "l": "6"
+    }
+   ]
+  },
+  {
+   "key": "die1",
+   "label": "Die 1",
+   "type": "select",
+   "default": "6",
+   "options": [
+    {
+     "v": "4",
+     "l": "d4 (4 sides)"
+    },
+    {
+     "v": "6",
+     "l": "d6 (6 sides)"
+    },
+    {
+     "v": "8",
+     "l": "d8 (8 sides)"
+    },
+    {
+     "v": "10",
+     "l": "d10 (10 sides)"
+    },
+    {
+     "v": "12",
+     "l": "d12 (12 sides)"
+    },
+    {
+     "v": "20",
+     "l": "d20 (20 sides)"
+    }
+   ],
+   "showIf": {
+    "mode": "dice",
+    "diceCount": [
+     "1",
+     "2",
+     "3",
+     "4",
+     "5",
+     "6"
+    ]
+   }
+  },
+  {
+   "key": "die2",
+   "label": "Die 2",
+   "type": "select",
+   "default": "6",
+   "options": [
+    {
+     "v": "4",
+     "l": "d4 (4 sides)"
+    },
+    {
+     "v": "6",
+     "l": "d6 (6 sides)"
+    },
+    {
+     "v": "8",
+     "l": "d8 (8 sides)"
+    },
+    {
+     "v": "10",
+     "l": "d10 (10 sides)"
+    },
+    {
+     "v": "12",
+     "l": "d12 (12 sides)"
+    },
+    {
+     "v": "20",
+     "l": "d20 (20 sides)"
+    }
+   ],
+   "showIf": {
+    "mode": "dice",
+    "diceCount": [
+     "2",
+     "3",
+     "4",
+     "5",
+     "6"
+    ]
+   }
+  },
+  {
+   "key": "die3",
+   "label": "Die 3",
+   "type": "select",
+   "default": "6",
+   "options": [
+    {
+     "v": "4",
+     "l": "d4 (4 sides)"
+    },
+    {
+     "v": "6",
+     "l": "d6 (6 sides)"
+    },
+    {
+     "v": "8",
+     "l": "d8 (8 sides)"
+    },
+    {
+     "v": "10",
+     "l": "d10 (10 sides)"
+    },
+    {
+     "v": "12",
+     "l": "d12 (12 sides)"
+    },
+    {
+     "v": "20",
+     "l": "d20 (20 sides)"
+    }
+   ],
+   "showIf": {
+    "mode": "dice",
+    "diceCount": [
+     "3",
+     "4",
+     "5",
+     "6"
+    ]
+   }
+  },
+  {
+   "key": "die4",
+   "label": "Die 4",
+   "type": "select",
+   "default": "6",
+   "options": [
+    {
+     "v": "4",
+     "l": "d4 (4 sides)"
+    },
+    {
+     "v": "6",
+     "l": "d6 (6 sides)"
+    },
+    {
+     "v": "8",
+     "l": "d8 (8 sides)"
+    },
+    {
+     "v": "10",
+     "l": "d10 (10 sides)"
+    },
+    {
+     "v": "12",
+     "l": "d12 (12 sides)"
+    },
+    {
+     "v": "20",
+     "l": "d20 (20 sides)"
+    }
+   ],
+   "showIf": {
+    "mode": "dice",
+    "diceCount": [
+     "4",
+     "5",
+     "6"
+    ]
+   }
+  },
+  {
+   "key": "die5",
+   "label": "Die 5",
+   "type": "select",
+   "default": "6",
+   "options": [
+    {
+     "v": "4",
+     "l": "d4 (4 sides)"
+    },
+    {
+     "v": "6",
+     "l": "d6 (6 sides)"
+    },
+    {
+     "v": "8",
+     "l": "d8 (8 sides)"
+    },
+    {
+     "v": "10",
+     "l": "d10 (10 sides)"
+    },
+    {
+     "v": "12",
+     "l": "d12 (12 sides)"
+    },
+    {
+     "v": "20",
+     "l": "d20 (20 sides)"
+    }
+   ],
+   "showIf": {
+    "mode": "dice",
+    "diceCount": [
+     "5",
+     "6"
+    ]
+   }
+  },
+  {
+   "key": "die6",
+   "label": "Die 6",
+   "type": "select",
+   "default": "6",
+   "options": [
+    {
+     "v": "4",
+     "l": "d4 (4 sides)"
+    },
+    {
+     "v": "6",
+     "l": "d6 (6 sides)"
+    },
+    {
+     "v": "8",
+     "l": "d8 (8 sides)"
+    },
+    {
+     "v": "10",
+     "l": "d10 (10 sides)"
+    },
+    {
+     "v": "12",
+     "l": "d12 (12 sides)"
+    },
+    {
+     "v": "20",
+     "l": "d20 (20 sides)"
+    }
+   ],
+   "showIf": {
+    "mode": "dice",
+    "diceCount": [
+     "6"
+    ]
    }
   },
   {
@@ -425,20 +688,30 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 }
 .cballs .cball { transform-box: fill-box; }
 .cballs.tumbling .cball { animation: tumble-ball 0.42s ease-in-out 3; }
+/* A folded slip of paper. The lower half is a flap that folds up over the
+   upper half and swings down to open. */
 .slip {
-  position: relative; display: inline-flex; align-items: center; justify-content: center;
-  padding: 0.35em 0.8em 0.45em; max-width: 100%;
-  background:
-    linear-gradient(180deg, rgba(0,0,0,0) 49.6%, rgba(0,0,0,0.07) 50%, rgba(0,0,0,0) 50.6%),
-    linear-gradient(170deg, #fffdf6, #f4efe0);
-  border-radius: 3px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.12), 0 10px 24px rgba(0,0,0,0.14);
-  transform: rotate(-1.5deg);
-  color: #24324f;
+  position: relative; transform: rotate(-1.5deg);
+  perspective: 900px;
+  color: #22304d;
   font-family: 'Segoe Print', 'Bradley Hand', 'Marker Felt', 'Comic Sans MS', cursive; font-weight: 700;
-  white-space: nowrap;
+  filter: drop-shadow(0 3px 4px rgba(0,0,0,0.14)) drop-shadow(0 10px 18px rgba(0,0,0,0.1));
 }
-.slip span { display: block; line-height: 1.15; }
+.slip .half { position: absolute; left: 0; right: 0; height: 50%; }
+.slip .top { top: 0; overflow: hidden; background: linear-gradient(175deg, #fffdf7, #f6f1e3); border-radius: 3px 3px 0 0; }
+.slip .bot { top: 50%; transform-origin: 50% 0; transform-style: preserve-3d; }
+.slip .bot .face, .slip .bot .back { position: absolute; inset: 0; backface-visibility: hidden; border-radius: 0 0 3px 3px; overflow: hidden; }
+.slip .bot .face { background: linear-gradient(185deg, #efe9da, #fbf8ef 30%, #f6f1e3); }
+.slip .bot .back { transform: rotateX(180deg); background: linear-gradient(180deg, #ebe4d2, #f7f2e5); border-radius: 3px 3px 0 0; box-shadow: inset 0 -1px 0 rgba(0,0,0,0.08); }
+.slip span { position: absolute; left: 0; right: 0; height: 200%; display: flex; align-items: center; justify-content: center; white-space: nowrap; line-height: 1; }
+.slip .top span { top: 0; }
+.slip .bot span { top: -100%; }
+@keyframes rustle { 0%, 100% { transform: translateY(0) rotate(0); } 30% { transform: translateY(-2px) rotate(-4deg); } 65% { transform: translateY(1px) rotate(3deg); } }
+.hat-slips .hslip { transform-box: fill-box; transform-origin: 50% 100%; }
+.hat-slips.rustle .hslip { animation: rustle 0.24s ease-in-out 3; }
+
+/* 3D dice canvas. */
+.dice3 canvas { display: block; }
 
 /* Dice and coins: the throw on the left, its chalkboard history beside it. */
 .play-row { display: flex; align-items: center; justify-content: center; gap: 30px; width: 100%; }
@@ -790,7 +1063,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     runs: 1,
     setup:   null,          // from the settings panel — see setupFromConfig()
     pool:    { bag: null, cards: null, number: [], list: null },
-    hist:    { dice: [], coin: [] },   // what's been written on the chalkboard
+    hist:    { dice: [], coin: [], bag: [] },   // what's been written on the chalkboard
     last:    {},            // mode → last outcome (shape depends on mode)
     stats:   {},            // mode → { sig, counts, total, sum, sumsq }
     rng:     0,             // PRNG state, so a seeded demo continues where it was
@@ -855,7 +1128,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   function fullDeck() { return Array.from({ length: 52 }, (_, i) => i); }
   function fullList() { return S.setup.list.items.slice(); }
   function refill(mode) {
-    if (mode === 'bag')    { S.pool.bag = fullBag(); S.pool.bagOut = []; }
+    if (mode === 'bag')    { S.pool.bag = fullBag(); S.pool.bagOut = []; if (S.hist) S.hist.bag = []; }
     if (mode === 'cards')  { S.pool.cards = shuffle(fullDeck()); S.pool.hand = []; }
     if (mode === 'number') S.pool.number = [];
     if (mode === 'list')   S.pool.list   = fullList();
@@ -1042,20 +1315,18 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     }
     if (mode === 'bag') {
       const pool = S.pool.bag, out = S.pool.bagOut;
-      // With replacement, what was drawn last goes back in first.
-      const back = st.replace ? out.splice(0) : [];
-      back.forEach(b => { pool[b.j] = (pool[b.j] || 0) + 1; });
       const balls = [];
       for (let i = 0; i < st.k; i++) {
         if (pool.reduce((s, x) => s + x, 0) <= 0) break;
         const j = pickWeighted(pool);
-        pool[j]--;
+        // With replacement it goes straight back in, so the jar is unchanged.
+        if (!st.replace) { pool[j]--; out.push({ j, c: st.balls[j].c }); }
         balls.push({ j, c: st.balls[j].c });
         tally(mode, j, m);
       }
-      out.push(...balls);
       if (out.length > 400) out.splice(0, out.length - 400);
-      return balls.length ? { balls: balls.map(b => b.c), idx: balls.map(b => b.j), back: back.map(b => b.c) } : null;
+      if (balls.length) pushHist('bag', null, balls.map(b => ({ c: b.c })));
+      return balls.length ? { balls: balls.map(b => b.c), idx: balls.map(b => b.j) } : null;
     }
     if (mode === 'spinner') {
       const sec = spinnerSectors();
@@ -1138,9 +1409,9 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     emitState(true);
   }
 
-  function pushHist(kind, entry) {
+  function pushHist(kind, entry, many) {
     const h = S.hist[kind] || (S.hist[kind] = []);
-    h.push(entry);
+    if (many) h.push(...many); else h.push(entry);
     if (h.length > 300) h.splice(0, h.length - 300);
   }
 
@@ -1235,8 +1506,12 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     const min = numCfg(c.numMin, 1, 0, cap, true), max = numCfg(c.numMax, Math.min(99, cap), 0, cap, true);
     const a = numCfg(c.distA, 0, -1e6, 1e6), b = numCfg(c.distB, 1, -1e6, 1e6);
     return {
-      dice:    { sides: (diceRows.length ? diceRows : ['6', '6']).slice(0, 12)
-                   .map(s => numCfg(String(s).replace(/^d/i, ''), 6, 2, 100, true)),
+      // One dropdown per die (a d6 and a d20, say). Decks saved with the
+      // older one-per-line list still read.
+      dice:    { sides: (c.diceCount != null || [1, 2, 3, 4, 5, 6].some(i => c['die' + i] != null)
+                   ? Array.from({ length: numCfg(c.diceCount, 2, 1, 6, true) }, (_, i) => c['die' + (i + 1)] ?? 6)
+                   : (diceRows.length ? diceRows : ['6', '6']).slice(0, 6))
+                   .map(s => { const v = numCfg(String(s).replace(/^d/i, ''), 6, 2, 100, true); return [4, 6, 8, 10, 12, 20].includes(v) ? v : 6; }),
                  },
       coin:    { n: numCfg(c.coins, 1, 1, 20, true), p: numCfg(c.pHeads, 0.5, 0, 1) },
       bag:     { balls: parseBalls(lines(c.balls).length ? lines(c.balls) : ['Red 3', 'Blue 2', 'Green 1']),
@@ -1284,7 +1559,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 
   function isExhausted() {
     ensurePools();
-    if (S.mode === 'bag') return S.pool.bag.reduce((s, x) => s + x, 0) + (S.setup.bag.replace ? S.pool.bagOut.length : 0) <= 0;
+    if (S.mode === 'bag') return S.pool.bag.reduce((s, x) => s + x, 0) <= 0;
     if (S.mode === 'cards') return S.pool.cards.length === 0;
     if (S.mode === 'list') return S.setup.list.remove ? !S.pool.list.length : !S.setup.list.items.length;
     if (S.mode === 'number' && S.setup.number.unique)
@@ -1397,6 +1672,13 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       `<g clip-path="url(#cw${uid})"><text class="ctext" x="${cx.toFixed(1)}" y="${(cy + fs * 0.12).toFixed(1)}" font-size="${fs.toFixed(1)}" text-anchor="middle" dominant-baseline="central" fill="${CHALK}">${v}</text>` +
       `<text x="${cx.toFixed(1)}" y="${(cy + u * 0.42).toFixed(1)}" font-size="${(u * 0.17).toFixed(1)}" text-anchor="middle" fill="${CHALK}" opacity="0.6">d${sides}</text></g>`;
   }
+  // A number written in chalk, revealed left to right when it's new.
+  function chalkTotal(v, cx, cy, u, w, uid) {
+    const fs = u * 0.78;
+    return `<clipPath id="ct${uid}"><rect class="wipe" x="${(cx - w / 2 - 4).toFixed(1)}" y="${(cy - u / 2).toFixed(1)}" width="${(w + 8).toFixed(1)}" height="${u.toFixed(1)}"/></clipPath>` +
+      `<g clip-path="url(#ct${uid})"><text x="${cx.toFixed(1)}" y="${(cy + fs * 0.06).toFixed(1)}" font-size="${fs.toFixed(1)}" text-anchor="middle" dominant-baseline="central" fill="${CHALK}">${v}</text></g>`;
+  }
+
   function chalkCoin(heads, cx, cy, u, i) {
     const r = u * 0.37, w = Math.max(1.6, u * 0.05), L = r * 0.46;
     let g = stroke('ring', wobblyPath(chalkCircle(cx, cy, r, i)), w);
@@ -1420,8 +1702,11 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     const gap = u * 0.45, rowH = u * 1.12;
     // Lay every entry out from the start; keep only the current board's worth.
     let x = 0, y = 0, page = [], placed = [];
+    // Dice are written up as just the total; coins as their letters, HTH.
+    const textOf = e => (kind === 'dice' ? String(e.reduce((a, d) => a + d.f, 0)) : e.map(v => (v ? 'H' : 'T')).join(''));
+    const widthOf = e => u * Math.max(1, 0.45 + 0.46 * textOf(e).length);
     entries.forEach((e, idx) => {
-      const n = e.length, w = n * u + (n - 1) * u * 0.1;
+      const w = widthOf(e);
       if (x > 0 && x + w > iw) { x = 0; y += rowH; }
       if (y + rowH > ih + 0.5) { x = 0; y = 0; page = []; }
       page.push({ e, idx, x, y, w });
@@ -1429,8 +1714,13 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     });
     placed = page;
     let body = '';
-    placed.forEach(({ e, idx, x: ex, y: ey }) => {
+    placed.forEach(({ e, idx, x: ex, y: ey, w: ew }) => {
       let g = '';
+      {
+        g = chalkTotal(textOf(e), pad + ex + ew / 2, pad + ey + rowH / 2, u, ew, idx);
+        body += `<g class="sketch${idx === entries.length - 1 ? ' newest' : ''}">${g}</g>`;
+        return;
+      }
       e.forEach((v, k) => {
         const cx = pad + ex + k * u * 1.1 + u / 2, cy = pad + ey + rowH / 2;
         g += kind === 'coin' ? chalkCoin(!!v, cx, cy, u, idx * 13 + k)
@@ -1501,9 +1791,9 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     emerald:  { face: '#1d9461', hi: '#4fcb91', lo: '#0c5636', ink: '#ffffff', pip: '#fbf7ef', pipHi: '#ffffff' },
     onyx:     { face: '#2e2e33', hi: '#5a5a62', lo: '#111114', ink: '#ffffff', pip: '#f2efe6', pipHi: '#ffffff' },
   };
-  // Classic dice: an ivory d6, blue polyhedra.
-  function dieColor(sides) {
-    return sides === 6 ? DIE_COLORS.ivory : DIE_COLORS.sapphire;
+  // Classic dice: ivory, whatever the number of sides.
+  function dieColor() {
+    return DIE_COLORS.ivory;
   }
 
   const PIPS = { 1: [[50, 50]], 2: [[27, 27], [73, 73]], 3: [[27, 27], [50, 50], [73, 73]],
@@ -1588,6 +1878,352 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     if (u) u.style.display = (v === 6 || v === 9) && sides >= 8 ? '' : 'none';
   }
 
+  // ── 3D dice ─────────────────────────────────────────────────────────────────
+  // Real polyhedra (three.js 0.160, vendored by the Beamer+ server and loaded
+  // on first use): numbered faces, lit and shadowed on a table, thrown so
+  // they tumble and come to rest showing the face that was rolled. Where
+  // three.js or WebGL isn't available (the file opened on its own, an old
+  // GPU), the flat dice above are used instead.
+  const THREE_URL = '/static/vendor/three/three.module.min.js';
+  const RBOX_URL  = '/static/vendor/three/RoundedBoxGeometry.js';
+  let T3 = null, RBox = null, t3Loading = null, t3Failed = false;
+  function loadThree() {
+    if (T3 || t3Failed) return Promise.resolve(T3);
+    if (!t3Loading) {
+      t3Loading = Promise.all([import(THREE_URL), import(RBOX_URL)])
+        .then(([m, r]) => {
+          // WebGL can still be unavailable (old GPU, remote desktop).
+          const probe = document.createElement('canvas');
+          if (!(probe.getContext('webgl2') || probe.getContext('webgl'))) throw new Error('no webgl');
+          T3 = m; RBox = r.RoundedBoxGeometry; return m;
+        })
+        .catch(() => { t3Failed = true; return null; });
+    }
+    return t3Loading;
+  }
+
+  const DIE_LOOK = {
+    poly: { body: 0xf3eee2, ink: '#17171a' },
+    d6:   { body: 0xf3eee2, ink: '#17171a' },
+  };
+
+  // ── Geometry: each die as a list of flat faces ─────────────────────────────
+  // A face: its polygon (outward winding), centre, normal, and which way is
+  // "up" for the number printed on it.
+  function facesFromGeometry(geo) {
+    const T = T3, g = geo.index ? geo.toNonIndexed() : geo;
+    const pos = g.getAttribute('position'), groups = [];
+    const a = new T.Vector3(), b = new T.Vector3(), c = new T.Vector3();
+    for (let i = 0; i < pos.count; i += 3) {
+      a.fromBufferAttribute(pos, i); b.fromBufferAttribute(pos, i + 1); c.fromBufferAttribute(pos, i + 2);
+      const n = new T.Vector3().subVectors(b, a).cross(new T.Vector3().subVectors(c, a)).normalize();
+      let grp = groups.find(f => f.n.dot(n) > 0.999);
+      if (!grp) groups.push(grp = { n, pts: [] });
+      [a, b, c].forEach(p => { if (!grp.pts.some(q => q.distanceTo(p) < 1e-4)) grp.pts.push(p.clone()); });
+    }
+    return groups.map(({ n, pts }) => polyFace(pts, n));
+  }
+  function polyFace(pts, n) {
+    const T = T3;
+    const centre = pts.reduce((s, p) => s.add(p), new T.Vector3()).multiplyScalar(1 / pts.length);
+    const u = new T.Vector3().subVectors(pts[0], centre).normalize(), v = new T.Vector3().crossVectors(n, u);
+    pts = pts.slice().sort((p, q) => {
+      const dp = new T.Vector3().subVectors(p, centre), dq = new T.Vector3().subVectors(q, centre);
+      return Math.atan2(dp.dot(v), dp.dot(u)) - Math.atan2(dq.dot(v), dq.dot(u));
+    });
+    // Inradius: how big a label fits.
+    let inr = Infinity;
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i], q = pts[(i + 1) % pts.length];
+      const edge = new T.Vector3().subVectors(q, p), w = new T.Vector3().subVectors(centre, p);
+      const t = Math.max(0, Math.min(1, w.dot(edge) / edge.lengthSq()));
+      inr = Math.min(inr, p.clone().addScaledVector(edge, t).distanceTo(centre));
+    }
+    const up = new T.Vector3().subVectors(pts[0], centre).normalize();
+    return { pts, centre, n: n.clone(), up, inr };
+  }
+  // Pentagonal trapezohedron: ten kites, the shape of a real d10. The ring
+  // height is solved so each kite is flat.
+  function d10Faces() {
+    const T = T3, H = 1;
+    const ring = e => {
+      const U = [], L = [];
+      for (let k = 0; k < 5; k++) {
+        const a1 = k * 2 * Math.PI / 5, a2 = a1 + Math.PI / 5;
+        U.push(new T.Vector3(Math.cos(a1), e, Math.sin(a1)));
+        L.push(new T.Vector3(Math.cos(a2), -e, Math.sin(a2)));
+      }
+      return { U, L };
+    };
+    const flatness = e => {
+      const { U, L } = ring(e), top = new T.Vector3(0, H, 0);
+      const n = new T.Vector3().subVectors(U[0], top).cross(new T.Vector3().subVectors(L[0], top));
+      return n.dot(new T.Vector3().subVectors(U[1], top));
+    };
+    let lo = 0.001, hi = 0.9;
+    for (let i = 0; i < 60; i++) { const mid = (lo + hi) / 2; (flatness(lo) * flatness(mid) <= 0) ? (hi = mid) : (lo = mid); }
+    const { U, L } = ring((lo + hi) / 2), top = new T.Vector3(0, H, 0), bot = new T.Vector3(0, -H, 0);
+    const faces = [];
+    for (let k = 0; k < 5; k++) {
+      faces.push([top, U[(k + 1) % 5], L[k], U[k]]);
+      faces.push([bot, L[k], U[(k + 1) % 5], L[(k + 1) % 5]]);
+    }
+    return faces.map(pts => {
+      const c = pts.reduce((s, p) => s.add(p), new T.Vector3()).multiplyScalar(0.25);
+      let n = new T.Vector3().subVectors(pts[1], pts[0]).cross(new T.Vector3().subVectors(pts[2], pts[0])).normalize();
+      if (n.dot(c) < 0) n.negate();
+      const f = polyFace(pts, n);
+      // The number reads with its top toward the point of the kite.
+      f.up = new T.Vector3().subVectors(pts[0], f.centre).normalize();
+      return f;
+    });
+  }
+  const faceCache = {};
+  function dieFaces(sides) {
+    if (faceCache[sides]) return faceCache[sides];
+    const T = T3;
+    let faces;
+    if (sides === 4)       faces = facesFromGeometry(new T.TetrahedronGeometry(1.25));
+    else if (sides === 8)  faces = facesFromGeometry(new T.OctahedronGeometry(1.15));
+    else if (sides === 10) faces = d10Faces().map(f => scaleFace(f, 1.05));
+    else if (sides === 12) faces = facesFromGeometry(new T.DodecahedronGeometry(1.12));
+    else if (sides === 20) faces = facesFromGeometry(new T.IcosahedronGeometry(1.15));
+    else {
+      const ax = [[0, 0, 1], [0, 0, -1], [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0]];
+      faces = ax.map(([x, y, z]) => {
+        const n = new T.Vector3(x, y, z), centre = n.clone().multiplyScalar(0.82);
+        const up = Math.abs(y) ? new T.Vector3(0, 0, -1) : new T.Vector3(0, 1, 0);
+        return { centre, n, up, inr: 0.82, pts: null };
+      });
+    }
+    // Number the faces so opposite faces add up to sides + 1, as on real dice.
+    const order = [];
+    const left = faces.map((_, i) => i);
+    let k = 1;
+    while (left.length) {
+      const i = left.shift();
+      const opp = left.findIndex(j => faces[j].n.dot(faces[i].n) < -0.999);
+      faces[i].value = k;
+      if (opp >= 0 && sides !== 4) { faces[left[opp]].value = sides + 1 - k; left.splice(opp, 1); }
+      order.push(i); k++;
+      if (sides === 4) continue;
+    }
+    if (sides === 4) faces.forEach((f, i) => { f.value = i + 1; });
+    return (faceCache[sides] = faces);
+  }
+  function scaleFace(f, s) {
+    // Copies: the corners are shared between faces.
+    f.pts = f.pts.map(p => p.clone().multiplyScalar(s)); f.centre = f.centre.clone().multiplyScalar(s); f.inr *= s; return f;
+  }
+
+  // ── Meshes ──────────────────────────────────────────────────────────────────
+  function labelTexture(text, sides, ink) {
+    const T = T3, cv = document.createElement('canvas');
+    cv.width = cv.height = 256;
+    const ctx = cv.getContext('2d');
+    ctx.clearRect(0, 0, 256, 256);
+    if (sides === 6) {
+      // Pips, sunk into the face.
+      const P = PIPS[text] || [];
+      P.forEach(([x, y]) => {
+        const cx = x / 100 * 256, cy = y / 100 * 256;
+        const g = ctx.createRadialGradient(cx - 6, cy - 6, 2, cx, cy, 26);
+        g.addColorStop(0, '#4a4a50'); g.addColorStop(1, ink);
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(cx, cy, 25, 0, Math.PI * 2); ctx.fill();
+      });
+    } else {
+      const s = String(text), fs = s.length > 1 ? 118 : 150;
+      ctx.font = `700 ${fs}px "DM Sans", "Segoe UI", system-ui, sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = ink; ctx.fillText(s, 128, 136);
+      if ((text === 6 || text === 9) && sides >= 8) { ctx.fillRect(128 - 30, 136 + fs * 0.42, 60, 10); }
+    }
+    const tex = new T.CanvasTexture(cv);
+    tex.colorSpace = T.SRGBColorSpace;
+    tex.anisotropy = 4;
+    return tex;
+  }
+
+  function buildDie(sides) {
+    const T = T3, faces = dieFaces(sides), group = new T.Group();
+    const look = sides === 6 ? DIE_LOOK.d6 : DIE_LOOK.poly;
+    const mat = new T.MeshPhysicalMaterial({ color: look.body, roughness: 0.42, clearcoat: 1, clearcoatRoughness: 0.25 });
+    let body;
+    if (sides === 6) body = new T.Mesh(new RBox(1.64, 1.64, 1.64, 5, 0.22), mat);
+    else {
+      const pos = [], nrm = [];
+      faces.forEach(f => {
+        for (let i = 1; i < f.pts.length - 1; i++) {
+          [f.pts[0], f.pts[i], f.pts[i + 1]].forEach(p => { pos.push(p.x, p.y, p.z); nrm.push(f.n.x, f.n.y, f.n.z); });
+        }
+      });
+      const geo = new T.BufferGeometry();
+      geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3));
+      geo.setAttribute('normal', new T.Float32BufferAttribute(nrm, 3));
+      body = new T.Mesh(geo, mat);
+      // Faint edges, so the facets read even when two are lit alike.
+      const edges = new T.LineSegments(new T.EdgesGeometry(geo, 10), new T.LineBasicMaterial({ color: 0x8c8678, transparent: true, opacity: 0.35 }));
+      group.add(edges);
+    }
+    body.castShadow = true;
+    group.add(body);
+    faces.forEach(f => {
+      const size = f.inr * (sides === 6 ? 2 : sides === 4 ? 1.55 : 1.45);
+      const plane = new T.Mesh(new T.PlaneGeometry(size, size),
+        new T.MeshStandardMaterial({ map: labelTexture(f.value, sides, look.ink), transparent: true, roughness: 0.5, polygonOffset: true, polygonOffsetFactor: -2 }));
+      const x = new T.Vector3().crossVectors(f.up, f.n).normalize();
+      const up = new T.Vector3().crossVectors(f.n, x).normalize();
+      plane.quaternion.setFromRotationMatrix(new T.Matrix4().makeBasis(x, up, f.n));
+      plane.position.copy(f.centre).addScaledVector(f.n, sides === 6 ? 0.003 : 0.004);
+      group.add(plane);
+    });
+    group.userData = { sides, faces };
+    return group;
+  }
+
+  // The orientation that puts face `value` facing up, its number reading
+  // the right way for the camera.
+  function restQuat(group, value, twist = 0) {
+    const T = T3, f = group.userData.faces.find(x => x.value === value) || group.userData.faces[0];
+    // A d4 shows its number on the face toward the room, not on top.
+    const target = group.userData.sides === 4 ? new T.Vector3(0, 0.62, 0.78).normalize() : new T.Vector3(0, 1, 0);
+    const q1 = new T.Quaternion().setFromUnitVectors(f.n, target);
+    const up = f.up.clone().applyQuaternion(q1);
+    const want = group.userData.sides === 4 ? new T.Vector3(0, 0.78, -0.62).normalize() : new T.Vector3(0, 0, -1);
+    const ang = Math.atan2(new T.Vector3().crossVectors(up, want).dot(target), up.dot(want)) + twist;
+    return new T.Quaternion().setFromAxisAngle(target, ang).multiply(q1);
+  }
+  // Height that puts the die's lowest point on the table.
+  function restY(group, q) {
+    const T = T3, faces = group.userData.faces;
+    let min = Infinity;
+    if (group.userData.sides === 6) {
+      [-1, 1].forEach(x => [-1, 1].forEach(y => [-1, 1].forEach(z => {
+        min = Math.min(min, new T.Vector3(x * 0.82, y * 0.82, z * 0.82).applyQuaternion(q).y);
+      })));
+    } else faces.forEach(f => f.pts.forEach(p => { min = Math.min(min, p.clone().applyQuaternion(q).y); }));
+    return -min;
+  }
+
+  // ── Scene ───────────────────────────────────────────────────────────────────
+  let D3 = null;   // { renderer, scene, camera, dice: [group], sig, raf }
+  function ensureScene() {
+    if (D3) return D3;
+    const T = T3;
+    const renderer = new T.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = T.PCFSoftShadowMap;
+    renderer.toneMapping = T.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    const scene = new T.Scene();
+    scene.add(new T.HemisphereLight(0xffffff, 0x8a8a90, 1.25));
+    const key = new T.DirectionalLight(0xffffff, 2.4);
+    key.position.set(-4, 10, 6);
+    key.castShadow = true;
+    key.shadow.mapSize.set(1024, 1024);
+    key.shadow.camera.left = -12; key.shadow.camera.right = 12; key.shadow.camera.top = 8; key.shadow.camera.bottom = -8;
+    key.shadow.radius = 6;
+    scene.add(key);
+    const fill = new T.DirectionalLight(0xbfd0ff, 0.6);
+    fill.position.set(6, 4, -3);
+    scene.add(fill);
+    const ground = new T.Mesh(new T.PlaneGeometry(60, 40), new T.ShadowMaterial({ opacity: 0.22 }));
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+    const camera = new T.PerspectiveCamera(28, 1, 0.1, 100);
+    D3 = { renderer, scene, camera, dice: [], sig: '', raf: 0, slots: [] };
+    return D3;
+  }
+  function layoutScene(sides, w, h) {
+    const T = T3, d = ensureScene();
+    d.renderer.setSize(w, h, false);
+    d.renderer.domElement.style.width = w + 'px';
+    d.renderer.domElement.style.height = h + 'px';
+    const sig = sides.join(',');
+    if (sig !== d.sig) {
+      d.dice.forEach(g => d.scene.remove(g));
+      d.dice = sides.map(buildDie);
+      d.dice.forEach(g => d.scene.add(g));
+      d.sig = sig;
+    }
+    // Side by side on the table, the camera pulled back to fit them all.
+    const gap = 2.7, n = sides.length;
+    d.slots = sides.map((_, i) => new T.Vector3((i - (n - 1) / 2) * gap, 0, 0));
+    d.camera.aspect = w / h;
+    const halfW = (n * gap) / 2 + 0.3, halfH = 1.75;
+    const vf = T.MathUtils.degToRad(d.camera.fov) / 2, hf = Math.atan(Math.tan(vf) * d.camera.aspect);
+    const dist = Math.max(halfW / Math.tan(hf), halfH / Math.tan(vf)) * 1.08;
+    // Nearly straight down, as you'd look at dice on a table to read them:
+    // the face that came up is the one facing the room.
+    d.camera.position.set(0, dist * 0.96, dist * 0.28);
+    d.camera.lookAt(0, 0.2, 0);
+    d.camera.updateProjectionMatrix();
+    return d;
+  }
+  const easeOut = t => 1 - Math.pow(1 - t, 3);
+
+  function renderDice3D(o, play, sides, faces, w, h) {
+    const T = T3, d = layoutScene(sides, w, h);
+    cancelAnimationFrame(d.raf);
+    // Twist each die a little off square, the same way every time for a roll.
+    const twistOf = i => ((S.rollId * 7 + i * 13) % 9 - 4) * 0.05;
+    const rest = d.dice.map((g, i) => {
+      const q = faces[i] ? restQuat(g, faces[i], twistOf(i)) : restQuat(g, g.userData.faces[(i * 3) % g.userData.faces.length].value, 0.3);
+      return { q, y: restY(g, q), x: d.slots[i].x };
+    });
+    const draw = () => d.renderer.render(d.scene, d.camera);
+    if (!play) {
+      d.dice.forEach((g, i) => { g.quaternion.copy(rest[i].q); g.position.set(rest[i].x, rest[i].y, 0); });
+      draw();
+      return 0;
+    }
+    // The throw: in from the left and above, tumbling about a random axis,
+    // bouncing, then settling onto the rolled face.
+    const DUR = 1500, start = performance.now();
+    const plan = d.dice.map((g, i) => {
+      const axis = new T.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
+      return { axis, spin: 14 + Math.random() * 6, q0: new T.Quaternion().setFromEuler(new T.Euler(Math.random() * 6, Math.random() * 6, Math.random() * 6)),
+               x0: rest[i].x - 3.2 - Math.random(), z0: -1.2 + Math.random() * 0.6, delay: i * 90 };
+    });
+    const tumble = new T.Quaternion(), from = new T.Quaternion();
+    const frame = now => {
+      let busy = false;
+      d.dice.forEach((g, i) => {
+        const p = plan[i], R = rest[i];
+        const t = Math.max(0, Math.min(1, (now - start - p.delay) / DUR));
+        if (t < 1) busy = true;
+        const SETTLE = 0.62;
+        // Rotation: free tumble, then ease onto the rest orientation.
+        const tt = Math.min(t, SETTLE) / SETTLE;
+        tumble.setFromAxisAngle(p.axis, p.spin * (1 - Math.pow(1 - tt, 2)));
+        from.copy(p.q0).premultiply(tumble);
+        if (t <= SETTLE) g.quaternion.copy(from);
+        else g.quaternion.copy(from).slerp(R.q, easeOut((t - SETTLE) / (1 - SETTLE)));
+        // Position: slide in, bouncing lower each time.
+        const e = easeOut(t);
+        const bounce = Math.abs(Math.cos(t * Math.PI * 2.6)) * 2.4 * Math.pow(1 - t, 2.2);
+        g.position.set(p.x0 + (R.x - p.x0) * e, R.y + bounce + (1 - e) * 0.6, p.z0 * (1 - e));
+      });
+      draw();
+      if (busy) d.raf = requestAnimationFrame(frame);
+    };
+    d.raf = requestAnimationFrame(frame);
+    return DUR + (d.dice.length - 1) * 90;
+  }
+
+  function settleDice3D(faces) {
+    if (!D3) return;
+    cancelAnimationFrame(D3.raf);
+    D3.dice.forEach((g, i) => {
+      const q = restQuat(g, faces[i] || 1, ((S.rollId * 7 + i * 13) % 9 - 4) * 0.05);
+      g.quaternion.copy(q); g.position.set(D3.slots[i].x, restY(g, q), 0);
+    });
+    D3.renderer.render(D3.scene, D3.camera);
+  }
+
   function renderDice(o, play) {
     const sides = S.setup.dice.sides;
     // Outcomes from an older set of dice (the settings changed since) are
@@ -1598,6 +2234,22 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     // A cube in perspective, tilted, takes more room than its face size,
     // and it needs headroom to be thrown into.
     const sp = boardSplit();
+    if (!T3 && !t3Failed) loadThree().then(() => { if (T3 && S.mode === 'dice' && !anim) renderResult(false); });
+    if (T3) {
+      // Real dice. The canvas is kept and moved into each new layout.
+      const r = resultEl.getBoundingClientRect();
+      const h = Math.round(Math.max(140, Math.min(r.height - 40, sp.playW * 0.8)));
+      resultEl.innerHTML = `<div class="play-row"><div class="play dice3" id="dice3" style="width:${sp.playW}px;height:${h}px"></div>` +
+        historyBoardHtml('dice', S.hist.dice, sp.bw, sp.bh) + '</div>';
+      const d = ensureScene();
+      $('dice3').appendChild(d.renderer.domElement);
+      const play3 = play && fresh;
+      const roll = renderDice3D(o, play3, sides, fresh ? faces : [], Math.round(sp.playW), h);
+      if (!play3) return;
+      const g = prepNewest(), w = writeNewest(g, roll + 120);
+      hold(Math.max(roll, w.end) + 30, () => { w.anims.forEach(a => a.cancel()); settleNewest(g); settleDice3D(faces); });
+      return;
+    }
     const sz = anyCube ? fitSize(n, 1.3, 0.42, 150, sp.playW) : fitSize(n, 1.05, 0.34, 170, sp.playW);
     resultEl.style.setProperty('--sz', sz + 'px');
     const col = dieColor(6);
@@ -1810,14 +2462,14 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   // `behindUntil` / `behindFrom`: the waypoint at which the ball comes out
   // from behind the container, or goes back behind it — so it rises from
   // inside, behind the glass and the label, rather than in front of them.
-  function flyBall(c, size, path, { duration = 1000, delay = 0, behindUntil = -1, behindFrom = Infinity } = {}) {
+  function flyBall(c, size, path, { duration = 1000, delay = 0, behindUntil = -1, behindFrom = Infinity, offsets = null } = {}) {
     const fly = document.createElement('span');
     fly.className = 'ball flying';
     fly.style.cssText = `--c:var(--hue-${c});--sz:${size}px;left:0;top:0;`;
     resultEl.appendChild(fly);
     const kf = [];
     path.forEach(([x, y, s, op], i) => {
-      const k = { transform: `translate(${x - size / 2}px, ${y - size / 2}px) scale(${s})`, opacity: op == null ? 1 : op, offset: i / (path.length - 1) };
+      const k = { transform: `translate(${x - size / 2}px, ${y - size / 2}px) scale(${s})`, opacity: op == null ? 1 : op, offset: offsets ? offsets[i] : i / (path.length - 1) };
       const behind = i < behindUntil || i > behindFrom;
       if (i === behindUntil) kf.push({ ...k, zIndex: 2 });
       kf.push({ ...k, zIndex: behind ? 2 : 9 });
@@ -1864,19 +2516,23 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       `<path class="ring" d="${d}" stroke="${col}" stroke-width="${Math.max(2, r * 0.13).toFixed(1)}"/>${hatch}</g>`;
   }
 
-  function boardHtml(out, W, H) {
+  // `oneJar`: without replacement the board is laid out for exactly a jar's
+  // worth. With replacement there's no end, so it's laid out in fixed
+  // cells and wiped when full. Either way a sketch never moves once drawn.
+  function boardHtml(all, W, H, oneJar) {
     const pad = 22, ledge = 16;
     const iw = W - pad * 2, ih = H - pad * 2 - ledge;
-    // Laid out for a jar's worth from the start, so a sketch never moves
-    // once it's drawn.
-    const n = Math.max(1, out.length, fullBag().reduce((a, b) => a + b, 0));
+    const n = oneJar ? Math.max(1, all.length, fullBag().reduce((a, b) => a + b, 0)) : 24;
     let cell = 16;
     for (let s = Math.min(96, ih); s >= 16; s -= 1) {
       if (Math.floor(iw / s) * Math.floor(ih / s) >= n) { cell = s; break; }
     }
     const cols = Math.max(1, Math.floor(iw / cell));
     const rows = Math.ceil(n / cols);
-    const x0 = pad + (iw - Math.min(n, cols) * cell) / 2, y0 = pad + (ih - rows * cell) / 2;
+    const cap = Math.max(1, cols * Math.max(rows, Math.floor(ih / cell)));
+    const page = oneJar ? 0 : Math.floor(Math.max(0, all.length - 1) / cap);
+    const out = all.slice(page * cap);
+    const x0 = pad + (iw - Math.min(n, cols) * cell) / 2, y0 = pad + (ih - (oneJar ? rows : Math.floor(ih / cell)) * cell) / 2;
     const sketches = out.map((b, i) => {
       const cx = x0 + (i % cols + 0.5) * cell + wob(i, 7) * cell * 0.08;
       const cy = y0 + (Math.floor(i / cols) + 0.5) * cell + wob(i, 9) * cell * 0.08;
@@ -1935,106 +2591,70 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 
   function renderBag(o, play) {
     const st = S.setup.bag, look = st.look === 'bag' ? 'bag' : 'jar';
-    const pool = S.pool.bag, out = S.pool.bagOut;
-    const left = pool.reduce((s, x) => s + x, 0);
+    const pool = S.pool.bag;
+    const drawnNow = o && !o.empty ? o.balls.length : 0;
+    // While a draw is animating, the container still shows the balls about
+    // to come out of it.
+    const shown = pool.slice();
+    if (play && !st.replace && o && o.idx) o.idx.forEach(j => { shown[j] = (shown[j] || 0) + 1; });
+    const left = shown.reduce((s, x) => s + x, 0);
     // Shuffle the colours into the jar deterministically, so the same jar
     // looks the same on every screen and doesn't reshuffle on a resize.
     const dots = [];
-    pool.forEach((n, j) => { for (let i = 0; i < n && dots.length < 200; i++) dots.push(st.balls[j].c); });
+    shown.forEach((n, j) => { for (let i = 0; i < n && dots.length < 200; i++) dots.push(st.balls[j].c); });
     dots.forEach((_, i) => { const j = (i * 7919 + 13) % dots.length; [dots[i], dots[j]] = [dots[j], dots[i]]; });
 
     const r = resultEl.getBoundingClientRect();
-    const jar = Math.max(90, Math.min(r.height * 0.82, r.width * 0.4 / 0.77, 420));
-    const sideW = Math.max(140, r.width - jar * 0.77 - jar * 0.2 - 70);
+    const jar = Math.max(90, Math.min(r.height * 0.8, r.width * 0.36 / 0.77, 400));
+    const sideW = Math.max(160, r.width - jar * 0.77 - jar * 0.5 - 70);
     resultEl.style.setProperty('--jar', jar + 'px');
-
-    // Beside the container: with replacement, the balls just drawn sit out
-    // until the next draw puts them back; without, each is recorded on a
-    // chalkboard.
-    let side, sz;
-    if (st.replace) {
-      sz = Math.max(30, Math.min(jar * 0.36, sideW / (Math.max(1, out.length) * 1.25), 150));
-      side = `<div class="spot">${out.map((b, i) => `<span class="ball" data-i="${i}" style="--c:var(--hue-${b.c})"></span>`).join('')}</div>`;
-    } else {
-      const bw = Math.min(sideW, jar * 1.45), bh = Math.min(jar * 0.85, bw * 0.72);
-      sz = Math.max(24, Math.min(jar * 0.3, 110));
-      side = boardHtml(out, Math.round(bw), Math.round(bh));
-    }
+    const sz = Math.max(26, Math.min(jar * 0.26, 100));
     resultEl.style.setProperty('--sz', sz + 'px');
+    const bw = Math.round(Math.min(sideW, jar * 1.45)), bh = Math.round(Math.min(jar * 0.85, bw * 0.72));
     const svg = look === 'bag' ? sackSvg(left).replace('</svg>', bagTag(left) + '</svg>') : jarSvg(dots);
     resultEl.innerHTML =
-      `<div class="bag-row"><div class="jar" id="container">${svg}${look === 'jar' ? stickyHtml(left) : ''}</div>` +
-      `<div class="bag-side">${side}</div></div>`;
-    if (!play || !o) return;
+      `<div class="bag-row" style="gap:${Math.round(jar * 0.45)}px"><div class="jar" id="container">${svg}${look === 'jar' ? stickyHtml(left) : ''}</div>` +
+      `<div class="bag-side">${boardHtml(S.hist.bag || [], bw, bh, !st.replace)}</div></div>`;
+    if (!play || !drawnNow) return;
 
-    const box = $('container').getBoundingClientRect(), host = resultEl.getBoundingClientRect();
+    const host = resultEl.getBoundingClientRect(), box = $('container').getBoundingClientRect();
     const at = ([x, y]) => [box.left - host.left + x / 100 * box.width, box.top - host.top + y / 130 * box.height];
     const [fx, fy] = at(MOUTH[look].from), [ox, oy] = at(MOUTH[look].out);
-    const flights = [], extra = [];
-
-    if (st.replace) {
-      const outEls = [...resultEl.querySelectorAll('.spot .ball')];
-      const fresh = outEls.slice(outEls.length - o.balls.length);
-      const centre = el => { const t = el.getBoundingClientRect(); return [t.left - host.left + t.width / 2, t.top - host.top + t.height / 2, t.width]; };
-
-      // First, the last draw goes back in: up off the table, over, and down
-      // into the container.
-      const back = o.back || [];
-      back.forEach((c, i) => {
-        const ref = fresh[i] || fresh[0] || outEls[0];
-        const [x, y, w] = ref ? centre(ref) : [ox + 120, oy + 80, sz];
-        const small = Math.max(0.3, jar * 0.065 / w);
-        const peak = Math.max(w * 0.4 + 6, Math.min(oy, y) - w * 0.6);
-        flights.push(flyBall(c, w, [
-          [x, y, 1], [x, y - w * 0.15, 1.02], [(x + ox) / 2, peak, 0.75], [ox, oy, small], [fx, fy, small],
-        ], { duration: 900, delay: i * 220, behindFrom: 3 }));
-      });
-      const after = back.length ? 900 + (back.length - 1) * 220 + 80 : 0;
-
-      // Then the new draw: out of the mouth, over, and down beside it.
-      fresh.forEach((el, i) => {
-        el.style.visibility = 'hidden';
-        const [x, y, w] = centre(el);
-        const peak = Math.max(w * 0.4 + 6, Math.min(oy, y) - w * 0.7);
-        const small = Math.max(0.25, Math.min(0.6, jar * 0.12 / w));
-        const f = flyBall(o.balls[i], w, [
-          [fx, fy, small], [ox, oy - w * 0.1, small * 1.2], [(ox + x) / 2, peak, 0.85], [x, y, 1],
-        ], { duration: 1000, delay: after + i * 600, behindUntil: 1 });
-        f.a.onfinish = () => { el.style.visibility = ''; f.fly.remove(); };
-        flights.push(f);
-      });
-      const total = after + (fresh.length ? 1000 + (fresh.length - 1) * 600 : 0) + 30;
-      hold(total, () => {
-        flights.forEach(f => { f.a.cancel(); f.fly.remove(); });
-        fresh.forEach(el => { el.style.visibility = ''; });
-      });
-      return;
-    }
-
-    // Without replacement: the ball comes up out of the container, travels
-    // to its place on the board and fades into the chalk sketch of it,
-    // which draws itself in.
-    const svgEl = resultEl.querySelector('.board svg'), sb = svgEl.getBoundingClientRect();
-    const sketches = [...svgEl.querySelectorAll('.sketch')];
-    const fresh = sketches.slice(sketches.length - o.balls.length);
+    const board = resultEl.querySelector('.board').getBoundingClientRect();
+    // Where a ball is held up for the room to see: between the container
+    // and the board, a little above the middle.
+    const hx = (box.right + board.left) / 2 - host.left, hy = box.top - host.top + box.height * 0.32;
+    const sketches = [...resultEl.querySelectorAll('.board .sketch')];
+    const fresh = sketches.slice(Math.max(0, sketches.length - drawnNow));
     fresh.forEach(g => g.querySelectorAll('.ring, .hatch').forEach(p => { p.style.strokeDasharray = '1 100000'; p.style.strokeDashoffset = '1'; }));
-    let lastEnd = 0;
-    fresh.forEach((g, i) => {
-      const x = sb.left - host.left + +g.dataset.cx, y = sb.top - host.top + +g.dataset.cy;
-      const delay = i * 1300;
-      const small = Math.max(0.25, Math.min(0.6, jar * 0.12 / sz));
-      const peak = Math.max(sz * 0.4 + 6, Math.min(oy, y) - sz * 0.6);
-      flights.push(flyBall(o.balls[i], sz, [
-        [fx, fy, small], [ox, oy - sz * 0.1, small * 1.2], [(ox + x) / 2, peak, 0.9], [x, y, 0.75, 1], [x, y, 0.6, 0],
-      ], { duration: 950, delay, behindUntil: 1 }));
-      const d = drawSketch(g, delay + 780);
-      extra.push(...d.anims);
-      lastEnd = Math.max(lastEnd, d.end);
+    const flights = [], extra = [];
+    const small = Math.max(0.25, Math.min(0.6, jar * 0.12 / sz));
+    const EACH = 2300, OUT = 0.3, SHOW = 0.66;
+    o.balls.forEach((c, i) => {
+      const delay = i * 1400;
+      const peak = Math.max(sz * 0.6, Math.min(oy, hy) - sz * 0.8);
+      let path, offsets, opts;
+      if (st.replace) {
+        // Out, held up, and back in.
+        path = [[fx, fy, small], [ox, oy - sz * 0.1, small * 1.2], [(ox + hx) / 2, peak, 0.8], [hx, hy, 1], [hx, hy, 1], [(ox + hx) / 2, peak, 0.8], [ox, oy, small * 1.2], [fx, fy, small]];
+        offsets = [0, 0.12, 0.22, OUT, SHOW, 0.78, 0.9, 1];
+        opts = { behindUntil: 1, behindFrom: 6 };
+      } else {
+        // Out, held up, then tossed away: off and down, spinning out of play.
+        const tx = hx + sz * 2.2, ty = host.height + sz;
+        path = [[fx, fy, small], [ox, oy - sz * 0.1, small * 1.2], [(ox + hx) / 2, peak, 0.8], [hx, hy, 1], [hx, hy, 1], [hx + sz * 1.2, hy - sz * 0.7, 0.95], [tx, ty, 0.7, 0]];
+        offsets = [0, 0.12, 0.22, OUT, SHOW, 0.76, 1];
+        opts = { behindUntil: 1 };
+      }
+      flights.push(flyBall(c, sz, path, { duration: EACH, delay, offsets, ...opts }));
+      if (fresh[i]) { const d = drawSketch(fresh[i], delay + EACH * OUT + 80); extra.push(...d.anims); }
     });
-    hold(Math.max(lastEnd, 950) + 40, () => {
+    hold((o.balls.length - 1) * 1400 + EACH + 40, () => {
       flights.forEach(f => { f.a.cancel(); f.fly.remove(); });
       extra.forEach(a => a.cancel());
       fresh.forEach(g => g.querySelectorAll('.ring, .hatch').forEach(p => { p.style.strokeDasharray = ''; p.style.strokeDashoffset = ''; }));
+      // Without replacement the container is now one ball lighter.
+      if (!st.replace) renderBag(o, false);
     });
   }
 
@@ -2410,33 +3030,66 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   // A top hat, upside down, full of folded slips. Drawing pulls one out; it
   // rises, unfolds, and the name is there in handwriting.
   function hatSvg(left) {
-    const slips = [[60, -14], [74, 8], [88, -6], [100, 12], [68, 20], [82, 26]].slice(0, Math.max(0, Math.min(6, left)))
-      .map(([x, rot], k) => `<rect x="${x - 7}" y="${28 + (k % 2) * 3}" width="14" height="10" rx="1" fill="#fbf8ef" stroke="#d8d1bf" stroke-width="0.5" transform="rotate(${rot} ${x} ${33})"/>`).join('');
-    return `<svg viewBox="0 0 160 150"><defs>
-        <linearGradient id="felt" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#121214"/><stop offset="0.45" stop-color="#3a3a40"/><stop offset="0.6" stop-color="#26262b"/><stop offset="1" stop-color="#0d0d0f"/></linearGradient>
-        <linearGradient id="brim" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a3a40"/><stop offset="1" stop-color="#151518"/></linearGradient>
+    // Folded slips standing up in the hat, at odd angles, as they'd sit.
+    const spots = [[72, -18, 0], [86, 9, 1], [100, -6, 0], [114, 14, 1], [128, -10, 0], [93, 22, 1], [108, -24, 0]];
+    const slips = spots.slice(0, Math.max(0, Math.min(spots.length, left))).map(([x, rot, k], i) =>
+      `<g class="hslip" style="animation-delay:${-i * 70}ms"><g transform="rotate(${rot} ${x} 60)">
+         <rect x="${x - 9}" y="${44 + k * 3}" width="18" height="17" rx="1.2" fill="#fbf8ee" stroke="#d6cfbb" stroke-width="0.5"/>
+         <path d="M${x - 9},${52.5 + k * 3} H${x + 9}" stroke="#d9d2bf" stroke-width="0.7"/>
+         <rect x="${x - 9}" y="${44 + k * 3}" width="18" height="8.5" fill="#000" opacity="0.04"/>
+       </g></g>`).join('');
+    const hand = "'Segoe Print','Bradley Hand','Marker Felt','Comic Sans MS',cursive";
+    return `<svg viewBox="0 0 200 190"><defs>
+        <linearGradient id="felt" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#08080a"/><stop offset="0.28" stop-color="#2b2b31"/><stop offset="0.38" stop-color="#4a4a52"/>
+          <stop offset="0.5" stop-color="#25252a"/><stop offset="0.85" stop-color="#121215"/><stop offset="1" stop-color="#040405"/>
+        </linearGradient>
+        <linearGradient id="brimTop" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#26262b"/><stop offset="1" stop-color="#0b0b0d"/></linearGradient>
+        <linearGradient id="brimFront" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#0a0a0c"/><stop offset="0.35" stop-color="#3a3a42"/><stop offset="0.55" stop-color="#1d1d22"/><stop offset="1" stop-color="#070708"/>
+        </linearGradient>
+        <radialGradient id="lining" cx="50%" cy="30%" r="75%"><stop offset="0" stop-color="#5a1424"/><stop offset="0.6" stop-color="#2a0710"/><stop offset="1" stop-color="#0c0204"/></radialGradient>
+        <linearGradient id="ribbon" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a8243a"/><stop offset="0.45" stop-color="#7c1427"/><stop offset="1" stop-color="#4e0b18"/></linearGradient>
+        <linearGradient id="kraft" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e4caa0"/><stop offset="1" stop-color="#c9a877"/></linearGradient>
       </defs>
-      <ellipse cx="80" cy="140" rx="54" ry="5" fill="rgba(0,0,0,0.22)"/>
-      <path d="M42,42 L118,42 L113,128 Q80,138 47,128 Z" fill="url(#felt)"/>
-      <path d="M43.5,54 L116.5,54 L116,64 L44,64 Z" fill="#8b1e2d"/>
-      <path d="M43.5,54 L116.5,54" stroke="#b03244" stroke-width="0.8"/>
-      <ellipse cx="80" cy="42" rx="66" ry="13" fill="url(#brim)"/>
-      <ellipse cx="80" cy="42" rx="38" ry="8" fill="#060607"/>
-      ${slips}
-      <path d="M14,42 A66,13 0 0 0 146,42 L118,42 A38,8 0 0 1 42,42 Z" fill="url(#brim)"/>
-      <path d="M18,45 A62,10 0 0 0 142,45" stroke="rgba(255,255,255,0.08)" stroke-width="1" fill="none"/>
-      <g class="hat-tag">
-        <path d="M128,47 C132,58 134,66 133,74" stroke="#cdb57d" stroke-width="0.9" fill="none"/>
-        <g transform="rotate(8 133 86)">
-          <path d="M122,78 L128,74.5 L138,74.5 L144,78 L144,100 L122,100 Z" fill="#d9bd8c" stroke="#a7875a" stroke-width="0.7" stroke-linejoin="round"/>
-          <circle cx="133" cy="77.6" r="1.5" fill="#3a2a1a" stroke="#f4ead2" stroke-width="0.8"/>
-          <text x="133" y="93" text-anchor="middle" font-size="12" font-weight="700" fill="#3b2a18" font-family="'Segoe Print','Bradley Hand','Marker Felt','Comic Sans MS',cursive">${left}</text>
-          <text x="133" y="98.4" text-anchor="middle" font-size="3.6" fill="#5a4630" font-family="'Segoe Print','Bradley Hand','Marker Felt','Comic Sans MS',cursive">${left === 1 ? 'name' : 'names'}</text>
-        </g>
+      <ellipse cx="100" cy="180" rx="66" ry="6" fill="rgba(0,0,0,0.25)"/>
+      <!-- Crown, upside down: flaring very slightly to its (now bottom) top. -->
+      <path d="M52,58 C53,100 55,140 58,168 Q100,178 142,168 C145,140 147,100 148,58 Z" fill="url(#felt)"/>
+      <path d="M78,62 C79,100 80,140 81,170" stroke="rgba(255,255,255,0.07)" stroke-width="6" fill="none" stroke-linecap="round"/>
+      <!-- Satin band and bow, just under the brim. -->
+      <path d="M52.4,70 Q100,79 147.6,70 L147.2,86 Q100,95 52.8,86 Z" fill="url(#ribbon)"/>
+      <path d="M52.6,72 Q100,81 147.4,72" stroke="rgba(255,255,255,0.18)" stroke-width="0.9" fill="none"/>
+      <path d="M60,79 C50,70 44,74 46,80 C44,86 50,90 60,81 Z" fill="url(#ribbon)" stroke="#4e0b18" stroke-width="0.5"/>
+      <path d="M60,81 C52,88 50,96 54,99 C57,94 60,88 62,83 Z" fill="#6d1122"/>
+      <rect x="57.5" y="76" width="6" height="8" rx="1.5" fill="#8c1a2e" stroke="#4e0b18" stroke-width="0.5"/>
+      <!-- Brim: top surface, the opening with its lining, then the front edge over the slips. -->
+      <ellipse cx="100" cy="58" rx="94" ry="21" fill="url(#brimTop)"/>
+      <ellipse cx="100" cy="56" rx="50" ry="11.5" fill="url(#lining)"/>
+      <ellipse cx="100" cy="53" rx="40" ry="6" fill="rgba(255,120,150,0.06)"/>
+      <g class="hat-slips">${slips}</g>
+      <path d="M6,58 A94,21 0 0 0 194,58 L150,56 A50,11.5 0 0 1 50,56 Z" fill="url(#brimFront)"/>
+      <path d="M9,61 A91,19 0 0 0 191,61" stroke="rgba(255,255,255,0.14)" stroke-width="1.2" fill="none"/>
+      <path d="M50,56 A50,11.5 0 0 0 150,56" stroke="rgba(255,255,255,0.1)" stroke-width="0.8" fill="none"/>
+      <!-- Paper tag on a string, with how many names are left. -->
+      <path d="M170,66 C175,80 177,92 176,104" stroke="#cdb57d" stroke-width="1" fill="none"/>
+      <g transform="rotate(7 176 118)">
+        <path d="M163,108 L170,104 L182,104 L189,108 L189,134 L163,134 Z" fill="url(#kraft)" stroke="#a7875a" stroke-width="0.8" stroke-linejoin="round"/>
+        <circle cx="176" cy="107.6" r="1.8" fill="#3a2a1a" stroke="#f4ead2" stroke-width="0.9"/>
+        <text x="176" y="125" text-anchor="middle" font-size="14" font-weight="700" fill="#3b2a18" font-family="${hand}">${left}</text>
+        <text x="176" y="131.5" text-anchor="middle" font-size="4.4" fill="#5a4630" font-family="${hand}">${left === 1 ? 'name' : 'names'}</text>
       </g>
     </svg>`;
   }
-  const HAT_MOUTH = [80, 40];
+  // The opening, in the hat's viewBox (200 × 190).
+  const HAT_MOUTH = [100, 54];
+
+  function slipHtml(name) {
+    const t = escHtml(name);
+    // A slip folded in half: the lower half is a flap folded up over the
+    // upper, and unfolds downward to show the whole name.
+    return `<div class="slip" id="slip"><div class="half top"><span>${t}</span></div>` +
+      `<div class="half bot"><div class="face"><span>${t}</span></div><div class="back"></div></div></div>`;
+  }
 
   function renderList(o, play) {
     const st = S.setup.list;
@@ -2452,35 +3105,58 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     const left = st.remove ? S.pool.list.length : st.items.length;
     const r = resultEl.getBoundingClientRect();
     const W = r.width - 40, H = r.height - 30;
-    const hatH = Math.max(120, Math.min(H * 0.8, W * 0.36 * 150 / 160));
-    const hatW = hatH * 160 / 150;
+    const hatH = Math.max(130, Math.min(H * 0.86, W * 0.4 * 190 / 200));
+    const hatW = hatH * 200 / 190;
     const slipW = Math.max(160, Math.min(W - hatW - 60, 560));
     resultEl.innerHTML =
-      `<div class="num-row"><div class="hat-box" id="hat-box" style="width:${hatW}px;height:${hatH}px">${hatSvg(left)}</div>` +
-      `<div class="slip-spot" style="width:${slipW}px">${o ? `<div class="slip" id="slip"><span>${escHtml(o.name)}</span></div>` : ''}</div></div>`;
+      `<div class="num-row"><div class="hat-box" id="hat-box" style="width:${hatW}px;height:${hatH}px">${hatSvg(left + (play ? 1 : 0) * (st.remove ? 1 : 0))}</div>` +
+      `<div class="slip-spot" style="width:${slipW}px">${o ? slipHtml(o.name) : ''}</div></div>`;
     if (!o) return;
-    // The name as large as the slip allows.
-    const slip = $('slip'), span = slip.querySelector('span');
-    let fs = Math.min(H * 0.22, 96);
-    span.style.fontSize = fs + 'px';
-    for (let i = 0; i < 16 && span.scrollWidth > slipW - 48 && fs > 16; i++) { fs *= 0.9; span.style.fontSize = fs + 'px'; }
+    // The name as large as the slip allows; the slip sized to the name.
+    const slip = $('slip'), spans = slip.querySelectorAll('span');
+    let fs = Math.min(H * 0.2, 92);
+    const measure = () => { spans.forEach(s => { s.style.fontSize = fs + 'px'; }); return spans[0].scrollWidth; };
+    for (let i = 0; i < 16 && measure() > slipW - 60 && fs > 16; i++) fs *= 0.9;
+    measure();
+    slip.style.width = Math.ceil(Math.min(slipW, spans[0].scrollWidth + fs * 2)) + 'px';
+    slip.style.height = Math.ceil(fs * 1.9) + 'px';
     if (!play) return;
 
     const hat = $('hat-box'), hb = hat.getBoundingClientRect(), sb = slip.getBoundingClientRect();
-    const mx = hb.left + HAT_MOUTH[0] / 160 * hb.width - (sb.left + sb.width / 2);
-    const my = hb.top + HAT_MOUTH[1] / 150 * hb.height - (sb.top + sb.height / 2);
-    const k = (hb.width * 0.16) / sb.width;
+    const scale = hb.width / 200;
+    const mx = hb.left + HAT_MOUTH[0] * scale - (sb.left + sb.width / 2);
+    const my = hb.top + HAT_MOUTH[1] * scale - (sb.top + sb.height / 2);
+    // Folded, the slip is about the size of the ones in the hat.
+    const k = (18 * scale * 1.3) / sb.width;
+    const flap = slip.querySelector('.bot');
     const anims = [];
-    anims.push(hat.animate([{ transform: 'rotate(0)' }, { transform: 'rotate(-4deg)' }, { transform: 'rotate(3deg)' }, { transform: 'rotate(-2deg)' }, { transform: 'rotate(0)' }],
-      { duration: 520, easing: 'ease-in-out' }));
+    // 1. A hand in the hat: the slips rustle, the hat rocks.
+    hat.querySelector('.hat-slips')?.classList.add('rustle');
+    anims.push(hat.animate([{ transform: 'rotate(0)' }, { transform: 'rotate(-2.5deg)' }, { transform: 'rotate(2deg)' }, { transform: 'rotate(-1deg)' }, { transform: 'rotate(0)' }],
+      { duration: 700, easing: 'ease-in-out' }));
+    // 2. One slip is pulled up out of the opening (revealed from the top as
+    //    it clears the brim), 3. carried over, 4. unfolded.
+    const hh = sb.height * k / 2;
     anims.push(slip.animate([
-      { transform: `translate(${mx}px, ${my}px) scale(${k}) rotateX(80deg) rotate(-6deg)`, opacity: 0 },
-      { transform: `translate(${mx}px, ${my}px) scale(${k}) rotateX(80deg) rotate(-6deg)`, opacity: 1, offset: 0.06 },
-      { transform: `translate(${mx}px, ${my - hb.height * 0.35}px) scale(${k * 1.4}) rotateX(80deg) rotate(4deg)`, offset: 0.35 },
-      { transform: `translate(${mx * 0.4}px, ${my * 0.4 - hb.height * 0.2}px) scale(${(k + 1) / 2}) rotateX(70deg) rotate(-2deg)`, offset: 0.62 },
-      { transform: 'translate(0, 0) scale(1) rotateX(0deg) rotate(-1.5deg)', offset: 1 },
-    ], { duration: 1500, delay: 380, easing: 'cubic-bezier(0.3, 0.6, 0.3, 1)', fill: 'both' }));
-    hold(1900, () => anims.forEach(a => a.cancel()));
+      { transform: `translate(${mx}px, ${my + hh * 0.2}px) scale(${k}) rotate(-8deg)`, clipPath: 'inset(0 0 100% 0)', offset: 0 },
+      { transform: `translate(${mx}px, ${my + hh * 0.2}px) scale(${k}) rotate(-8deg)`, clipPath: 'inset(0 0 100% 0)', offset: 0.28 },
+      { transform: `translate(${mx}px, ${my - hh * 1.6}px) scale(${k * 1.05}) rotate(4deg)`, clipPath: 'inset(0 0 50% 0)', offset: 0.46 },
+      { transform: `translate(${mx}px, ${my - hh * 2.4}px) scale(${k * 1.15}) rotate(-3deg)`, clipPath: 'inset(0 0 0 0)', offset: 0.52 },
+      { transform: `translate(${mx * 0.45}px, ${my * 0.4 - hb.height * 0.3}px) scale(${(k + 1) / 2}) rotate(6deg)`, clipPath: 'inset(0 0 0 0)', offset: 0.75 },
+      { transform: 'translate(0, 0) scale(1) rotate(-1.5deg)', clipPath: 'inset(0 0 0 0)', offset: 1 },
+    ], { duration: 2000, easing: 'cubic-bezier(0.35, 0.1, 0.3, 1)', fill: 'both' }));
+    anims.push(flap.animate([
+      { transform: 'rotateX(178deg)' },
+      { transform: 'rotateX(178deg)', offset: 0.55 },
+      { transform: 'rotateX(-12deg)', offset: 0.88 },
+      { transform: 'rotateX(0deg)' },
+    ], { duration: 2000 + 700, easing: 'ease-out', fill: 'both' }));
+    hold(2730, () => {
+      anims.forEach(a => a.cancel());
+      hat.querySelector('.hat-slips')?.classList.remove('rustle');
+      // The hat now has one fewer slip in it.
+      if (st.remove) hat.innerHTML = hatSvg(left);
+    });
   }
 
   // ── Animation ───────────────────────────────────────────────────────────────
@@ -2548,7 +3224,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     if ([1, 10, 100, 1000].includes(s.runs)) S.runs = s.runs;
     if (s.pool && typeof s.pool === 'object') S.pool = { ...S.pool, ...s.pool };
     if (s.last && typeof s.last === 'object') S.last = s.last;
-    if (s.hist && typeof s.hist === 'object') S.hist = { dice: Array.isArray(s.hist.dice) ? s.hist.dice : [], coin: Array.isArray(s.hist.coin) ? s.hist.coin : [] };
+    if (s.hist && typeof s.hist === 'object') S.hist = { dice: Array.isArray(s.hist.dice) ? s.hist.dice : [], coin: Array.isArray(s.hist.coin) ? s.hist.coin : [], bag: Array.isArray(s.hist.bag) ? s.hist.bag : [] };
     if (s.stats && typeof s.stats === 'object') S.stats = s.stats;
     if (typeof s.rng === 'number') S.rng = s.rng >>> 0;
     if (typeof s.spin === 'number') S.spin = s.spin;
@@ -2585,6 +3261,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 
   function destroy() {
     finishAnim(true);
+    if (D3) { cancelAnimationFrame(D3.raf); try { D3.renderer.dispose(); } catch (_) { /* already gone */ } D3 = null; }
     clearTimeout(syncTimer);
     clearTimeout(resizeTimer);
     if (ro) ro.disconnect();
