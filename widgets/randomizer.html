@@ -710,15 +710,16 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 .hat-slips .hslip { transform-box: fill-box; transform-origin: 50% 100%; }
 .hat-slips.rustle .hslip { animation: rustle 0.24s ease-in-out 3; }
 
-/* 3D dice canvas. */
-.dice3 canvas { display: block; }
+/* 3D canvases. */
+.dice3 canvas, .stage3d canvas { display: block; }
+.stage3d { position: relative; }
 
 /* Dice and coins: the throw on the left, its chalkboard history beside it. */
 .play-row { display: flex; align-items: center; justify-content: center; gap: 30px; width: 100%; }
 .play { display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
 
 /* The chalkboard drawn balls are recorded on. */
-.board { flex: 0 0 auto; filter: drop-shadow(0 6px 12px rgba(0,0,0,0.2)); }
+.board { flex: 0 0 auto; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,0.18); }
 .board svg { display: block; overflow: visible; }
 
 /* The tray drawn balls collect in: a wooden rim around green felt. */
@@ -1620,29 +1621,67 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     anim.timer = setTimeout(() => finishAnim(), ms);
   }
 
-  // ── Chalkboard history (dice, coins) ────────────────────────────────────────
-  // Each roll or flip is written up on the board in chalk, in order, left to
-  // right. Positions are worked out from the first entry on, so nothing on
-  // the board moves once it's written; when the board is full, it's wiped
-  // and the next entry starts a fresh one.
+  // ── Chalkboard ──────────────────────────────────────────────────────────────
+  // Everything on the board is drawn as strokes and written in one stroke at
+  // a time, with a stick of chalk travelling along the tip: numbers and
+  // letters from a small single-stroke hand, balls as a quick ring and some
+  // shading. Chalk texture is a fixed speckle mask (no per-frame filters,
+  // so the writing stays smooth).
   const CHALK = '#f1eee4';
-
-  function wobblyPath(points, closed) {
-    return points.map((p, k) => `${k ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join('') + (closed ? 'Z' : '');
+  function hueHex(c) {
+    return getComputedStyle(document.documentElement).getPropertyValue(`--hue-${c}`).trim() || '#888888';
   }
-  function chalkSquare(cx, cy, h, i) {
-    // A quick rounded square, ends overlapping a touch.
-    const pts = [], N = 36, r = h * 0.16;
-    for (let k = 0; k <= N + 3; k++) {
-      const t = (k / N) % 1, side = Math.floor(t * 4), f = (t * 4) % 1;
-      const a = h / 2 - r, corners = [[1, -1], [1, 1], [-1, 1], [-1, -1]];
-      const [sx, sy] = corners[side], [nx, ny] = corners[(side + 1) % 4];
-      let x = cx + (sx + (nx - sx) * f) * a, y = cy + (sy + (ny - sy) * f) * a;
-      const ox = sx === nx ? sx : 0, oy = sy === ny ? sy : 0;
-      x += ox * r + wob(i, k) * h * 0.03; y += oy * r + wob(i, k + 50) * h * 0.03;
-      pts.push([x, y]);
-    }
-    return pts;
+  // Small deterministic wobble, so a sketch looks the same on every redraw.
+  const wob = (i, k) => { const x = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453; return x - Math.floor(x) - 0.5; };
+
+  // Single-stroke handwriting, in a box 0.62 wide and 1 tall (y down).
+  const GLYPHS = {
+    0: ['M0.33,0.01 C0.08,0.0 0.0,0.3 0.01,0.52 C0.02,0.78 0.12,1.0 0.32,0.99 C0.53,0.98 0.62,0.74 0.61,0.48 C0.6,0.22 0.5,0.0 0.3,0.03'],
+    1: ['M0.1,0.2 C0.2,0.13 0.28,0.07 0.35,0.0 C0.34,0.35 0.33,0.7 0.34,1.0'],
+    2: ['M0.04,0.24 C0.08,0.04 0.32,-0.03 0.48,0.06 C0.66,0.17 0.58,0.4 0.42,0.56 C0.3,0.69 0.14,0.84 0.02,0.99 C0.22,0.98 0.42,0.98 0.62,0.99'],
+    3: ['M0.06,0.11 C0.22,-0.03 0.56,-0.02 0.56,0.22 C0.56,0.4 0.38,0.46 0.24,0.47 C0.46,0.46 0.63,0.58 0.6,0.77 C0.57,1.0 0.22,1.04 0.02,0.88'],
+    4: ['M0.47,0.99 C0.47,0.66 0.47,0.33 0.47,0.0 C0.31,0.24 0.15,0.46 0.0,0.69 C0.2,0.69 0.41,0.69 0.62,0.68'],
+    5: ['M0.57,0.01 C0.41,0.01 0.25,0.01 0.11,0.01 C0.09,0.15 0.08,0.3 0.06,0.45 C0.26,0.33 0.6,0.37 0.6,0.68 C0.6,1.0 0.22,1.04 0.02,0.86'],
+    6: ['M0.54,0.05 C0.22,-0.04 0.02,0.28 0.02,0.62 C0.02,0.9 0.16,1.0 0.32,1.0 C0.5,1.0 0.61,0.86 0.6,0.67 C0.59,0.47 0.45,0.38 0.3,0.39 C0.15,0.4 0.05,0.5 0.03,0.62'],
+    7: ['M0.02,0.02 C0.22,0.01 0.42,0.01 0.61,0.01 C0.46,0.32 0.32,0.66 0.2,0.99'],
+    8: ['M0.32,0.47 C0.08,0.42 0.07,0.02 0.31,0.02 C0.56,0.02 0.55,0.41 0.32,0.47 C0.05,0.53 0.03,0.98 0.31,0.98 C0.6,0.98 0.58,0.53 0.32,0.47'],
+    9: ['M0.58,0.34 C0.55,0.56 0.42,0.62 0.29,0.62 C0.12,0.61 0.02,0.49 0.02,0.32 C0.02,0.12 0.15,0.01 0.31,0.01 C0.5,0.01 0.6,0.15 0.58,0.38 C0.56,0.6 0.52,0.8 0.47,0.99'],
+    H: ['M0.05,0.0 C0.05,0.33 0.04,0.66 0.05,1.0', 'M0.58,0.0 C0.58,0.33 0.58,0.66 0.57,1.0', 'M0.05,0.51 C0.23,0.5 0.4,0.5 0.58,0.49'],
+    T: ['M0.0,0.03 C0.2,0.02 0.42,0.01 0.62,0.0', 'M0.31,0.02 C0.31,0.35 0.31,0.68 0.32,1.0'],
+  };
+  const GLYPH_ADV = 0.8;   // advance per character, × height
+
+  // Transform a glyph's unit path into place: scale, a slight slant, and a
+  // wobble of its own so repeated digits don't look stamped.
+  function glyphD(d, x, y, h, slant, seed) {
+    let k = 0;
+    return d.replace(/(-?\d*\.?\d+),(-?\d*\.?\d+)/g, (_, gx, gy) => {
+      gx = +gx; gy = +gy; k++;
+      const px = x + (gx + (1 - gy) * slant) * h + wob(seed, k) * h * 0.025;
+      const py = y + gy * h + wob(seed, k + 31) * h * 0.025;
+      return `${px.toFixed(1)},${py.toFixed(1)}`;
+    });
+  }
+  // One chalk stroke: the line itself and a faint halo of dust around it.
+  function chalkStroke(d, color, w) {
+    return `<g class="st" data-c="${color}"><path class="ce" d="${d}" stroke="${color}" stroke-width="${(w * 2.1).toFixed(1)}" opacity="0.16"/>` +
+           `<path class="cm" d="${d}" stroke="${color}" stroke-width="${w.toFixed(1)}" opacity="0.92"/></g>`;
+  }
+  // A word or number, centred on (cx, cy), h tall.
+  function chalkText(text, cx, cy, h, seed) {
+    const chars = [...String(text)], w = Math.max(1, h * 0.065);
+    const total = h * (chars.length * GLYPH_ADV - (GLYPH_ADV - 0.62));
+    let x = cx - total / 2, out = '';
+    chars.forEach((ch, i) => {
+      (GLYPHS[ch] || []).forEach((d, j) => {
+        out += chalkStroke(glyphD(d, x, cy - h / 2, h, 0.12 + wob(seed, i) * 0.06, seed * 17 + i * 5 + j), CHALK, w);
+      });
+      x += h * GLYPH_ADV;
+    });
+    return out;
+  }
+  function wobblyPath(points) {
+    return points.map((p, k) => `${k ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join('');
   }
   function chalkCircle(cx, cy, r, i) {
     const pts = [], start = wob(i, 1) * Math.PI, N = 30;
@@ -1653,58 +1692,65 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     }
     return pts;
   }
-  const stroke = (cls, d, w) => `<path class="${cls}" d="${d}" stroke="${CHALK}" stroke-width="${w.toFixed(1)}"/>`;
-
-  // One die or coin in chalk, centred on (cx, cy), about u across.
-  function chalkDie(v, sides, cx, cy, u, i, uid) {
-    const h = u * 0.74, w = Math.max(1.6, u * 0.05);
-    if (sides === 6) {
-      let g = stroke('ring', wobblyPath(chalkSquare(cx, cy, h, i)), w);
-      (PIPS[v] || []).forEach(([px, py], k) => {
-        const x = cx + (px - 50) / 100 * h, y = cy + (py - 50) / 100 * h, pr = h * 0.075;
-        g += stroke('hatch', wobblyPath(chalkCircle(x, y, pr, i * 7 + k)), w * 1.3);
-      });
-      return g;
+  // A ball: a ring in its colour, then a few strokes of shading.
+  function sketchSvg(i, cx, cy, r, c) {
+    const col = mixHex(hueHex(c), '#ffffff', 0.32), w = Math.max(1.8, r * 0.12);
+    let out = chalkStroke(wobblyPath(chalkCircle(cx, cy, r, i)), col, w);
+    const n = 4;
+    for (let k = 0; k < n; k++) {
+      const off = (k - (n - 1) / 2) * r * 0.42;
+      const half = Math.sqrt(Math.max(0, (r * 0.78) ** 2 - off * off));
+      const mx = cx + Math.SQRT1_2 * off, my = cy + Math.SQRT1_2 * off, j = wob(i, k + 40) * r * 0.08;
+      out += chalkStroke(`M${(mx - Math.SQRT1_2 * half + j).toFixed(1)},${(my + Math.SQRT1_2 * half).toFixed(1)}L${(mx + Math.SQRT1_2 * half).toFixed(1)},${(my - Math.SQRT1_2 * half + j).toFixed(1)}`, col, w * 0.8);
     }
-    // Other dice: the number, written in, with a small d-mark under it.
-    const fs = u * (String(v).length > 2 ? 0.42 : 0.58);
-    return `<clipPath id="cw${uid}"><rect class="wipe" x="${(cx - u / 2).toFixed(1)}" y="${(cy - u / 2).toFixed(1)}" width="${u.toFixed(1)}" height="${u.toFixed(1)}"/></clipPath>` +
-      `<g clip-path="url(#cw${uid})"><text class="ctext" x="${cx.toFixed(1)}" y="${(cy + fs * 0.12).toFixed(1)}" font-size="${fs.toFixed(1)}" text-anchor="middle" dominant-baseline="central" fill="${CHALK}">${v}</text>` +
-      `<text x="${cx.toFixed(1)}" y="${(cy + u * 0.42).toFixed(1)}" font-size="${(u * 0.17).toFixed(1)}" text-anchor="middle" fill="${CHALK}" opacity="0.6">d${sides}</text></g>`;
-  }
-  // A number written in chalk, revealed left to right when it's new.
-  function chalkTotal(v, cx, cy, u, w, uid) {
-    const fs = u * 0.78;
-    return `<clipPath id="ct${uid}"><rect class="wipe" x="${(cx - w / 2 - 4).toFixed(1)}" y="${(cy - u / 2).toFixed(1)}" width="${(w + 8).toFixed(1)}" height="${u.toFixed(1)}"/></clipPath>` +
-      `<g clip-path="url(#ct${uid})"><text x="${cx.toFixed(1)}" y="${(cy + fs * 0.06).toFixed(1)}" font-size="${fs.toFixed(1)}" text-anchor="middle" dominant-baseline="central" fill="${CHALK}">${v}</text></g>`;
+    return `<g class="sketch" data-i="${i}" data-cx="${cx.toFixed(1)}" data-cy="${cy.toFixed(1)}">${out}</g>`;
   }
 
-  function chalkCoin(heads, cx, cy, u, i) {
-    const r = u * 0.37, w = Math.max(1.6, u * 0.05), L = r * 0.46;
-    let g = stroke('ring', wobblyPath(chalkCircle(cx, cy, r, i)), w);
-    const j = k => wob(i, k) * u * 0.02;
-    if (heads) {
-      g += stroke('hatch', `M${cx - L * 0.7 + j(1)},${cy - L}L${cx - L * 0.7 + j(2)},${cy + L}`, w * 1.2);
-      g += stroke('hatch', `M${cx + L * 0.7 + j(3)},${cy - L}L${cx + L * 0.7 + j(4)},${cy + L}`, w * 1.2);
-      g += stroke('hatch', `M${cx - L * 0.7},${cy + j(5)}L${cx + L * 0.7},${cy + j(6)}`, w * 1.2);
-    } else {
-      g += stroke('hatch', `M${cx - L * 0.8},${cy - L + j(1)}L${cx + L * 0.8},${cy - L + j(2)}`, w * 1.2);
-      g += stroke('hatch', `M${cx + j(3)},${cy - L}L${cx + j(4)},${cy + L}`, w * 1.2);
+  // The board itself: slate in a wooden frame, a ledge with chalk and a
+  // duster, and the writing on it.
+  function slateHtml(W, H, content) {
+    const ledge = 16;
+    // Speckle: chalk never covers the slate completely. A fixed tile of
+    // dots punched out of the writing.
+    let dots = '';
+    for (let k = 0; k < 160; k++) {
+      dots += `<circle cx="${((wob(k, 1) + 0.5) * 48).toFixed(1)}" cy="${((wob(k, 2) + 0.5) * 48).toFixed(1)}" r="${(0.35 + (wob(k, 3) + 0.5) * 0.75).toFixed(2)}"/>`;
     }
-    return g;
+    return `<div class="board" style="width:${W}px;height:${H}px"><svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
+      <defs>
+        <pattern id="grainPat" width="48" height="48" patternUnits="userSpaceOnUse"><g fill="#000">${dots}</g></pattern>
+        <mask id="grain" maskUnits="userSpaceOnUse" x="0" y="0" width="${W}" height="${H}">
+          <rect width="${W}" height="${H}" fill="#fff"/><rect width="${W}" height="${H}" fill="url(#grainPat)"/>
+        </mask>
+        <radialGradient id="dust" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffffff" stop-opacity="0.08"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient>
+        <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bf8c58"/><stop offset="1" stop-color="#7c5230"/></linearGradient>
+        <linearGradient id="slate" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b3832"/><stop offset="1" stop-color="#222d28"/></linearGradient>
+        <linearGradient id="stickG" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#d8d4c8"/></linearGradient>
+      </defs>
+      <rect x="0" y="0" width="${W}" height="${H - ledge + 4}" rx="10" fill="url(#wood)"/>
+      <rect x="9" y="9" width="${W - 18}" height="${H - ledge - 14}" rx="4" fill="url(#slate)"/>
+      <ellipse cx="${W * 0.3}" cy="${H * 0.35}" rx="${W * 0.28}" ry="${H * 0.22}" fill="url(#dust)"/>
+      <ellipse cx="${W * 0.72}" cy="${H * 0.62}" rx="${W * 0.24}" ry="${H * 0.18}" fill="url(#dust)"/>
+      <g class="chalk" mask="url(#grain)" fill="none" stroke-linecap="round" stroke-linejoin="round">${content}</g>
+      <g class="stick" style="display:none"><g transform="rotate(32)"><rect x="-2.6" y="-1" width="6.2" height="24" rx="2.4" fill="url(#stickG)" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/></g></g>
+      <rect x="4" y="${H - ledge - 2}" width="${W - 8}" height="${ledge}" rx="3" fill="url(#wood)"/>
+      <rect x="${W * 0.66}" y="${H - ledge - 6}" width="${Math.min(46, W * 0.12)}" height="6" rx="3" fill="#f4f1e8"/>
+      <rect x="${W * 0.2}" y="${H - ledge - 9}" width="${Math.min(44, W * 0.11)}" height="9" rx="2" fill="#5a4a3a"/>
+      <rect x="${W * 0.2}" y="${H - ledge - 9}" width="${Math.min(44, W * 0.11)}" height="3" rx="1.5" fill="#cfc8b8"/>
+    </svg></div>`;
   }
 
   /** Board for the dice or coin history; the newest entry is `.sketch.newest`. */
   function historyBoardHtml(kind, entries, W, H) {
-    const pad = 20, ledge = 16;
+    const pad = 22, ledge = 16;
     const iw = W - pad * 2, ih = H - pad * 2 - ledge;
     const u = Math.max(22, Math.min(64, Math.floor(Math.sqrt(iw * ih / 22))));
-    const gap = u * 0.45, rowH = u * 1.12;
-    // Lay every entry out from the start; keep only the current board's worth.
-    let x = 0, y = 0, page = [], placed = [];
+    const gap = u * 0.55, rowH = u * 1.25;
     // Dice are written up as just the total; coins as their letters, HTH.
     const textOf = e => (kind === 'dice' ? String(e.reduce((a, d) => a + d.f, 0)) : e.map(v => (v ? 'H' : 'T')).join(''));
-    const widthOf = e => u * Math.max(1, 0.45 + 0.46 * textOf(e).length);
+    const widthOf = e => u * 0.78 * (textOf(e).length * GLYPH_ADV);
+    // Lay every entry out from the start; keep only the current board's worth.
+    let x = 0, y = 0, page = [];
     entries.forEach((e, idx) => {
       const w = widthOf(e);
       if (x > 0 && x + w > iw) { x = 0; y += rowH; }
@@ -1712,41 +1758,34 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       page.push({ e, idx, x, y, w });
       x += w + gap;
     });
-    placed = page;
-    let body = '';
-    placed.forEach(({ e, idx, x: ex, y: ey, w: ew }) => {
-      let g = '';
-      {
-        g = chalkTotal(textOf(e), pad + ex + ew / 2, pad + ey + rowH / 2, u, ew, idx);
-        body += `<g class="sketch${idx === entries.length - 1 ? ' newest' : ''}">${g}</g>`;
-        return;
-      }
-      e.forEach((v, k) => {
-        const cx = pad + ex + k * u * 1.1 + u / 2, cy = pad + ey + rowH / 2;
-        g += kind === 'coin' ? chalkCoin(!!v, cx, cy, u, idx * 13 + k)
-                             : chalkDie(v.f, v.s, cx, cy, u, idx * 13 + k, `${idx}_${k}`);
-      });
-      body += `<g class="sketch${idx === entries.length - 1 ? ' newest' : ''}">${g}</g>`;
-    });
-    return `<div class="board" style="width:${W}px;height:${H}px"><svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
-      <defs>
-        <filter id="chalk" x="-10%" y="-10%" width="120%" height="120%">
-          <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="3" result="n"/>
-          <feDisplacementMap in="SourceGraphic" in2="n" scale="2.2" xChannelSelector="R" yChannelSelector="G" result="d"/>
-          <feComposite in="d" in2="n" operator="arithmetic" k1="0" k2="1" k3="-0.25" k4="0.06"/>
-        </filter>
-        <radialGradient id="dust" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffffff" stop-opacity="0.07"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient>
-        <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b98652"/><stop offset="1" stop-color="#7f5530"/></linearGradient>
-      </defs>
-      <rect x="0" y="0" width="${W}" height="${H - ledge + 4}" rx="10" fill="url(#wood)"/>
-      <rect x="9" y="9" width="${W - 18}" height="${H - ledge - 14}" rx="4" fill="#26332d"/>
-      <ellipse cx="${W * 0.3}" cy="${H * 0.35}" rx="${W * 0.28}" ry="${H * 0.22}" fill="url(#dust)"/>
-      <ellipse cx="${W * 0.72}" cy="${H * 0.62}" rx="${W * 0.24}" ry="${H * 0.18}" fill="url(#dust)"/>
-      <g class="chalk" filter="url(#chalk)" fill="none" stroke-linecap="round" stroke-linejoin="round" font-family="'Segoe Print','Bradley Hand','Marker Felt','Comic Sans MS',cursive" font-weight="700">${body}</g>
-      <rect x="4" y="${H - ledge - 2}" width="${W - 8}" height="${ledge}" rx="3" fill="url(#wood)"/>
-      <rect x="${W * 0.66}" y="${H - ledge - 6}" width="${Math.min(46, W * 0.12)}" height="6" rx="3" fill="#f4f1e8"/>
-      <rect x="${W * 0.2}" y="${H - ledge - 7}" width="${Math.min(40, W * 0.1)}" height="7" rx="2" fill="#5a4a3a"/>
-    </svg></div>`;
+    const body = page.map(({ e, idx, x: ex, y: ey, w: ew }) =>
+      `<g class="sketch${idx === entries.length - 1 ? ' newest' : ''}">${chalkText(textOf(e), pad + ex + ew / 2, pad + ey + rowH / 2, u * 0.78, idx + 1)}</g>`).join('');
+    return slateHtml(W, H, body);
+  }
+
+  // `oneJar`: without replacement the board is laid out for exactly a jar's
+  // worth. With replacement there's no end, so it's laid out in fixed
+  // cells and wiped when full. Either way a sketch never moves once drawn.
+  function boardHtml(all, W, H, oneJar) {
+    const pad = 22, ledge = 16;
+    const iw = W - pad * 2, ih = H - pad * 2 - ledge;
+    const n = oneJar ? Math.max(1, all.length, fullBag().reduce((a, b) => a + b, 0)) : 24;
+    let cell = 16;
+    for (let s = Math.min(96, ih); s >= 16; s -= 1) {
+      if (Math.floor(iw / s) * Math.floor(ih / s) >= n) { cell = s; break; }
+    }
+    const cols = Math.max(1, Math.floor(iw / cell));
+    const rows = Math.ceil(n / cols);
+    const cap = Math.max(1, cols * Math.max(rows, Math.floor(ih / cell)));
+    const page = oneJar ? 0 : Math.floor(Math.max(0, all.length - 1) / cap);
+    const out = all.slice(page * cap);
+    const x0 = pad + (iw - Math.min(n, cols) * cell) / 2, y0 = pad + (ih - (oneJar ? rows : Math.floor(ih / cell)) * cell) / 2;
+    const sketches = out.map((b, i) => {
+      const cx = x0 + (i % cols + 0.5) * cell + wob(i, 7) * cell * 0.08;
+      const cy = y0 + (Math.floor(i / cols) + 0.5) * cell + wob(i, 9) * cell * 0.08;
+      return sketchSvg(i, cx, cy, cell * 0.34, b.c);
+    }).join('');
+    return slateHtml(W, H, sketches);
   }
 
   // Lay out the thing being thrown beside its board: returns the width the
@@ -1758,30 +1797,66 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     return { playW: W - bw - 30, bw, bh };
   }
 
+  // ── Writing ─────────────────────────────────────────────────────────────────
+  // Hidden outright, not a zero-length dash: a round cap would still leave a dot.
+  const hideStroke = st => { st.style.visibility = 'hidden'; st.querySelectorAll('path').forEach(p => { p.style.strokeDasharray = '0 100000'; }); };
+  const showStroke = st => { st.style.visibility = ''; st.querySelectorAll('path').forEach(p => { p.style.strokeDasharray = ''; p.style.strokeDashoffset = ''; }); };
+  function hideSketch(g) { if (g) g.querySelectorAll('.st').forEach(hideStroke); }
+
+  // Write a sketch in, one stroke after another at a steady hand speed, the
+  // chalk stick riding the tip and lifting between strokes. One rAF loop;
+  // returns { anims: [{ cancel }], end } so it fits with the other timings.
+  function drawSketch(g, delay) {
+    if (!g) return { anims: [], end: delay };
+    const svg = g.ownerSVGElement, stick = svg && svg.querySelector('.stick');
+    const plan = [];
+    let t = delay;
+    g.querySelectorAll('.st').forEach(st => {
+      const p = st.querySelector('.cm'), len = p.getTotalLength();
+      const dur = Math.max(110, Math.min(700, len * 5.5));
+      plan.push({ st, paths: [...st.querySelectorAll('path')], p, len, start: t, dur });
+      hideStroke(st);
+      t += dur + 70;
+    });
+    const t0 = performance.now();
+    let raf = 0, finished = false;
+    const ease = x => (x < 0.5 ? 2 * x * x : 1 - (-2 * x + 2) ** 2 / 2);
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      cancelAnimationFrame(raf);
+      plan.forEach(s => showStroke(s.st));
+      if (stick) stick.style.display = 'none';
+    };
+    const step = now => {
+      const el = now - t0;
+      let tip = null;
+      plan.forEach(s => {
+        const f = Math.max(0, Math.min(1, (el - s.start) / s.dur));
+        if (f <= 0) return;
+        const drawn = s.len * ease(f);
+        s.st.style.visibility = '';
+        s.paths.forEach(p => { p.style.strokeDasharray = `${drawn.toFixed(1)} 100000`; });
+        if (f < 1) tip = s.p.getPointAtLength(drawn);
+      });
+      if (stick) {
+        if (tip) { stick.style.display = ''; stick.setAttribute('transform', `translate(${tip.x.toFixed(1)},${tip.y.toFixed(1)})`); }
+        else stick.style.display = 'none';
+      }
+      if (el < t) raf = requestAnimationFrame(step); else finish();
+    };
+    raf = requestAnimationFrame(step);
+    return { anims: [{ cancel: finish }], end: t };
+  }
+
   // Hide the newest entry until the throw lands, then write it in.
   function prepNewest() {
     const g = resultEl.querySelector('.sketch.newest');
-    if (!g) return null;
-    g.querySelectorAll('.ring, .hatch').forEach(p => { p.style.strokeDasharray = '1 100000'; p.style.strokeDashoffset = '1'; });
-    g.querySelectorAll('.wipe').forEach(rc => { rc.style.transform = 'scaleX(0)'; rc.style.transformBox = 'fill-box'; });
+    hideSketch(g);
     return g;
   }
-  function writeNewest(g, delay) {
-    if (!g) return { anims: [], end: delay };
-    const d = drawSketch(g, delay);
-    let t = d.end;
-    g.querySelectorAll('.wipe').forEach(rc => {
-      d.anims.push(rc.animate([{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }],
-        { duration: 420, delay: t, easing: 'ease-in-out', fill: 'both' }));
-      t += 440;
-    });
-    return { anims: d.anims, end: t };
-  }
-  function settleNewest(g) {
-    if (!g) return;
-    g.querySelectorAll('.ring, .hatch').forEach(p => { p.style.strokeDasharray = ''; p.style.strokeDashoffset = ''; });
-    g.querySelectorAll('.wipe').forEach(rc => { rc.style.transform = ''; });
-  }
+  function writeNewest(g, delay) { return drawSketch(g, delay); }
+  function settleNewest(g) { if (g) g.querySelectorAll('.st').forEach(showStroke); }
 
   // ── Dice ────────────────────────────────────────────────────────────────────
   const DIE_COLORS = {
@@ -1878,6 +1953,530 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     if (u) u.style.display = (v === 6 || v === 9) && sides >= 8 ? '' : 'none';
   }
 
+  // ── Shared 3D renderer ──────────────────────────────────────────────────────
+  // One WebGL canvas, reused by whichever mode is showing (dice, bingo cage,
+  // hat), with a soft studio environment so metal and satin have something
+  // to reflect.
+  let R3 = null;
+  function getRenderer() {
+    if (R3) return R3.renderer;
+    const T = T3;
+    const renderer = new T.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = T.PCFSoftShadowMap;
+    renderer.toneMapping = T.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    let env = null;
+    try {
+      const pmrem = new T.PMREMGenerator(renderer);
+      env = pmrem.fromScene(new RoomEnv(), 0.04).texture;
+      pmrem.dispose();
+    } catch (_) { /* plain lighting still works */ }
+    R3 = { renderer, env };
+    return renderer;
+  }
+  function mountRenderer(host, w, h) {
+    const r = getRenderer();
+    r.setSize(w, h, false);
+    r.domElement.style.width = w + 'px';
+    r.domElement.style.height = h + 'px';
+    host.appendChild(r.domElement);
+    return r;
+  }
+  function stageLights(scene, { shadowBox = 6 } = {}) {
+    const T = T3;
+    if (R3 && R3.env) { scene.environment = R3.env; }
+    scene.add(new T.HemisphereLight(0xffffff, 0x8a8a90, 0.7));
+    const key = new T.DirectionalLight(0xffffff, 2.2);
+    key.position.set(-4, 9, 6);
+    key.castShadow = true;
+    key.shadow.mapSize.set(1024, 1024);
+    Object.assign(key.shadow.camera, { left: -shadowBox, right: shadowBox, top: shadowBox, bottom: -shadowBox });
+    key.shadow.radius = 5;
+    key.shadow.bias = -0.0008;
+    scene.add(key);
+    const rim = new T.DirectionalLight(0xc8d6ff, 0.8);
+    rim.position.set(5, 4, -5);
+    scene.add(rim);
+    const ground = new T.Mesh(new T.PlaneGeometry(60, 40), new T.ShadowMaterial({ opacity: 0.22 }));
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+  }
+  const clamp01 = x => Math.max(0, Math.min(1, x));
+  const easeInOut = x => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2);
+  const easeOutBack = x => { const c1 = 1.5, c3 = c1 + 1; return 1 + c3 * (x - 1) ** 3 + c1 * (x - 1) ** 2; };
+  const seg = (t, a, b) => clamp01((t - a) / (b - a));
+  function canvasTex(cv) {
+    const tex = new T3.CanvasTexture(cv);
+    tex.colorSpace = T3.SRGBColorSpace;
+    tex.anisotropy = 8;
+    return tex;
+  }
+
+  // ── Bingo cage ──────────────────────────────────────────────────────────────
+  // A brass wire globe on a wooden stand, full of numbered balls that really
+  // tumble (a little physics: gravity, the turning wall dragging them round).
+  // When it stops, the drawn ball drops out, rolls down the chute and is held
+  // up to the room.
+  function bingoBallTexture(text, hue) {
+    const cv = document.createElement('canvas');
+    cv.width = 1024; cv.height = 512;
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = hueHex(hue);
+    ctx.fillRect(0, 0, 1024, 512);
+    // A white disc either side (u = 0.25 faces +z, 0.75 faces −z), number on each.
+    [256, 768].forEach(cx => {
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(cx, 256, 118, 0, Math.PI * 2); ctx.fill();
+      const s = String(text);
+      const fs = s.length <= 2 ? 150 : s.length === 3 ? 112 : Math.max(46, 340 / s.length);
+      ctx.fillStyle = '#18181b';
+      ctx.font = `800 ${fs}px "DM Sans", "Segoe UI", system-ui, sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(s, cx, 262);
+      if (s === '6' || s === '9') ctx.fillRect(cx - 28, 262 + fs * 0.42, 56, 9);
+    });
+    return canvasTex(cv);
+  }
+  function bingoBall(text, hue, r) {
+    const T = T3;
+    const m = new T.Mesh(new T.SphereGeometry(r, 48, 32),
+      new T.MeshPhysicalMaterial({ map: bingoBallTexture(text, hue), roughness: 0.22, clearcoat: 1, clearcoatRoughness: 0.12 }));
+    m.castShadow = true;
+    return m;
+  }
+
+  let CG = null;
+  const CAGE = { c: new Float32Array([0, 2.3, 0]), R: 1.42, ball: 0.27 };
+  function buildCage() {
+    const T = T3, scene = new T.Scene();
+    stageLights(scene, { shadowBox: 5 });
+    const brass = new T.MeshStandardMaterial({ color: 0xd8aa48, metalness: 1, roughness: 0.26 });
+    const darkBrass = new T.MeshStandardMaterial({ color: 0xa87a2a, metalness: 1, roughness: 0.34 });
+    const wood = new T.MeshStandardMaterial({ color: 0x7b4a27, roughness: 0.55 });
+    const red = new T.MeshPhysicalMaterial({ color: 0xb3261e, roughness: 0.3, clearcoat: 1 });
+    const cy = CAGE.c[1], R = CAGE.R;
+    const add = (geo, mat, x = 0, y = 0, z = 0, parent = scene) => {
+      const m = new T.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; parent.add(m); return m;
+    };
+    // Stand.
+    add(new T.BoxGeometry(4.4, 0.28, 1.9), wood, 0, 0.14, 0);
+    [-1, 1].forEach(sx => {
+      const post = add(new T.CylinderGeometry(0.07, 0.09, cy - 0.28, 16), darkBrass, sx * 1.85, 0.28 + (cy - 0.28) / 2, 0);
+      post.rotation.z = sx * 0.06;
+      add(new T.CylinderGeometry(0.16, 0.16, 0.08, 20), darkBrass, sx * 1.85, 0.32, 0);
+    });
+    const axle = add(new T.CylinderGeometry(0.045, 0.045, 3.9, 12), darkBrass, 0, cy, 0);
+    axle.rotation.z = Math.PI / 2;
+    // The globe: meridians through the axle and three hoops across it.
+    const cage = new T.Group();
+    cage.position.set(0, cy, 0);
+    scene.add(cage);
+    for (let k = 0; k < 6; k++) {
+      const ring = add(new T.TorusGeometry(R, 0.026, 10, 96), brass, 0, 0, 0, cage);
+      ring.rotation.x = k * Math.PI / 6;
+    }
+    [-0.95, 0, 0.95].forEach(x => {
+      const r = Math.sqrt(R * R - x * x);
+      const hoop = add(new T.TorusGeometry(r, x ? 0.022 : 0.034, 10, 96), brass, x, 0, 0, cage);
+      hoop.rotation.y = Math.PI / 2;
+    });
+    [-1, 1].forEach(sx => {
+      const hub = add(new T.CylinderGeometry(0.16, 0.16, 0.12, 24), brass, sx * (R + 0.02), 0, 0, cage);
+      hub.rotation.z = Math.PI / 2;
+    });
+    // Crank on the right, turning with the cage.
+    const arm = add(new T.BoxGeometry(0.06, 0.62, 0.08), darkBrass, R + 0.42, 0.28, 0, cage);
+    arm.rotation.z = 0;
+    const hub2 = add(new T.CylinderGeometry(0.07, 0.07, 0.5, 12), darkBrass, R + 0.22, 0, 0, cage);
+    hub2.rotation.z = Math.PI / 2;
+    add(new T.SphereGeometry(0.11, 20, 16), red, R + 0.42, 0.6, 0, cage);
+    const handle = add(new T.CylinderGeometry(0.05, 0.05, 0.26, 12), red, R + 0.55, 0.6, 0, cage);
+    handle.rotation.z = Math.PI / 2;
+    // Chute: from the bottom of the cage, down and forward to the right.
+    const chute = new T.CatmullRomCurve3([
+      new T.Vector3(0.15, cy - R - 0.05, 0.35), new T.Vector3(0.9, 0.62, 0.95), new T.Vector3(1.9, 0.5, 1.35), new T.Vector3(2.7, 0.45, 1.5),
+    ]);
+    [-0.13, 0.13].forEach(off => {
+      const pts = chute.getPoints(30).map(p => p.clone().add(new T.Vector3(-off * 0.35, -0.12, off)));
+      add(new T.TubeGeometry(new T.CatmullRomCurve3(pts), 40, 0.022, 8), brass);
+    });
+    add(new T.TorusGeometry(0.2, 0.03, 10, 32), brass, 2.78, 0.33, 1.52).rotation.x = Math.PI / 2;
+    add(new T.CylinderGeometry(0.03, 0.03, 0.2, 8), darkBrass, 2.78, 0.22, 1.52);
+    // Balls inside: in the cage's frame, but not turning with it.
+    const inner = new T.Group();
+    inner.position.set(0, cy, 0);
+    scene.add(inner);
+    const balls = [];
+    for (let k = 0; k < 11; k++) {
+      const b = bingoBall(String(1 + ((k * 37) % 75)), k % 6, CAGE.ball);
+      inner.add(b);
+      balls.push({ m: b, p: new T.Vector3((wob(k, 1)) * 1.4, -0.6 + wob(k, 2) * 0.4, wob(k, 3) * 1.2), v: new T.Vector3() });
+    }
+    const camera = new T.PerspectiveCamera(30, 1, 0.1, 100);
+    CG = { scene, camera, cage, inner, balls, chute, shown: null, shownKey: '', raf: 0, spinAngle: 0 };
+    // Let the balls settle into a pile before anyone sees them.
+    for (let i = 0; i < 180; i++) stepBalls(1 / 60, 0);
+    return CG;
+  }
+
+  // Gravity, the sphere wall, a turning wall that drags balls along, and
+  // balls pushing each other apart. Small and stable, not a physics engine.
+  function stepBalls(dt, omega) {
+    const T = T3, Rin = CAGE.R - CAGE.ball - 0.04, r2 = CAGE.ball * 2;
+    const g = new T.Vector3(0, -9.8, 0), wall = new T.Vector3(), n = new T.Vector3(), d = new T.Vector3();
+    CG.balls.forEach(b => {
+      b.v.addScaledVector(g, dt);
+      b.p.addScaledVector(b.v, dt);
+      const len = b.p.length();
+      if (len > Rin) {
+        n.copy(b.p).divideScalar(len);
+        b.p.copy(n).multiplyScalar(Rin);
+        const vn = b.v.dot(n);
+        if (vn > 0) b.v.addScaledVector(n, -1.35 * vn);
+        // The wall moves at ω × p (axle along x).
+        wall.set(0, -omega * b.p.z, omega * b.p.y);
+        b.v.lerp(wall, 0.18);
+      }
+    });
+    for (let i = 0; i < CG.balls.length; i++) for (let j = i + 1; j < CG.balls.length; j++) {
+      const a = CG.balls[i], b = CG.balls[j];
+      d.subVectors(b.p, a.p);
+      const dist = d.length();
+      if (dist > 0 && dist < r2) {
+        d.divideScalar(dist);
+        const push = (r2 - dist) / 2;
+        a.p.addScaledVector(d, -push); b.p.addScaledVector(d, push);
+        const rel = b.v.clone().sub(a.v).dot(d);
+        if (rel < 0) { a.v.addScaledVector(d, rel * 0.9); b.v.addScaledVector(d, -rel * 0.9); }
+      }
+    }
+    CG.balls.forEach(b => {
+      b.m.position.copy(b.p);
+      // Roll a little with the motion.
+      b.m.rotation.x += b.v.z * dt * 3; b.m.rotation.z -= b.v.x * dt * 3;
+    });
+  }
+
+  function frameCage(w, h) {
+    const T = T3, cam = CG.camera;
+    cam.aspect = w / h;
+    // Fit the cage and the presented ball: about x −2.4 … 4.
+    const vf = T.MathUtils.degToRad(cam.fov) / 2, hf = Math.atan(Math.tan(vf) * cam.aspect);
+    const dist = Math.max(3.35 / Math.tan(hf), 2.35 / Math.tan(vf)) * 1.05;
+    cam.position.set(0.85, 1.55 + dist * 0.32, dist);
+    cam.lookAt(0.85, 1.5, 0.4);
+    cam.updateProjectionMatrix();
+  }
+  // Where the drawn ball is held up: to the right, toward the room.
+  const SHOW = { x: 3.0, y: 1.75, z: 1.9, scale: 2.5 };
+
+  function presentBall(text, hue) {
+    const key = text + '|' + hue;
+    if (CG.shown && CG.shownKey === key) return CG.shown;
+    if (CG.shown) { CG.scene.remove(CG.shown); CG.shown.geometry.dispose(); CG.shown.material.map.dispose(); CG.shown.material.dispose(); }
+    CG.shown = bingoBall(text, hue, CAGE.ball);
+    CG.shownKey = key;
+    CG.scene.add(CG.shown);
+    return CG.shown;
+  }
+  function restShown() {
+    const b = CG.shown; if (!b) return;
+    b.position.set(SHOW.x, SHOW.y, SHOW.z);
+    b.scale.setScalar(SHOW.scale);
+    b.quaternion.identity();
+    b.lookAt(CG.camera.position);
+  }
+
+  function renderNumber3D(o, play, host, w, h) {
+    const T = T3;
+    if (!CG) buildCage();
+    const renderer = mountRenderer(host, w, h);
+    frameCage(w, h);
+    cancelAnimationFrame(CG.raf);
+    const st = S.setup.number;
+    const draw = () => renderer.render(CG.scene, CG.camera);
+    if (o) presentBall(String(o.v).padStart(st.digits, '0'), o.v % 6);
+    else if (CG.shown) { CG.scene.remove(CG.shown); CG.shown = null; CG.shownKey = ''; }
+    if (!play || !o) { restShown(); draw(); return 0; }
+
+    // 0–1.7 s: the crank turns, the balls tumble. 1.7–2.5 s: the ball drops
+    // out and rolls down the chute. 2.5–3.2 s: it's lifted up to the room.
+    const DUR = 3200, t0 = performance.now();
+    const ball = CG.shown;
+    ball.visible = false;
+    let last = t0;
+    const quatEnd = (() => { const q = ball.quaternion.clone(); ball.position.set(SHOW.x, SHOW.y, SHOW.z); ball.lookAt(CG.camera.position); const r = ball.quaternion.clone(); ball.quaternion.copy(q); return r; })();
+    const spin = new T.Quaternion(), axis = new T.Vector3();
+    const frame = now => {
+      const t = now - t0, dt = Math.min(0.033, (now - last) / 1000);
+      last = now;
+      // Crank: speeds up, holds, slows to a stop.
+      const s = t / 1700;
+      const omega = s < 1 ? 9 * Math.sin(Math.PI * s) ** 0.6 : 0;
+      CG.cage.rotation.x -= omega * dt;
+      for (let k = 0; k < 2; k++) stepBalls(dt / 2, -omega);
+      if (t > 1700) {
+        ball.visible = true;
+        const roll = seg(t, 1700, 2500), lift = seg(t, 2500, 3200);
+        if (lift <= 0) {
+          const p = CG.chute.getPointAt(easeInOut(roll));
+          ball.position.set(p.x, p.y + CAGE.ball * 0.2, p.z);
+          ball.scale.setScalar(1);
+          // Rolling: turn about the axis across its direction of travel.
+          const tan = CG.chute.getTangentAt(Math.min(0.999, roll));
+          axis.set(tan.z, 0, -tan.x).normalize();
+          spin.setFromAxisAngle(axis, roll * 9);
+          ball.quaternion.copy(spin);
+        } else {
+          const e = easeInOut(lift);
+          const end = CG.chute.getPointAt(1);
+          ball.position.set(end.x + (SHOW.x - end.x) * e, end.y + (SHOW.y - end.y) * e + Math.sin(Math.PI * lift) * 0.5, end.z + (SHOW.z - end.z) * e);
+          ball.scale.setScalar(1 + (SHOW.scale - 1) * e);
+          ball.quaternion.slerp(quatEnd, Math.min(1, e * 1.2));
+        }
+      }
+      draw();
+      if (t < DUR) CG.raf = requestAnimationFrame(frame);
+    };
+    frame(t0);
+    return DUR;
+  }
+  function settleNumber3D() {
+    if (!CG) return;
+    cancelAnimationFrame(CG.raf);
+    if (CG.shown) CG.shown.visible = true;
+    restShown();
+    getRenderer().render(CG.scene, CG.camera);
+  }
+
+  // ── Top hat ─────────────────────────────────────────────────────────────────
+  // A silk top hat, upside down, lined in red satin, with folded slips
+  // standing in it. Drawing a name: the slips shuffle, one is pulled up out of
+  // the hat, brought round to face the room, and opened along its fold.
+  const PAPER = 0xfbf7ec;
+  function paperMat(map) {
+    return new T3.MeshStandardMaterial({ color: map ? 0xffffff : PAPER, map: map || null, roughness: 0.92, side: map ? T3.FrontSide : T3.DoubleSide });
+  }
+  function foldedSlip(w, h) {
+    // A small tent: two halves meeting at the fold along the top.
+    const T = T3, g = new T.Group(), mat = paperMat();
+    [-1, 1].forEach(s => {
+      const p = new T.Mesh(new T.PlaneGeometry(w, h), mat);
+      p.position.set(0, -h / 2 * Math.cos(0.26), s * h / 2 * Math.sin(0.26));
+      p.rotation.x = s * 0.26;
+      p.castShadow = true;
+      g.add(p);
+    });
+    return g;
+  }
+  function tagTexture(n) {
+    const cv = document.createElement('canvas');
+    cv.width = 256; cv.height = 320;
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = '#d7b98a';
+    ctx.beginPath(); ctx.moveTo(40, 0); ctx.lineTo(216, 0); ctx.lineTo(256, 44); ctx.lineTo(256, 320); ctx.lineTo(0, 320); ctx.lineTo(0, 44); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#3a2a1a';
+    ctx.beginPath(); ctx.arc(128, 36, 13, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#3b2a18';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `700 150px 'Segoe Print', 'Bradley Hand', 'Marker Felt', 'Comic Sans MS', cursive`;
+    ctx.fillText(String(n), 128, 175);
+    ctx.font = `600 40px 'Segoe Print', 'Bradley Hand', 'Marker Felt', 'Comic Sans MS', cursive`;
+    ctx.fillText(n === 1 ? 'name' : 'names', 128, 280);
+    return canvasTex(cv);
+  }
+  function nameTexture(name) {
+    const cv = document.createElement('canvas');
+    cv.width = 1536; cv.height = 768;
+    const ctx = cv.getContext('2d');
+    // Paper, a hint of the fold across the middle, the name in ink.
+    const g = ctx.createLinearGradient(0, 0, 0, 768);
+    g.addColorStop(0, '#fffdf6'); g.addColorStop(0.49, '#f6f1e2'); g.addColorStop(0.5, '#e6dfcc'); g.addColorStop(0.51, '#f3eddc'); g.addColorStop(1, '#fbf7ec');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, 1536, 768);
+    ctx.fillStyle = '#22304d';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    let fs = 300;
+    const font = s => `700 ${s}px 'Segoe Print', 'Bradley Hand', 'Marker Felt', 'Comic Sans MS', cursive`;
+    ctx.font = font(fs);
+    while (ctx.measureText(name).width > 1340 && fs > 60) { fs -= 8; ctx.font = font(fs); }
+    ctx.save(); ctx.translate(768, 392); ctx.rotate(-0.025); ctx.fillText(name, 0, 0); ctx.restore();
+    return canvasTex(cv);
+  }
+
+  let HT = null;
+  const HAT = { x: -1.55, brimY: 2.42 };
+  function buildHat() {
+    const T = T3, scene = new T.Scene();
+    stageLights(scene, { shadowBox: 5 });
+    const felt = new T.MeshPhysicalMaterial({ color: 0x131316, roughness: 0.62, sheen: 1, sheenRoughness: 0.35, sheenColor: new T.Color(0x6a6a78), side: T.DoubleSide });
+    const lining = new T.MeshPhysicalMaterial({ color: 0x7a1427, roughness: 0.32, sheen: 1, sheenColor: new T.Color(0xff8fa0), side: T.BackSide });
+    const satin = new T.MeshPhysicalMaterial({ color: 0x80172c, roughness: 0.28, clearcoat: 0.6, sheen: 1, sheenColor: new T.Color(0xff9aaa) });
+    const hat = new T.Group();
+    hat.position.set(HAT.x, 0, 0);
+    scene.add(hat);
+    const mesh = (geo, mat) => { const m = new T.Mesh(geo, mat); m.castShadow = true; m.receiveShadow = true; hat.add(m); return m; };
+    // Crown (upside down: it widens slightly toward the table).
+    const crown = [[0.0, 0.02], [1.02, 0.02], [1.08, 0.08], [1.07, 0.7], [1.04, 1.5], [1.01, 2.3], [1.0, HAT.brimY]].map(([x, y]) => new T.Vector2(x, y));
+    mesh(new T.LatheGeometry(crown, 96), felt);
+    mesh(new T.LatheGeometry(crown.slice(1).map(v => new T.Vector2(v.x * 0.965, Math.max(0.3, v.y))), 96), lining);
+    const floor = mesh(new T.CircleGeometry(0.98, 64), new T.MeshStandardMaterial({ color: 0x4d0c18, roughness: 0.5 }));
+    floor.rotation.x = -Math.PI / 2; floor.position.y = 0.3;
+    // Brim: a curled ring.
+    const brim = [[0.99, 2.38], [1.4, 2.36], [1.66, 2.42], [1.8, 2.55], [1.83, 2.62], [1.78, 2.6], [1.64, 2.49], [1.4, 2.45], [0.99, 2.47], [0.99, 2.38]].map(([x, y]) => new T.Vector2(x, y));
+    mesh(new T.LatheGeometry(brim, 128), felt);
+    // Satin band next to the brim, and a bow.
+    mesh(new T.CylinderGeometry(1.012, 1.02, 0.34, 96, 1, true), satin).position.y = 2.12;
+    const bow = new T.Group();
+    [-1, 1].forEach(s => {
+      const loop = new T.Mesh(new T.SphereGeometry(1, 24, 16), satin);
+      loop.scale.set(0.24, 0.13, 0.06); loop.position.set(s * 0.2, 0, 0); loop.rotation.z = s * 0.25; loop.castShadow = true;
+      bow.add(loop);
+    });
+    const knot = new T.Mesh(new T.BoxGeometry(0.11, 0.15, 0.08), satin); bow.add(knot);
+    const ang = -2.25;
+    bow.position.set(Math.cos(ang) * 1.07, 2.12, -Math.sin(ang) * 1.07);
+    bow.rotation.y = ang + Math.PI / 2;
+    hat.add(bow);
+    // Slips standing in the hat.
+    const slips = new T.Group(); slips.position.y = HAT.brimY; hat.add(slips);
+    // Tag on a string, from the brim.
+    const tag = new T.Mesh(new T.PlaneGeometry(0.42, 0.52), new T.MeshStandardMaterial({ map: tagTexture(0), transparent: true, roughness: 0.9, side: T.DoubleSide }));
+    tag.position.set(1.72, 1.75, 0.95); tag.rotation.set(-0.15, -0.35, 0.12); tag.castShadow = true;
+    hat.add(tag);
+    const string = new T.Mesh(new T.CylinderGeometry(0.008, 0.008, 0.62, 6), new T.MeshStandardMaterial({ color: 0xcdb57d }));
+    string.position.set(1.66, 2.27, 0.93); string.rotation.z = 0.25;
+    hat.add(string);
+    const camera = new T.PerspectiveCamera(30, 1, 0.1, 100);
+    HT = { scene, camera, hat, slips, tag, tagN: -1, slipsN: -1, pick: null, pickKey: '', raf: 0 };
+    return HT;
+  }
+  function fillHat(n) {
+    if (HT.slipsN === n) return;
+    HT.slipsN = n;
+    while (HT.slips.children.length) HT.slips.remove(HT.slips.children[0]);
+    for (let k = 0; k < Math.min(n, 9); k++) {
+      const s = foldedSlip(0.46, 0.3);
+      const a = k * 2.4, rad = 0.18 + (k % 3) * 0.2;
+      s.position.set(Math.cos(a) * rad, 0.16 + wob(k, 4) * 0.08, Math.sin(a) * rad);
+      s.rotation.set(wob(k, 5) * 0.5, a + wob(k, 6), wob(k, 7) * 0.4);
+      HT.slips.add(s);
+    }
+    if (HT.tagN !== n) {
+      HT.tagN = n;
+      HT.tag.material.map.dispose();
+      HT.tag.material.map = tagTexture(n);
+      HT.tag.material.needsUpdate = true;
+    }
+  }
+  function frameHat(w, h) {
+    const T = T3, cam = HT.camera;
+    cam.aspect = w / h;
+    const vf = T.MathUtils.degToRad(cam.fov) / 2, hf = Math.atan(Math.tan(vf) * cam.aspect);
+    const dist = Math.max(3.6 / Math.tan(hf), 2.3 / Math.tan(vf)) * 1.05;
+    cam.position.set(0.55, 1.6 + dist * 0.42, dist);
+    cam.lookAt(0.55, 1.55, 0.3);
+    cam.updateProjectionMatrix();
+  }
+  // The picked slip: two halves of one sheet, the lower one hinged at the fold.
+  const SLIP = { w: 2.7, h: 0.82 };
+  function buildPick(name) {
+    const T = T3, tex = nameTexture(name), g = new T.Group();
+    const half = top => {
+      const geo = new T.PlaneGeometry(SLIP.w, SLIP.h);
+      const uv = geo.getAttribute('uv');
+      for (let i = 0; i < uv.count; i++) uv.setY(i, top ? 0.5 + uv.getY(i) * 0.5 : uv.getY(i) * 0.5);
+      const front = new T.Mesh(geo, paperMat(tex));
+      const back = new T.Mesh(new T.PlaneGeometry(SLIP.w, SLIP.h), new T.MeshStandardMaterial({ color: 0xf1ead8, roughness: 0.95 }));
+      back.rotation.y = Math.PI; back.position.z = -0.002;
+      front.castShadow = back.castShadow = true;
+      const hg = new T.Group(); hg.add(front, back);
+      return hg;
+    };
+    const top = half(true); top.position.y = SLIP.h / 2;
+    const hinge = new T.Group();
+    const bot = half(false); bot.position.y = -SLIP.h / 2;
+    hinge.add(bot);
+    g.add(top, hinge);
+    g.userData = { hinge, tex };
+    return g;
+  }
+  const PICK_AT = { x: 2.05, y: 1.85, z: 1.9 };
+  function setPick(name) {
+    if (HT.pick && HT.pickKey === name) return HT.pick;
+    if (HT.pick) { HT.scene.remove(HT.pick); HT.pick.userData.tex.dispose(); }
+    HT.pick = name == null ? null : buildPick(name);
+    HT.pickKey = name;
+    if (HT.pick) HT.scene.add(HT.pick);
+    return HT.pick;
+  }
+  function restPick() {
+    const p = HT.pick; if (!p) return;
+    p.position.set(PICK_AT.x, PICK_AT.y, PICK_AT.z);
+    p.scale.setScalar(1);
+    p.quaternion.identity();
+    p.lookAt(HT.camera.position);
+    p.rotateZ(-0.03);
+    p.userData.hinge.rotation.x = 0;
+  }
+
+  function renderList3D(o, play, host, w, h, left) {
+    const T = T3;
+    if (!HT) buildHat();
+    const renderer = mountRenderer(host, w, h);
+    frameHat(w, h);
+    cancelAnimationFrame(HT.raf);
+    const draw = () => renderer.render(HT.scene, HT.camera);
+    // While a slip is coming out, the hat still holds it.
+    fillHat(play && S.setup.list.remove ? left + 1 : left);
+    setPick(o ? o.name : null);
+    HT.hat.rotation.set(0, 0, 0);
+    if (!play || !o) { restPick(); draw(); return 0; }
+
+    const pick = HT.pick, hinge = pick.userData.hinge;
+    const DUR = 3000, t0 = performance.now();
+    const endQ = (() => { restPick(); return pick.quaternion.clone(); })();
+    const startQ = new T.Quaternion().setFromEuler(new T.Euler(0, 0.4, 0));
+    const mouth = new T.Vector3(HAT.x, HAT.brimY - 0.35, 0.05);
+    const above = new T.Vector3(HAT.x + 0.1, HAT.brimY + 1.25, 0.25);
+    const end = new T.Vector3(PICK_AT.x, PICK_AT.y, PICK_AT.z);
+    const k0 = 0.2;
+    const frame = now => {
+      const t = now - t0;
+      // 0–0.7 s: a hand in the hat. Slips shuffle, the hat rocks.
+      const rustle = 1 - seg(t, 0, 750);
+      HT.hat.rotation.z = Math.sin(t / 55) * 0.035 * rustle;
+      HT.slips.children.forEach((s, i) => { s.position.y = 0.16 + wob(i, 4) * 0.08 + Math.sin(t / 40 + i * 1.7) * 0.05 * rustle; });
+      const rise = easeInOut(seg(t, 550, 1350)), carry = easeInOut(seg(t, 1350, 2250)), open = seg(t, 2150, 2950);
+      // Out of the hat, folded, small; carried round to face the room.
+      const p = new T.Vector3().lerpVectors(mouth, above, rise);
+      if (carry > 0) p.lerpVectors(above, end, carry).y += Math.sin(Math.PI * carry) * 0.45;
+      pick.position.copy(p);
+      pick.scale.setScalar(k0 + (1 - k0) * carry);
+      const sway = (1 - carry) * Math.sin(t / 180) * 0.12;
+      pick.quaternion.copy(startQ).slerp(endQ, carry);
+      pick.rotateZ(sway);
+      hinge.rotation.x = -Math.PI * 0.985 * (1 - easeOutBack(open));
+      // Once it's out, the hat has one fewer in it.
+      if (t > 1000 && S.setup.list.remove) fillHat(left);
+      draw();
+      if (t < DUR) HT.raf = requestAnimationFrame(frame);
+    };
+    // First frame now, so the slip is never seen where it last rested.
+    frame(t0);
+    return DUR;
+  }
+  function settleList3D(left) {
+    if (!HT) return;
+    cancelAnimationFrame(HT.raf);
+    HT.hat.rotation.set(0, 0, 0);
+    fillHat(left);
+    restPick();
+    getRenderer().render(HT.scene, HT.camera);
+  }
+
   // ── 3D dice ─────────────────────────────────────────────────────────────────
   // Real polyhedra (three.js 0.160, vendored by the Beamer+ server and loaded
   // on first use): numbered faces, lit and shadowed on a table, thrown so
@@ -1886,16 +2485,17 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   // GPU), the flat dice above are used instead.
   const THREE_URL = '/static/vendor/three/three.module.min.js';
   const RBOX_URL  = '/static/vendor/three/RoundedBoxGeometry.js';
-  let T3 = null, RBox = null, t3Loading = null, t3Failed = false;
+  const ROOM_URL  = '/static/vendor/three/RoomEnvironment.js';
+  let T3 = null, RBox = null, RoomEnv = null, t3Loading = null, t3Failed = false;
   function loadThree() {
     if (T3 || t3Failed) return Promise.resolve(T3);
     if (!t3Loading) {
-      t3Loading = Promise.all([import(THREE_URL), import(RBOX_URL)])
-        .then(([m, r]) => {
+      t3Loading = Promise.all([import(THREE_URL), import(RBOX_URL), import(ROOM_URL)])
+        .then(([m, r, e]) => {
           // WebGL can still be unavailable (old GPU, remote desktop).
           const probe = document.createElement('canvas');
           if (!(probe.getContext('webgl2') || probe.getContext('webgl'))) throw new Error('no webgl');
-          T3 = m; RBox = r.RoundedBoxGeometry; return m;
+          T3 = m; RBox = r.RoundedBoxGeometry; RoomEnv = e.RoomEnvironment; return m;
         })
         .catch(() => { t3Failed = true; return null; });
     }
@@ -2111,13 +2711,9 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   function ensureScene() {
     if (D3) return D3;
     const T = T3;
-    const renderer = new T.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = T.PCFSoftShadowMap;
-    renderer.toneMapping = T.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.05;
+    const renderer = getRenderer();
     const scene = new T.Scene();
+    if (R3.env) { scene.environment = R3.env; scene.environmentIntensity = 0.35; }
     scene.add(new T.HemisphereLight(0xffffff, 0x8a8a90, 1.25));
     const key = new T.DirectionalLight(0xffffff, 2.4);
     key.position.set(-4, 10, 6);
@@ -2480,102 +3076,6 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     return { a, fly };
   }
 
-  // ── Chalkboard ──────────────────────────────────────────────────────────────
-  // Without replacement, each ball drawn is recorded on a chalkboard as a
-  // chalk sketch in its colour: a hand-drawn ring, then a few strokes of
-  // shading, as if someone at the board were keeping score.
-  function hueHex(c) {
-    return getComputedStyle(document.documentElement).getPropertyValue(`--hue-${c}`).trim() || '#888888';
-  }
-  // Small deterministic wobble, so a sketch looks the same on every redraw.
-  const wob = (i, k) => { const x = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453; return x - Math.floor(x) - 0.5; };
-
-  function sketchSvg(i, cx, cy, r, c) {
-    const col = mixHex(hueHex(c), '#ffffff', 0.32);
-    // The ring: a little over one turn, radius drifting, so the ends overlap
-    // like a quick hand-drawn circle.
-    const start = wob(i, 1) * Math.PI, turns = 1.1, N = 30;
-    let d = '';
-    for (let k = 0; k <= N; k++) {
-      const a = start + (k / N) * turns * 2 * Math.PI;
-      const rr = r * (1 + 0.06 * Math.sin(k * 0.9 + i) + 0.04 * wob(i, k));
-      d += `${k ? 'L' : 'M'}${(cx + rr * Math.cos(a)).toFixed(1)},${(cy + rr * Math.sin(a)).toFixed(1)}`;
-    }
-    // Shading: diagonal strokes clipped to the ring.
-    let hatch = '';
-    const n = 5;
-    for (let k = 0; k < n; k++) {
-      const off = (k - (n - 1) / 2) * r * 0.36;
-      const half = Math.sqrt(Math.max(0, (r * 0.8) ** 2 - off * off));
-      const ux = Math.SQRT1_2, uy = -Math.SQRT1_2, vx = Math.SQRT1_2, vy = Math.SQRT1_2;
-      const mx = cx + vx * off, my = cy + vy * off;
-      const j = wob(i, k + 40) * r * 0.08;
-      hatch += `<path class="hatch" d="M${(mx - ux * half + j).toFixed(1)},${(my - uy * half).toFixed(1)}L${(mx + ux * half).toFixed(1)},${(my + uy * half + j).toFixed(1)}" stroke="${col}" stroke-width="${Math.max(1.4, r * 0.09).toFixed(1)}"/>`;
-    }
-    return `<g class="sketch" data-i="${i}" data-cx="${cx.toFixed(1)}" data-cy="${cy.toFixed(1)}">` +
-      `<path class="ring" d="${d}" stroke="${col}" stroke-width="${Math.max(2, r * 0.13).toFixed(1)}"/>${hatch}</g>`;
-  }
-
-  // `oneJar`: without replacement the board is laid out for exactly a jar's
-  // worth. With replacement there's no end, so it's laid out in fixed
-  // cells and wiped when full. Either way a sketch never moves once drawn.
-  function boardHtml(all, W, H, oneJar) {
-    const pad = 22, ledge = 16;
-    const iw = W - pad * 2, ih = H - pad * 2 - ledge;
-    const n = oneJar ? Math.max(1, all.length, fullBag().reduce((a, b) => a + b, 0)) : 24;
-    let cell = 16;
-    for (let s = Math.min(96, ih); s >= 16; s -= 1) {
-      if (Math.floor(iw / s) * Math.floor(ih / s) >= n) { cell = s; break; }
-    }
-    const cols = Math.max(1, Math.floor(iw / cell));
-    const rows = Math.ceil(n / cols);
-    const cap = Math.max(1, cols * Math.max(rows, Math.floor(ih / cell)));
-    const page = oneJar ? 0 : Math.floor(Math.max(0, all.length - 1) / cap);
-    const out = all.slice(page * cap);
-    const x0 = pad + (iw - Math.min(n, cols) * cell) / 2, y0 = pad + (ih - (oneJar ? rows : Math.floor(ih / cell)) * cell) / 2;
-    const sketches = out.map((b, i) => {
-      const cx = x0 + (i % cols + 0.5) * cell + wob(i, 7) * cell * 0.08;
-      const cy = y0 + (Math.floor(i / cols) + 0.5) * cell + wob(i, 9) * cell * 0.08;
-      return sketchSvg(i, cx, cy, cell * 0.34, b.c);
-    }).join('');
-    return `<div class="board" style="width:${W}px;height:${H}px"><svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
-      <defs>
-        <filter id="chalk" x="-10%" y="-10%" width="120%" height="120%">
-          <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="3" result="n"/>
-          <feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G" result="d"/>
-          <feComposite in="d" in2="n" operator="arithmetic" k1="0" k2="1" k3="-0.25" k4="0.06"/>
-        </filter>
-        <radialGradient id="dust" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffffff" stop-opacity="0.07"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient>
-        <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b98652"/><stop offset="1" stop-color="#7f5530"/></linearGradient>
-      </defs>
-      <rect x="0" y="0" width="${W}" height="${H - ledge + 4}" rx="10" fill="url(#wood)"/>
-      <rect x="9" y="9" width="${W - 18}" height="${H - ledge - 14}" rx="4" fill="#26332d"/>
-      <ellipse cx="${W * 0.3}" cy="${H * 0.35}" rx="${W * 0.28}" ry="${H * 0.22}" fill="url(#dust)"/>
-      <ellipse cx="${W * 0.72}" cy="${H * 0.62}" rx="${W * 0.24}" ry="${H * 0.18}" fill="url(#dust)"/>
-      <g class="chalk" filter="url(#chalk)" fill="none" stroke-linecap="round" stroke-linejoin="round">${sketches}</g>
-      <rect x="4" y="${H - ledge - 2}" width="${W - 8}" height="${ledge}" rx="3" fill="url(#wood)"/>
-      <rect x="${W * 0.66}" y="${H - ledge - 6}" width="${Math.min(46, W * 0.12)}" height="6" rx="3" fill="#f4f1e8"/>
-      <rect x="${W * 0.2}" y="${H - ledge - 7}" width="${Math.min(40, W * 0.1)}" height="7" rx="2" fill="#5a4a3a"/>
-    </svg></div>`;
-  }
-
-  // Draw a sketch's strokes in, as if by hand: the ring, then each shading
-  // stroke. Returns the running animations.
-  function drawSketch(g, delay) {
-    const anims = [];
-    let t = delay;
-    g.querySelectorAll('.ring, .hatch').forEach(p => {
-      const len = p.getTotalLength();
-      const dur = p.classList.contains('ring') ? 520 : 90;
-      p.style.strokeDasharray = `${len} ${len}`;
-      p.style.strokeDashoffset = String(len);
-      anims.push(p.animate([{ strokeDashoffset: len }, { strokeDashoffset: 0 }],
-        { duration: dur, delay: t, easing: 'ease-in-out', fill: 'both' }));
-      t += dur + 25;
-    });
-    return { anims, end: t };
-  }
-
   // A kraft-paper tag on a bit of twine, tied to the bag's drawstring.
   function bagTag(left) {
     return `<g class="bag-tag">
@@ -2626,7 +3126,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     const hx = (box.right + board.left) / 2 - host.left, hy = box.top - host.top + box.height * 0.32;
     const sketches = [...resultEl.querySelectorAll('.board .sketch')];
     const fresh = sketches.slice(Math.max(0, sketches.length - drawnNow));
-    fresh.forEach(g => g.querySelectorAll('.ring, .hatch').forEach(p => { p.style.strokeDasharray = '1 100000'; p.style.strokeDashoffset = '1'; }));
+    fresh.forEach(hideSketch);
     const flights = [], extra = [];
     const small = Math.max(0.25, Math.min(0.6, jar * 0.12 / sz));
     const EACH = 2300, OUT = 0.3, SHOW = 0.66;
@@ -2652,7 +3152,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     hold((o.balls.length - 1) * 1400 + EACH + 40, () => {
       flights.forEach(f => { f.a.cancel(); f.fly.remove(); });
       extra.forEach(a => a.cancel());
-      fresh.forEach(g => g.querySelectorAll('.ring, .hatch').forEach(p => { p.style.strokeDasharray = ''; p.style.strokeDashoffset = ''; }));
+      fresh.forEach(settleNewest);
       // Without replacement the container is now one ball lighter.
       if (!st.replace) renderBag(o, false);
     });
@@ -2990,6 +3490,18 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   }
 
   function renderNumber(o, play) {
+    if (!T3 && !t3Failed) loadThree().then(() => { if (T3 && S.mode === 'number' && !anim) renderResult(false); });
+    if (!T3) return renderNumberSvg(o, play);
+    const st = S.setup.number;
+    const r = resultEl.getBoundingClientRect();
+    const w = Math.round(r.width - 30), h = Math.round(r.height - 20);
+    resultEl.innerHTML = `<div class="stage3d" id="stage3d" style="width:${w}px;height:${h}px"></div>` +
+      (st.unique ? `<div class="cage-count">${S.pool.number.length} of ${st.max - st.min + 1} drawn</div>` : '');
+    const dur = renderNumber3D(o, play, $('stage3d'), w, h);
+    if (dur) hold(dur + 30, settleNumber3D);
+  }
+
+  function renderNumberSvg(o, play) {
     const st = S.setup.number;
     const r = resultEl.getBoundingClientRect();
     const W = r.width - 40, H = r.height - 30;
@@ -3103,6 +3615,15 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       return;
     }
     const left = st.remove ? S.pool.list.length : st.items.length;
+    if (!T3 && !t3Failed) loadThree().then(() => { if (T3 && S.mode === 'list' && !anim) renderResult(false); });
+    if (T3) {
+      const r = resultEl.getBoundingClientRect();
+      const w = Math.round(r.width - 30), h = Math.round(r.height - 20);
+      resultEl.innerHTML = `<div class="stage3d" id="stage3d" style="width:${w}px;height:${h}px"></div>`;
+      const dur = renderList3D(o && o.type === 'pick' ? o : null, play, $('stage3d'), w, h, left);
+      if (dur) hold(dur + 30, () => settleList3D(left));
+      return;
+    }
     const r = resultEl.getBoundingClientRect();
     const W = r.width - 40, H = r.height - 30;
     const hatH = Math.max(130, Math.min(H * 0.86, W * 0.4 * 190 / 200));
@@ -3261,7 +3782,11 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 
   function destroy() {
     finishAnim(true);
-    if (D3) { cancelAnimationFrame(D3.raf); try { D3.renderer.dispose(); } catch (_) { /* already gone */ } D3 = null; }
+    if (D3) cancelAnimationFrame(D3.raf);
+    if (CG) cancelAnimationFrame(CG.raf);
+    if (HT) cancelAnimationFrame(HT.raf);
+    if (R3) { try { R3.renderer.dispose(); } catch (_) { /* already gone */ } }
+    D3 = CG = HT = R3 = null;
     clearTimeout(syncTimer);
     clearTimeout(resizeTimer);
     if (ro) ro.disconnect();
