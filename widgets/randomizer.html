@@ -497,6 +497,28 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 /* 3D canvases. */
 .dice3 canvas, .stage3d canvas { display: block; }
 .stage3d { position: relative; }
+/* Everything drawn from the deck, in order: opened from the discard pile. */
+.pile-list {
+  position: absolute; inset: 0; z-index: 80;
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+}
+.pile-panel {
+  display: flex; flex-direction: column; max-width: 100%; max-height: 100%;
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+}
+.pile-head { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 14px; border-bottom: 1px solid var(--border); }
+.pile-title { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-2); }
+.pile-sub { flex: 1; font-size: var(--fs-chrome-sm); color: var(--text-3); }
+.pile-grid {
+  --sz: calc(84px * var(--u));
+  display: grid; grid-template-columns: repeat(auto-fill, calc(var(--sz) * 0.714)); gap: 12px 10px;
+  justify-content: center; padding: 14px; overflow: auto; min-width: min(560px, 80vw);
+  scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+}
+.pile-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.pile-item span { font-family: var(--font-mono); font-size: var(--fs-chrome-sm); color: var(--text-3); }
 /* A quiet count under the hat or the deck. */
 .count-note {
   position: absolute; transform: translateX(-50%); white-space: nowrap; pointer-events: none;
@@ -1381,6 +1403,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     const mode = S.mode, o = S.last[mode];
     const play = !!(animate && canAnimate() && o && !o.empty && (o.runs === 1 || mode === 'list'));
     if (mode !== 'spinner') wheelBuiltFor = '';
+    syncPileList();
     if (o && o.empty) {
       const why = { bag: 'The jar is empty.', cards: 'The deck is empty.', list: 'Everyone has been picked.',
                     number: 'Every number in the range has been used.' }[mode] || 'Nothing left.';
@@ -1602,6 +1625,9 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 
   let CG = null;
   const CAGE = { c: new Float32Array([0, 2.3, 0]), R: 1.42, ball: 0.27 };
+  // The door's cell, in the globe's own frame: x from x0 to x1 along the
+  // axle, angles a0…a1 measured from the top toward the front.
+  const CAGE_DOOR = { x0: 0.1, x1: 0.86, a0: 0.05, a1: 0.47 };
   function buildCage() {
     const T = T3, scene = new T.Scene();
     stageLights(scene, { shadowBox: 5 });
@@ -1639,6 +1665,23 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       const hub = add(new T.CylinderGeometry(0.16, 0.16, 0.12, 24), brass, sx * (R + 0.02), 0, 0, cage);
       hub.rotation.z = Math.PI / 2;
     });
+    // A hinged door in one cell of the globe: between the x = 0 hoop and the
+    // x = 0.95 one, and between the meridians at 0 and 30° from the top, so
+    // no fixed wire crosses the opening when it swings back. Hinged along
+    // the edge nearer the top; it opens back over the globe.
+    const D = CAGE_DOOR, rAt = x => Math.sqrt(R * R - x * x) + 0.012;
+    const hinge = new T.Vector3(0, R * Math.cos(D.a0), R * Math.sin(D.a0));
+    const door = new T.Group();
+    door.position.copy(hinge);
+    cage.add(door);
+    const onGlobe = (x, a) => new T.Vector3(x, rAt(x) * Math.cos(a), rAt(x) * Math.sin(a)).sub(hinge);
+    const bar = (pts, r) => add(new T.TubeGeometry(new T.CatmullRomCurve3(pts), 24, r, 8), brass, 0, 0, 0, door);
+    const N = 12, am = (D.a0 + D.a1) / 2;
+    [D.x0, D.x1].forEach(x => bar(Array.from({ length: N + 1 }, (_, i) => onGlobe(x, D.a0 + (D.a1 - D.a0) * i / N)), 0.024));
+    [D.a0, am, D.a1].forEach((a, k) => bar(Array.from({ length: N + 1 }, (_, i) => onGlobe(D.x0 + (D.x1 - D.x0) * i / N, a)), k === 1 ? 0.016 : 0.024));
+    // A little latch on the free edge, so it reads as a door.
+    const latch = add(new T.SphereGeometry(0.05, 14, 10), darkBrass, 0, 0, 0, door);
+    latch.position.copy(onGlobe((D.x0 + D.x1) / 2, D.a1 + 0.02));
     // Crank on the right, turning with the cage.
     const arm = add(new T.BoxGeometry(0.06, 0.62, 0.08), darkBrass, R + 0.42, 0.28, 0, cage);
     arm.rotation.z = 0;
@@ -1670,7 +1713,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       balls.push({ m: b, p: new T.Vector3((wob(k, 1)) * 1.4, -0.6 + wob(k, 2) * 0.4, wob(k, 3) * 1.2), v: new T.Vector3() });
     }
     const camera = new T.PerspectiveCamera(28, 1, 0.1, 100);
-    CG = { scene, camera, cage, inner, balls, chute, shown: null, shownKey: '', raf: 0, spinAngle: 0 };
+    CG = { scene, camera, cage, door, inner, balls, chute, shown: null, shownKey: '', raf: 0, spinAngle: 0, pending: null };
     // Let the balls settle into a pile before anyone sees them.
     for (let i = 0; i < 180; i++) stepBalls(1 / 60, 0);
     return CG;
@@ -1763,15 +1806,67 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     b.lookAt(CG.views.close.pos);
   }
 
+  // ── Balls going back into the cage, and coming out of it ──
+  // With repeats allowed the cage always holds the same number of balls: the
+  // one drawn last time is thrown back in before the next turn, and the one
+  // that drops out now leaves the pile. Without repeats a drawn ball is gone.
+  function addCageBall(m, worldP, v) {
+    const T = T3;
+    m.removeFromParent();
+    CG.inner.add(m);
+    const p = worldP.clone().sub(CG.inner.position);
+    // Anywhere inside the wall; physics drops it onto the pile.
+    const Rin = CAGE.R - CAGE.ball - 0.06;
+    if (p.length() > Rin) p.setLength(Rin);
+    CG.balls.push({ m, p, v: v ? v.clone() : new T.Vector3() });
+    m.position.copy(p);
+    m.visible = true;
+    m.scale.setScalar(1);
+  }
+  function takeCageBall() {
+    if (!CG.balls.length) return;
+    // The lowest one — the ball nearest the hole the chute starts from.
+    let k = 0;
+    CG.balls.forEach((b, i) => { if (b.p.y < CG.balls[k].p.y) k = i; });
+    const b = CG.balls.splice(k, 1)[0];
+    CG.inner.remove(b.m);
+    b.m.geometry.dispose(); b.m.material.map && b.m.material.map.dispose(); b.m.material.dispose();
+  }
+  // Where the door's cell is, in the globe's frame: centre on the surface,
+  // and a point just inside it.
+  function doorCell(rad) {
+    const D = CAGE_DOOR, a = (D.a0 + D.a1) / 2, x = (D.x0 + D.x1) / 2;
+    const r = Math.sqrt(CAGE.R * CAGE.R - x * x) * rad;
+    return new T3.Vector3(x, r * Math.cos(a), r * Math.sin(a));
+  }
+  // The globe angle that brings the door round to just in front of the top,
+  // facing the room — the nearest such angle to where the globe stopped.
+  function doorUpAngle(from) {
+    const D = CAGE_DOOR, want = 0.3 - (D.a0 + D.a1) / 2, TAU = Math.PI * 2;
+    let d = ((from - want) % TAU + TAU) % TAU;
+    if (d > Math.PI) d -= TAU;
+    return from - d;
+  }
+
   function renderNumber3D(o, play, host, w, h) {
     const T = T3;
     if (!CG) buildCage();
     const renderer = mountRenderer(host, w, h);
     frameCage(w, h);
     cancelAnimationFrame(CG.raf);
-    const st = S.setup.number;
+    if (CG.pending) CG.pending();
+    const st = S.setup.number, repeats = !st.unique;
     const draw = () => renderer.render(CG.scene, CG.camera);
     const hadBall = !!CG.shown;
+    CG.door.rotation.x = 0;
+
+    // With repeats, last time's ball goes back into the cage: thrown in
+    // through the door when there's a new draw to make, quietly otherwise.
+    let back = null;
+    if (repeats && CG.shown && (play || !o || CG.shownKey !== String(o.v).padStart(st.digits, '0') + '|' + (o.v % 6))) {
+      back = CG.shown; CG.shown = null; CG.shownKey = '';
+      if (!(play && o)) { addCageBall(back, CG.inner.position.clone().add(new T.Vector3(0, 0.6, 0))); back = null; }
+    }
     if (o) presentBall(String(o.v).padStart(st.digits, '0'), o.v % 6);
     else if (CG.shown) { CG.scene.remove(CG.shown); CG.shown = null; CG.shownKey = ''; }
     if (!play || !o) {
@@ -1781,10 +1876,16 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       return 0;
     }
 
-    // 0–0.6 s: pull back to see the cage. 0.4–2.1 s: the crank turns and
-    // the balls tumble. 2.1–3.0 s: the ball drops out and rolls down the
-    // chute into the cup. 3.0–3.9 s: move in to read it.
-    const DUR = 3900, t0 = performance.now(), V = CG.views;
+    // With a ball to put back first (OFF ms):
+    //   0–0.6 s  pull back to see the cage; the globe turns its door up
+    //   0.6–0.9  the door swings open
+    //   0.85–1.75 the ball is lobbed from the cup, over and in
+    //   1.75–2.05 the door shuts
+    // Then, as for every draw: the crank turns and the balls tumble (1.7 s),
+    // the drawn ball drops out and rolls down the chute into the cup, and
+    // the camera moves in to read it.
+    const OFF = back ? 2050 : 0;
+    const DUR = OFF + 3900, t0 = performance.now(), V = CG.views;
     const ball = CG.shown;
     ball.visible = false;
     const endQ = (() => { restShown(); return ball.quaternion.clone(); })();
@@ -1793,21 +1894,81 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     let last = t0;
     const spinQ = new T.Quaternion(), axis = new T.Vector3();
     const chuteEnd = CG.chute.getPointAt(1), rest = ballRest();
+
+    // The throw back: from the cup, up in an arc over the open door, then
+    // down through it. Positions are worked out once, for where the door
+    // will be once the globe has turned it up.
+    const rot0 = CG.cage.rotation.x, rotUp = back ? doorUpAngle(rot0) : rot0;
+    let thrown = !back, taken = !repeats;
+    let lob = null;
+    if (back) {
+      const q = new T.Quaternion().setFromAxisAngle(new T.Vector3(1, 0, 0), rotUp);
+      const c = CG.inner.position;
+      const mouth = doorCell(1).applyQuaternion(q).add(c);
+      const inside = doorCell(0.55).applyQuaternion(q).add(c);
+      const out = mouth.clone().sub(c).normalize();
+      const above = mouth.clone().addScaledVector(out, 0.6);
+      const start = back.position.clone();
+      const top = start.clone().lerp(above, 0.5); top.y = Math.max(start.y, above.y) + 1.1;
+      lob = { start, top, above, inside, spin: new T.Vector3(0.3, 1, 0.5).normalize() };
+    }
+    const finishBack = () => {
+      if (thrown) return;
+      thrown = true;
+      addCageBall(back, lob.inside, new T.Vector3(0, -1.5, 0));
+    };
+    // Cut short (Space again, a resize): whatever's mid-air lands at once.
+    CG.pending = () => {
+      CG.pending = null;
+      if (!thrown) finishBack();
+      if (!taken) { taken = true; takeCageBall(); }
+      CG.door.rotation.x = 0;
+    };
+
     const frame = now => {
       const t = now - t0, dt = Math.min(0.033, Math.max(0, (now - last) / 1000));
       last = now;
       // Camera.
       if (t < 600) lerpCam(from, V.wide, easeInOut(seg(t, 0, 600)));
-      else if (t < 3000) setCam(V.wide);
-      else lerpCam(V.wide, V.close, easeInOut(seg(t, 3000, 3900)));
-      // Crank: speeds up, holds, slows to a stop.
-      const s = seg(t, 400, 2100);
-      const omega = s > 0 && s < 1 ? 9 * Math.sin(Math.PI * s) ** 0.6 : 0;
-      CG.cage.rotation.x -= omega * dt;
-      for (let k = 0; k < 2; k++) stepBalls(dt / 2, -omega);
-      if (t > 2100) {
+      else if (t < OFF + 3000) setCam(V.wide);
+      else lerpCam(V.wide, V.close, easeInOut(seg(t, OFF + 3000, OFF + 3900)));
+
+      if (back && t < OFF) {
+        // Turn the door up, open it, lob the ball in, shut it.
+        CG.cage.rotation.x = rot0 + (rotUp - rot0) * easeInOut(seg(t, 0, 600));
+        const open = easeInOut(seg(t, 600, 900)) * (1 - easeInOut(seg(t, 1750, 2050)));
+        CG.door.rotation.x = -1.95 * open;
+        const u = seg(t, 850, 1450), v = seg(t, 1450, 1750);
+        if (!thrown) {
+          if (v <= 0) {
+            // A lob: a quadratic arc from the cup to just over the door.
+            const e = easeInOut(u), a = (1 - e) * (1 - e), b2 = 2 * (1 - e) * e, c2 = e * e;
+            back.position.set(
+              a * lob.start.x + b2 * lob.top.x + c2 * lob.above.x,
+              a * lob.start.y + b2 * lob.top.y + c2 * lob.above.y,
+              a * lob.start.z + b2 * lob.top.z + c2 * lob.above.z);
+          } else {
+            back.position.lerpVectors(lob.above, lob.inside, v * v);
+          }
+          back.quaternion.setFromAxisAngle(lob.spin, t / 90);
+          if (v >= 1) finishBack();
+        }
+        // The pile settles as usual while the cage stands still.
+        for (let k = 0; k < 2; k++) stepBalls(dt / 2, 0);
+      } else {
+        if (!thrown) finishBack();
+        CG.door.rotation.x = 0;
+        // Crank: speeds up, holds, slows to a stop.
+        const s = seg(t, OFF + 400, OFF + 2100);
+        const omega = s > 0 && s < 1 ? 9 * Math.sin(Math.PI * s) ** 0.6 : 0;
+        CG.cage.rotation.x -= omega * dt;
+        for (let k = 0; k < 2; k++) stepBalls(dt / 2, -omega);
+      }
+      const tb = t - OFF;
+      if (tb > 2100) {
+        if (!taken) { taken = true; takeCageBall(); }
         ball.visible = true;
-        const roll = seg(t, 2100, 2850), drop = seg(t, 2850, 3050);
+        const roll = seg(tb, 2100, 2850), drop = seg(tb, 2850, 3050);
         if (drop <= 0) {
           const p = CG.chute.getPointAt(easeInOut(roll));
           ball.position.set(p.x, p.y + CAGE.ball * 0.2, p.z);
@@ -1823,10 +1984,11 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
                             chuteEnd.z + (rest.z - chuteEnd.z) * e);
           ball.quaternion.copy(spinQ).slerp(endQ, e);
         }
-        if (t > 3050) { ball.position.copy(rest); ball.position.y += Math.abs(Math.sin(seg(t, 3050, 3350) * Math.PI * 2)) * 0.05 * (1 - seg(t, 3050, 3350)); ball.quaternion.copy(endQ); }
+        if (tb > 3050) { ball.position.copy(rest); ball.position.y += Math.abs(Math.sin(seg(tb, 3050, 3350) * Math.PI * 2)) * 0.05 * (1 - seg(tb, 3050, 3350)); ball.quaternion.copy(endQ); }
       }
       draw();
       if (t < DUR) CG.raf = requestAnimationFrame(frame);
+      else CG.pending = null;
     };
     frame(t0);
     return DUR;
@@ -1834,6 +1996,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   function settleNumber3D() {
     if (!CG) return;
     cancelAnimationFrame(CG.raf);
+    if (CG.pending) CG.pending();
     restShown();
     setCam(CG.shown ? CG.views.close : CG.views.wide);
     getRenderer().render(CG.scene, CG.camera);
@@ -1955,10 +2118,12 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     const T = T3, cam = HT.camera;
     cam.aspect = w / h;
     const vf = T.MathUtils.degToRad(cam.fov) / 2, hf = Math.atan(Math.tan(vf) * cam.aspect);
-    // The hat in the middle; the drawn name is held up beside it.
-    const dist = Math.max(4.15 / Math.tan(hf), 2.3 / Math.tan(vf)) * 1.05;
-    cam.position.set(HAT.x, 1.6 + dist * 0.42, dist);
-    cam.lookAt(HAT.x, 1.55, 0.3);
+    // The hat and the drawn name held up beside it, clear of the brim, framed
+    // together: aimed between the two so neither runs off an edge.
+    const cx = (HAT.x - 1.85 + PICK_AT.x + SLIP.w / 2) / 2;
+    const dist = Math.max(3.75 / Math.tan(hf), 2.3 / Math.tan(vf)) * 1.05;
+    cam.position.set(cx, 1.6 + dist * 0.42, dist);
+    cam.lookAt(cx, 1.55, 0.3);
     cam.updateProjectionMatrix();
   }
   // The picked slip: two halves of one sheet, the lower one hinged at the fold.
@@ -2004,7 +2169,10 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     m.castShadow = true;
     return m;
   }
-  const PICK_AT = { x: 0.7, y: 1.85, z: 1.6 };
+  // Far enough right that the slip's left edge clears the brim (hat centre
+  // −1.55, brim radius 1.83) even turned toward the camera — any nearer and
+  // the brim pokes through the paper.
+  const PICK_AT = { x: 1.95, y: 1.85, z: 1.2 };
   function pickRestQuat(p) {
     p.position.set(PICK_AT.x, PICK_AT.y, PICK_AT.z);
     p.quaternion.identity();
@@ -2804,22 +2972,25 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       plane.position.copy(f.centre).addScaledVector(f.n, sides === 6 ? 0.003 : 0.004);
       group.add(plane);
     });
-    group.userData = { sides, faces };
+    // What the physics touches the table with: the rounded cube's own
+    // vertices (its corners and edges really are round, so it can't rest on
+    // one), or a polyhedron's corners. And the sharp corners alone, used to
+    // find the die's symmetries.
+    const uniq = list => list.reduce((o, v) => { if (!o.some(q => q.distanceToSquared(v) < 1e-6)) o.push(v.clone()); return o; }, []);
+    let hull, corners;
+    if (sides === 6) {
+      const geo = new RBox(1.64, 1.64, 1.64, 2, 0.22), P = geo.getAttribute('position');
+      hull = uniq(Array.from({ length: P.count }, (_, i) => new T.Vector3().fromBufferAttribute(P, i)));
+      geo.dispose();
+      corners = [];
+      [-1, 1].forEach(x => [-1, 1].forEach(y => [-1, 1].forEach(z => corners.push(new T.Vector3(x, y, z).multiplyScalar(0.82)))));
+    } else {
+      hull = corners = uniq(faces.flatMap(f => f.pts));
+    }
+    group.userData = { sides, faces, hull, corners };
     return group;
   }
 
-  // The orientation that puts face `value` facing up, its number reading
-  // the right way for the camera.
-  function restQuat(group, value, twist = 0) {
-    const T = T3, f = group.userData.faces.find(x => x.value === value) || group.userData.faces[0];
-    // A d4 shows its number on the face toward the room, not on top.
-    const target = group.userData.sides === 4 ? new T.Vector3(0, 0.62, 0.78).normalize() : new T.Vector3(0, 1, 0);
-    const q1 = new T.Quaternion().setFromUnitVectors(f.n, target);
-    const up = f.up.clone().applyQuaternion(q1);
-    const want = group.userData.sides === 4 ? new T.Vector3(0, 0.78, -0.62).normalize() : new T.Vector3(0, 0, -1);
-    const ang = Math.atan2(new T.Vector3().crossVectors(up, want).dot(target), up.dot(want)) + twist;
-    return new T.Quaternion().setFromAxisAngle(target, ang).multiply(q1);
-  }
   // Height that puts the die's lowest point on the table.
   function restY(group, q) {
     const T = T3, faces = group.userData.faces;
@@ -2873,11 +3044,13 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     }
     // The cup on the left, the dice laid out to its right; the whole group
     // centred, the camera pulled back to fit it.
-    const gap = 2.7, n = sides.length;
-    const total = CUPD.w + 1.1 + n * gap;
+    // Room between the cup and the first die for the cup to tip into: the
+    // dice pour out of its mouth and roll on to their places from there.
+    const gap = 2.7, n = sides.length, clear = 2.3;
+    const total = CUPD.w + clear + n * gap;
     const left = -total / 2;
     d.cupAt = new T.Vector3(left + CUPD.w / 2, 0, 0);
-    d.slots = sides.map((_, i) => new T.Vector3(left + CUPD.w + 1.1 + gap / 2 + i * gap, 0, 0));
+    d.slots = sides.map((_, i) => new T.Vector3(left + CUPD.w + clear + gap / 2 + i * gap, 0, 0));
     if (!d.cup) { d.cup = buildCup(); d.scene.add(d.cup); }
     d.camera.aspect = w / h;
     d.camera.updateProjectionMatrix();
@@ -2989,23 +3162,178 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     d.onTable = false;
   }
 
+  // ── Dice physics ──
+  // Every throw is a real simulation — gravity, the table, bounces, friction
+  // and spin — so a die tumbles, skids and rocks to a stop the way a real one
+  // does, rather than spinning on a fixed axis and easing to its answer.
+  //
+  // The result is still the one rand() chose: a die's symmetries leave its
+  // shape unchanged, so after simulating we relabel it with the symmetry that
+  // puts the wanted number where the simulated landing put a face. The motion
+  // is exactly the same; only which number is printed where differs.
+  //
+  // Everything is a pure function of the roll id, so presenter, viewers and a
+  // restored deck all compute the same throw.
+  const DPHYS = { g: 55, e: 0.35, mu: 0.5, dt: 1 / 240, I: 0.42, maxT: 4 };
+  function simulateDie(pts, p0, q0, v0, w0) {
+    const T = T3;
+    const p = p0.clone(), q = q0.clone(), v = v0.clone(), w = w0.clone();
+    const frames = [{ p: p.clone(), q: q.clone() }];
+    const r = new T.Vector3(), vel = new T.Vector3(), tmp = new T.Vector3(), J = new T.Vector3(), tan = new T.Vector3(), nf = new T.Vector3();
+    const up = new T.Vector3(0, 1, 0), dq = new T.Quaternion();
+    const invI = 1 / DPHYS.I, dt = DPHYS.dt, steps = Math.round(DPHYS.maxT / dt);
+    // Unit mass, and the same moment about every axis: true of a cube and
+    // of the Platonic solids, near enough for the d10.
+    const impulse = (Jv, rr) => { v.add(Jv); w.add(tmp.copy(rr).cross(Jv).multiplyScalar(invI)); };
+    let still = 0;
+    for (let s = 0; s < steps; s++) {
+      v.y -= DPHYS.g * dt;
+      // Contacts: every hull point touching the table. Sequential impulses,
+      // accumulated and clamped, so a die resting on a face is held by all
+      // four corners at once rather than rattling from one to the next.
+      const cs = [];
+      for (const b of pts) { r.copy(b).applyQuaternion(q); if (p.y + r.y < 0.003) cs.push({ r: r.clone(), jn: 0, jf: new T.Vector3() }); }
+      for (const c of cs) { vel.copy(w).cross(c.r).add(v); c.bias = vel.y < -1.5 ? -DPHYS.e * vel.y : 0; }
+      for (let it = 0; it < 10; it++) for (const c of cs) {
+        vel.copy(w).cross(c.r).add(v);
+        tmp.copy(c.r).cross(up);
+        const jn = Math.max(0, c.jn + (c.bias - vel.y) / (1 + tmp.lengthSq() * invI)), dj = jn - c.jn;
+        c.jn = jn;
+        impulse(J.set(0, dj, 0), c.r);
+        vel.copy(w).cross(c.r).add(v);
+        vel.y = 0;
+        const sp = vel.length();
+        if (sp > 1e-7) {
+          tan.copy(vel).divideScalar(sp);
+          tmp.copy(c.r).cross(tan);
+          nf.copy(c.jf).addScaledVector(tan, -sp / (1 + tmp.lengthSq() * invI));
+          const lim = DPHYS.mu * c.jn;
+          if (nf.length() > lim) nf.setLength(lim);
+          impulse(J.subVectors(nf, c.jf), c.r);
+          c.jf.copy(nf);
+        }
+      }
+      // Felt: a little rolling resistance while touching.
+      if (cs.length) { w.multiplyScalar(1 - 2.2 * dt); v.multiplyScalar(1 - 0.6 * dt); }
+      p.addScaledVector(v, dt);
+      dq.set(w.x * dt / 2, w.y * dt / 2, w.z * dt / 2, 0).multiply(q);
+      q.set(q.x + dq.x, q.y + dq.y, q.z + dq.z, q.w + dq.w).normalize();
+      let minY = Infinity;
+      for (const b of pts) minY = Math.min(minY, r.copy(b).applyQuaternion(q).y);
+      if (p.y + minY < 0) p.y = -minY;
+      if (s % 2) frames.push({ p: p.clone(), q: q.clone() });   // 120 a second
+      if (cs.length >= 3 && v.length() < 0.25 && w.length() < 0.5) { if ((still += dt) > 0.15) break; } else still = 0;
+    }
+    return frames;
+  }
+  // The face the result is read from: the top one, or for a d4 the one
+  // facing the room.
+  const readDir = sides => (sides === 4 ? new T3.Vector3(0, 0.62, 0.78).normalize() : new T3.Vector3(0, 1, 0));
+  function faceToward(group, q, dir) {
+    let best = 0, bd = -Infinity;
+    group.userData.faces.forEach((f, i) => { const d = f.n.clone().applyQuaternion(q).dot(dir); if (d > bd) { bd = d; best = i; } });
+    return best;
+  }
+  // A rotation of the die onto itself that carries face `a` onto face `b`.
+  function symmetryBetween(group, a, b) {
+    const T = T3, { faces, corners } = group.userData, fa = faces[a], fb = faces[b];
+    const onFace = n => { const m = Math.max(...corners.map(c => c.dot(n))); return corners.filter(c => c.dot(n) > m - 1e-3); };
+    const basis = (n, c) => {
+      const u = c.clone().addScaledVector(n, -c.dot(n)).normalize();
+      return new T.Matrix4().makeBasis(u, n.clone().cross(u), n);
+    };
+    const A = basis(fa.n, onFace(fa.n)[0]).transpose();
+    for (const c of onFace(fb.n)) {
+      const M = basis(fb.n, c).multiply(A);
+      if (corners.every(x => { const y = x.clone().applyMatrix4(M); return corners.some(z => z.distanceToSquared(y) < 1e-4); }))
+        return new T.Quaternion().setFromRotationMatrix(M);
+    }
+    return new T.Quaternion();
+  }
+
+  // Timings shared by the animation and by working out where dice land.
+  function diceTiming(n, wasOut) {
+    const G = wasOut ? 650 + (n - 1) * 110 : 0;
+    const S0 = G + (wasOut ? 120 : 0), SH = 950, T0 = S0 + SH, TIP = 480;
+    // The die bound for the farthest place leaves first, so none rolls
+    // through another on its way.
+    const release = i => T0 + 330 + (n - 1 - i) * 90;
+    return { G, S0, SH, T0, TIP, release, SLIDE: 170, BACK0: T0 + TIP + 380, BACK: 650 };
+  }
+  // Shake: lifted, quick side-to-side with a rocking tilt. Tip: swung over to
+  // the right, mouth down toward the table, then set back.
+  function poseCup(d, t, tm) {
+    const s = seg(t, tm.S0, tm.S0 + tm.SH), env = Math.sin(Math.PI * Math.min(1, s * 1.15));
+    const lift = easeInOut(seg(t, tm.S0, tm.S0 + 180)) * (1 - easeInOut(seg(t, tm.T0, tm.T0 + tm.TIP)));
+    const x = Math.sin(s * Math.PI * 2 * 5.5) * 0.28 * env, z = Math.sin(s * Math.PI * 2 * 4 + 1) * 0.12 * env;
+    const rz = Math.sin(s * Math.PI * 2 * 5.5 + 0.6) * 0.16 * env;
+    const tp = easeInOut(seg(t, tm.T0, tm.T0 + tm.TIP)) * (1 - easeInOut(seg(t, tm.BACK0, tm.BACK0 + tm.BACK)));
+    d.cup.position.set(d.cupAt.x + x + tp * 0.5, lift * 0.7 + tp * 2.25, z);
+    d.cup.rotation.set(0, 0, rz - tp * 1.75);
+    d.cup.updateMatrixWorld();
+  }
+  // Where a die is as it slides out of the tipped cup's mouth.
+  function mouthPose(d, inCup, sl) {
+    const T = T3;
+    const lp = inCup.p.clone().lerp(new T.Vector3(inCup.p.x * 0.5, CUPD.h + 0.5, inCup.p.z * 0.5), sl * sl);
+    return { p: lp.applyMatrix4(d.cup.matrixWorld), q: d.cup.quaternion.clone().multiply(inCup.q) };
+  }
+
+  // The whole throw for this roll: per die, its flight (simulated frames),
+  // the relabelling that makes it land on its number, and where it ends.
+  // Cached by roll, so the animation, the settle and a resize agree.
+  function planThrow(d, faces) {
+    const T = T3, key = S.rollId + '|' + d.sig + '|' + faces.join(',');
+    if (d.plan && d.plan.key === key) return d.plan;
+    const n = d.dice.length, seed = S.rollId % 17, tm = diceTiming(n, false);
+    const dice = d.dice.map((g, i) => {
+      const inCup = inCupPose(i, n, seed);
+      poseCup(d, tm.release(i) + tm.SLIDE, tm);
+      const m0 = mouthPose(d, inCup, 1);
+      const mouth = new T.Vector3(0, 1, 0).applyQuaternion(d.cup.quaternion);
+      const target = d.slots[i];
+      // A few throws, each a little different; keep the one that lands
+      // nearest its place (the rest is made up while it's in the air).
+      let best = null;
+      for (let k = 0; k < 6; k++) {
+        const r = (j) => wob(S.rollId * 31 + i * 7 + k, j);
+        const reach = target.x - m0.p.x;
+        const v0 = mouth.clone().multiplyScalar(2.2).add(new T.Vector3(reach * (1.6 + r(1) * 0.8), 1.5 + r(2) * 2, r(3) * 1.6));
+        const w0 = new T.Vector3(r(4), r(5), r(6)).normalize().multiplyScalar(10 + (r(7) + 0.5) * 8);
+        const frames = simulateDie(g.userData.hull, m0.p, m0.q, v0, w0);
+        const end = frames[frames.length - 1].p;
+        const miss = Math.hypot(target.x - end.x, end.z) + (frames.length > 300 ? 1 : 0);
+        if (!best || miss < best.miss) best = { frames, miss };
+        if (miss < 0.35) break;
+      }
+      const frames = best.frames, last = frames[frames.length - 1];
+      // Square it up exactly on the face it came to rest on…
+      const down = faceToward(g, last.q, new T.Vector3(0, -1, 0));
+      const qf = new T.Quaternion().setFromUnitVectors(g.userData.faces[down].n.clone().applyQuaternion(last.q), new T.Vector3(0, -1, 0)).multiply(last.q);
+      // …and relabel so the number showing is the one rolled.
+      const shown = faceToward(g, qf, readDir(g.userData.sides));
+      const want = g.userData.faces.findIndex(f => f.value === faces[i]);
+      const C = symmetryBetween(g, want < 0 ? shown : want, shown);
+      const endQ = qf.clone().multiply(C);
+      const endP = new T.Vector3(target.x, restY(g, endQ), 0);
+      return { frames, C, inCup, endQ, endP, drift: new T.Vector3(target.x - last.p.x, 0, -last.p.z), lastQ: last.q };
+    });
+    restCup(d);
+    return (d.plan = { key, dice });
+  }
+
   function renderDice3D(o, play, sides, faces, w, h) {
     const T = T3, d = layoutScene(sides, w, h);
     cancelAnimationFrame(d.raf);
-    // Twist each die a little off square, the same way every time for a roll.
-    const twistOf = i => ((S.rollId * 7 + i * 13) % 9 - 4) * 0.05;
-    const rest = d.dice.map((g, i) => {
-      if (!faces[i]) return null;
-      const q = restQuat(g, faces[i], twistOf(i));
-      return { q, y: restY(g, q), x: d.slots[i].x };
-    });
     const draw = () => d.renderer.render(d.scene, d.camera);
+    const fresh = faces.length === d.dice.length && faces.every(f => f != null);
     if (!play) {
       // Before the first roll (or with new dice) they wait in the cup.
-      if (rest.some(r => !r)) diceInCup(d, 0);
+      if (!fresh) diceInCup(d, 0);
       else {
+        const pl = planThrow(d, faces);
         restCup(d);
-        d.dice.forEach((g, i) => { g.quaternion.copy(rest[i].q); g.position.set(rest[i].x, rest[i].y, 0); });
+        d.dice.forEach((g, i) => { g.quaternion.copy(pl.dice[i].endQ); g.position.copy(pl.dice[i].endP); });
         d.onTable = true;
       }
       draw();
@@ -3014,86 +3342,65 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 
     // 1. Any dice on the table go back into the cup.
     // 2. The cup is lifted and shaken.
-    // 3. It's tipped over to the right and the dice tumble out across the
-    //    table to where they land; the cup is set back down.
-    const n = d.dice.length, seed = S.rollId % 17;
+    // 3. It's tipped over to the right and the dice pour out, each thrown for
+    //    real across the table; the cup is set back down.
+    const pl = planThrow(d, faces);
+    const n = d.dice.length;
     restCup(d);
     const start = d.dice.map(g => ({ p: g.position.clone(), q: g.quaternion.clone() }));
     const wasOut = d.onTable;
-    const inCup = d.dice.map((_, i) => inCupPose(i, n, seed));
+    const tm = diceTiming(n, wasOut);
     const cupTop = new T.Vector3(0, CUPD.h + 1.3, 0).add(d.cupAt);
-    const G = wasOut ? 650 + (n - 1) * 110 : 0;
-    const S0 = G + (wasOut ? 120 : 0), SH = 950;
-    const T0 = S0 + SH, TIP = 480;
-    const release = i => T0 + 330 + i * 70, SLIDE = 170;
-    const ROLL = 1350;
-    const BACK0 = T0 + TIP + 380, BACK = 650;
-    const DUR = Math.max(release(n - 1) + SLIDE + ROLL, BACK0 + BACK);
-    const plan = d.dice.map((g, i) => ({
-      axis: new T.Vector3(wob(i, seed + 7), wob(i, seed + 8), wob(i, seed + 9)).normalize(),
-      spin: 12 + (wob(i, seed + 10) + 0.5) * 6,
-    }));
-    const tumble = new T.Quaternion(), from = new T.Quaternion(), tmp = new T.Vector3();
-    const rel = d.dice.map(() => null);
-    const cupPose = t => {
-      // Shake: lifted, quick side-to-side with a rocking tilt.
-      const s = seg(t, S0, S0 + SH), env = Math.sin(Math.PI * Math.min(1, s * 1.15));
-      const lift = easeInOut(seg(t, S0, S0 + 180)) * (1 - easeInOut(seg(t, T0, T0 + TIP)));
-      const x = Math.sin(s * Math.PI * 2 * 5.5) * 0.28 * env, z = Math.sin(s * Math.PI * 2 * 4 + 1) * 0.12 * env;
-      const rz = Math.sin(s * Math.PI * 2 * 5.5 + 0.6) * 0.16 * env;
-      // Tip: swung over to the right, mouth down toward the table.
-      const tp = easeInOut(seg(t, T0, T0 + TIP)) * (1 - easeInOut(seg(t, BACK0, BACK0 + BACK)));
-      d.cup.position.set(d.cupAt.x + x + tp * 1.0, lift * 0.7 + tp * 2.25, z);
-      d.cup.rotation.set(0, 0, rz - tp * 1.75);
-      d.cup.updateMatrixWorld();
-    };
+    const flightMs = i => (pl.dice[i].frames.length - 1) * 1000 / 120;
+    const land = i => tm.release(i) + tm.SLIDE;
+    // The cup isn't set back down until the last die out is well clear of it.
+    tm.BACK0 = Math.max(tm.BACK0, ...d.dice.map((_, i) => land(i) + flightMs(i) * 0.6));
+    const DUR = Math.max(...d.dice.map((_, i) => land(i) + flightMs(i)), tm.BACK0 + tm.BACK) + 60;
+    const axisOf = d.dice.map((_, i) => new T.Vector3(wob(i, S.rollId + 7), wob(i, S.rollId + 8), wob(i, S.rollId + 9)).normalize());
+    const qa = new T.Quaternion(), qb = new T.Quaternion(), pa = new T.Vector3();
     const frame = now => {
       const t = now - t0;
-      cupPose(t);
+      poseCup(d, t, tm);
       d.dice.forEach((g, i) => {
-        const R = rest[i];
-        // Still in the cup (or being gathered into it).
-        if (t < release(i) + SLIDE) {
-          const inside = tmp.copy(inCup[i].p).applyMatrix4(d.cup.matrixWorld);
-          const insideQ = new T.Quaternion().copy(d.cup.quaternion).multiply(inCup[i].q);
-          if (wasOut && t < G + 60) {
-            const u = seg(t, i * 110, i * 110 + 650), e = easeInOut(u);
-            // Up over the rim, then down into the cup.
-            const mid = cupTop.clone();
-            const a = start[i].p.clone().lerp(mid, Math.min(1, e / 0.6));
-            if (e > 0.6) a.copy(mid).lerp(inside, (e - 0.6) / 0.4);
+        const P = pl.dice[i];
+        if (t < land(i)) {
+          // In the cup — already wearing the labels it'll land with.
+          const insideQ = d.cup.quaternion.clone().multiply(P.inCup.q).multiply(P.C);
+          const inside = P.inCup.p.clone().applyMatrix4(d.cup.matrixWorld);
+          if (wasOut && t < tm.G + 60) {
+            // Gathered: up over the rim, then down into the cup.
+            const e = easeInOut(seg(t, i * 110, i * 110 + 650));
+            const a = start[i].p.clone().lerp(cupTop, Math.min(1, e / 0.6));
+            if (e > 0.6) a.copy(cupTop).lerp(inside, (e - 0.6) / 0.4);
             else a.y += Math.sin(Math.PI * e / 0.6) * 0.6;
             g.position.copy(a);
             g.quaternion.copy(start[i].q).slerp(insideQ, e);
-          } else if (t >= release(i)) {
+          } else if (t >= tm.release(i)) {
             // Sliding down the tipped cup and out of its mouth.
-            const sl = seg(t, release(i), release(i) + SLIDE);
-            const lp = inCup[i].p.clone().lerp(new T.Vector3(inCup[i].p.x * 0.5, CUPD.h + 0.5, inCup[i].p.z * 0.5), sl * sl);
-            g.position.copy(lp.applyMatrix4(d.cup.matrixWorld));
-            g.quaternion.copy(insideQ);
+            const m = mouthPose(d, P.inCup, seg(t, tm.release(i), land(i)));
+            g.position.copy(m.p);
+            g.quaternion.copy(m.q).multiply(P.C);
           } else {
             // Rattling about inside while it's shaken.
-            const jig = Math.sin(t / 37 + i * 2) * 0.12 * seg(t, S0, S0 + 200) * (1 - seg(t, T0, T0 + 200));
-            g.position.copy(inside); g.position.y += jig;
+            const sh = seg(t, tm.S0, tm.S0 + 200) * (1 - seg(t, tm.T0 - 150, tm.T0 + 50));
+            g.position.copy(inside); g.position.y += Math.sin(t / 37 + i * 2) * 0.12 * sh;
             g.quaternion.copy(insideQ);
-            if (t > S0 && t < T0) g.rotateOnAxis(plan[i].axis, (t - S0) / 90);
+            if (sh > 0) g.quaternion.multiply(qa.setFromAxisAngle(axisOf[i], Math.sin(t / 60 + i) * 0.5 * sh));
           }
           return;
         }
-        // Out of the cup and across the table.
-        if (!rel[i]) rel[i] = { p: g.position.clone(), q: g.quaternion.clone() };
-        const u = seg(t, release(i) + SLIDE, release(i) + SLIDE + ROLL), SETTLE = 0.62;
-        const tt = Math.min(u, SETTLE) / SETTLE;
-        tumble.setFromAxisAngle(plan[i].axis, plan[i].spin * (1 - Math.pow(1 - tt, 2)));
-        from.copy(rel[i].q).premultiply(tumble);
-        if (u <= SETTLE) g.quaternion.copy(from);
-        else g.quaternion.copy(from).slerp(R.q, easeOut((u - SETTLE) / (1 - SETTLE)));
-        const e = easeOut(u), FALL = 0.14;
-        // Drops from the mouth to the table, then bounces lower each time.
-        let y;
-        if (u < FALL) y = rel[i].p.y + (R.y - rel[i].p.y) * (u / FALL) ** 2;
-        else { const v = (u - FALL) / (1 - FALL); y = R.y + Math.abs(Math.sin(v * Math.PI * 2.5)) * 0.9 * Math.pow(1 - v, 2.2); }
-        g.position.set(rel[i].p.x + (R.x - rel[i].p.x) * e, y, rel[i].p.z * (1 - e));
+        // The throw, frame by frame from the simulation, nudged over the
+        // flight toward its place in the row, squared up as it stops.
+        const F = P.frames, ft = (t - land(i)) / 1000 * 120, k = Math.min(F.length - 1, Math.floor(ft)), u = Math.min(1, ft - k);
+        const A = F[k], B = F[Math.min(F.length - 1, k + 1)];
+        pa.lerpVectors(A.p, B.p, u);
+        qb.copy(A.q).slerp(B.q, u);
+        const along = Math.min(1, ft / (F.length - 1));
+        pa.addScaledVector(P.drift, easeInOut(Math.min(1, along / 0.8)));
+        const sq = easeInOut(seg(along, 0.85, 1));
+        g.quaternion.copy(qb).multiply(P.C);
+        if (sq > 0) { g.quaternion.slerp(P.endQ, sq); pa.y += (P.endP.y - pa.y) * sq; }
+        g.position.copy(pa);
       });
       draw();
       if (t < DUR) d.raf = requestAnimationFrame(frame);
@@ -3107,10 +3414,8 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     if (!D3) return;
     cancelAnimationFrame(D3.raf);
     restCup(D3);
-    D3.dice.forEach((g, i) => {
-      const q = restQuat(g, faces[i] || 1, ((S.rollId * 7 + i * 13) % 9 - 4) * 0.05);
-      g.quaternion.copy(q); g.position.set(D3.slots[i].x, restY(g, q), 0);
-    });
+    const pl = planThrow(D3, faces);
+    D3.dice.forEach((g, i) => { g.quaternion.copy(pl.dice[i].endQ); g.position.copy(pl.dice[i].endP); });
     D3.onTable = true;
     D3.renderer.render(D3.scene, D3.camera);
   }
@@ -3650,7 +3955,12 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   const CARD = { w: 0.64, h: 0.9, r: 0.045, th: 0.0042 };
   const MAT_Y = 0.03;
   const DECK3 = { x: -0.78, z: 0 };
-  const GRID = { x0: 0.24, z0: -0.56, sx: 0.36, sz: 0.37, cols: 13 };
+  // Without repeats, everything drawn goes onto one discard pile to the
+  // right of the deck. A draw of several cards lands fanned on top of it, so
+  // the whole draw shows; click the pile to see every card in order.
+  const PILE = { fan: 0.2, gap: 0.7 };
+  const pileFan = k => Math.max(1, Math.min(13, k || 1));
+  const pileX = k => DECK3.x + CARD.w + PILE.gap + (pileFan(k) - 1) * PILE.fan / 2;
   const CARD_EL = 1.16;                       // camera elevation, radians (~66°)
 
   function roundedShape(w, h, r) {
@@ -3871,11 +4181,9 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       scene.add(m);
       mats[key] = { m, cx, cz, w, d };
     };
-    const gx1 = GRID.x0 + GRID.sx * (GRID.cols - 1) + CARD.w / 2, gx0 = DECK3.x - CARD.w / 2;
-    mkMat('grid', (gx0 + gx1) / 2, 0, gx1 - gx0 + 0.5, 2 * 1.0 + 0.42);
     mkMat('back', DECK3.x, DECK3.z, 2.3, 1.75);
     const camera = new T.PerspectiveCamera(30, 1, 0.1, 100);
-    CD = { scene, camera, faceGeo, backGeo, backMat, edgeMat, slabGeo, deck, mats, tex: new Map(), table: [], fly: [], raf: 0, mode: '' };
+    CD = { scene, camera, faceGeo, backGeo, backMat, edgeMat, slabGeo, deck, mats, mkMat, tex: new Map(), table: [], fly: [], raf: 0, mode: '' };
     return CD;
   }
   function faceMat(id) {
@@ -3901,14 +4209,28 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     CD.deckN = n;
   }
   const deckTop = n => MAT_Y + n * CARD.th;
-  function slotPose(i) {
-    const col = i % GRID.cols, row = Math.floor(i / GRID.cols);
+  // Card i of the discard pile. Cards are drawn k at a time, so i % k is its
+  // place in its draw's fan. Each lands a little askew, as a real pile does.
+  function pilePose(i, k) {
+    k = pileFan(k);
+    const j = i % k, off = j - (k - 1) / 2;
     return {
-      p: new T3.Vector3(GRID.x0 + col * GRID.sx + wob(i, 1) * 0.012, MAT_Y + 0.0015 + i * 0.0011, GRID.z0 + row * GRID.sz + wob(i, 2) * 0.012),
-      yaw: wob(i, 3) * 0.035,
+      p: new T3.Vector3(pileX(k) + off * PILE.fan + wob(i, 1) * 0.03, MAT_Y + 0.0015 + i * 0.0011, wob(i, 2) * 0.03 + Math.abs(off) * 0.012),
+      yaw: wob(i, 3) * 0.16 - off * 0.05,
     };
   }
+  // The pile's mat is sized to the fan, so it's (re)made for each draw size.
+  function pileMat(k) {
+    k = pileFan(k);
+    if (CD.pileK === k) return;
+    const old = CD.mats.pile;
+    if (old) { CD.scene.remove(old.m); old.m.geometry.dispose(); old.m.material.forEach(m => { m.map && m.map.dispose(); m.dispose(); }); }
+    const x0 = DECK3.x - CARD.w / 2, x1 = pileX(k) + (k - 1) * PILE.fan / 2 + CARD.w / 2 + 0.12;
+    CD.mkMat('pile', (x0 + x1) / 2, 0, x1 - x0 + 0.5, CARD.h + 0.75);
+    CD.pileK = k;
+  }
   function frameCards(w, h, mode) {
+    if (mode === 'pile') pileMat(S.setup.cards.k);
     const T = T3, cam = CD.camera, mat = CD.mats[mode];
     cam.aspect = w / h;
     cam.updateProjectionMatrix();
@@ -3941,12 +4263,66 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       `<div class="count-note" style="left:${((v.x + 1) / 2 * r.width).toFixed(0)}px;top:${((1 - v.y) / 2 * r.height + 8).toFixed(0)}px"><b>${n}</b> ${n === 1 ? 'card' : 'cards'}</div>`);
     return host.querySelector('.count-note b');
   }
+  // Where the discard pile is on screen (for the click that opens it), and a
+  // quiet note under it saying how many are there.
+  function pileNote(host, n) {
+    const T = T3, k = pileFan(S.setup.cards.k), cx = pileX(k);
+    const hw = (k - 1) * PILE.fan / 2 + CARD.w / 2 + 0.06, hd = CARD.h / 2 + 0.06;
+    let x0 = 1, x1 = -1, y0 = 1, y1 = -1;
+    [-1, 1].forEach(sx => [-1, 1].forEach(sz => {
+      const v = new T.Vector3(cx + sx * hw, MAT_Y, sz * hd).project(CD.camera);
+      x0 = Math.min(x0, v.x); x1 = Math.max(x1, v.x); y0 = Math.min(y0, v.y); y1 = Math.max(y1, v.y);
+    }));
+    const r = host.getBoundingClientRect();
+    CD.pileRect = n ? { host, l: (x0 + 1) / 2 * r.width, r: (x1 + 1) / 2 * r.width, t: (1 - y1) / 2 * r.height, b: (1 - y0) / 2 * r.height } : null;
+    const mat = CD.mats.pile, v = new T.Vector3(cx, 0, mat.cz + mat.d / 2).project(CD.camera);
+    host.insertAdjacentHTML('beforeend', n
+      ? `<div class="count-note" style="left:${((v.x + 1) / 2 * r.width).toFixed(0)}px;top:${((1 - v.y) / 2 * r.height + 8).toFixed(0)}px"><b>${n}</b> drawn · click the pile to see them</div>`
+      : '');
+  }
+  function overPile(e) {
+    const pr = CD && CD.mode === 'pile' && CD.pileRect;
+    if (!pr || !pr.host.isConnected) return false;
+    const r = pr.host.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+    return x >= pr.l && x <= pr.r && y >= pr.t && y <= pr.b;
+  }
+
+  // Every card drawn so far, in the order it came off the deck.
+  function openPileList() {
+    const hand = S.pool.hand || [];
+    let el = $('pile-list');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'pile-list';
+      el.className = 'pile-list';
+      el.addEventListener('click', e => { if (e.target === el || e.target.closest('.pile-close')) closePileList(); });
+      $('stage').appendChild(el);
+    }
+    el.innerHTML =
+      `<div class="pile-panel" role="dialog" aria-label="Cards drawn">
+        <div class="pile-head"><span class="pile-title">Drawn so far</span><span class="pile-sub">${hand.length} of 52, in order</span>
+          <button class="bw-btn bw-btn--icon pile-close" title="Close" aria-label="Close"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>
+        <div class="pile-grid">${hand.map((id, i) =>
+          `<div class="pile-item"><div class="slot-card">${cardFace(id)}</div><span>${i + 1}</span></div>`).join('') || '<div class="bw-hint">Nothing drawn yet.</div>'}</div>
+      </div>`;
+    const grid = el.querySelector('.pile-grid');
+    if (grid) grid.scrollTop = grid.scrollHeight;
+  }
+  function closePileList() { const el = $('pile-list'); if (el) el.remove(); }
+  // Kept current while it's open: a draw (or the presenter's, for a viewer)
+  // adds to it, a reset or shuffle empties it, another mode closes it.
+  function syncPileList() {
+    if (!$('pile-list')) return;
+    if (S.mode !== 'cards' || S.setup.cards.replace) closePileList();
+    else openPileList();
+  }
+
   function layTable(hand) {
     // Keep the cards already down exactly where they are.
     hand.forEach((id, i) => {
       let c = CD.table[i];
       if (!c || c.userData.id !== id) { dropCard(c); c = CD.table[i] = makeCard(id); }
-      const s = slotPose(i);
+      const s = pilePose(i, S.setup.cards.k);
       c.visible = true;
       c.position.copy(s.p); c.rotation.set(0, s.yaw, 0); c.scale.setScalar(1);
     });
@@ -3956,7 +4332,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   function clearFly() { CD.fly.forEach(dropCard); CD.fly = []; }
 
   function renderCards3D(o, play, host, w, h, shuffling) {
-    const T = T3, st = S.setup.cards, mode = st.replace ? 'back' : 'grid';
+    const T = T3, st = S.setup.cards, mode = st.replace ? 'back' : 'pile';
     if (!CD) buildCards();
     const renderer = mountRenderer(host, w, h);
     cancelAnimationFrame(CD.raf);
@@ -3966,6 +4342,8 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     const draw = () => renderer.render(CD.scene, CD.camera);
     const deckN = S.pool.cards.length, hand = st.replace ? [] : S.pool.hand;
 
+    CD.pileRect = null;
+    if (mode === 'pile') pileNote(host, hand.length);
     if (shuffling) return shuffle3D(deckN, draw);
     const k = play && o ? o.cards.length : 0;
     if (!k) { layTable(hand); setDeck(deckN); draw(); return 0; }
@@ -3976,7 +4354,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       const first = hand.length - k, EACH = 950, GAP = 330;
       const cards = CD.table.slice(first);
       const from = cards.map((_, j) => new T.Vector3(DECK3.x, deckTop(deckN + k - j) + 0.0005, DECK3.z));
-      const to = cards.map((_, j) => slotPose(first + j));
+      const to = cards.map((_, j) => pilePose(first + j, st.k));
       cards.forEach(c => { c.visible = false; });
       setDeck(deckN + k);
       const DUR = (k - 1) * GAP + EACH, t0 = performance.now();
@@ -4658,15 +5036,21 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 
   // ── Event wiring ────────────────────────────────────────────────────────────
   resultEl.addEventListener('click', e => {
+    // The discard pile opens to show what's been drawn — for viewers too.
+    if (S.mode === 'cards' && overPile(e)) { openPileList(); return; }
     if (IS_VIEWER) return;
     if (isExhausted()) return;
     go();
   });
   deckBtn.addEventListener('click', shuffleDeck);
+  resultEl.addEventListener('mousemove', e => {
+    resultEl.style.cursor = S.mode === 'cards' && overPile(e) ? 'zoom-in' : '';
+  });
 
 
   // Space / Enter goes, S toggles stats — from anywhere except a field.
   document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && $('pile-list')) { closePileList(); return; }
     if (IS_VIEWER || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.target.closest && e.target.closest('input, textarea, select')) return;
     if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); if (!isExhausted()) go(); }

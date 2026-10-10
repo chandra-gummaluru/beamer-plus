@@ -709,6 +709,9 @@ defineModule('engine', ['state'], (state) => {
      time (1000/2000/4000/8000ms). Anything built by adding those intervals to
      an already-snapped time lands back on the grid automatically. */
   const GLOBAL_TICK_MS = 6.25;
+  // The 1× hop. Every other hop choice slows the whole circuit down by
+  // hopMs / BASE_HOP_MS — clocks included (see tickClocks).
+  const BASE_HOP_MS = 1000;
   const snapToGlobalTick = (t) => Math.round(t / GLOBAL_TICK_MS) * GLOBAL_TICK_MS;
 
   /* ── Pin geometry ────────────────────────────────────────────────────── */
@@ -1181,14 +1184,18 @@ defineModule('engine', ['state'], (state) => {
     }
 
     /* ── simulation ───────────────────────────────────────────────────── */
-    function tickClocks(now) {
+    // `scale` is the global slow-down: the hop setting over its 1s base. A
+    // clock's period is its rate at 1×, so at 8s a hop a 1s clock ticks every
+    // 8s — otherwise it flips faster than a signal can cross one net and its
+    // pulses never arrive.
+    function tickClocks(now, scale = 1) {
       // Computed from absolute time, not incrementally, so every clock is
       // phase-locked to the same origin regardless of when it was placed or
       // how long it sat paused. phaseStart is the *exact* instant the phase
       // began — the seed that makes everything downstream exact.
       for (const c of components.values()) {
         if (c.kind === 'CLOCK' && !c.state.paused) {
-          const half = Math.max(1, c.state.period / 2);
+          const half = Math.max(1, c.state.period * scale / 2);
           const phase = Math.floor(now / half) % 2;
           if (c.state.value !== phase) {
             c.state.value = phase;
@@ -1312,7 +1319,7 @@ defineModule('engine', ['state'], (state) => {
     // before its hop is up.
     const SETTLE_PASSES = 8;
     function step(now, hopMs, instant) {
-      tickClocks(now);
+      tickClocks(now, (hopMs || BASE_HOP_MS) / BASE_HOP_MS);
       const { rootOf, driversOf } = topology();
       for (let pass=0; pass<SETTLE_PASSES; pass++) {
         const a = computeOutputs(now, driversOf, instant);
