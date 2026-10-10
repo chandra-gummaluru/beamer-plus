@@ -497,28 +497,6 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 /* 3D canvases. */
 .dice3 canvas, .stage3d canvas { display: block; }
 .stage3d { position: relative; }
-/* Everything drawn from the deck, in order: opened from the discard pile. */
-.pile-list {
-  position: absolute; inset: 0; z-index: 80;
-  display: flex; align-items: center; justify-content: center; padding: 16px;
-  background: color-mix(in srgb, var(--bg) 70%, transparent);
-}
-.pile-panel {
-  display: flex; flex-direction: column; max-width: 100%; max-height: 100%;
-  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.18);
-}
-.pile-head { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 14px; border-bottom: 1px solid var(--border); }
-.pile-title { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-2); }
-.pile-sub { flex: 1; font-size: var(--fs-chrome-sm); color: var(--text-3); }
-.pile-grid {
-  --sz: calc(84px * var(--u));
-  display: grid; grid-template-columns: repeat(auto-fill, calc(var(--sz) * 0.714)); gap: 12px 10px;
-  justify-content: center; padding: 14px; overflow: auto; min-width: min(560px, 80vw);
-  scrollbar-width: thin; scrollbar-color: var(--border) transparent;
-}
-.pile-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.pile-item span { font-family: var(--font-mono); font-size: var(--fs-chrome-sm); color: var(--text-3); }
 /* A quiet count under the hat or the deck. */
 .count-note {
   position: absolute; transform: translateX(-50%); white-space: nowrap; pointer-events: none;
@@ -1403,7 +1381,6 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     const mode = S.mode, o = S.last[mode];
     const play = !!(animate && canAnimate() && o && !o.empty && (o.runs === 1 || mode === 'list'));
     if (mode !== 'spinner') wheelBuiltFor = '';
-    syncPileList();
     if (o && o.empty) {
       const why = { bag: 'The jar is empty.', cards: 'The deck is empty.', list: 'Everyone has been picked.',
                     number: 'Every number in the range has been used.' }[mode] || 'Nothing left.';
@@ -3957,7 +3934,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   const DECK3 = { x: -0.78, z: 0 };
   // Without repeats, everything drawn goes onto one discard pile to the
   // right of the deck. A draw of several cards lands fanned on top of it, so
-  // the whole draw shows; click the pile to see every card in order.
+  // the whole draw shows; click the pile to gather it up and shuffle.
   const PILE = { fan: 0.2, gap: 0.7 };
   const pileFan = k => Math.max(1, Math.min(13, k || 1));
   const pileX = k => DECK3.x + CARD.w + PILE.gap + (pileFan(k) - 1) * PILE.fan / 2;
@@ -4263,8 +4240,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       `<div class="count-note" style="left:${((v.x + 1) / 2 * r.width).toFixed(0)}px;top:${((1 - v.y) / 2 * r.height + 8).toFixed(0)}px"><b>${n}</b> ${n === 1 ? 'card' : 'cards'}</div>`);
     return host.querySelector('.count-note b');
   }
-  // Where the discard pile is on screen (for the click that opens it), and a
-  // quiet note under it saying how many are there.
+  // Where the discard pile is on screen, for the click that gathers it up.
   function pileNote(host, n) {
     const T = T3, k = pileFan(S.setup.cards.k), cx = pileX(k);
     const hw = (k - 1) * PILE.fan / 2 + CARD.w / 2 + 0.06, hd = CARD.h / 2 + 0.06;
@@ -4275,46 +4251,12 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     }));
     const r = host.getBoundingClientRect();
     CD.pileRect = n ? { host, l: (x0 + 1) / 2 * r.width, r: (x1 + 1) / 2 * r.width, t: (1 - y1) / 2 * r.height, b: (1 - y0) / 2 * r.height } : null;
-    const mat = CD.mats.pile, v = new T.Vector3(cx, 0, mat.cz + mat.d / 2).project(CD.camera);
-    host.insertAdjacentHTML('beforeend', n
-      ? `<div class="count-note" style="left:${((v.x + 1) / 2 * r.width).toFixed(0)}px;top:${((1 - v.y) / 2 * r.height + 8).toFixed(0)}px"><b>${n}</b> drawn · click the pile to see them</div>`
-      : '');
   }
   function overPile(e) {
     const pr = CD && CD.mode === 'pile' && CD.pileRect;
     if (!pr || !pr.host.isConnected) return false;
     const r = pr.host.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
     return x >= pr.l && x <= pr.r && y >= pr.t && y <= pr.b;
-  }
-
-  // Every card drawn so far, in the order it came off the deck.
-  function openPileList() {
-    const hand = S.pool.hand || [];
-    let el = $('pile-list');
-    if (!el) {
-      el = document.createElement('div');
-      el.id = 'pile-list';
-      el.className = 'pile-list';
-      el.addEventListener('click', e => { if (e.target === el || e.target.closest('.pile-close')) closePileList(); });
-      $('stage').appendChild(el);
-    }
-    el.innerHTML =
-      `<div class="pile-panel" role="dialog" aria-label="Cards drawn">
-        <div class="pile-head"><span class="pile-title">Drawn so far</span><span class="pile-sub">${hand.length} of 52, in order</span>
-          <button class="bw-btn bw-btn--icon pile-close" title="Close" aria-label="Close"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>
-        <div class="pile-grid">${hand.map((id, i) =>
-          `<div class="pile-item"><div class="slot-card">${cardFace(id)}</div><span>${i + 1}</span></div>`).join('') || '<div class="bw-hint">Nothing drawn yet.</div>'}</div>
-      </div>`;
-    const grid = el.querySelector('.pile-grid');
-    if (grid) grid.scrollTop = grid.scrollHeight;
-  }
-  function closePileList() { const el = $('pile-list'); if (el) el.remove(); }
-  // Kept current while it's open: a draw (or the presenter's, for a viewer)
-  // adds to it, a reset or shuffle empties it, another mode closes it.
-  function syncPileList() {
-    if (!$('pile-list')) return;
-    if (S.mode !== 'cards' || S.setup.cards.replace) closePileList();
-    else openPileList();
   }
 
   function layTable(hand) {
@@ -5036,21 +4978,20 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 
   // ── Event wiring ────────────────────────────────────────────────────────────
   resultEl.addEventListener('click', e => {
-    // The discard pile opens to show what's been drawn — for viewers too.
-    if (S.mode === 'cards' && overPile(e)) { openPileList(); return; }
     if (IS_VIEWER) return;
+    // Clicking the discard pile gathers it back into the deck and shuffles.
+    if (S.mode === 'cards' && overPile(e)) { shuffleDeck(); return; }
     if (isExhausted()) return;
     go();
   });
   deckBtn.addEventListener('click', shuffleDeck);
   resultEl.addEventListener('mousemove', e => {
-    resultEl.style.cursor = S.mode === 'cards' && overPile(e) ? 'zoom-in' : '';
+    resultEl.style.cursor = !IS_VIEWER && S.mode === 'cards' && overPile(e) ? 'pointer' : '';
   });
 
 
   // Space / Enter goes, S toggles stats — from anywhere except a field.
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && $('pile-list')) { closePileList(); return; }
     if (IS_VIEWER || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.target.closest && e.target.closest('input, textarea, select')) return;
     if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); if (!isExhausted()) go(); }
