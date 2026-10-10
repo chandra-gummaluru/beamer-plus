@@ -798,7 +798,6 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   <div id="toolbar" class="bw-toolbar" data-bw-topbar>
     <span class="bw-toolbar-title">Randomizer</span>
     <div class="bw-spacer"></div>
-    <button class="bw-btn" id="deck-btn" title="Put every card back and shuffle">Shuffle</button>
   </div>
 
   <div id="app">
@@ -830,7 +829,6 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 
   // ── DOM ─────────────────────────────────────────────────────────────────────
   const $ = id => document.getElementById(id);
-  const deckBtn    = $('deck-btn');
   const resultEl   = $('result');
 
   // ── State ───────────────────────────────────────────────────────────────────
@@ -1330,7 +1328,6 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 
   // ── Render ──────────────────────────────────────────────────────────────────
   function render(animate) {
-    deckBtn.style.display = S.mode === 'cards' && !IS_VIEWER ? '' : 'none';
     // The thing itself is the button: click the dice, the coin, the jar…
     resultEl.classList.toggle('clickable', !IS_VIEWER && !isExhausted());
     resultEl.title = IS_VIEWER ? '' : `${VERB[S.mode]} (click or Space)`;
@@ -4984,7 +4981,6 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
     if (isExhausted()) return;
     go();
   });
-  deckBtn.addEventListener('click', shuffleDeck);
   resultEl.addEventListener('mousemove', e => {
     resultEl.style.cursor = !IS_VIEWER && S.mode === 'cards' && overPile(e) ? 'pointer' : '';
   });
