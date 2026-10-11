@@ -682,8 +682,12 @@ body.is-viewer #drawTools { display: none !important; }
 
   --ref:        var(--accent);
   --ref-soft:   var(--accent-bg);
-  --mutate:     #C46A00;   /* reserved exclusively for mutation */
-  --mutate-soft:#FBEEDA;
+  /* Reserved exclusively for mutation. The deck's highlighter pen is
+     #f1c40f, so a change is marked the way the slides mark things: a
+     yellow wash under the box, a darker gold edge that still reads on
+     white, and the text left in ink so it stays legible. */
+  --mutate:     #B88F00;
+  --mutate-soft:#F9E79F;   /* #f1c40f at 40% over white */
   --danger:     var(--err);
   --danger-soft:var(--err-bg);
 
@@ -738,8 +742,8 @@ html[data-theme="dark"]{
   --chart-1: #ededea; --chart-2: #cfcfc9; --chart-3: #b4b4ad;
   --chart-4: #9a9a93; --chart-5: #85857d;
   --grid: rgba(255,255,255,.05);
-  --mutate:     #F2A64B;
-  --mutate-soft:#3A2A12;
+  --mutate:     #F1C40F;
+  --mutate-soft:#4A3E10;
   --t-int:#7FA0F5; --t-float:#7FA0F5; --t-str:#55C4AF; --t-bool:#C39BE8;
   --t-none:#8A938E; --t-list:#F2A64B; --t-dict:#E48AC8; --t-tuple:#A9CF6B;
   --t-function:#EDF1EE; --t-range:#A9CF6B;
@@ -862,13 +866,14 @@ html[data-theme="dark"]{
 /* Every stroke in the diagram is one of these three. Colour is carried by
    CSS so the drawing follows the light/dark theme. */
 .hd-ink   { stroke: var(--ink); fill:none; stroke-linecap:round; stroke-linejoin:round; }
-.hd-mut   { stroke: var(--mutate); fill:none; stroke-linecap:round; stroke-linejoin:round; }
+.hd-mut   { stroke: var(--mutate); fill:none; stroke-linecap:round; stroke-linejoin:round; stroke-width:2.2; }
 .hd-fill  { fill: var(--surface); stroke:none; }
+.hd-fill.mut{ fill: var(--mutate-soft); }
 .hd-head  { fill: var(--ink); stroke:none; }
 .hd-head.mut{ fill: var(--mutate); }
 .hd-text  { fill: var(--ink); font-family: var(--hand); }
 .hd-text.dim{ fill: var(--ink-2); }
-.hd-text.mut{ fill: var(--mutate); }
+.hd-text.mut{ fill: var(--ink); }
 /* An object that has just become garbage: shown once, on its way out. */
 .hd-ghost{ stroke: var(--ink-3); fill:none; stroke-linecap:round; stroke-linejoin:round; opacity:.5; }
 .hd-text.ghost{ fill: var(--ink-3); opacity:.7; }
@@ -1706,7 +1711,8 @@ function Interpreter(srcLines){
   this.lastNote = null;
   this.loops = [];
   this.steps = 0;
-  this.frames = [{ label:'Global frame', kind:'global', vars: new Map(), globals: null }];
+  this.frames = [{ label:'global', kind:'global', cid: 0, vars: new Map(), globals: null }];
+  this.nextCall = 1;
   this.NONE = this.intern('NoneType', null);
 }
 
@@ -2419,11 +2425,11 @@ Interpreter.prototype = {
       }
 
       var self = this;
-      /* A method's frame is named for its class; its arguments, self
-         included, are right there in the frame. */
-      var label = f.isMethod ? f.qual
-        : f.name + '(' + args.map(function(a){ return self.repr(a); }).join(', ') + ')';
-      this.frames.push({ label: label, kind:'call', name: f.name, vars: vars, globals: null, callLine: node.line });
+      /* A frame is named for its function, as on the whiteboard; the
+         arguments are already right there in the frame's variables. A
+         method keeps its class, so Dog.bark and Cat.bark stay apart. */
+      var label = f.isMethod ? f.qual : f.name;
+      this.frames.push({ label: label, kind:'call', cid: this.nextCall++, name: f.name, vars: vars, globals: null, callLine: node.line });
       this.note(node.line, label, 'starts running ' + f.name + '()');
 
       var ret = this.NONE;
@@ -2782,7 +2788,7 @@ Interpreter.prototype = {
         visit(ref);
         vars.push({ name: name, ref: ref, type: self.typeOf(ref) });
       });
-      return { label: f.label, kind: f.kind, vars: vars, callLine: f.callLine || null, depth: idx };
+      return { label: f.label, kind: f.kind, cid: f.cid || 0, vars: vars, callLine: f.callLine || null, depth: idx };
     });
 
     /* Only variables promote a scalar into its own heap box: two names on one
@@ -3313,6 +3319,154 @@ function heapDepths(state){
   return depth;
 }
 
+/* -------------------------------------------------------------------------
+   LAYOUT
+   Frames and objects are packed tight against each other and shaped to the
+   pane they are drawn in. There are no arrows to route — a slot names its
+   object by id — so an object does not need to sit beside whatever refers
+   to it, and lining them up in id order reads id1, id2, id3 down the page.
+
+     tall pane (side-by-side split)  frames in a column on the left, the
+                                     objects in one column beside them
+     wide pane (stacked split)       frames in a row along the top, the
+                                     objects in a row underneath
+     either, when the other one fits     see memoryOrient: the pane's shape is
+     the program clearly better          a preference, not a rule
+
+   Either flow wraps when it reaches the edge of the pane rather than running
+   off it. The edge is taken at zoom 1, so zooming in magnifies the diagram
+   instead of reflowing it.
+------------------------------------------------------------------------- */
+var SECTION_GAP = 48;   /* frames → objects */
+var WRAP_GAP = 40;      /* between wrapped columns / rows of objects */
+
+function idNum(o){
+  var n = o && parseInt(String(o.idLabel || '').replace(/\D+/g, ''), 10);
+  return isNaN(n) ? 1e9 : n;
+}
+
+/* The pane's inside, in diagram units at zoom 1. Zero when the pane is not
+   laid out (hidden, or printing to the notes PDF). */
+function memoryRoom(wrap, u){
+  if (!wrap || !wrap.clientWidth || !wrap.clientHeight) return { w: 0, h: 0 };
+  var cs = getComputedStyle(wrap);
+  var px = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+  var py = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+  var k = u * DIAGRAM_BASE;
+  return { w: Math.max(0, wrap.clientWidth - px) / k, h: Math.max(0, wrap.clientHeight - py) / k };
+}
+
+function packMemory(frames, objs, orient, avail){
+  var W = 0, H = 0;
+  if (orient === 'rows'){
+    /* Frames left to right along the top, wrapping if a deep call stack
+       outgrows the pane. */
+    var limW = avail.w || Infinity;
+    var x = 0, y = 0, rowH = 0;
+    frames.forEach(function(m){
+      if (x > 0 && x + m.w > limW){ x = 0; y += rowH + D.frameGap; rowH = 0; }
+      m.x = x; m.y = y;
+      x += m.w + D.frameGap;
+      rowH = Math.max(rowH, m.h);
+      W = Math.max(W, m.x + m.w);
+    });
+    var top = frames.length ? y + rowH + SECTION_GAP : 0;
+    x = 0; y = top; rowH = 0;
+    objs.forEach(function(m){
+      if (x > 0 && x + m.w > limW){ x = 0; y += rowH + WRAP_GAP; rowH = 0; }
+      m.x = x; m.y = y;
+      x += m.w + D.boxGap;
+      rowH = Math.max(rowH, m.h);
+      W = Math.max(W, m.x + m.w);
+    });
+    H = objs.length ? y + rowH : Math.max(0, top - SECTION_GAP);
+    return { W: W, H: H };
+  }
+
+  /* cols: frames stacked on the left, one width so their edges line up */
+  var frameW = 0, fy = 0;
+  frames.forEach(function(m){ frameW = Math.max(frameW, m.w); });
+  frames.forEach(function(m){ m.x = 0; m.w = frameW; m.y = fy; fy += m.h + D.frameGap; });
+  var framesH = frames.length ? fy - D.frameGap : 0;
+  /* Never wrap shorter than the frames themselves: the column of objects
+     may always run as far down as the stack does. */
+  var limH = Math.max(avail.h || Infinity, framesH);
+  var cx = frames.length ? frameW + SECTION_GAP : 0, cy = 0, colW = 0;
+  objs.forEach(function(m){
+    if (cy > 0 && cy + m.h > limH){ cx += colW + WRAP_GAP; cy = 0; colW = 0; }
+    m.x = cx; m.y = cy;
+    cy += m.h + D.boxGap;
+    colW = Math.max(colW, m.w);
+    H = Math.max(H, m.y + m.h);
+  });
+  W = Math.max(frameW, objs.length ? cx + colW : 0);
+  H = Math.max(H, framesH);
+  return { W: W, H: H };
+}
+
+/* The frames on the diagram: the live stack, then every call that has
+   returned, faded. A finished call is the lesson as much as a running one —
+   its locals are what the room was just looking at — so it is kept, moved
+   below the live frames, and left where it is from then on. Built from the
+   steps before this one, so stepping back brings a returned frame back to
+   life. The newest snapshot of each call wins: that is its last state. */
+var MAX_GONE_FRAMES = 8;
+
+function framesWithGone(state, past){
+  var live = {}, gone = {}, list = [];
+  state.frames.forEach(function(f){ live[f.cid || 0] = true; });
+  for (var h = (past || []).length - 1; h >= 0 && list.length < MAX_GONE_FRAMES; h--){
+    past[h].frames.forEach(function(f){
+      var c = f.cid || 0;
+      if (live[c] || gone[c] || list.length >= MAX_GONE_FRAMES) return;
+      gone[c] = true;
+      var g = {}; for (var k in f) g[k] = f[k];
+      g.gone = true;
+      list.push(g);
+    });
+  }
+  list.sort(function(a, b){ return a.cid - b.cid; });
+  return state.frames.concat(list);
+}
+
+function memoryOrient(frames, objs, avail){
+  if (!avail.w || !avail.h) return 'cols';
+
+  /* The pane's shape says which arrangement to prefer; the other is taken
+     only when the preferred one would not fit. A stacked split with a
+     long global frame is the case this is for: frames-on-top would push
+     every object below the fold, so the objects go beside it instead.
+
+     Judged on the whole run, not the step on screen — the first step is
+     nearly empty and would always say "either" — and remembered, so the
+     diagram never flips mid-trace. */
+  var key = app.trace ? app.trace : null;
+  var c = app.mmOrient;
+  if (c && c.trace === key && c.w === Math.round(avail.w) && c.h === Math.round(avail.h)) return c.orient;
+
+  var fs = frames, os = objs;
+  var states = app.trace && app.trace.states;
+  if (states && states.length){
+    /* the finished program: global plus every returned call */
+    var last = states[states.length - 1];
+    fs = framesWithGone(last, states.slice(0, -1)).map(measureFrame);
+    os = last.order.map(function(id){ return measureObject(last.objects[id]); });
+  }
+  var fit = function(o){
+    var sz = packMemory(fs, os, o, avail);
+    return Math.min(avail.w / (sz.W || 1), avail.h / (sz.H || 1));
+  };
+  var r = avail.w / avail.h;
+  var pref  = r > 1.6 ? 'rows' : 'cols';
+  var other = pref === 'rows' ? 'cols' : 'rows';
+  /* Keep the preferred arrangement whenever it fits on screen. Only if it
+     would run off the pane, and the other shows clearly more, switch. */
+  var fp = fit(pref), fo = fit(other);
+  var orient = fp < 1 && fo > fp * 1.1 ? other : pref;
+  app.mmOrient = { trace: key, w: Math.round(avail.w), h: Math.round(avail.h), orient: orient };
+  return orient;
+}
+
 function renderMemory(state, prev, history){
   var svg = $('diagram');
   var wrap = $('memoryWrap');
@@ -3322,7 +3476,7 @@ function renderMemory(state, prev, history){
   while (svg.firstChild) svg.removeChild(svg.firstChild);
 
   var u = mmScale();
-  var frames = state.frames.map(measureFrame);
+  var frames;
   var depth = heapDepths(state);
   var shown = state.order.filter(function(id){ return depth[id] !== undefined; });
 
@@ -3349,6 +3503,7 @@ function renderMemory(state, prev, history){
       nghosts++;
     }
   }
+  frames = framesWithGone(state, past).map(measureFrame);
 
   if (!frames.length && !shown.length){
     var t = document.createElementNS(SVGNS, 'text');
@@ -3362,117 +3517,31 @@ function renderMemory(state, prev, history){
     return;
   }
 
-  /* --- place the frames in one column on the left ----------------------- */
-  var y = 0, frameW = 0;
-  frames.forEach(function(m){ frameW = Math.max(frameW, m.w); });
-  frames.forEach(function(m){ m.x = 0; m.w = frameW; m.y = y; y += m.h + D.frameGap; });
-
-  /* --- then the objects, in columns by how far they are from a name ------ */
-  var byDepth = {}, maxD = 0;
-  shown.forEach(function(id){
-    var d = depth[id];
-    (byDepth[d] = byDepth[d] || []).push(id);
-    maxD = Math.max(maxD, d);
+  /* --- place frames and objects, shaped to the pane ------------------- */
+  shown.sort(function(a, b){ return idNum(state.objects[a] || ghosts[a]) - idNum(state.objects[b] || ghosts[b]); });
+  var objs = shown.map(function(id){
+    var m = measureObject(state.objects[id] || ghosts[id]);
+    m.ghost = !!ghosts[id];
+    return m;
   });
-
+  var avail = memoryRoom(wrap, u);
+  var orient = memoryOrient(frames, objs, avail);
+  var size = packMemory(frames, objs, orient, avail);
   var placed = {};
-  var colX = frameW + D.colGap;
-  var maxY = y;
-  for (var d = 0; d <= maxD; d++){
-    var ids = byDepth[d] || [];
-    var ms = ids.map(function(id){
-      var m = measureObject(state.objects[id] || ghosts[id]);
-      m.ghost = !!ghosts[id];
-      return m;
-    });
-
-    /* Order each column by where its referrers already sit, so arrows run
-       roughly parallel instead of crossing. */
-    ms.forEach(function(m){
-      var keys = [];
-      var candidates = (d === 0 ? frames : Object.keys(placed).map(function(k){ return placed[k]; }));
-      candidates.forEach(function(src){
-        (src.slots || []).forEach(function(sl){
-          /* row first, then column: a left-to-right run of list slots should
-             land on a top-to-bottom run of objects, so nothing crosses */
-          if (sl.ref === m.id) keys.push((src.y + sl.y) * 10000 + sl.x);
-        });
-      });
-      m.sortKey = keys.length ? Math.min.apply(null, keys) : 1e12;
-    });
-    ms.sort(function(a, b){ return a.sortKey - b.sortKey; });
-
-    /* Boxes hold the position they had on the previous step. Only objects
-       that are new to this column are given somewhere to go, and they take
-       the first gap that fits - which is usually the space a dead object has
-       just vacated. Nothing slides sideways while a faded object is still on
-       screen, and nothing jumps when it goes. */
-    var taken = [];
-    var fits = function(top, h){
-      for (var i = 0; i < taken.length; i++){
-        if (top < taken[i].b + D.boxGap && top + h + D.boxGap > taken[i].t) return false;
-      }
-      return true;
-    };
-    var settle = function(m, top){
-      m.x = colX; m.y = top;
-      taken.push({ t: top, b: top + m.h });
-      placed[m.id] = m;
-      app.layout[m.id] = { d: d, y: top };
-    };
-
-    var remembered = ms.filter(function(m){
-      var L = app.layout[m.id];
-      return L && L.d === d;
-    }).sort(function(a, b){ return app.layout[a.id].y - app.layout[b.id].y; });
-    var fresh = ms.filter(function(m){ return remembered.indexOf(m) < 0; });
-
-    remembered.forEach(function(m){
-      var top = app.layout[m.id].y;
-      while (!fits(top, m.h)) top += GRID_STEP;   /* a grown box may need room */
-      settle(m, top);
-    });
-    fresh.forEach(function(m){
-      /* Among the gaps this box could occupy, take the one nearest the name
-         that refers to it, so a recycled slot does not send its arrow across
-         the column. Never beyond the bottom, or a loop would march the
-         diagram off the page. */
-      var ideal = m.sortKey < 1e12 ? Math.floor(m.sortKey / 10000) : 0;
-      var best = null, bottom = 0;
-      taken.forEach(function(t){ bottom = Math.max(bottom, t.b); });
-      for (var top = 0; top <= bottom + D.boxGap; top += GRID_STEP){
-        if (!fits(top, m.h)) continue;
-        if (best === null || Math.abs(top - ideal) < Math.abs(best - ideal)) best = top;
-      }
-      if (best === null){
-        best = 0;
-        while (!fits(best, m.h)) best += GRID_STEP;
-      }
-      settle(m, best);
-    });
-
-    var cy = 0, colW = 0;
-    ms.forEach(function(m){
-      cy = Math.max(cy, m.y + m.h + D.boxGap);
-      colW = Math.max(colW, m.w);
-    });
-    maxY = Math.max(maxY, cy);
-    if (ms.length) colX += colW + D.colGap;
-  }
-
-  var W = Math.max(colX - D.colGap, frameW) + 8;
-  var H = Math.max(maxY - D.frameGap, y - D.frameGap) + 8;
+  objs.forEach(function(m){ placed[m.id] = m; });
+  var W = size.W + 8;
+  var H = size.H + 8;
 
   /* --- draw: fills first, then ink on top ------------------------------ */
   var fills = document.createElementNS(SVGNS, 'g');
   var ink = document.createElementNS(SVGNS, 'g');
   svg.appendChild(fills); svg.appendChild(ink);
 
-  function fill(x, y, w, h){
+  function fill(x, y, w, h, cls){
     var r = document.createElementNS(SVGNS, 'rect');
     r.setAttribute('x', x); r.setAttribute('y', y);
     r.setAttribute('width', w); r.setAttribute('height', h);
-    r.setAttribute('class', 'hd-fill');
+    r.setAttribute('class', 'hd-fill' + (cls ? ' ' + cls : ''));
     fills.appendChild(r);
   }
   function label(x, y, str, size, cls, anchor){
@@ -3491,12 +3560,17 @@ function renderMemory(state, prev, history){
 
   var seed = 1;
   frames.forEach(function(m){
-    var wasFrame = prev ? prev.frames.filter(function(p){ return p.label === m.f.label; })[0] : null;
+    /* By stack position, not by name: a recursive call makes several
+       frames with the same name. */
+    var gone = !!m.f.gone;
+    var pf = prev && !gone ? prev.frames[m.f.depth] : null;
+    var wasFrame = pf && pf.label === m.f.label ? pf : null;
+    var fcls = gone ? 'hd-ghost' : 'hd-ink', tcls = gone ? 'ghost' : null;
     fill(m.x, m.y, m.w, m.h);
-    box(m.x, m.y, m.w, m.h, seed += 13);
+    box(m.x, m.y, m.w, m.h, seed += 13, fcls);
     fill(m.x, m.y, m.headW, D.hdrH);
-    box(m.x, m.y, m.headW, D.hdrH, seed += 13);
-    label(m.x + m.headW / 2, m.y + D.hdrH / 2 + D.base, m.f.label, D.fs);
+    box(m.x, m.y, m.headW, D.hdrH, seed += 13, fcls);
+    label(m.x + m.headW / 2, m.y + D.hdrH / 2 + D.base, m.f.label, D.fs, tcls);
 
     if (!m.f.vars.length){
       label(m.x + m.w / 2, m.y + D.hdrH + D.pad + 22,
@@ -3504,11 +3578,11 @@ function renderMemory(state, prev, history){
     }
     m.slots.forEach(function(sl){
       var was = wasFrame ? wasFrame.vars.filter(function(v){ return v.name === sl.name; })[0] : null;
-      var fresh = prev && (!was || was.ref !== sl.ref);
-      label(m.x + sl.nameX, m.y + sl.y + sl.h / 2 + D.base, sl.name, D.fs, null, 'start');
-      fill(m.x + sl.x, m.y + sl.y, sl.w, sl.h);
-      box(m.x + sl.x, m.y + sl.y, sl.w, sl.h, seed += 13, fresh ? 'hd-mut' : 'hd-ink');
-      centreText(sl, m.x, m.y, sl.text, fresh ? 'mut' : null);
+      var fresh = !gone && prev && (!was || was.ref !== sl.ref);
+      label(m.x + sl.nameX, m.y + sl.y + sl.h / 2 + D.base, sl.name, D.fs, tcls, 'start');
+      fill(m.x + sl.x, m.y + sl.y, sl.w, sl.h, fresh ? 'mut' : null);
+      box(m.x + sl.x, m.y + sl.y, sl.w, sl.h, seed += 13, gone ? 'hd-ghost' : (fresh ? 'hd-mut' : 'hd-ink'));
+      centreText(sl, m.x, m.y, sl.text, gone ? 'ghost' : (fresh ? 'mut' : null));
     });
   });
 
@@ -3521,7 +3595,8 @@ function renderMemory(state, prev, history){
     var cls = m.ghost ? 'hd-ghost' : (mutated ? 'hd-mut' : 'hd-ink');
     var tcls = m.ghost ? 'ghost' : null;
 
-    fill(m.x, m.y, m.w, m.h);
+    /* A plain value has no slots to mark, so the whole box takes the wash. */
+    fill(m.x, m.y, m.w, m.h, mutated && m.body !== undefined ? 'mut' : null);
     box(m.x, m.y, m.w, m.h, seed += 13, cls);
 
     fill(m.x, m.y, m.idW, D.hdrH);
@@ -3545,7 +3620,7 @@ function renderMemory(state, prev, history){
       var oldCell = oldCells ? oldCells[sl.i] : null;
       var changed = was && (!oldCell || oldCell.text !== sl.text);
       var scls = m.ghost ? 'hd-ghost' : (changed && !sl.key ? 'hd-mut' : 'hd-ink');
-      fill(m.x + sl.x, m.y + sl.y, sl.w, sl.h);
+      fill(m.x + sl.x, m.y + sl.y, sl.w, sl.h, scls === 'hd-mut' ? 'mut' : null);
       box(m.x + sl.x, m.y + sl.y, sl.w, sl.h, seed += 13, scls);
       centreText(sl, m.x, m.y, sl.text, m.ghost ? 'ghost' : (changed && !sl.key ? 'mut' : null));
       if (sl.idx !== undefined){
@@ -3987,6 +4062,22 @@ function setupKeys(){
   /* The scale multiplier changes with the presentation layout, and the
      diagram bakes it into its own width, so it is redrawn on a resize. */
   window.addEventListener('resize', function(){ requestAnimationFrame(render); });
+
+  /* Dragging a splitter resizes the pane without resizing the window, and
+     the diagram's shape follows the pane's — so watch the pane itself. */
+  try {
+    var lastRoom = '', roTick = 0;
+    new ResizeObserver(function(){
+      var w = $('memoryWrap');
+      var k = w.clientWidth + 'x' + w.clientHeight;
+      if (k === lastRoom || !w.clientWidth) return;
+      lastRoom = k;
+      cancelAnimationFrame(roTick);
+      roTick = requestAnimationFrame(function(){
+        if (app.painted && app.mode !== 'draw') renderMemory(app.painted, app.paintedPrev, app.paintedHistory);
+      });
+    }).observe($('memoryWrap'));
+  } catch (_) { /* no observer: window resizes still redraw */ }
 }
 
 /* ===========================================================================
@@ -4290,7 +4381,7 @@ function addShape(type){
   var nid = 'id' + k;
 
   if (type === 'frame'){
-    sh.head = draw.shapes.some(function(o){ return o.type === 'frame'; }) ? 'f' : 'Global frame';
+    sh.head = draw.shapes.some(function(o){ return o.type === 'frame'; }) ? 'f' : 'global';
     sh.rows = [{ a: '', b: '' }, { a: '', b: '' }];
   } else if (type === 'object'){
     sh.hid = nid; sh.hty = 'int'; sh.body = '';
