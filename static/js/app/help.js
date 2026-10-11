@@ -132,6 +132,8 @@ BeamerWidget.topbar.onReset(() =&gt; clearEverything());</code>
   <dt>widget-collapse</dt><dd>Return to the original size.</dd>
   <dt>widget-get-state</dt><dd>Received when navigating away. Reply with a ${_hic('widget-state')} message containing serialisable state.</dd>
   <dt>widget-set-state</dt><dd>Received when returning to the slide. Restore your UI from the saved state.</dd>
+  <dt>widget-hidden</dt><dd>Received when the slide is navigated away from. The iframe stays alive, so pause any audio or video here.</dd>
+  <dt>widget-shown</dt><dd>Received when the slide is shown again.</dd>
   <dt>widget-cleanup</dt><dd>Received when the widget is removed. Stop timers and release resources.</dd>
   <dt>widget-settings</dt><dd>Post ${_hic('{ widgetId, patch, remove }')} to save settings into your config item, where they persist with the deck. Use this if your widget changes its own configuration at run time; the presenter's own edits come from the editor panel.</dd>
 </dl>

@@ -7,8 +7,12 @@
   "category": "Tools",
   "fields": [
     { "key": "videoId",        "label": "YouTube URL or Video ID", "type": "text",     "placeholder": "https://youtube.com/watch?v=…" },
+    { "key": "startTime",      "label": "Clip start",              "type": "duration", "min": 0,
+      "note": "Or use the scissors button on the video to set start and end from the current position." },
+    { "key": "endTime",        "label": "Clip end (blank = play to the end)", "type": "duration", "min": 0 },
     { "key": "autoplay",       "label": "Autoplay on slide load",  "type": "checkbox", "default": false },
-    { "key": "startTime",      "label": "Start time (seconds)",    "type": "number",   "min": 0, "step": 1, "placeholder": "0" },
+    { "key": "hideYouTubeUI",  "label": "Hide YouTube title, logo & suggestions", "type": "checkbox", "default": true },
+    { "key": "showControls",   "label": "Show playback controls",  "type": "checkbox", "default": true },
     { "key": "allowManualUrl", "label": "Allow URL input box",     "type": "checkbox", "default": false }
   ]
 }
@@ -34,7 +38,7 @@
 </script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>YouTube Widget</title>
+<title>YouTube Video — Beamer+</title>
 <style>
 :root {
   --bg:         oklch(99% 0.003 80);
@@ -70,11 +74,19 @@ html, body {
   width: 100%;
   height: 100%;
   background: #000;
+  overflow: hidden;
 }
 
+/* Positioned by layoutPlayer(). With "hide YouTube UI" on, the player is made
+   taller than the video and the extra (black, letterboxed) bands hang off the
+   top and bottom of the container — YouTube anchors its title bar, logo and
+   "More videos" strip to the player's edges, not the video's, so they end up
+   in the clipped-off bands. */
 #player-wrap {
   position: absolute;
-  inset: 0;
+  left: 0; top: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
 }
 
@@ -83,6 +95,33 @@ html, body {
   width: 100% !important;
   height: 100% !important;
 }
+
+/* Poster: covers the player before the first play and after the clip ends,
+   which is when YouTube shows its title card and end-screen suggestions. */
+#cover {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  background: #000 center / cover no-repeat;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+#cover.shown { display: flex; }
+
+#cover-btn {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+#cover-btn svg { width: 30px; height: 30px; fill: currentColor; }
 
 #click-layer {
   position: absolute;
@@ -111,7 +150,8 @@ html, body {
   pointer-events: none;
 }
 
-#controls.viewer-mode {
+#controls.viewer-mode,
+#controls.off {
   display: none !important;
 }
 
@@ -186,6 +226,10 @@ html, body {
   background: rgba(255,255,255,0.14);
 }
 
+.ctrl-btn.is-active {
+  background: rgba(255,255,255,0.22);
+}
+
 .ctrl-btn svg {
   width: 18px;
   height: 18px;
@@ -229,6 +273,49 @@ html, body {
   cursor: pointer;
   border: none;
 }
+
+/* ── Trim row ─────────────────────────────────────────────────────────────── */
+#trim-row {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-family: var(--mono);
+  font-size: calc(11px * var(--u));
+  color: rgba(255,255,255,0.85);
+  padding-bottom: 4px;
+}
+
+#trim-row.shown { display: flex; }
+
+.trim-lbl {
+  font-family: var(--font);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.6);
+}
+
+.trim-val { min-width: 38px; }
+
+.trim-btn {
+  font-family: var(--font);
+  font-size: calc(11px * var(--u));
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.22);
+  color: #fff;
+  border-radius: var(--r);
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.trim-btn:hover { background: rgba(255,255,255,0.22); }
+
+.trim-btn--primary { background: #fff; color: #000; border-color: #fff; }
+.trim-btn--primary:hover { background: rgba(255,255,255,0.85); }
+
+#trim-msg { color: rgba(255,255,255,0.6); font-family: var(--font); }
 
 /* Placeholder */
 #placeholder {
@@ -304,30 +391,53 @@ html, body {
     <div id="yt-player"></div>
   </div>
 
+  <div id="cover">
+    <div id="cover-btn">
+      <svg id="cover-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+      <svg id="cover-replay" viewBox="0 0 24 24" style="display:none"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+    </div>
+  </div>
+
   <div id="click-layer"></div>
 
   <div id="controls" class="hidden">
+    <div id="trim-row">
+      <span class="trim-lbl">Start</span>
+      <span class="trim-val" id="trim-start-val">0:00</span>
+      <button class="trim-btn" id="trim-set-start" title="Set clip start to the current position (I)">Set to here</button>
+      <span class="trim-lbl" style="margin-left:8px">End</span>
+      <span class="trim-val" id="trim-end-val">end</span>
+      <button class="trim-btn" id="trim-set-end" title="Set clip end to the current position (O)">Set to here</button>
+      <button class="trim-btn" id="trim-clear" title="Play the whole video">Clear</button>
+      <span id="trim-msg"></span>
+      <div style="flex:1"></div>
+      <button class="trim-btn trim-btn--primary" id="trim-done">Done</button>
+    </div>
     <div id="progress-row">
-      <input type="range" id="scrubber" min="0" max="100" value="0" step="0.1">
+      <input type="range" id="scrubber" min="0" max="100" value="0" step="0.1" tabindex="-1">
       <span id="time-display">0:00 / 0:00</span>
     </div>
     <div id="buttons-row">
-      <button class="ctrl-btn" id="btn-play" title="Play/Pause (Space)">
+      <button class="ctrl-btn" id="btn-play" title="Play/Pause (Space or K)" tabindex="-1">
         <svg id="icon-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
         <svg id="icon-pause" viewBox="0 0 24 24" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
       </button>
 
       <div id="vol-wrap">
-        <button class="ctrl-btn" id="btn-mute" title="Mute (M)">
+        <button class="ctrl-btn" id="btn-mute" title="Mute (M)" tabindex="-1">
           <svg id="icon-vol" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
           <svg id="icon-muted" viewBox="0 0 24 24" style="display:none"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
         </button>
-        <input type="range" id="vol-slider" min="0" max="100" value="80">
+        <input type="range" id="vol-slider" min="0" max="100" value="80" tabindex="-1">
       </div>
 
       <div id="spacer"></div>
 
-      <button class="ctrl-btn" id="btn-fs" title="Fullscreen (F)">
+      <button class="ctrl-btn" id="btn-trim" title="Trim clip" tabindex="-1">
+        <svg viewBox="0 0 24 24"><path d="M9.64 7.64c.23-.5.36-1.05.36-1.64 0-2.21-1.79-4-4-4S2 3.79 2 6s1.79 4 4 4c.59 0 1.14-.13 1.64-.36L10 12l-2.36 2.36C7.14 14.13 6.59 14 6 14c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4c0-.59-.13-1.14-.36-1.64L12 14l7 7h3v-1L9.64 7.64zM6 8c-1.1 0-2-.89-2-2s.9-2 2-2 2 .89 2 2-.9 2-2 2zm0 12c-1.1 0-2-.89-2-2s.9-2 2-2 2 .89 2 2-.9 2-2 2zm6-7.5c-.28 0-.5-.22-.5-.5s.22-.5.5-.5.5.22.5.5-.22.5-.5.5zM19 3l-6 6 2 2 7-7V3z"/></svg>
+      </button>
+
+      <button class="ctrl-btn" id="btn-fs" title="Fullscreen (F)" tabindex="-1">
         <svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
       </button>
     </div>
@@ -346,56 +456,76 @@ html, body {
 <script src="/static/vendor/socket.io.min.js"></script>
 <script>
 // ── State ────────────────────────────────────────────────────────────────────
-let player       = null;
-let cfg          = {};
-let socket       = null;
-let hideTimer    = null;
+let player        = null;
+let playerReady   = false;
+let cfg           = {};
+let socket        = null;
+let socketUrl     = null;
+let hideTimer     = null;
 let progressTimer = null;
-let isScrubbing  = false;
-let isMuted      = false;
-let lastVolume   = 80;
-let isPlaying    = false;
+let isScrubbing   = false;
+let isMuted       = false;
+let lastVolume    = 80;
+let isPlaying     = false;
+let trimMode      = false;
+let currentVid    = null;
+let pendingState  = null;   // a widget-set-state that arrived before onReady
+let started       = false;  // has this player ever played — drives the poster
 
 // ── DOM ──────────────────────────────────────────────────────────────────────
-const container  = document.getElementById('container');
-const controls   = document.getElementById('controls');
+const container   = document.getElementById('container');
+const wrap        = document.getElementById('player-wrap');
+const cover       = document.getElementById('cover');
+const coverPlay   = document.getElementById('cover-play');
+const coverReplay = document.getElementById('cover-replay');
+const controls    = document.getElementById('controls');
 const placeholder = document.getElementById('placeholder');
-const scrubber   = document.getElementById('scrubber');
-const timeDisp   = document.getElementById('time-display');
-const btnPlay    = document.getElementById('btn-play');
-const iconPlay   = document.getElementById('icon-play');
-const iconPause  = document.getElementById('icon-pause');
-const btnMute    = document.getElementById('btn-mute');
-const iconVol    = document.getElementById('icon-vol');
-const iconMuted  = document.getElementById('icon-muted');
-const volSlider  = document.getElementById('vol-slider');
-const btnFs      = document.getElementById('btn-fs');
-const clickLayer = document.getElementById('click-layer');
-const urlInput   = document.getElementById('url-input');
-const loadBtn    = document.getElementById('load-btn');
-const urlRow     = document.getElementById('url-row');
+const scrubber    = document.getElementById('scrubber');
+const timeDisp    = document.getElementById('time-display');
+const btnPlay     = document.getElementById('btn-play');
+const iconPlay    = document.getElementById('icon-play');
+const iconPause   = document.getElementById('icon-pause');
+const btnMute     = document.getElementById('btn-mute');
+const iconVol     = document.getElementById('icon-vol');
+const iconMuted   = document.getElementById('icon-muted');
+const volSlider   = document.getElementById('vol-slider');
+const btnFs       = document.getElementById('btn-fs');
+const btnTrim     = document.getElementById('btn-trim');
+const trimRow     = document.getElementById('trim-row');
+const trimStartV  = document.getElementById('trim-start-val');
+const trimEndV    = document.getElementById('trim-end-val');
+const trimMsg     = document.getElementById('trim-msg');
+const clickLayer  = document.getElementById('click-layer');
+const urlInput    = document.getElementById('url-input');
+const loadBtn     = document.getElementById('load-btn');
+const urlRow      = document.getElementById('url-row');
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+const isViewer     = () => cfg.role === 'viewer';
+const hideUI       = () => cfg.hideYouTubeUI !== false;
+const wantControls = () => cfg.showControls !== false;
+
 function extractVideoId(input) {
   if (!input) return null;
-  input = input.trim();
+  input = String(input).trim();
   let m;
   m = input.match(/youtu\.be\/([A-Za-z0-9_-]{11})/);
   if (m) return m[1];
   m = input.match(/[?&]v=([A-Za-z0-9_-]{11})/);
   if (m) return m[1];
-  m = input.match(/\/embed\/([A-Za-z0-9_-]{11})/);
+  m = input.match(/\/(?:embed|shorts|live)\/([A-Za-z0-9_-]{11})/);
   if (m) return m[1];
   if (/^[A-Za-z0-9_-]{11}$/.test(input)) return input;
   return null;
 }
 
 function fmtTime(secs) {
-  if (!secs || isNaN(secs)) return '0:00';
+  if (!secs || isNaN(secs) || secs < 0) return '0:00';
   secs = Math.floor(secs);
-  const m = Math.floor(secs / 60);
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
   const s = String(secs % 60).padStart(2, '0');
-  return `${m}:${s}`;
+  return h ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
 }
 
 function setPlayIcon(playing) {
@@ -410,14 +540,86 @@ function setMuteIcon(muted) {
   iconMuted.style.display = muted ? '' : 'none';
 }
 
-function updateScrubberFill(pct) {
-  scrubber.style.background =
-    `linear-gradient(to right, rgba(255,255,255,0.85) ${pct}%, rgba(255,255,255,0.25) ${pct}%)`;
+const ytState = () => { try { return player?.getPlayerState?.(); } catch (_) { return undefined; } };
+const curTime = () => { try { return player?.getCurrentTime?.() || 0; } catch (_) { return 0; } };
+const duration = () => { try { return player?.getDuration?.() || 0; } catch (_) { return 0; } };
+
+// ── Clip (trim) ──────────────────────────────────────────────────────────────
+// Start/end are stored in whole seconds by the settings panel's duration
+// field. An end at or before the start means "no end": play to the finish.
+function clipStart() { return Math.max(0, Number(cfg.startTime) || 0); }
+function clipEndSet() {
+  const e = Number(cfg.endTime) || 0;
+  return e > clipStart() ? e : 0;
+}
+function clipEnd() {
+  const d = duration();
+  const e = clipEndSet();
+  if (e) return d ? Math.min(e, d) : e;
+  return d;
+}
+
+// The scrubber spans the clip normally, and the whole video while trimming
+// so the presenter can find points outside the current clip.
+function scrubRange() {
+  if (trimMode) return [0, duration()];
+  return [clipStart(), clipEnd()];
+}
+
+// ── Layout: crop away YouTube's chrome ───────────────────────────────────────
+function layoutPlayer() {
+  const W = container.clientWidth, H = container.clientHeight;
+  if (!hideUI() || !W || !H) {
+    Object.assign(wrap.style, { left: '0px', top: '0px', width: '100%', height: '100%' });
+    return;
+  }
+  // Fit a 16:9 box, then pad it above and below. The pads are generous: they
+  // are letterbox black that gets clipped, and YouTube's overlays grow with
+  // the player (its "big mode" kicks in on large screens).
+  let vw = W, vh = W * 9 / 16;
+  if (vh > H) { vh = H; vw = H * 16 / 9; }
+  const pad = Math.round(Math.max(160, vh * 0.35));
+  Object.assign(wrap.style, {
+    left:   Math.round((W - vw) / 2) + 'px',
+    top:    Math.round((H - vh) / 2 - pad) + 'px',
+    width:  Math.round(vw) + 'px',
+    height: Math.round(vh + 2 * pad) + 'px',
+  });
+}
+
+window.addEventListener('resize', layoutPlayer);
+if (window.ResizeObserver) new ResizeObserver(layoutPlayer).observe(container);
+
+// ── Poster cover ─────────────────────────────────────────────────────────────
+function setPoster(vid) {
+  // maxres doesn't exist for every video; YouTube answers with a 120×90 grey
+  // stand-in rather than a clean 404, so check the size too.
+  const img = new Image();
+  const fallback = () => { cover.style.backgroundImage = `url("https://i.ytimg.com/vi/${vid}/hqdefault.jpg")`; };
+  img.onload  = () => {
+    if (img.naturalWidth <= 120) fallback();
+    else cover.style.backgroundImage = `url("${img.src}")`;
+  };
+  img.onerror = fallback;
+  img.src = `https://i.ytimg.com/vi/${vid}/maxresdefault.jpg`;
+}
+
+function showCover(kind) {   // 'play' | 'replay' | null
+  if (!kind || !hideUI()) { cover.classList.remove('shown'); return; }
+  coverPlay.style.display   = kind === 'play'   ? '' : 'none';
+  coverReplay.style.display = kind === 'replay' ? '' : 'none';
+  cover.classList.add('shown');
 }
 
 // ── Controls visibility ──────────────────────────────────────────────────────
+function applyControlsVisibility() {
+  controls.classList.toggle('viewer-mode', isViewer());
+  controls.classList.toggle('off', !wantControls());
+  btnTrim.style.display = isViewer() ? 'none' : '';
+}
+
 function showControls() {
-  if (cfg.role === 'viewer') return;
+  if (isViewer() || !wantControls() || !playerReady) return;
   controls.classList.remove('hidden');
   resetHideTimer();
 }
@@ -425,69 +627,113 @@ function showControls() {
 function resetHideTimer() {
   clearTimeout(hideTimer);
   hideTimer = setTimeout(() => {
-    if (isPlaying) controls.classList.add('hidden');
+    if (isPlaying && !trimMode) controls.classList.add('hidden');
   }, 3000);
 }
 
 container.addEventListener('mousemove', showControls);
 container.addEventListener('mouseenter', showControls);
 
+// Buttons and sliders must not keep keyboard focus: a focused range input
+// swallows the arrow keys (the host's nav bridge leaves inputs alone), which
+// is what made ←/→ seek the video instead of changing slides.
+controls.addEventListener('pointerup', () => {
+  setTimeout(() => {
+    const a = document.activeElement;
+    if (a && a !== document.body && a !== urlInput) a.blur?.();
+  }, 0);
+});
+
 // ── Progress loop ────────────────────────────────────────────────────────────
+function updateProgress() {
+  if (!player || isScrubbing) return;
+  const cur = curTime();
+  const [lo, hi] = scrubRange();
+  const span = hi - lo;
+  const pct = span > 0 ? Math.min(100, Math.max(0, ((cur - lo) / span) * 100)) : 0;
+  scrubber.value = pct;
+  paintScrubber(pct);
+  timeDisp.textContent = trimMode
+    ? `${fmtTime(cur)} / ${fmtTime(duration())}`
+    : `${fmtTime(cur - lo)} / ${fmtTime(span)}`;
+}
+
+function paintScrubber(pct) {
+  const hi = 'rgba(255,255,255,0.85)', lo = 'rgba(255,255,255,0.25)';
+  if (!trimMode) {
+    scrubber.style.background = `linear-gradient(to right, ${hi} ${pct}%, ${lo} ${pct}%)`;
+    return;
+  }
+  // While trimming, show the kept region against the whole video.
+  const d = duration() || 1;
+  const s = (clipStart() / d) * 100;
+  const e = ((clipEndSet() || d) / d) * 100;
+  const out = 'rgba(255,255,255,0.12)', keep = 'rgba(255,255,255,0.55)';
+  scrubber.style.background =
+    `linear-gradient(to right, ${out} ${s}%, ${keep} ${s}%, ${keep} ${e}%, ${out} ${e}%)`;
+}
+
+function tick() {
+  if (!player) return;
+  // Enforce the clip end ourselves rather than with YouTube's `end` param:
+  // that one only applies to the first play and ends in YouTube's end screen.
+  if (!trimMode && isPlaying && clipEndSet() && curTime() >= clipEnd() - 0.15) {
+    try { player.pauseVideo(); } catch (_) {}
+    setPlayIcon(false);
+    showCover('replay');
+    emitState('pause');
+  }
+  updateProgress();
+}
+
 function startProgressLoop() {
   stopProgressLoop();
-  progressTimer = setInterval(() => {
-    if (!player || isScrubbing) return;
-    try {
-      const cur = player.getCurrentTime?.() || 0;
-      const dur = player.getDuration?.() || 0;
-      if (dur > 0) {
-        const pct = (cur / dur) * 100;
-        scrubber.value = pct;
-        updateScrubberFill(pct);
-      }
-      timeDisp.textContent = `${fmtTime(cur)} / ${fmtTime(dur)}`;
-    } catch (_) {}
-  }, 500);
+  progressTimer = setInterval(tick, 200);
 }
 
 function stopProgressLoop() {
   clearInterval(progressTimer);
+  progressTimer = null;
 }
 
 // ── Socket sync ──────────────────────────────────────────────────────────────
-function connectSocket(url, widgetId) {
+function connectSocket(url) {
+  if (url === socketUrl && socket) return;
   if (socket) { socket.disconnect(); socket = null; }
-  if (!url) return;
+  socketUrl = url;
+  if (!url || typeof io === 'undefined') return;
   try {
     socket = io(url, { transports: ['websocket', 'polling'] });
-    socket.on('connect', () => console.log('[yt-widget] socket connected'));
     socket.on('widget_state', (data) => {
-      if (!player || data?.widgetId !== widgetId) return;
-      if (cfg.role !== 'viewer') return;
+      if (!player || !isViewer() || data?.widgetId !== cfg.widgetId) return;
       const state = data?.state || {};
       try {
-        if (state.videoId && state.videoId !== cfg.videoId) {
-          cfg.videoId = state.videoId;
+        if (state.clip) { cfg.startTime = state.clip[0]; cfg.endTime = state.clip[1]; }
+        if (state.videoId && state.videoId !== currentVid) {
+          currentVid = state.videoId;
+          setPoster(currentVid);
           player.loadVideoById({ videoId: state.videoId, startSeconds: state.time || 0 });
           return;
         }
         if (state.action === 'seek' && state.time != null) player.seekTo(state.time, true);
         if (state.action === 'play')  { player.playVideo?.();  setPlayIcon(true); }
         if (state.action === 'pause') { player.pauseVideo?.(); setPlayIcon(false); }
+        updateProgress();
       } catch (_) {}
     });
-  } catch (_) {}
+  } catch (_) { socket = null; }
 }
 
 function emitState(action, extra = {}) {
-  if (!socket || cfg.role === 'viewer') return;
+  if (!socket || isViewer()) return;
   try {
     socket.emit('widget_state', {
       widgetId: cfg.widgetId || 'yt-default',
       state: {
-        videoId: cfg.videoId,
+        videoId: currentVid,
         action,
-        time: player?.getCurrentTime?.() || 0,
+        time: curTime(),
+        clip: [clipStart(), clipEndSet()],
         ...extra,
       },
     });
@@ -498,7 +744,8 @@ function emitState(action, extra = {}) {
 function loadYouTubeAPI() {
   return new Promise(resolve => {
     if (window.YT && window.YT.Player) { resolve(); return; }
-    window.onYouTubeIframeAPIReady = resolve;
+    const prev = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => { prev?.(); resolve(); };
     if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
       const s = document.createElement('script');
       s.src = 'https://www.youtube.com/iframe_api';
@@ -507,45 +754,64 @@ function loadYouTubeAPI() {
   });
 }
 
-async function createPlayer(videoId, startTime) {
+async function createPlayer(videoId) {
+  currentVid = videoId;
   await loadYouTubeAPI();
+  if (currentVid !== videoId) return;   // superseded while the API loaded
   if (player) {
     try { player.destroy(); } catch (_) {}
     player = null;
   }
-  const wrap = document.getElementById('player-wrap');
+  playerReady = false;
+  started     = false;
   wrap.innerHTML = '<div id="yt-player"></div>';
+  setPoster(videoId);
+  showCover('play');
+  layoutPlayer();
 
   return new Promise(resolve => {
     player = new YT.Player('yt-player', {
       videoId,
       playerVars: {
-        enablejsapi: 1,
-        controls: 0,
+        enablejsapi:    1,
+        controls:       0,
+        disablekb:      1,
         modestbranding: 1,
-        rel: 0,
-        start: Math.floor(startTime || 0),
-        playsinline: 1,
-        fs: 0,
+        rel:            0,
+        iv_load_policy: 3,   // no annotations / info cards
+        start:          Math.floor(clipStart()),
+        playsinline:    1,
+        fs:             0,
       },
       events: {
         onReady(e) {
+          playerReady = true;
           e.target.setVolume(lastVolume);
-          if (cfg.autoplay) e.target.playVideo();
-          startProgressLoop();
           placeholder.classList.add('hidden');
-          controls.classList.remove('hidden');
+          if (pendingState) { const s = pendingState; pendingState = null; restoreState(s); }
+          if (cfg.autoplay && !isViewer()) e.target.playVideo();
+          updateProgress();
+          showControls();
           resolve();
         },
         onStateChange(e) {
           const S = YT.PlayerState;
           if (e.data === S.PLAYING) {
+            started = true;
             setPlayIcon(true);
+            showCover(null);
             startProgressLoop();
             resetHideTimer();
-          } else if (e.data === S.PAUSED || e.data === S.ENDED) {
+          } else if (e.data === S.PAUSED) {
             setPlayIcon(false);
             stopProgressLoop();
+            updateProgress();
+            showControls();
+          } else if (e.data === S.ENDED) {
+            setPlayIcon(false);
+            stopProgressLoop();
+            updateProgress();
+            showCover('replay');   // hides YouTube's end-screen suggestions
             showControls();
           }
         }
@@ -554,99 +820,242 @@ async function createPlayer(videoId, startTime) {
   });
 }
 
-// ── updateConfig ─────────────────────────────────────────────────────────────
-async function updateConfig(newCfg) {
-  cfg = { ...cfg, ...newCfg };
-  cfg.widgetId = cfg.id || cfg.widgetId || 'yt-default';
-  const allowManualUrl = cfg.allowManualUrl === true && cfg.role !== 'viewer';
-  if (urlRow) urlRow.style.display = allowManualUrl ? 'flex' : 'none';
-
-  if (cfg.socketUrl) {
-    connectSocket(cfg.socketUrl, cfg.widgetId);
-  }
-
-  if (cfg.role === 'viewer') {
-    controls.classList.add('viewer-mode');
-    if (urlRow) urlRow.style.display = 'none';
-  }
-
-  const videoId = extractVideoId(cfg.videoId || cfg.url || '');
-  if (videoId) {
-    cfg.videoId = videoId;
-    await createPlayer(videoId, cfg.startTime || 0);
-  }
+// ── Play / pause / seek ──────────────────────────────────────────────────────
+function play() {
+  if (!player || !playerReady) return;
+  try {
+    // Outside the clip (or sitting at its end): start the clip over.
+    if (!trimMode) {
+      const t = curTime();
+      const outside = t < clipStart() - 0.5 || (clipEnd() && t >= clipEnd() - 0.25);
+      if (outside || ytState() === YT.PlayerState.ENDED) player.seekTo(clipStart(), true);
+    }
+    player.playVideo();
+    emitState('play');
+  } catch (_) {}
 }
 
-// ── destroy ───────────────────────────────────────────────────────────────────
+function pause() {
+  if (!player || !playerReady) return;
+  try { player.pauseVideo(); } catch (_) {}
+  setPlayIcon(false);
+  emitState('pause');
+}
+
+function togglePlayPause() {
+  if (!player || isViewer()) return;
+  if (ytState() === YT.PlayerState.PLAYING || ytState() === YT.PlayerState.BUFFERING) pause();
+  else play();
+}
+
+// seekTo() on a video that hasn't started yet starts it playing, so a cued
+// player is re-cued at the new time instead.
+function seekQuiet(t) {
+  if (!player || !playerReady) return;
+  const st = ytState();
+  try {
+    if (!started || st === YT.PlayerState.UNSTARTED || st === YT.PlayerState.CUED) {
+      player.cueVideoById({ videoId: currentVid, startSeconds: t });
+      showCover('play');
+    } else {
+      player.seekTo(t, true);
+      if (st === YT.PlayerState.ENDED) { player.pauseVideo(); }
+    }
+  } catch (_) {}
+  setTimeout(updateProgress, 120);
+}
+
+function seekBy(dt) {
+  if (!player || !playerReady) return;
+  const [lo, hi] = scrubRange();
+  const t = Math.min(hi || Infinity, Math.max(lo, curTime() + dt));
+  seekQuiet(t);
+  emitState('seek', { time: t });
+}
+
+// ── Trim ─────────────────────────────────────────────────────────────────────
+function saveSettings(patch, remove = []) {
+  Object.assign(cfg, patch);
+  remove.forEach(k => { delete cfg[k]; });
+  // Written into this widget's slide config item, so the trim saves with the
+  // deck exactly as if it had been typed into the settings panel.
+  try {
+    window.parent.postMessage({ type: 'widget-settings', widgetId: cfg.id ?? cfg.widgetId,
+                                patch, remove }, '*');
+  } catch (_) {}
+  emitState('seek', { time: curTime() });
+}
+
+function renderTrim() {
+  trimRow.classList.toggle('shown', trimMode);
+  btnTrim.classList.toggle('is-active', trimMode);
+  trimStartV.textContent = fmtTime(clipStart());
+  trimEndV.textContent   = clipEndSet() ? fmtTime(clipEndSet()) : 'end';
+  updateProgress();
+}
+
+function flashTrim(msg) {
+  trimMsg.textContent = msg;
+  clearTimeout(flashTrim._t);
+  flashTrim._t = setTimeout(() => { trimMsg.textContent = ''; }, 2500);
+}
+
+function setTrimMode(on) {
+  if (isViewer()) return;
+  trimMode = on;
+  if (on) showControls();
+  else {
+    // Leaving trim mode outside the clip would put the scrubber off its ends.
+    const t = curTime();
+    if (t < clipStart() || (clipEndSet() && t > clipEnd())) seekQuiet(clipStart());
+    resetHideTimer();
+  }
+  renderTrim();
+}
+
+function setStartHere() {
+  const t = Math.floor(curTime());
+  const patch = { startTime: t }, remove = [];
+  if (clipEndSet() && clipEndSet() <= t) { remove.push('endTime'); flashTrim('End cleared — it was before the new start'); }
+  saveSettings(patch, remove);
+  renderTrim();
+}
+
+function setEndHere() {
+  const t = Math.ceil(curTime());
+  if (t <= clipStart()) { flashTrim('End must be after the start'); return; }
+  saveSettings({ endTime: t });
+  renderTrim();
+}
+
+function clearTrim() {
+  saveSettings({}, ['startTime', 'endTime']);
+  renderTrim();
+}
+
+btnTrim.addEventListener('click', (e) => { e.stopPropagation(); setTrimMode(!trimMode); });
+document.getElementById('trim-set-start').addEventListener('click', setStartHere);
+document.getElementById('trim-set-end').addEventListener('click', setEndHere);
+document.getElementById('trim-clear').addEventListener('click', clearTrim);
+document.getElementById('trim-done').addEventListener('click', () => setTrimMode(false));
+
+// ── updateConfig ─────────────────────────────────────────────────────────────
+// Re-called whenever settings change (the settings panel dispatches a fresh
+// widget-config on every edit), so it only rebuilds what actually changed.
+const LIVE_KEYS = ['startTime', 'endTime', 'autoplay', 'hideYouTubeUI', 'showControls', 'allowManualUrl'];
+
+async function updateConfig(newCfg) {
+  if (!newCfg) return;
+  const prevStart = clipStart(), prevEnd = clipEndSet();
+  const full = newCfg.id != null || newCfg.widgetId != null;
+  cfg = { ...cfg, ...newCfg };
+  // A full config is authoritative: a field cleared in the panel is simply
+  // absent from it, and merging would otherwise keep the old value.
+  if (full) LIVE_KEYS.forEach(k => { if (!(k in newCfg)) delete cfg[k]; });
+  cfg.widgetId = cfg.id || cfg.widgetId || 'yt-default';
+
+  const allowManualUrl = cfg.allowManualUrl === true && !isViewer();
+  if (urlRow) urlRow.style.display = allowManualUrl ? 'flex' : 'none';
+
+  if (cfg.socketUrl) connectSocket(cfg.socketUrl);
+  applyControlsVisibility();
+  layoutPlayer();
+
+  const vid = extractVideoId(newCfg.videoId || newCfg.url || '') || currentVid;
+  if (vid && vid !== currentVid) {
+    await createPlayer(vid);
+    return;
+  }
+
+  if (!hideUI()) showCover(null);
+  else if (!started) showCover('play');
+
+  // Trim edited from the settings panel: show the new start (or end) frame.
+  if (playerReady && !isPlaying) {
+    if (clipStart() !== prevStart)    seekQuiet(clipStart());
+    else if (clipEndSet() !== prevEnd && clipEndSet() && started) seekQuiet(Math.max(clipStart(), clipEndSet() - 0.1));
+  }
+  renderTrim();
+}
+
+// ── Hidden / shown / destroy ─────────────────────────────────────────────────
+function onHidden() {
+  // The host parks this iframe rather than unloading it — without this the
+  // video carried on (with sound) on the next slide.
+  if (player && playerReady) {
+    try { player.pauseVideo(); } catch (_) {}
+    setPlayIcon(false);
+    emitState('pause');
+  }
+  if (trimMode) setTrimMode(false);
+}
+
+function onShown() {
+  layoutPlayer();
+  if (cfg.autoplay && !isViewer() && playerReady) play();
+}
+
 function destroy() {
   stopProgressLoop();
   clearTimeout(hideTimer);
-  if (socket) { socket.disconnect(); socket = null; }
+  if (socket) { socket.disconnect(); socket = null; socketUrl = null; }
   if (player) { try { player.destroy(); } catch (_) {} player = null; }
+  playerReady = false;
+}
+
+// ── State persistence ────────────────────────────────────────────────────────
+function restoreState(s) {
+  if (!s) return;
+  if (s.videoId && s.videoId !== currentVid) { createPlayer(s.videoId); return; }
+  if (!playerReady) { pendingState = s; return; }
+  if (s.time == null) return;
+  const t = Number(s.time) || 0;
+  if (Math.abs(t - curTime()) < 0.75) return;
+  if (t < clipStart() || (clipEndSet() && t > clipEnd())) return;
+  seekQuiet(t);
 }
 
 // ── Message listener ─────────────────────────────────────────────────────────
 window.addEventListener('message', e => {
-  if (e.data?.type === 'widget-config')  updateConfig(e.data.config);
-  if (e.data?.type === 'widget-cleanup') destroy?.();
-  // Beamer+ state persistence protocol
-  if (e.data?.type === 'widget-get-state') {
-    const currentTime = player?.getCurrentTime?.() || 0;
+  const d = e.data || {};
+  if (d.type === 'widget-config')  updateConfig(d.config);
+  if (d.type === 'widget-cleanup') destroy();
+  if (d.type === 'widget-hidden')  onHidden();
+  if (d.type === 'widget-shown')   onShown();
+  if (d.type === 'widget-get-state') {
     window.parent.postMessage({ type: 'widget-state', widgetId: cfg.widgetId,
-      state: { videoId: cfg.videoId, time: currentTime } }, '*');
+      state: { videoId: currentVid, time: curTime() } }, '*');
   }
-  if (e.data?.type === 'widget-set-state' && e.data.state) {
-    const s = e.data.state;
-    if (s.videoId && s.videoId !== cfg.videoId) {
-      cfg.videoId = s.videoId;
-      player?.loadVideoById?.({ videoId: s.videoId, startSeconds: s.time || 0 });
-    } else if (s.time != null && player?.seekTo) {
-      player.seekTo(s.time, true);
-    }
-  }
+  if (d.type === 'widget-set-state' && d.state) restoreState(d.state);
 });
 
 // ── Control interactions ──────────────────────────────────────────────────────
-function togglePlayPause() {
-  if (!player) return;
-  try {
-    if (player.getPlayerState() === YT.PlayerState.PLAYING) {
-      player.pauseVideo();
-      emitState('pause');
-    } else {
-      player.playVideo();
-      emitState('play');
-    }
-  } catch (_) {}
-}
-
 clickLayer.addEventListener('click', togglePlayPause);
 btnPlay.addEventListener('click', (e) => { e.stopPropagation(); togglePlayPause(); });
 
-scrubber.addEventListener('mousedown', () => { isScrubbing = true; });
+scrubber.addEventListener('pointerdown', () => { isScrubbing = true; });
 scrubber.addEventListener('input', () => {
   if (!player) return;
-  try {
-    const dur = player.getDuration() || 0;
-    const pct = parseFloat(scrubber.value);
-    updateScrubberFill(pct);
-    timeDisp.textContent = `${fmtTime((pct / 100) * dur)} / ${fmtTime(dur)}`;
-  } catch (_) {}
+  const [lo, hi] = scrubRange();
+  const pct = parseFloat(scrubber.value);
+  if (!trimMode) paintScrubber(pct);
+  const t = lo + (pct / 100) * (hi - lo);
+  timeDisp.textContent = trimMode
+    ? `${fmtTime(t)} / ${fmtTime(duration())}`
+    : `${fmtTime(t - lo)} / ${fmtTime(hi - lo)}`;
 });
 scrubber.addEventListener('change', () => {
-  if (!player) return;
-  try {
-    const dur = player.getDuration() || 0;
-    const t = (parseFloat(scrubber.value) / 100) * dur;
-    player.seekTo(t, true);
-    emitState('seek', { time: t });
-  } catch (_) {}
   isScrubbing = false;
+  if (!player) return;
+  const [lo, hi] = scrubRange();
+  const t = lo + (parseFloat(scrubber.value) / 100) * (hi - lo);
+  seekQuiet(t);
+  emitState('seek', { time: t });
 });
 
 volSlider.addEventListener('input', () => {
   if (!player) return;
-  lastVolume = parseInt(volSlider.value);
+  lastVolume = parseInt(volSlider.value, 10);
   try {
     player.setVolume(lastVolume);
     if (lastVolume === 0) { player.mute(); setMuteIcon(true); }
@@ -674,18 +1083,14 @@ btnMute.addEventListener('click', (e) => {
 
 btnFs.addEventListener('click', (e) => {
   e.stopPropagation();
-  if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen?.();
-  } else {
-    document.exitFullscreen?.();
-  }
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+  else document.exitFullscreen?.();
 });
 
 loadBtn.addEventListener('click', () => {
   const vid = extractVideoId(urlInput.value);
   if (vid) {
-    cfg.videoId = vid;
-    createPlayer(vid, 0);
+    createPlayer(vid);
     emitState('seek', { videoId: vid, time: 0 });
   }
 });
@@ -695,40 +1100,41 @@ urlInput.addEventListener('keydown', (e) => {
 });
 
 // ── Keyboard shortcuts ────────────────────────────────────────────────────────
+// ←/→ and PageUp/PageDown are deliberately NOT handled here: the host's nav
+// bridge forwards them to the deck, so the arrows change slides even when
+// the video has focus. Seeking uses YouTube's own J / L instead.
 document.addEventListener('keydown', (e) => {
-  if (!player || cfg.role === 'viewer') return;
+  if (!player || isViewer()) return;
   if (document.activeElement === urlInput) return;
-  try {
-    switch (e.key) {
-      case ' ':
-        e.preventDefault();
-        togglePlayPause();
-        break;
-      case 'ArrowLeft': {
-        e.preventDefault();
-        const t = Math.max(0, (player.getCurrentTime() || 0) - 10);
-        player.seekTo(t, true);
-        emitState('seek', { time: t });
-        break;
-      }
-      case 'ArrowRight': {
-        e.preventDefault();
-        const t = Math.min(player.getDuration() || 0, (player.getCurrentTime() || 0) + 10);
-        player.seekTo(t, true);
-        emitState('seek', { time: t });
-        break;
-      }
-      case 'm':
-      case 'M':
-        btnMute.click();
-        break;
-      case 'f':
-      case 'F':
-        btnFs.click();
-        break;
-    }
-  } catch (_) {}
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  switch (e.key) {
+    case ' ':
+    case 'k': case 'K':
+      e.preventDefault();
+      togglePlayPause();
+      break;
+    case 'j': case 'J':
+      e.preventDefault(); seekBy(-10); break;
+    case 'l': case 'L':
+      e.preventDefault(); seekBy(10); break;
+    case 'm': case 'M':
+      btnMute.click(); break;
+    case 'f': case 'F':
+      btnFs.click(); break;
+    case 'i': case 'I':
+      if (trimMode) { e.preventDefault(); setStartHere(); }
+      break;
+    case 'o': case 'O':
+      if (trimMode) { e.preventDefault(); setEndHere(); }
+      break;
+    case 'Escape':
+      if (trimMode) setTrimMode(false);
+      break;
+  }
 });
+
+// ── Boot ─────────────────────────────────────────────────────────────────────
+if (window.WIDGET_CONFIG) updateConfig(window.WIDGET_CONFIG);
 </script>
 </body>
 </html>

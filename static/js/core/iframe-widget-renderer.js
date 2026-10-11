@@ -306,6 +306,12 @@ export function parkWidgets(container, slideKey) {
         iframe.style.pointerEvents = 'none';
         iframe.style.zIndex        = '-1';  // ensure hidden behind visible iframes
         const wid = iframe.dataset.widgetId;
+        // Parked iframes stay alive, so anything playing keeps playing (and
+        // keeps making sound) unless the widget is told it's off screen.
+        // Sent before widget-get-state so the captured state is the paused one.
+        if (wasShown) {
+            try { iframe.contentWindow?.postMessage({ type: 'widget-hidden' }, '*'); } catch (_) {}
+        }
         if (wid) {
             _widgetRegistry.delete(wid);
             // Capture state now; will be re-applied when the slide is revisited.
@@ -552,6 +558,7 @@ export function renderWidgets(slideConfig, container, zipFile, viewerMode = fals
             existing.style.zIndex        = w.zIndex || 10;
             existing.style.pointerEvents = w.interactive !== false ? 'auto' : 'none';
             existing.style.opacity       = '1';  // make visible
+            try { existing.contentWindow?.postMessage({ type: 'widget-shown' }, '*'); } catch (_) {}
 
             // After a short delay (browser reflow), fire resize and re-apply
             // captured state so canvas-based widgets redraw correctly.
