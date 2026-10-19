@@ -1318,7 +1318,11 @@ function syncAnnotations() {
     const slide = state.slideStructure[activeAnnSlide()];
     annotationSyncTimer = setTimeout(() => {
         const idx = state.slideStructure.indexOf(slide);
-        if (idx >= 0) state.annotations[idx] = cvs.canvas.toDataURL('image/png');
+        // The stroke's own history entry is already this canvas as a PNG
+        // (Canvas.commitHistory runs on the same pointerup). Re-encoding it
+        // here cost a second full-canvas PNG per stroke: ~50 ms at 1x and
+        // ~110 ms on a high-DPI screen, which made quick inking stutter.
+        if (idx >= 0) state.annotations[idx] = cvs.getCommittedSnapshot();
     }, 100);
 }
 

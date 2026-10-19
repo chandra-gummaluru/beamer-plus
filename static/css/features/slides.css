@@ -154,6 +154,10 @@ model-viewer { pointer-events: auto !important; }
     transition: opacity 0.1s ease;
 }
 .slide-loading-overlay.visible { opacity: 1; }
+/* Hidden overlays stay in the layout (for the fade), so their squiggle must
+   not keep animating: an invisible infinite animation still restyles and
+   repaints the stage every frame, under the blurred toolbars. */
+.slide-loading-overlay:not(.visible) .slide-squiggle path { animation: none; }
 .slide-squiggle { width: 96px; height: 32px; display: block; }
 .slide-squiggle path {
     fill: none; stroke: var(--ink-2); stroke-width: 2.5;
