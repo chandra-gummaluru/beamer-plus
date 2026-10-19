@@ -1,6 +1,7 @@
 // Save — rebuilds the presentation ZIP from the in-memory state (slide
 // configs, slide order, annotations, widget states, newly added files) and
-// downloads it.
+// downloads it. buildPresentationZip() is the same ZIP as a Blob, for
+// Save to GitHub (github/ui.js).
 import { collectWidgetStates, getLoadedWidgetStates } from '../core/iframe-widget-renderer.js';
 import { requestWidgetFileFlush } from './widget-settings.js';
 import { ctx } from './context.js';
@@ -37,6 +38,25 @@ export async function savePresentation() {
     const modal = window.BeamerModal;
     modal?.show({ kind: 'loading', title: 'Saving…', message: 'Building ZIP…' });
     try {
+        const blob = await buildPresentationZip();
+        const url  = URL.createObjectURL(blob);
+        // Same name the deck was uploaded with (a PDF upload saves as
+        // <name>.zip), so re-saving overwrites rather than piling up copies.
+        const a    = Object.assign(document.createElement('a'), { href: url, download: `${ctx.state.deckName || 'presentation'}.zip` });
+        a.click();
+        URL.revokeObjectURL(url);
+        modal?.close();
+    } catch (err) {
+        modal?.close();
+        window.BeamerModal?.show({ kind: 'error', title: 'Save failed', message: err.message });
+    }
+}
+
+/** The presentation as it stands now, as a ZIP Blob. `extra` maps more
+ *  ZIP paths to their contents (Save to GitHub adds config/resume.json). */
+export async function buildPresentationZip({ extra = {} } = {}) {
+    if (!ctx.state.zipFile) throw new Error('No presentation loaded.');
+    {
         // Ask file-owning widgets to write their files out now; the uploads
         // arrive while we copy the rest of the ZIP below.
         requestWidgetFileFlush();
@@ -78,6 +98,7 @@ export async function savePresentation() {
             if (path === 'config/slide-order.json') continue;
             if (path === 'config/annotations.json') continue;
             if (path === 'config/widget-states.json') continue;
+            if (path === 'config/resume.json') continue;    // only Save to GitHub writes it, fresh
             const m = /^config\/s(.+)\.json$/.exec(path);
             if (m) {
                 const key = m[1];
@@ -135,16 +156,10 @@ export async function savePresentation() {
             newZip.file(path, buffer);
         }
 
-        const blob = await newZip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
-        const url  = URL.createObjectURL(blob);
-        // Same name the deck was uploaded with (a PDF upload saves as
-        // <name>.zip), so re-saving overwrites rather than piling up copies.
-        const a    = Object.assign(document.createElement('a'), { href: url, download: `${ctx.state.deckName || 'presentation'}.zip` });
-        a.click();
-        URL.revokeObjectURL(url);
-        modal?.close();
-    } catch (err) {
-        modal?.close();
-        window.BeamerModal?.show({ kind: 'error', title: 'Save failed', message: err.message });
+        for (const [path, data] of Object.entries(extra)) {
+            newZip.file(path, data);
+        }
+
+        return newZip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
     }
 }

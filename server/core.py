@@ -38,6 +38,10 @@ _CACHEABLE_PREFIXES = ('/api/zip-asset/',)
 @app.after_request
 def _no_store(resp):
     path = request.path or ''
+    if path.startswith('/api/github/'):
+        # Sign-in responses carry tokens: never cache them anywhere.
+        resp.headers['Cache-Control'] = 'no-store'
+        return resp
     if any(seg in path for seg in _CACHEABLE_PREFIXES):
         return resp
     resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'

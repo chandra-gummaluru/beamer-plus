@@ -4,9 +4,19 @@
 // off through bus events, keeping this decoupled from main.js.
 import { bus } from '../core/events.js';
 
+// Signed in with GitHub, the upload button opens the lecture library
+// instead of the file picker (github/ui.js registers that here).
+let buttonHandler = null;
+export function setUploadButtonHandler(fn) { buttonHandler = fn; }
+/** The computer's file picker, whatever the button does. */
+export function chooseLocalFile() { document.getElementById('upload-presentation')?.click(); }
+
 export function initUploader() {
     const input = document.getElementById('upload-presentation');
-    document.getElementById('upload-presentation-btn')?.addEventListener('click', () => input?.click());
+    document.getElementById('upload-presentation-btn')?.addEventListener('click', () => {
+        if (buttonHandler && buttonHandler() !== false) return;
+        input?.click();
+    });
 
     input?.addEventListener('change', (e) => {
         const file = e.target.files?.[0];

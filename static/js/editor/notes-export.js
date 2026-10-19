@@ -242,6 +242,28 @@ export async function downloadNotes() {
         return;
     }
     if (_busy) return;
+    try {
+        const blob = await buildNotesPdf();
+        const url  = URL.createObjectURL(blob);
+        const a    = Object.assign(document.createElement('a'), { href: url, download: `${deckBaseName()}-notes.pdf` });
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+        window.BeamerModal?.close();
+    } catch (err) {
+        console.error('[notes] export failed', err);
+        window.BeamerModal?.close();
+        window.BeamerModal?.show({ kind: 'error', title: 'Notes export failed', message: err.message || String(err) });
+    }
+}
+
+/** The notes PDF as a Blob (Save to GitHub uploads it). Shows its own
+ *  progress in the loading modal; leaves the modal open when done. */
+export async function buildNotesPdf() {
+    const s = ctx.state;
+    if (!s.zipFile) throw new Error('No presentation loaded.');
+    if (_busy) throw new Error('Notes are already being built.');
     _busy = true;
     showProgress('Preparing…');
 
@@ -386,18 +408,7 @@ export async function downloadNotes() {
 
         showProgress('Saving…');
         const bytes = await out.save();
-        const blob = new Blob([bytes], { type: 'application/pdf' });
-        const url  = URL.createObjectURL(blob);
-        const a    = Object.assign(document.createElement('a'), { href: url, download: `${deckBaseName()}-notes.pdf` });
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 10000);
-        window.BeamerModal?.close();
-    } catch (err) {
-        console.error('[notes] export failed', err);
-        window.BeamerModal?.close();
-        window.BeamerModal?.show({ kind: 'error', title: 'Notes export failed', message: err.message || String(err) });
+        return new Blob([bytes], { type: 'application/pdf' });
     } finally {
         _busy = false;
     }

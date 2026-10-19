@@ -78,6 +78,21 @@ export async function downloadRecording(id) {
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
+/** A finished take as one Blob, with its saved details. */
+export async function getRecording(id) {
+    const meta = (await store.allMeta()).find(m => m.id === id);
+    if (!meta) return null;
+    return { meta, blob: new Blob(await store.chunks(id), { type: meta.mimeType }) };
+}
+
+/** Add details to a take (Save to GitHub notes where it uploaded it). */
+export async function updateRecording(id, patch) {
+    const meta = (await store.allMeta()).find(m => m.id === id);
+    if (!meta) return;
+    await store.putMeta({ ...meta, ...patch });
+    emitChange();
+}
+
 export async function deleteRecording(id) {
     if (active && active.id === id) return;
     await store.remove(id);
@@ -280,6 +295,9 @@ async function startRecording({ mic, sound }) {
         status: 'recording',
         hasMic: !!micStream,
         hasSound: displayAudio.length > 0,
+        // The GitHub lecture the deck came from, if any ("c/t/lecture"), so
+        // Save to GitHub can offer this take with that lecture.
+        lecture: appState?.ghTarget ? `${appState.ghTarget.c}/${appState.ghTarget.t}/${appState.ghTarget.lecture}` : null,
     };
 
     active = {

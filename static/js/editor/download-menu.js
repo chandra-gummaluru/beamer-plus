@@ -2,6 +2,7 @@
 // reopens) or the notes version (one flat PDF with everything drawn in),
 // followed by every screen recording made with the record button.
 import { savePresentation } from './save.js';
+import { githubSaveChoice } from '../github/ui.js';
 import { downloadNotes } from './notes-export.js';
 import { listRecordings, downloadRecording, deleteRecording, onRecordingsChange,
          isRecording, stopRecording, formatDuration, formatSize } from '../app/recorder.js';
@@ -23,12 +24,15 @@ const CHOICES = [
 export function openDownloadMenu() {
     const root = document.createElement('div');
     root.className = 'download-choices';
-    for (const c of CHOICES) {
+    // Signed in with GitHub, Save to GitHub comes first.
+    const gh = githubSaveChoice();
+    for (const c of gh ? [gh, ...CHOICES] : CHOICES) {
         const card = document.createElement('button');
         card.type = 'button';
         card.className = 'download-choice';
         card.dataset.choice = c.key;
-        card.innerHTML = `<span class="download-choice-icon">${ICONS[c.key]}</span>
+        if (c.key === 'github') card.classList.add('download-choice--primary');
+        card.innerHTML = `<span class="download-choice-icon">${c.icon || ICONS[c.key]}</span>
             <span class="download-choice-text">
                 <span class="download-choice-title"></span>
                 <span class="download-choice-desc"></span>
@@ -58,7 +62,7 @@ export function openDownloadMenu() {
 
     window.BeamerModal?.show({
         kind: 'info',
-        title: 'Download',
+        title: gh ? 'Save or download' : 'Download',
         body: root,
         buttons: [{ label: 'Cancel', kind: 'cancel' }],
     });
@@ -128,7 +132,8 @@ async function renderRecordings(section) {
             month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
         });
         const parts = [r.deckName && r.deckName !== 'Beamer+' ? r.deckName : null, when,
-                       formatDuration(r.durationMs || 0), formatSize(r.size || 0)];
+                       formatDuration(r.durationMs || 0), formatSize(r.size || 0),
+                       r.uploaded ? 'on GitHub' : null];
         const row = recordingRow({
             name: r.label + (r.recovered ? ' (recovered)' : ''),
             meta: parts.filter(Boolean).join(' · '),

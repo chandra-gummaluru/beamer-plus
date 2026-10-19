@@ -32,6 +32,7 @@ import { initUploader } from './app/uploader.js';
 import { startTour } from './app/tour.js';
 import { initEditor } from './editor/editor.js';
 import { initRecorder } from './app/recorder.js';
+import { initGitHub } from './github/ui.js';
 import { getSessionId, sessionUrl, saveLastSession } from './app/session.js';
 
 /* ─── Render generation counters ─────────────────────────────── */
@@ -156,6 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initUploader(state);
     initEditor(state);
     initRecorder(state);
+    initGitHub(state);
     initSettings();
     // Must run before applyDefaultPen(): that call emits a 'tool:change' to
     // sync other modules' tracked "previous tool" state (see below), and
@@ -1666,6 +1668,7 @@ export async function loadZipPresentation(file) {
 
         state.zipFile        = zip;
         state.deckName       = deckNameOf(file);
+        adoptSource(file);
         // Free the previous PDF's worker memory, then reuse the document we
         // just parsed instead of decoding it again on first render.
         state._pdfDocPromise?.then(d => d?.destroy?.()).catch(() => {});
@@ -1697,6 +1700,17 @@ export async function loadZipPresentation(file) {
             } catch (_) {}
         }
 
+        // Where the last Save to GitHub left off (config/resume.json).
+        let resumeAt = 0;
+        const resumeFile = zip.file('config/resume.json');
+        if (resumeFile) {
+            try {
+                const r = JSON.parse(await resumeFile.async('string'));
+                const n = Number(r?.slide);
+                if (Number.isInteger(n) && n > 0 && n < slideStructure.length) resumeAt = n;
+            } catch (_) {}
+        }
+
         await renderLogicalSlide(0);
         await generateThumbnails();
         populateSlideNavigator();
@@ -1704,6 +1718,8 @@ export async function loadZipPresentation(file) {
 
         modal?.close();
         enableControls();
+        if (resumeAt) await goToSlide(resumeAt);
+        bus.emit('deck:loaded', { kind: 'zip' });
     } catch (err) {
         console.error('ZIP load error:', err);
         modal?.close();
@@ -1735,6 +1751,7 @@ export async function loadPdfPresentation(file) {
 
         state.zipFile = zip;
         state.deckName = deckNameOf(file);
+        adoptSource(file);
         // Free the previous PDF's worker memory, then reuse the document we
         // just parsed instead of decoding it again on first render.
         state._pdfDocPromise?.then(d => d?.destroy?.()).catch(() => {});
@@ -1754,11 +1771,21 @@ export async function loadPdfPresentation(file) {
         updateBlankSlideButtons();
         modal?.close();
         enableControls();
+        bus.emit('deck:loaded', { kind: 'pdf' });
     } catch (err) {
         console.error('PDF load error:', err);
         modal?.close();
         window.BeamerModal?.show({ kind: 'error', title: 'Upload failed', message: err.message });
     }
+}
+
+// The file the deck was opened from, and — when it came from GitHub — the
+// lecture it belongs to (github/ui.js sets pendingGhTarget just before
+// opening it). Any other way in (upload, drop, the tour) leaves no target.
+function adoptSource(file) {
+    state.sourceFile = file;
+    state.ghTarget = state.pendingGhTarget || null;
+    state.pendingGhTarget = null;
 }
 
 function enableControls() {

@@ -76,6 +76,73 @@ The download button (top-right) offers two files, plus any screen recordings
   placeholder box. Built in the browser with pdf-lib; PDF slides are copied as
   vector pages, so their text stays selectable.
 
+## GitHub (optional)
+
+The welcome screen offers **Sign in with GitHub** or **Continue as guest**.
+As a guest, Beamer+ works exactly as described above: files come from and go to
+your computer. Signed in, it keeps your lectures in your GitHub course
+repository: the same pair of repositories Lectern uses (e.g. `courses-utor`,
+public with GitHub Pages, and `courses-utor-private`), though Beamer+ doesn't
+need Lectern to do it.
+
+- **Upload button → Open a lecture.** Pick a course offering (`csc258/f26`) and
+  a lecture. A deck you've saved before shows **Resume** (it opens at the slide
+  you were on) and **Start over** (the original, without your saved changes;
+  those stay on GitHub until you next save). **Add a deck** / **New lecture**
+  upload a PDF or ZIP from your computer into a lecture; **Open a file from this
+  computer instead** works as before, without GitHub.
+- **Download button → Save to GitHub** (or **Ctrl/⌘+S**). Saves the deck as it
+  stands, with the slide you're on; the notes PDF (on by default); and any
+  recordings you tick (this lecture's takes are ticked for you; GitHub refuses
+  files over 100 MB). Ctrl/⌘+S saves the deck and notes without asking.
+  A deck opened from your computer asks which lecture it belongs in first.
+
+Where things go (one commit per repository per save):
+
+```
+courses-utor-private/                              (private)
+  csc258/f26/lectures/05 - Binary Arithmetic/
+    05 - Binary Arithmetic.zip          original (what Start over opens)
+    05 - Binary Arithmetic.saved.zip    your last save (what Resume opens)
+courses-utor/                                      (public, GitHub Pages)
+  csc258/f26/slides/05 - Binary Arithmetic.pdf              notes PDF
+  csc258/f26/recordings/05 - Binary Arithmetic - recording (2026-10-19 14-05).mp4
+```
+
+The notes and recordings land in the course offering's `slides/` and
+`recordings/` folders of the public repository, so Lectern's course page can
+pick and link them. A repository without a `-private` twin holds everything
+(Beamer+ warns you if that one is public).
+
+Tokens stay in the browser (for the tab only, unless **Keep me signed in on this
+computer** is ticked); only the sign-in itself passes through the server.
+
+### Setting up sign-in (one time, per server)
+
+Beamer+ uses its own GitHub App (separate from Lectern's):
+
+1. **GitHub → Settings → Developer settings → GitHub Apps → New GitHub App**
+   (<https://github.com/settings/apps/new>). Name it e.g. `Beamer+ UofT`.
+2. **Homepage URL:** where Beamer+ runs, e.g. `https://beamer.changapp.net`.
+3. **Callback URL:** `<that address>/api/github/callback`. Add one per address
+   you open Beamer+ at (e.g. `https://localhost:5001/api/github/callback`, or
+   the LAN address `launch.py` prints).
+4. Leave **Expire user authorization tokens** ticked; leave **Request user
+   authorization during installation** and **Device Flow** unticked; untick
+   **Webhook → Active**.
+5. **Repository permissions → Contents: Read and write.** Nothing else.
+6. **Where can this GitHub App be installed? Any account.** Create it.
+7. Copy the **Client ID**, generate a **client secret**, and note the app's
+   address `github.com/apps/<slug>`.
+8. Copy `.env.example` to `.env` beside `app.py` and fill in
+   `BEAMER_GH_CLIENT_ID`, `BEAMER_GH_CLIENT_SECRET` and `BEAMER_GH_APP_SLUG`
+   (`BEAMER_APP_URL` too if the server sits behind another address). `.env` is
+   git-ignored. Both `app.py` and `launch.py` read it.
+9. **Install App** on your account, with access to your course repository and
+   its `-private` twin. Beamer+'s repository chooser links here too.
+
+`tests/browser/flow_github.py` walks through all of this against a fake GitHub.
+
 ## Recording
 
 The record button (bottom-right, next to the hide-slide button) records this
