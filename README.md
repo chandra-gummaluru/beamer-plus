@@ -33,12 +33,13 @@ python app.py               # ad-hoc HTTPS cert (needs `cryptography`)
 python app.py --http        # plain HTTP (camera widget disabled on LAN)
 ```
 
-To try the built-in demo presentation, click the tour button in the bottom-left
-corner of the app.
+To try the built-in demo presentation (with a guided tour), click **Or open the
+demo presentation** on the empty slide, or **Demo presentation** in the menu
+beside Save.
 
 ## Loading a presentation
 
-Use the upload button (top-right), or drag the file onto the window, to load either:
+Click the empty slide, drag the file onto the window, or use **Open a presentation…** in the menu beside **Save** (top-right) to load either:
 
 - **A plain PDF** — every page becomes a slide.
 - **A presentation ZIP** — a PDF plus saved configuration, media, widgets and
@@ -62,8 +63,9 @@ presentation.zip
 
 ## Downloading
 
-The download button (top-right) offers two files, plus any screen recordings
-(see Recording below):
+As a guest, **Save** (top-right, or Ctrl/⌘+S) offers two files to download, plus any
+screen recordings (see Recording below); signed in with GitHub, they're under
+**Download…** in the menu beside Save:
 
 - **Presentation (ZIP)** — everything above, to reopen and keep presenting.
 - **Notes (PDF)** — one flat PDF to hand out. Every visible slide (hidden and
@@ -85,17 +87,16 @@ repository: the same pair of repositories Lectern uses (e.g. `courses-utor`,
 public with GitHub Pages, and `courses-utor-private`), though Beamer+ doesn't
 need Lectern to do it.
 
-- **Upload button → Open a lecture.** Pick a course offering (`csc258/f26`) and
+- **Open a lecture** (click the empty slide, or the menu beside Save). Pick a course offering (`csc258/f26`) and
   a lecture. A deck you've saved before shows **Resume** (it opens at the slide
   you were on) and **Start over** (the original, without your saved changes;
   those stay on GitHub until you next save). **Add a deck** / **New lecture**
   upload a PDF or ZIP from your computer into a lecture; **Open a file from this
   computer instead** works as before, without GitHub.
-- **Download button → Save to GitHub** (or **Ctrl/⌘+S**). Saves the deck as it
-  stands, with the slide you're on; the notes PDF (on by default); and any
-  recordings you tick (this lecture's takes are ticked for you; GitHub refuses
-  files over 100 MB). Ctrl/⌘+S saves the deck and notes without asking.
-  A deck opened from your computer asks which lecture it belongs in first.
+- **Save** (or **Ctrl/⌘+S**) saves to GitHub: the deck as it stands, with the
+  slide you're on, and the notes PDF (on by default). When this lecture has new
+  recordings, it asks which to upload (GitHub refuses files over 100 MB). A deck
+  opened from your computer asks which lecture it belongs in first.
 
 Where things go (one commit per repository per save):
 
@@ -149,7 +150,7 @@ The record button (bottom-right, next to the hide-slide button) records this
 tab — slides, ink and widgets — as a video, with your microphone and/or the
 tab's sound (videos, audio, widgets). While recording, the button turns into a
 small bar with the time, pause / resume and stop. Stop and start again as often
-as you like — every take is kept and listed under the download button, where
+as you like — every take is kept and listed under **Download…** in the menu beside Save, where
 each can be downloaded (MP4 in Chrome/Edge, WebM elsewhere) or deleted.
 
 Takes are saved to the browser's storage (IndexedDB) a second at a time, so a

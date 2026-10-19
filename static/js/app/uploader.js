@@ -1,22 +1,25 @@
 // Upload — loading a presentation from a PDF or a saved Beamer+ ZIP.
-// Two ways in: the upload button (one file picker that takes either), or
-// dropping the file anywhere on the window. Both route by file type and hand
+// Ways in: clicking the empty slide or "Open a presentation…" in the menu
+// beside Save (openUpload: the file picker, or the GitHub lecture library when
+// signed in), or dropping the file anywhere on the window. Both route by file type and hand
 // off through bus events, keeping this decoupled from main.js.
 import { bus } from '../core/events.js';
 
-// Signed in with GitHub, the upload button opens the lecture library
+// Signed in with GitHub, opening a presentation shows the lecture library
 // instead of the file picker (github/ui.js registers that here).
 let buttonHandler = null;
 export function setUploadButtonHandler(fn) { buttonHandler = fn; }
-/** The computer's file picker, whatever the button does. */
+/** The computer's file picker, whatever openUpload does. */
 export function chooseLocalFile() { document.getElementById('upload-presentation')?.click(); }
+/** Open a presentation: the lecture library when signed in, else the file picker. */
+export function openUpload() {
+    if (!uploadAllowed()) return;
+    if (buttonHandler && buttonHandler() !== false) return;
+    chooseLocalFile();
+}
 
 export function initUploader() {
     const input = document.getElementById('upload-presentation');
-    document.getElementById('upload-presentation-btn')?.addEventListener('click', () => {
-        if (buttonHandler && buttonHandler() !== false) return;
-        input?.click();
-    });
 
     input?.addEventListener('change', (e) => {
         const file = e.target.files?.[0];
@@ -51,13 +54,11 @@ export function openPresentationFile(file) {
 /* ─── drag and drop ───────────────────────────────────────────── */
 // Drop a PDF or ZIP anywhere on the presenter window to load it. Only file
 // drags are intercepted (dragging text or an annotation is left alone), and
-// only while uploading is allowed at all — the upload button is the source
-// of truth for that (split view disables it, for instance). Drops onto a
-// widget never reach here: they land in the widget's own iframe.
+// not while editing. Drops onto a widget never reach here: they land in the
+// widget's own iframe.
 
 function uploadAllowed() {
-    const btn = document.getElementById('upload-presentation-btn');
-    return !!btn && !btn.disabled && !document.body.classList.contains('edit-mode');
+    return !document.body.classList.contains('edit-mode');
 }
 
 function hasFiles(e) {

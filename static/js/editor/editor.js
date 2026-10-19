@@ -20,7 +20,6 @@ import { addWidget } from './widget-picker.js';
 import { showViewConfig, hideViewConfig } from './view-config.js';
 import { applySlideReorder, removeSlideReorder } from './reorder.js';
 import { initWidgetSettings } from './widget-settings.js';
-import { openDownloadMenu } from './download-menu.js';
 import { initNumberSteppers } from './number-stepper.js';
 import { realSlideCount } from '../slides/structure.js';
 import { PAPER_STYLES, PAPER_SPACING, PAPER_THICKNESS, PAPER_COLORS, normalizePaper } from '../slides/paper.js';
@@ -33,7 +32,6 @@ export function initEditor(state) {
     state.editorNewFiles = {};
 
     document.getElementById('edit-mode-btn')?.addEventListener('click', toggleEditMode);
-    document.getElementById('edit-save-btn')?.addEventListener('click', openDownloadMenu);
     document.getElementById('edit-add-video-btn')?.addEventListener('click', () => pickMediaFile('video', 'video/*'));
     document.getElementById('edit-add-audio-btn')?.addEventListener('click', () => pickMediaFile('audio', 'audio/*'));
     document.getElementById('edit-add-model-btn')?.addEventListener('click', () => pickMediaFile('model', '.glb,.gltf'));

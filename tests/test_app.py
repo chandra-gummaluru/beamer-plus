@@ -66,7 +66,8 @@ def create_survey(client, session_id, **payload):
 def test_welcome_page(client):
     resp = client.get('/')
     assert resp.status_code == 200
-    assert b'Start a new session' in resp.data
+    assert b'Continue as guest' in resp.data
+    assert b'Sign in with GitHub' in resp.data
 
 
 def test_session_create_and_presenter_page(client):

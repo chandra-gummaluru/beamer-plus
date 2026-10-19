@@ -83,7 +83,7 @@ body.is-recording #record-btn { display: none; }
    stays, showing only the recording bar. */
 body.edit-mode.is-recording #mute-container {
     display: flex;
-    right: calc(var(--editor-panel-width) + var(--sp-3));
+    right: calc(var(--editor-panel-width) + var(--sp-3));   /* edit's button is at the top while editing */
 }
 body.focus-mode.is-recording #mute-container { display: flex !important; }
 body.edit-mode #mute-btn,

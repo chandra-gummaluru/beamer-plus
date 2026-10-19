@@ -5,7 +5,7 @@
 #top-right-controls {
     position: fixed;
     top: var(--sp-3);
-    right: calc(var(--sp-3) + var(--hit-min) + var(--sp-2));
+    right: var(--sp-3);
     z-index: 230;
     display: flex;
     flex-direction: row;
@@ -13,24 +13,63 @@
     gap: var(--sp-2);
 }
 
-#top-right-controls #upload-container,
-#top-right-controls #save-container {
-    display: flex;
-    align-items: center;
+/* Save — a dark text button, like Lectern's — with a small menu button
+   joined to it (open another presentation, downloads, the demo). */
+.save-split { display: flex; align-items: stretch; }
+#top-right-controls .save-btn {
+    min-height: var(--hit-min);
+    padding: 0 var(--sp-4);
+    font-weight: 600;
+    background: var(--ink-1);
+    border-color: var(--ink-1);
+    color: var(--ink-on-accent);
+    border-radius: var(--r-md) 0 0 var(--r-md);
 }
-
-#top-right-controls .btn {
-    width: var(--hit-min);
-    min-width: var(--hit-min);
+#top-right-controls .save-btn:hover:not(:disabled) { background: var(--accent-strong); border-color: var(--accent-strong); }
+#top-right-controls .save-btn:disabled { opacity: 0.45; cursor: default; }
+#top-right-controls .save-more-btn {
+    min-width: 30px;
+    width: 30px;
     min-height: var(--hit-min);
     padding: 0;
+    margin-left: 1px;
+    background: var(--ink-1);
+    border-color: var(--ink-1);
+    color: var(--ink-on-accent);
+    border-radius: 0 var(--r-md) var(--r-md) 0;
 }
+#top-right-controls .save-more-btn:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
+#top-right-controls .save-more-btn svg { width: 14px; height: 14px; }
+
+/* The menu under it */
+.save-menu {
+    position: fixed;
+    z-index: 9500;
+    min-width: 230px;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface-paper);
+    border: var(--line-soft);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-3);
+    font-family: var(--font-sans);
+}
+.save-menu button {
+    display: flex; align-items: center; gap: var(--sp-2);
+    padding: 8px 10px;
+    background: none; border: 0; border-radius: var(--r-sm);
+    font: inherit; font-size: var(--fs-base); color: var(--ink-1);
+    text-align: left; cursor: pointer;
+}
+.save-menu button:hover, .save-menu button:focus-visible { background: var(--surface-cream-2); outline: none; }
+.save-menu button svg { width: 16px; height: 16px; color: var(--ink-2); flex: 0 0 auto; }
+.save-menu hr { border: 0; border-top: var(--line-soft); margin: 4px 2px; }
 
 /* Top-controls panel (legacy hidden) */
 #top-controls-panel { display: none; }
 
-body.split-view-active #top-right-controls,
-body.split-view-active:not(.edit-mode) #edit-mode-container {
+body.split-view-active #top-right-controls {
     top: var(--sp-2);
 }
 
@@ -39,7 +78,6 @@ body.focus-mode #slide-navigator,
 body.focus-mode #floating-annotation-toolbar,
 body.focus-mode #edit-mode-container,
 body.focus-mode #mute-container,
-body.focus-mode #top-right-controls #upload-container,
 body.focus-mode #top-right-controls #save-container {
     display: none !important;
 }
@@ -56,28 +94,13 @@ body.focus-mode #main-content {
 
 
 @media (max-width: 1024px) {
-    #edit-mode-container {
-        top: var(--sp-2);
-        right: var(--sp-2);
-    }
     #top-right-controls {
-        top: var(--sp-2);
-        right: calc(var(--sp-2) + var(--hit-min) + var(--sp-2));
-    }
-}
-
-@media (max-width: 480px) {
-    #top-right-controls {
-        right: calc(var(--sp-2) + var(--hit-min) + var(--sp-1));
-        gap: var(--sp-1);
-    }
-    #edit-mode-container {
         top: var(--sp-2);
         right: var(--sp-2);
     }
 }
 
-/* ── Mobile portrait — upload/download/edit grouped at the top-left ──
+/* ── Mobile portrait — Save grouped at the top-left ──
    (the combined menu button moves to the top-right; see shortcuts.css) */
 @media (max-width: 1024px) and (orientation: portrait) {
     #top-right-controls {
@@ -85,17 +108,14 @@ body.focus-mode #main-content {
         right: auto;
         top: var(--sp-2);
     }
-    #edit-mode-container {
-        left: calc(2 * var(--hit-min) + 3 * var(--sp-2));
-        right: auto;
-        top: var(--sp-2);
-    }
 }
 
-/* ── Mute — bottom-right corner ───────────────────────────────── */
+/* ── Record, Mute, Edit — bottom-right corner ─────────────────────
+   Edit sits rightmost (its own fixed element, see editor.css), so the
+   record/mute pair stops one button short of the corner. */
 #mute-container {
     position: fixed;
-    right: var(--sp-3);
+    right: calc(var(--sp-3) + var(--hit-min) + var(--sp-2));
     bottom: var(--sp-3);
     z-index: 230;
     display: flex;
@@ -112,5 +132,5 @@ body.edit-mode #mute-container { display: none; }
 /* Split view puts the navigator along the bottom: sit just above it. */
 body.split-view-active #mute-container { bottom: calc(88px + var(--sp-3)); }
 @media (max-width: 1024px) {
-    #mute-container { bottom: calc(100px + var(--sp-3)); right: var(--sp-2); }
+    #mute-container { bottom: calc(100px + var(--sp-3)); right: calc(var(--sp-2) + var(--hit-min) + var(--sp-2)); }
 }

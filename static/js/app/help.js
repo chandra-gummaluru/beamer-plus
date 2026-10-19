@@ -38,10 +38,10 @@ export function showHelpModal() {
             id: 'start', label: 'Getting Started',
             html: `
 <h4 class="help-h">Loading a presentation</h4>
-<p class="help-p">Click the upload button ${_hbtn('upload','Upload')} in the top-right corner, or drag the file anywhere onto the window. You can load two types of file:</p>
+<p class="help-p">Click the empty slide, drag the file anywhere onto the window, or choose <b>Open a presentation…</b> from the menu beside <b>Save</b> (top-right). Signed in with GitHub, this opens your course lectures instead. You can load two types of file:</p>
 <ul class="help-ul">
   <li>Your bare slide deck (as a PDF). Once loaded you can annotate it and place interactive widgets on any slide.</li>
-  <li>A saved Beamer+ presentation (as a ZIP) that bundles the PDF together with all your widgets, overlays, and annotations. To create one, start from a bare slide deck, edit it in Beamer+, then click the download button ${_hbtn('download','Save & download')}. Beamer+ packages everything into a ZIP you can reload later.</li>
+  <li>A saved Beamer+ presentation (as a ZIP) that bundles the PDF together with all your widgets, overlays, and annotations. To create one, start from a bare slide deck, edit it in Beamer+, then click <b>Save</b> (as a guest) or <b>Download…</b> in the menu beside it. Beamer+ packages everything into a ZIP you can reload later.</li>
 </ul>`,
         },
         {
@@ -70,7 +70,7 @@ export function showHelpModal() {
             id: 'edit', label: 'Editing',
             html: `
 <h4 class="help-h">Entering edit mode</h4>
-<p class="help-p">Click the edit button ${_hbtn('edit','Edit mode')} in the top-right corner. A panel opens on the right where you can select, configure, and delete anything on the current slide.</p>
+<p class="help-p">Click the edit button ${_hbtn('edit','Edit mode')} in the bottom-right corner, beside the hide-slide button. A panel opens on the right where you can select, configure, and delete anything on the current slide.</p>
 <h4 class="help-h">Adding overlays</h4>
 <p class="help-p">The buttons at the bottom of the editor panel let you add content on top of your slides:</p>
 <ul class="help-ul">
@@ -82,7 +82,7 @@ export function showHelpModal() {
 <h4 class="help-h">Moving &amp; resizing</h4>
 <p class="help-p">Drag any overlay to reposition it, or drag its bottom-right corner to resize. The Properties panel shows exact position and size. To change what sits in front, drag the items in the slide's <strong>On this slide</strong> list — the top one is in front.</p>
 <h4 class="help-h">Saving your work</h4>
-<p class="help-p">Click ${_hbtn('download','Save & download')} to save your presentation. Choose <b>Presentation</b> for a ZIP with all overlays, widgets, and annotations that you can reopen later, or <b>Notes</b> for a single PDF to hand out: every visible slide with your annotations drawn on, each widget as it stands now, videos and 3D models as pictures, and poll results.</p>`,
+<p class="help-p">Click <b>Save</b> (top-right, or Ctrl/⌘+S). Signed in with GitHub, it saves the deck to its lecture, where it reopens at the slide you were on, with a notes PDF; the first time, it asks which lecture. As a guest, or with <b>Download…</b> in the menu beside it, choose <b>Presentation</b> for a ZIP with all overlays, widgets, and annotations that you can reopen later, or <b>Notes</b> for a single PDF to hand out: every visible slide with your annotations drawn on, each widget as it stands now, videos and 3D models as pictures, and poll results.</p>`,
         },
         {
             id: 'widgets', label: 'Widgets',

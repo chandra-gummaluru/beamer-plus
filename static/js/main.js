@@ -33,6 +33,7 @@ import { startTour } from './app/tour.js';
 import { initEditor } from './editor/editor.js';
 import { initRecorder } from './app/recorder.js';
 import { initGitHub } from './github/ui.js';
+import { initSaveButton } from './app/save-button.js';
 import { getSessionId, sessionUrl, saveLastSession } from './app/session.js';
 
 /* ─── Render generation counters ─────────────────────────────── */
@@ -158,6 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initEditor(state);
     initRecorder(state);
     initGitHub(state);
+    initSaveButton(state);
     initSettings();
     // Must run before applyDefaultPen(): that call emits a 'tool:change' to
     // sync other modules' tracked "previous tool" state (see below), and
@@ -179,6 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
     wireResizeAndFullscreen();
     document.getElementById('mute-btn')?.addEventListener('click', () => toggleMute());
     updateStageEmptyState();
+    document.getElementById('stage-empty-demo')?.addEventListener('click', (e) => { e.stopPropagation(); bus.emit('demo:open'); });
     maybeStartTourFromUrl();
 
     // annotation sync + active-pane tracking
@@ -516,9 +519,9 @@ function toggleMute(force) {
 // Launched from the welcome page's "Take a tour" button, which creates a
 // session and lands here with ?tour=1. Loads the demo deck if nothing is
 // loaded yet, so every step has something to point at.
-function launchTour() {
+function launchTour({ demo = false } = {}) {
     if (isNavCollapsed()) setNavCollapsed(false, { persist: false });
-    const loader = state.zipFile ? null : async () => {
+    const loader = state.zipFile && !demo ? null : async () => {
         window.BeamerModal?.show({ kind: 'loading', title: 'Loading demo…', message: 'Fetching demo presentation…' });
         const resp = await fetch('/api/demo-zip');
         if (!resp.ok) { window.BeamerModal?.close(); return; }
@@ -527,6 +530,10 @@ function launchTour() {
     };
     startTour(loader);
 }
+
+// "Demo presentation" (the upload window, the empty stage): always the demo
+// deck, then the tour.
+bus.on('demo:open', () => launchTour({ demo: true }));
 
 function maybeStartTourFromUrl() {
     const params = new URLSearchParams(window.location.search);
@@ -1357,7 +1364,7 @@ const STAGE_CONTROL_SELECTOR = [
     '#split-toggle',
     '#mute-btn',
     '#duplicate-slide-btn',
-    '#edit-save-btn',
+    '#save-btn',
     '#bookmark-btn',
     '#floating-annotation-toolbar button',
 ].join(', ');

@@ -11,14 +11,6 @@
     gap: var(--sp-2);
 }
 .welcome-gh-mark { flex: 0 0 auto; }
-.welcome-btn--guest {
-    min-height: 44px;
-    font-size: var(--fs-md);
-    background: transparent;
-    color: var(--ink-2);
-    border-color: var(--ink-4);
-}
-.welcome-btn--guest:hover:not(:disabled) { background: var(--surface-cream-2); color: var(--ink-1); }
 .welcome-gh-extra {
     display: flex;
     align-items: center;
@@ -78,6 +70,7 @@
 .gh-row { display: flex; gap: var(--sp-2); flex-wrap: wrap; align-items: center; }
 .gh-row[hidden] { display: none; }
 .gh-row--end { justify-content: flex-end; }
+.gh-row--between { justify-content: space-between; }
 
 .gh-field { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); color: var(--ink-2); font-weight: 600; }
 .gh-field select, .gh-field input {

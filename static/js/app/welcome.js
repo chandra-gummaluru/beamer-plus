@@ -4,7 +4,6 @@ import { signedIn, startSignIn, consumeRedirect, signOut, user } from '../github
 const ghBtn = document.getElementById('welcome-github-btn');
 const ghLabel = document.getElementById('welcome-github-label');
 const createBtn = document.getElementById('welcome-create-btn');
-const tourBtn = document.getElementById('welcome-tour-btn');
 const keepRow = document.getElementById('welcome-keep-row');
 const keepBox = document.getElementById('welcome-keep');
 const outBtn = document.getElementById('welcome-signout-btn');
@@ -17,7 +16,7 @@ function setStatus(msg, isError = false) {
 }
 
 function setBusy(on) {
-    for (const b of [ghBtn, createBtn, tourBtn]) if (b) b.disabled = on;
+    for (const b of [ghBtn, createBtn]) if (b) b.disabled = on;
 }
 
 function goToSession(sessionId, { tour = false, github = false, guest = false } = {}) {
@@ -26,9 +25,9 @@ function goToSession(sessionId, { tour = false, github = false, guest = false } 
     window.location.href = `/s/${sessionId}/` + (q ? `?${q}` : '');
 }
 
-// Every button starts a fresh session. Signed in with GitHub, the session
+// Both buttons start a fresh session. Signed in with GitHub, the session
 // opens and saves lectures there; as a guest, files come from and go to this
-// computer. The tour button also loads the demo deck and runs the tour.
+// computer. (The demo deck and its tour are offered inside the session.)
 async function handleCreate({ tour = false, github = false, guest = false } = {}) {
     setStatus(tour ? 'Setting up the tour…' : 'Creating session…');
     setBusy(true);
@@ -78,7 +77,6 @@ ghBtn?.addEventListener('click', async () => {
 });
 // A guest session ignores a GitHub sign-in this browser may hold.
 createBtn?.addEventListener('click', () => handleCreate({ guest: signedIn() }));
-tourBtn?.addEventListener('click', () => handleCreate({ tour: true, github: false }));
 outBtn?.addEventListener('click', () => { signOut(); drawSignedIn(); setStatus('Signed out of GitHub.'); });
 
 init();

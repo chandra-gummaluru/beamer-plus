@@ -92,7 +92,9 @@
                     <path class="stage-empty-squiggle" d="M18 26 Q 27 13, 36 26 T 54 26"/>
                 </svg>
                 <p class="stage-empty-title">Nothing here yet…</p>
-                <p class="stage-empty-hint">Drop a PDF or Beamer+ ZIP here, or add a slide to get started.</p>
+                <p class="stage-empty-hint" id="stage-empty-hint">Click here to open a PDF or Beamer+ ZIP, or drop one anywhere.</p>
+                <button type="button" class="stage-empty-demo" id="stage-empty-demo"
+                        title="Open a demo presentation with a guided tour">Or open the demo presentation</button>
             </div>
             <div class="slide-loading-overlay">
                 <svg class="slide-squiggle" viewBox="0 0 120 40">
@@ -114,7 +116,8 @@
         </div>
     </main>
 
-    <!-- Edit mode button — standalone pill, always visible at top-right -->
+    <!-- Edit mode button — bottom-right, just right of the hide-slide button
+         (top-right while editing, where it closes the editor). -->
     <div id="edit-mode-container">
         <button class="btn" id="edit-mode-btn" title="Edit mode">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -124,13 +127,13 @@
         </button>
     </div>
 
-    <!-- Top-right cluster -->
+    <!-- Top-right: Save, and a menu beside it (open another presentation,
+         downloads, the demo). Opening a presentation is also a click on the
+         empty slide, or dropping a file anywhere. -->
     <div id="top-right-controls">
-        <div id="upload-container">
-            <button class="btn" id="upload-presentation-btn" title="Upload presentation"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></button>
-        </div>
-        <div id="save-container">
-            <button class="btn" id="edit-save-btn" title="Download presentation or notes"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+        <div id="save-container" class="save-split">
+            <button class="btn save-btn" id="save-btn" title="Save">Save</button>
+            <button class="btn save-more-btn" id="save-more-btn" title="Open, download…" aria-haspopup="menu" aria-expanded="false"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></button>
         </div>
     </div>
 

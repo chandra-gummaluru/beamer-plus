@@ -6,11 +6,13 @@
     --editor-panel-width: 272px;
 }
 
-/* ─── Standalone edit-mode button ────────────────────────────── */
+/* ─── Edit-mode button ───────────────────────────────────────────
+   Bottom-right, just right of the hide-slide button; while editing it moves
+   to the top-right corner and becomes the editor's close button. */
 
 #edit-mode-container {
     position: fixed;
-    top: var(--sp-3);
+    bottom: var(--sp-3);
     right: var(--sp-3);
     z-index: 231;
     display: flex;
@@ -24,6 +26,10 @@
     min-height: var(--hit-min);
     padding: 0;
 }
+
+body.edit-mode #edit-mode-container { top: var(--sp-3); bottom: auto; }
+/* Split view puts the navigator along the bottom: sit above it, with Mute. */
+body.split-view-active:not(.edit-mode) #edit-mode-container { bottom: calc(88px + var(--sp-3)); }
 
 /* When edit mode is active the button shows an X — reset to a light close-button look */
 #edit-mode-btn.is-close,
@@ -1169,9 +1175,10 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 
 @media (max-width: 1024px) {
     #edit-mode-container {
-        top: var(--sp-2);
+        bottom: calc(100px + var(--sp-3));
         right: var(--sp-2);
     }
+    body.edit-mode #edit-mode-container { top: var(--sp-2); bottom: auto; }
 
     #editor-panel {
         top: auto; right: 0; left: 0; bottom: 0;

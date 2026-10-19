@@ -105,6 +105,7 @@ def run():
         # 1. Welcome page, signed out, then signed in.
         page.goto(BASE); page.wait_for_timeout(700); shot("01-welcome")
         check("welcome offers sign-in", "Sign in with GitHub" in page.inner_text("#welcome-github-btn"))
+        check("welcome offers guest, no tour", page.locator("#welcome-create-btn").is_visible() and page.locator("#welcome-tour-btn").count() == 0)
         page.evaluate(SIGN_IN); page.reload(); page.wait_for_timeout(800); shot("02-welcome-signed-in")
         check("welcome greets the user", "Continue as chandra-gummaluru" in page.inner_text("#welcome-github-btn"))
 
@@ -126,9 +127,10 @@ def run():
 
         # 4. Save dialog from the download button, with a recording to pick.
         page.evaluate(FAKE_TAKE)
-        page.click("#edit-save-btn"); page.wait_for_timeout(500); shot("06-download-menu")
-        check("download menu leads with Save to GitHub", "Save to GitHub" in page.inner_text(".download-choices"))
-        page.click(".download-choice[data-choice='github']"); page.wait_for_timeout(700); shot("07-save-dialog")
+        page.click("#save-more-btn"); page.wait_for_timeout(300); shot("06-save-menu")
+        check("menu offers open, download, demo", page.locator(".save-menu [data-menu]").count() == 3)
+        page.keyboard.press("Escape")
+        page.click("#save-btn"); page.wait_for_timeout(900); shot("07-save-dialog")
         check("recording offered and ticked", page.locator("[data-rec='rec-1']").is_checked())
         page.click(".custom-modal-btn-ok"); page.wait_for_timeout(6000); shot("08-saved")
         pf, uf = priv.files(), pub.files()
@@ -157,13 +159,13 @@ def run():
         check("Resume offered", page.locator(".gh-lecture[data-i='0'] [data-resume]").count() == 1)
         page.click(".gh-lecture[data-i='0'] [data-resume]"); page.wait_for_timeout(3000)
         check("resumed at slide 5", st("currentSlide") == 4)
-        page.click("#upload-presentation-btn"); page.wait_for_timeout(1200)
+        page.click("#save-more-btn"); page.click(".save-menu [data-menu='open']"); page.wait_for_timeout(1200)
         page.click(".gh-lecture[data-i='0'] [data-orig]"); page.wait_for_timeout(3000)
         check("start over at slide 1", st("currentSlide") == 0)
         shot("10-start-over")
 
         # 7. A new lecture with a deck from this computer, in a new course offering.
-        page.click("#upload-presentation-btn"); page.wait_for_timeout(1200)
+        page.click("#save-more-btn"); page.click(".save-menu [data-menu='open']"); page.wait_for_timeout(1200)
         page.select_option(".gh-lib select[data-off]", "__new")
         page.fill("[data-c]", "csc258"); page.fill("[data-t]", "w27"); page.click("[data-make-off]"); page.wait_for_timeout(300)
         page.fill("[data-name]", "01 - Intro"); shot("11-new-lecture")
@@ -178,13 +180,12 @@ def run():
         shot("12-new-lecture-open")
 
         # 8. A deck from this computer, then Save to GitHub → choose where.
-        page.click("#upload-presentation-btn"); page.wait_for_timeout(800)
+        page.click("#save-more-btn"); page.click(".save-menu [data-menu='open']"); page.wait_for_timeout(800)
         with page.expect_file_chooser() as fc:
             page.click("[data-local]")
         fc.value.set_files(pdf); page.wait_for_timeout(2500)
         check("local deck has no lecture", not st("ghTarget"))
-        page.click("#edit-save-btn"); page.wait_for_timeout(300)
-        page.click(".download-choice[data-choice='github']"); page.wait_for_timeout(1500); shot("13-save-where")
+        page.click("#save-btn"); page.wait_for_timeout(1500); shot("13-save-where")
         page.select_option(".gh-lib select[data-off]", "csc258/f26"); page.wait_for_timeout(800)
         page.click(".gh-lecture[data-i='1'] [data-save-here]"); page.wait_for_timeout(600)
         page.click(".custom-modal-btn-ok"); page.wait_for_timeout(5000)
@@ -193,13 +194,26 @@ def run():
               "csc258/f26/lectures/06 - Multiplication/intro.saved.zip" in pf)
         check("notes named for lecture + deck", "csc258/f26/slides/06 - Multiplication - intro.pdf" in pub.files())
 
-        # 9. Guest: the upload button is the file picker again.
+        # 9. Demo presentation from the library: loads the demo deck and starts the tour.
+        page.click("#save-more-btn"); page.click(".save-menu [data-menu='open']"); page.wait_for_timeout(1200)
+        page.click("[data-demo]"); page.wait_for_timeout(12000); shot("14-demo-tour")
+        check("demo deck loaded", st("deckName") == "demo")
+        check("tour running", "1 of" in page.inner_text("body"))
+
+        # 10. Guest: clicking the empty slide opens the file picker; it also offers the demo.
         page.goto(BASE); page.wait_for_timeout(600)
         page.click("#welcome-create-btn"); page.wait_for_url("**/s/**"); page.wait_for_timeout(2600)
         with page.expect_file_chooser(timeout=3000) as fc:
-            page.click("#upload-presentation-btn")
-        check("guest upload opens the file picker", fc.value is not None)
+            page.click("#stage-empty .stage-empty-title")
+        check("guest: clicking the empty slide opens the file picker", fc.value is not None)
         check("guest has no library modal", page.locator(".gh-lib").count() == 0)
+        shot("15-guest-empty")
+        check("empty stage offers the demo", page.locator("#stage-empty-demo").is_visible())
+        with page.expect_file_chooser(timeout=3000) as fc:
+            page.click("#save-more-btn"); page.click(".save-menu [data-menu='open']")
+        check("guest menu opens the file picker", fc.value is not None)
+        check("edit button sits right of mute", page.locator("#edit-mode-btn").bounding_box()["x"] > page.locator("#mute-btn").bounding_box()["x"]
+              and abs(page.locator("#edit-mode-btn").bounding_box()["y"] - page.locator("#mute-btn").bounding_box()["y"]) < 4)
         b.close()
 
     bad = [e for e in errors if "favicon" not in e]

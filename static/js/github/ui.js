@@ -1,11 +1,12 @@
-// GitHub in the presenter: the lecture library behind the upload button,
-// and Save to GitHub behind the download button (and Ctrl/⌘+S).
+// GitHub in the presenter: the lecture library behind "open a presentation"
+// (the empty slide, the menu beside Save), and Save to GitHub behind Save
+// (and Ctrl/⌘+S; see app/save-button.js).
 //
-//   Upload button → "Open a lecture": course offering → lecture → its decks.
+//   Open → "Open a lecture": course offering → lecture → its decks.
 //     A deck saved before opens where it left off (Resume); "Start over"
 //     opens the original instead. A lecture can take a new deck from this
 //     computer, and new lectures and course offerings can be started here.
-//   Download button → "Save to GitHub": the deck as it is now (with the slide
+//   Save → "Save to GitHub": the deck as it is now (with the slide
 //     you're on), the notes PDF and, if you tick them, recordings. See
 //     library.js for where each file goes.
 //
@@ -20,6 +21,7 @@ import { buildNotesPdf } from '../editor/notes-export.js';
 import { listRecordings, getRecording, updateRecording, isRecording, formatSize, formatDuration } from '../app/recorder.js';
 
 let appState = null;
+let active = false;     // signed in, and not a guest session
 const G = {
     me: null,           // { login, avatar_url }
     pair: null,         // { priv, pub } repositories
@@ -62,21 +64,10 @@ export function initGitHub(state) {
     } catch { /* storage blocked */ }
     if (!signedIn()) return;          // a guest: nothing changes
     schedule();
+    active = true;
     document.body.classList.add('gh-signed-in');
     setUploadButtonHandler(() => { openLibrary(); });
-    const up = document.getElementById('upload-presentation-btn');
-    if (up) up.title = 'Open a lecture from GitHub';
-    const dl = document.getElementById('edit-save-btn');
-    if (dl) dl.title = 'Save to GitHub, or download';
-
-    // Ctrl/⌘+S saves to GitHub (quietly, when the deck already has a lecture).
-    document.addEventListener('keydown', (e) => {
-        if (!(e.ctrlKey || e.metaKey) || e.altKey || e.key.toLowerCase() !== 's') return;
-        e.preventDefault();
-        if (!appState.zipFile || document.querySelector('.custom-modal-overlay')) return;
-        if (appState.ghTarget) saveNow({ notes: wantNotes(), recordings: [] });
-        else openSaveDialog();
-    }, true);
+    bus.emit('github:changed');
 
     bus.on('deck:loaded', () => updateTitle());
     user().then(u => { G.me = u; }).catch(e => { if (e.status === 401) { signOut(); location.reload(); } });
@@ -96,9 +87,30 @@ function updateTitle() {
     document.title = t ? `${t.lecture} · Beamer+` : 'Beamer+';
 }
 
+/** True when this session saves to GitHub (signed in, not a guest session). */
+export const githubActive = () => active && signedIn();
+
+/** The Save button. The first save asks which lecture the deck belongs in;
+ *  new recordings for the lecture bring up the dialog so you can pick them;
+ *  otherwise it saves straight away (the deck, and the notes unless you
+ *  turned them off). */
+export async function saveToGitHub() {
+    if (!appState.zipFile) return;
+    const t = appState.ghTarget;
+    if (!t) return openSaveDialog();
+    let fresh = [];
+    try {
+        const pubName = G.pair ? (L.twoRepos(G.pair) ? G.pair.pub : G.pair.priv).full_name : null;
+        const key = `${t.c}/${t.t}/${t.lecture}`;
+        fresh = (await listRecordings()).filter(r => r.lecture === key && !(r.uploaded && r.uploaded.repo === pubName) && (r.size || 0) <= L.MAX_BYTES);
+    } catch { /* none */ }
+    if (fresh.length) return openSaveDialog();
+    return saveNow({ notes: wantNotes(), recordings: [] });
+}
+
 /** The download menu's first card when signed in (null for a guest). */
 export function githubSaveChoice() {
-    if (!signedIn()) return null;
+    if (!githubActive()) return null;
     const t = appState?.ghTarget;
     return {
         key: 'github', title: 'Save to GitHub', format: 'GITHUB', icon: ICON.gh,
@@ -214,11 +226,13 @@ function drawFoot(ctxt) {
     const who = G.me ? esc(G.me.login) : '…';
     const repo = G.pair ? (L.twoRepos(G.pair) ? `${G.pair.pub.full_name} + -private` : G.pair.priv.full_name) : '';
     ctxt.foot.innerHTML = `
-        ${ctxt.mode === 'open' ? `<button type="button" class="gh-link" data-local>${ICON.laptop}Open a file from this computer instead</button>` : ''}
+        ${ctxt.mode === 'open' ? `<div class="gh-row gh-row--between"><button type="button" class="gh-link" data-local>${ICON.laptop}Open a file from this computer instead</button>
+            <button type="button" class="gh-link" data-demo title="Opens a demo deck with a guided tour">${ICON.play}Demo presentation</button></div>` : ''}
         <div class="gh-acct">${ICON.gh}<span>${who}${repo ? ` · <span title="Your course repository">${esc(repo)}</span>` : ''}</span>
             ${G.pair ? '<button type="button" class="gh-link" data-repo>Change</button>' : ''}
             <button type="button" class="gh-link" data-out>Sign out</button></div>`;
     ctxt.foot.querySelector('[data-local]')?.addEventListener('click', () => { window.BeamerModal?.close(); chooseLocalFile(); });
+    ctxt.foot.querySelector('[data-demo]')?.addEventListener('click', () => { window.BeamerModal?.close(); bus.emit('demo:open'); });
     ctxt.foot.querySelector('[data-repo]')?.addEventListener('click', () => repoPicker(ctxt));
     ctxt.foot.querySelector('[data-out]')?.addEventListener('click', () => {
         signOut();
@@ -227,10 +241,8 @@ function drawFoot(ctxt) {
         document.body.classList.remove('gh-signed-in');
         setUploadButtonHandler(null);
         appState.ghTarget = null;
-        const up = document.getElementById('upload-presentation-btn');
-        if (up) up.title = 'Upload presentation';
-        const dl = document.getElementById('edit-save-btn');
-        if (dl) dl.title = 'Download presentation or notes';
+        active = false;
+        bus.emit('github:changed');
         toast('Signed out of GitHub. Beamer+ works as a guest until you sign in again.');
     });
 }
@@ -503,6 +515,8 @@ async function saveNow({ notes, recordings }) {
     const t = appState.ghTarget;
     if (!t || saving) return;
     saving = true;
+    const btn = document.getElementById('save-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
     loading('Saving to GitHub…', 'Building the presentation…');
     try {
         if (!(await ensurePair())) throw new GhError(0, 'Choose your course repository first.');
@@ -551,5 +565,6 @@ async function saveNow({ notes, recordings }) {
         showError('Save to GitHub failed', e);
     } finally {
         saving = false;
+        if (btn) { btn.textContent = 'Save'; btn.disabled = !appState.zipFile; }
     }
 }
