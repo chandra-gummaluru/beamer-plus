@@ -5,9 +5,11 @@
 .custom-modal-overlay {
     position: fixed;
     inset: 0;
-    background: oklch(20% 0.01 260 / 0.32);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    /* No backdrop blur: blurring the whole (high-DPI) screen made every frame
+       under a modal cost 70-110 ms (opening, hovering, typing), more when a
+       widget or video behind it was still drawing. A slightly deeper scrim
+       reads the same. */
+    background: oklch(20% 0.01 260 / 0.42);
     display: flex;
     align-items: center;
     justify-content: center;

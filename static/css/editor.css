@@ -954,9 +954,7 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
     position: fixed;
     inset: 0;
     z-index: 900;
-    background: oklch(20% 0.01 260 / 0.35);
-    backdrop-filter: blur(3px);
-    -webkit-backdrop-filter: blur(3px);
+    background: oklch(20% 0.01 260 / 0.45);   /* no backdrop blur: see modal.css */
     display: flex;
     align-items: center;
     justify-content: center;

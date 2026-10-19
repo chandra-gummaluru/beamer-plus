@@ -75,8 +75,17 @@ async function _loadCatalog() {
 }
 
 // Fill the names early, so the properties badge has them before the picker
-// has ever been opened.
-_loadCatalog().then(list => { for (const w of list) WIDGET_LABELS[w.type] = w.label; });
+// has ever been opened. The list is kept, so the picker opens at once instead
+// of waiting on a round trip to the server each time (it refreshes behind).
+let _catalog = null;
+function _refreshCatalog() {
+    return _loadCatalog().then(list => {
+        if (list.length || !_catalog) _catalog = list;
+        for (const w of list) WIDGET_LABELS[w.type] = w.label;
+        return _catalog;
+    });
+}
+let _catalogReady = _refreshCatalog();
 
 /* ─── picker modal ──────────────────────────────────────────── */
 
@@ -87,9 +96,9 @@ export async function addWidget() {
         return;
     }
 
-    const widgets = await _loadCatalog();
-    for (const w of widgets) WIDGET_LABELS[w.type] = w.label;
+    const widgets = _catalog || await _catalogReady;
     _showWidgetModal(widgets);
+    _catalogReady = _refreshCatalog();   // a widget dropped into widgets/ shows up next time
 }
 
 function _showWidgetModal(widgets) {
