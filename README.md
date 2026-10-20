@@ -41,7 +41,7 @@ out, and **Ends the session** (back to the start page).
 
 ## Loading a presentation
 
-Click the empty slide, drag the file onto the window, or use **Open a presentation…** in the account menu (top-right, beside Save) to load either:
+Click the empty slide, drag the file onto the window, or use **Open a presentation…** in the account menu (top-right) to load either:
 
 - **A plain PDF** — every page becomes a slide.
 - **A presentation ZIP** — a PDF plus saved configuration, media, widgets and
@@ -65,9 +65,9 @@ presentation.zip
 
 ## Downloading
 
-**Save** (top-right) offers two files to save to your computer, plus any screen
-recordings (see Recording below). (Signed in with GitHub, Save puts them on GitHub
-instead; see below.)
+Signed out without a folder, **Download instead** (in the Save window) offers two files, plus any screen
+recordings (see Recording below). (Normally **Save presentation…** saves them in your
+repository or folder instead; see below.)
 
 - **Presentation (ZIP)** — everything above, to reopen and keep presenting.
 - **Notes (PDF)** — one flat PDF to hand out. Every visible slide (hidden and
@@ -80,45 +80,35 @@ instead; see below.)
   placeholder box. Built in the browser with pdf-lib; PDF slides are copied as
   vector pages, so their text stays selectable.
 
-## GitHub (optional)
+## Sessions: GitHub or a folder
 
-The welcome screen offers **Sign in with GitHub** or **Continue as guest**.
-As a guest, Beamer+ works exactly as described above: files come from and go to
-your computer. Signed in, it keeps your lectures in your GitHub course
-repository: the same pair of repositories Lectern uses (e.g. `courses-utor`,
-public with GitHub Pages, and `courses-utor-private`), though Beamer+ doesn't
-need Lectern to do it.
+The welcome screen offers **Sign in with GitHub** or **Continue as guest**. The
+account button (top-right: your GitHub name, or **Connect GitHub**) is the
+session menu: **Open a presentation…**, **Edit presentation**, **Save
+presentation…** (Edit and Save once a presentation is open), **Sign out** and
+**End session** (back to the start page).
 
-- **Open a lecture** (click the empty slide, or the account menu, top-right).
-  Signed in, presentations come from GitHub only: a file from your computer goes
-  into a lecture first (**Add a deck** / **New lecture**). Pick a course offering (`csc258/f26`) and
-  a lecture. A deck you've saved before shows **Resume** (it opens at the slide
-  you were on) and **Start over** (the original, without your saved changes;
-  those stay on GitHub until you next save). **Add a deck** / **New lecture**
-  upload a PDF or ZIP from your computer into a lecture; **Open a file from this
-  computer instead** works as before, without GitHub.
-- **Save** (top-right) asks what to save to GitHub (the deck, the notes PDF,
-  recordings); **Ctrl/⌘+S** saves straight away: the deck as it stands, with the
-  slide you're on, and the notes PDF (on by default). When this lecture has new
-  recordings, it asks which to upload (GitHub refuses files over 100 MB). A deck
-  opened from your computer asks which lecture it belongs in first.
+Open and Save work like a file manager. Signed in, you pick a **repository**
+(any the Beamer+ GitHub App can see); signed out, you pick a **folder** on this
+computer (Chrome and Edge; elsewhere, open a single file or download instead).
+Then you browse its folders, e.g. `csc258 › f26 › lectures`. Beamer+ doesn't
+impose a layout: you choose where things go.
 
-Where things go (one commit per repository per save):
+- **Open a presentation** lists the folders and the `.zip` / `.pdf` files in
+  the one you're in; click one to open it. Signed in, presentations come from
+  GitHub only: **Upload a file here** puts one from your computer in the folder.
+  Clicking the empty slide opens this window too.
+- **Save presentation** starts in the repository and folder the presentation
+  came from. Pick a folder (or **New folder**), a file name, and what to save:
+  - `<name>.zip`: the presentation, which reopens at the slide you were on
+  - `<name> (notes).pdf`: the notes PDF
+  - `<name> recording (…).webm`/`.mp4`: any recordings you tick (this
+    presentation's are ticked for you; GitHub refuses files over 100 MB)
+- **Ctrl/⌘+S** saves the presentation and notes straight away to where it was
+  last opened from or saved (and asks first when there are new recordings).
 
-```
-courses-utor-private/                              (private)
-  csc258/f26/lectures/05 - Binary Arithmetic/
-    05 - Binary Arithmetic.zip          original (what Start over opens)
-    05 - Binary Arithmetic.saved.zip    your last save (what Resume opens)
-courses-utor/                                      (public, GitHub Pages)
-  csc258/f26/slides/05 - Binary Arithmetic.pdf              notes PDF
-  csc258/f26/recordings/05 - Binary Arithmetic - recording (2026-10-19 14-05).mp4
-```
-
-The notes and recordings land in the course offering's `slides/` and
-`recordings/` folders of the public repository, so Lectern's course page can
-pick and link them. A repository without a `-private` twin holds everything
-(Beamer+ warns you if that one is public).
+On GitHub, each save is one commit. Saving over a `.zip` replaces it; the
+earlier version stays in the repository's history.
 
 Tokens stay in the browser (for the tab only, unless **Keep me signed in on this
 computer** is ticked); only the sign-in itself passes through the server.

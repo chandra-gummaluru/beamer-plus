@@ -21,7 +21,7 @@ const STEPS = [
         sel:   '#account-btn',
         place: 'auto',
         title: 'Your session',
-        body:  'Your GitHub account (or Connect GitHub). Its menu opens a presentation (a plain PDF, or a saved Beamer+ ZIP with its widgets and annotations), changes the course repository, signs out, and ends the session. Clicking the empty slide opens one too.',
+        body:  'Your session: open a presentation (a plain PDF, or a saved Beamer+ ZIP with its widgets and annotations), edit it, save it, and end the session. Signed in with GitHub, presentations live in your course repository; otherwise, in a folder on this computer. Clicking the empty slide opens one too.',
     },
     {
         sel:   '#slide-navigator',
@@ -78,10 +78,10 @@ const STEPS = [
         body:  'Click anywhere on a slide to type a note. Wrap math in $…$ and it is typeset as LaTeX, right on the slide.',
     },
     {
-        sel:   '#edit-mode-btn',
+        sel:   '#account-btn',
         place: 'auto',
         title: 'Edit mode',
-        body:  'Opens the editing panel where you can add videos, audio, 3D models, and interactive widgets to any slide. Drag and resize overlays freely.',
+        body:  'Edit presentation (in this menu) opens the editing panel where you can add videos, audio, 3D models, and interactive widgets to any slide. Drag and resize overlays freely.',
     },
     {
         sel:   '#record-btn',
@@ -96,10 +96,10 @@ const STEPS = [
         body:  'Blank the stage for a moment (or press .), handy for a question or a pause. You can keep moving through slides while it is hidden.',
     },
     {
-        sel:   '#save-btn',
+        sel:   '#account-btn',
         place: 'auto',
         title: 'Save your work',
-        body:  'Signed in with GitHub, Save puts the deck in its lecture (it reopens where you left off), the notes PDF and any recordings you pick on GitHub; Ctrl+S (⌘S) saves straight away. Not signed in, it saves to this computer: the presentation as a Beamer+ ZIP, or notes: one PDF with your annotations, widgets, media, and poll results drawn in.',
+        body:  'Save presentation (in this menu) picks the folder and file name, and what to save: the deck (it reopens where you left off), the notes PDF (annotations, widgets, media and poll results drawn in) and any recordings. Ctrl+S (⌘S) saves straight away after that.',
     },
     {
         sel:   null,

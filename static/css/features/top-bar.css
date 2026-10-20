@@ -34,17 +34,7 @@
 .account-mark { display: inline-flex; width: 18px; height: 18px; margin-left: 4px; color: var(--ink-1); flex: 0 0 auto; }
 .account-mark svg { width: 100%; height: 100%; }
 
-/* Save — the same paper button as every other control, with a label. */
-#top-right-controls .save-btn {
-    gap: 6px;
-    min-height: var(--hit-min);
-    padding: 0 14px 0 12px;
-    font-size: var(--fs-sm);
-    font-weight: 600;
-}
-#top-right-controls .save-btn svg { width: 16px; height: 16px; }
-#top-right-controls .save-btn:disabled { opacity: 0.45; cursor: default; }
-body.gh-saving #top-right-controls .save-btn svg { animation: account-saving 0.8s ease-in-out infinite alternate; }
+body.gh-saving #top-right-controls .account-btn .account-chevron { animation: account-saving 0.8s ease-in-out infinite alternate; }
 .account-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #top-right-controls .account-btn .account-chevron { width: 13px; height: 13px; color: var(--ink-3); flex: 0 0 auto; }
 #top-right-controls .account-btn[aria-expanded="true"] { --_bg: var(--surface-cream-2); --_bd: var(--ink-4); }
@@ -91,6 +81,9 @@ body.gh-saving #top-right-controls .save-btn svg { animation: account-saving 0.8
 .account-menu button:disabled svg { color: var(--ink-4); }
 .account-menu-label { flex: 1 1 auto; }
 .account-menu button.is-strong { font-weight: 600; }
+.account-menu button:disabled { color: var(--ink-4); cursor: default; }
+.account-menu button:disabled svg { color: var(--ink-4); }
+.account-menu kbd { font-family: var(--font-sans); font-size: var(--fs-xs); color: var(--ink-3); }
 .account-menu button.is-strong svg { color: var(--ink-1); }
 .account-menu button.is-danger:hover, .account-menu button.is-danger:focus-visible { color: var(--danger); }
 .account-menu button.is-danger:hover svg { color: var(--danger); }
@@ -140,12 +133,10 @@ body.focus-mode #main-content {
     }
 }
 
-/* ── Record, Mute, Edit — bottom-right corner ─────────────────────
-   Edit sits rightmost (its own fixed element, see editor.css), so the
-   record/mute pair stops one button short of the corner. */
+/* ── Record, Mute — bottom-right corner ─────────────────────────── */
 #mute-container {
     position: fixed;
-    right: calc(var(--sp-3) + var(--hit-min) + var(--sp-2));
+    right: var(--sp-3);
     bottom: var(--sp-3);
     z-index: 230;
     display: flex;
@@ -162,5 +153,5 @@ body.edit-mode #mute-container { display: none; }
 /* Split view puts the navigator along the bottom: sit just above it. */
 body.split-view-active #mute-container { bottom: calc(88px + var(--sp-3)); }
 @media (max-width: 1024px) {
-    #mute-container { bottom: calc(100px + var(--sp-3)); right: calc(var(--sp-2) + var(--hit-min) + var(--sp-2)); }
+    #mute-container { bottom: calc(100px + var(--sp-3)); right: var(--sp-2); }
 }

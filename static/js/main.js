@@ -33,6 +33,7 @@ import { startTour } from './app/tour.js';
 import { initEditor } from './editor/editor.js';
 import { initRecorder } from './app/recorder.js';
 import { initGitHub } from './github/ui.js';
+import { initLibrary } from './library/ui.js';
 import { initAccountMenu } from './app/account-menu.js';
 import { getSessionId, sessionUrl, saveLastSession } from './app/session.js';
 
@@ -159,6 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initEditor(state);
     initRecorder(state);
     initGitHub(state);
+    initLibrary(state);
     initAccountMenu(state);
     initSettings();
     // Must run before applyDefaultPen(): that call emits a 'tool:change' to
@@ -1364,7 +1366,6 @@ const STAGE_CONTROL_SELECTOR = [
     '#split-toggle',
     '#mute-btn',
     '#duplicate-slide-btn',
-    '#save-btn',
     '#bookmark-btn',
     '#floating-annotation-toolbar button',
 ].join(', ');

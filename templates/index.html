@@ -127,18 +127,14 @@
         </button>
     </div>
 
-    <!-- Top-right, as in Lectern: the GitHub account (Change repository,
-         Sign out; "Connect GitHub" when signed out) and Save. Signed in, Save
-         goes to GitHub; as a guest, it downloads. The account menu also opens
-         a presentation, the demo, and ends the session (app/account-menu.js).
-         Opening is also a click on the empty slide. -->
+    <!-- Top-right: the account button (your GitHub name, or "Connect GitHub").
+         Its menu saves (to GitHub when signed in, to this computer otherwise),
+         opens a presentation, the demo, changes the repository, signs out and
+         ends the session (app/account-menu.js). Ctrl/⌘+S saves too; opening is
+         also a click on the empty slide. -->
     <div id="top-right-controls">
         <button class="btn account-btn" id="account-btn" aria-haspopup="menu" aria-expanded="false" title="Guest session">
             <span class="account-name">Connect GitHub</span>
-        </button>
-        <button class="btn save-btn" id="save-btn" title="Save (Ctrl+S)">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-            <span>Save</span>
         </button>
     </div>
 

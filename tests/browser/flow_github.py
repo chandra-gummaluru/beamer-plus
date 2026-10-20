@@ -1,4 +1,5 @@
-"""Walk through Beamer+'s GitHub features against a fake GitHub (fakegh.py).
+"""Walk through Beamer+'s session menu, Open / Save presentation on GitHub (a fake one,
+fakegh.py) and in a folder (the browser's private file system standing in).
 
   python app.py --http --port 5001        (in another terminal)
   python tests/browser/flow_github.py     screenshots land in tests/browser/shots/
@@ -77,13 +78,43 @@ FAKE_TAKE = """async () => {
   const now = Date.now();
   tx.objectStore('meta').put({ id:'rec-1', sessionId:'X', deckName:'05 - Binary Arithmetic', label:'Recording 1',
     fileName:'05 - Binary Arithmetic - recording 1 (x).webm', mimeType:'video/webm', startedAt: now - 60000, durationMs: 42000,
-    size: 11, status:'done', lecture:'csc258/f26/05 - Binary Arithmetic' });
+    size: 11, status:'done', lecture:'csc258/f26/lectures/05 - Binary Arithmetic/05 - Binary Arithmetic' });
   tx.objectStore('chunks').add({ recId:'rec-1', seq:0, blob: new Blob(['hello video'], {type:'video/webm'}) });
   await new Promise(r => tx.oncomplete = r);
 }"""
 
 
+# Signed out, "Choose a folder" gets a folder in the browser's private file system
+# (Playwright can't drive the real folder picker), laid out like the repositories.
+FAKE_FOLDER = r"""() => {
+  window.showDirectoryPicker = async () => {
+    const root = await (await navigator.storage.getDirectory()).getDirectoryHandle('teaching', { create: true });
+    return root;
+  };
+}"""
+SEED_FOLDER = r"""async (zipB64) => {
+  const bytes = Uint8Array.from(atob(zipB64), c => c.charCodeAt(0));
+  const top = await navigator.storage.getDirectory();
+  try { await top.removeEntry('teaching', { recursive: true }); } catch (e) {}
+  const root = await top.getDirectoryHandle('teaching', { create: true });
+  const d = await root.getDirectoryHandle('csc258', { create: true });
+  const fh = await d.getFileHandle('07 - Adders.zip', { create: true });
+  const w = await fh.createWritable(); await w.write(bytes); await w.close();
+}"""
+LIST_FOLDER = r"""async () => {
+  const out = [];
+  const walk = async (d, pre) => { for await (const [n, h] of d.entries()) { if (h.kind === 'directory') await walk(h, pre + n + '/'); else out.push(pre + n); } };
+  await walk(await (await navigator.storage.getDirectory()).getDirectoryHandle('teaching'), '');
+  return out.sort();
+}"""
+
+
+def menu_keys(page):
+    return [b.get_attribute("data-menu") for b in page.locator(".account-menu [data-menu]").all()]
+
+
 def run():
+    import base64
     gh = make_gh()
     priv, pub = gh.repos["chandra-gummaluru/courses-private"], gh.repos["chandra-gummaluru/courses"]
     errors, checks = [], []
@@ -96,148 +127,135 @@ def run():
         b = p.chromium.launch()
         ctx = b.new_context(viewport={"width": 1360, "height": 860})
         ctx.route("https://api.github.com/**", gh.handle)
+        ctx.add_init_script(f"({FAKE_FOLDER})()")
         page = ctx.new_page()
         page.on("console", lambda m: errors.append(f"{m.type}: {m.text}") if m.type == "error" else None)
         page.on("pageerror", lambda e: errors.append(f"pageerror: {e}"))
         shot = lambda n: page.screenshot(path=f"{OUT}/{n}.png")
         st = lambda expr: page.evaluate(f"() => {{ const s = window.beamerState || {{}}; return s.{expr}; }}")
+        menu = lambda key: (page.click("#account-btn"), page.click(f".account-menu [data-menu='{key}']"))
+        items = lambda: [x.inner_text().strip() for x in page.locator(".gh-files .gh-item").all()]
+        crumbs = lambda: [x.inner_text().strip() for x in page.locator(".gh-crumbs .gh-crumb").all()]
+        go = lambda name: (page.locator(".gh-files .gh-item", has_text=name).first.click(), page.wait_for_timeout(400))
 
-        # 1. Welcome page, signed out, then signed in.
+        # 1. Start page.
         page.goto(BASE); page.wait_for_timeout(700); shot("01-welcome")
-        check("welcome offers sign-in", "Sign in with GitHub" in page.inner_text("#welcome-github-btn"))
-        check("welcome offers guest, no tour", page.locator("#welcome-create-btn").is_visible() and page.locator("#welcome-tour-btn").count() == 0)
-        page.evaluate(SIGN_IN); page.reload(); page.wait_for_timeout(800); shot("02-welcome-signed-in")
-        check("welcome shows who is signed in", "chandra-gummaluru" in page.inner_text("#welcome-account")
-              and "Start a session" in page.inner_text("#welcome-github-btn"))
+        check("start page: Sign in with GitHub / Continue as guest",
+              "Sign in with GitHub" in page.inner_text("#welcome-github-btn") and page.locator("#welcome-create-btn").is_visible())
+        page.evaluate(SIGN_IN); page.reload(); page.wait_for_timeout(800)
+        check("start page shows who is signed in", "chandra-gummaluru" in page.inner_text("#welcome-account"))
 
-        # 2. Continue → session; the library opens by itself; choose the repository.
-        page.click("#welcome-github-btn"); page.wait_for_url("**/s/**"); page.wait_for_timeout(3200); shot("03-repo-picker")
-        check("asks for the repository", page.locator(".gh-lib [data-repo]").count() == 1)
-        page.select_option(".gh-lib select[data-repo]", "chandra-gummaluru/courses"); page.wait_for_timeout(200)
-        page.click("[data-use]"); page.wait_for_timeout(1200); shot("04-library")
-        check("lists lectures", page.locator(".gh-lecture").count() == 2)
-
-        # 3. Open the lecture's deck (no save yet: just Open).
-        page.click(".gh-lecture[data-i='0'] [data-orig]"); page.wait_for_timeout(2500)
-        check("deck opened with its lecture", st("ghTarget && s.ghTarget.lecture") == "05 - Binary Arithmetic")
-        check("deck name", st("deckName") == "05 - Binary Arithmetic")
+        # 2. Open: choose a repository, then browse its folders.
+        page.click("#welcome-github-btn"); page.wait_for_url("**/s/**"); page.wait_for_timeout(3200); shot("02-open-repo")
+        check("open window asks for a repository first", page.locator(".gh-lib select[data-repo]").count() == 1 and page.locator(".gh-files").count() == 0)
+        page.select_option(".gh-lib select[data-repo]", "chandra-gummaluru/courses-private"); page.wait_for_timeout(1200); shot("03-browse-root")
+        check("then its top folder", crumbs() == ["courses-private"] and items() == ["csc108", "csc258"])
+        go("csc258"); go("f26")
+        check("folders open in place, with a path", crumbs() == ["courses-private", "csc258", "f26"] and items() == ["..", "lectures", "grades.json"][:2])
+        go("lectures"); go("05 - Binary Arithmetic"); shot("04-browse-deep")
+        check("only presentations are listed", [i.split("\n")[0] for i in items()] == ["..", "05 - Binary Arithmetic.zip"])
+        page.locator(".gh-crumb", has_text="f26").click(); page.wait_for_timeout(300)
+        check("a path step goes back up", crumbs()[-1] == "f26")
+        go("lectures"); go("05 - Binary Arithmetic"); go("05 - Binary Arithmetic.zip"); page.wait_for_timeout(2500)
+        check("opened, remembering where it came from", st("ghTarget && s.ghTarget.dir") == L and st("ghTarget.name") == "05 - Binary Arithmetic")
         for _ in range(3):
             page.keyboard.press("ArrowRight"); page.wait_for_timeout(350)
-        check("on slide 4", st("currentSlide") == 3)
-        shot("05-opened")
 
-        # 4. Save dialog from the download button, with a recording to pick.
+        # 3. The session menu; Save presentation starts in the same repository and folder.
         page.evaluate(FAKE_TAKE)
-        page.click("#account-btn"); page.wait_for_timeout(300); shot("06-account-menu")
-        check("account menu: open, demo, change repo, sign out, end",
-              [b.get_attribute("data-menu") for b in page.locator(".account-menu [data-menu]").all()] == ["open", "demo", "repo", "out", "end"])
-        check("account button shows the GitHub login", "chandra-gummaluru" in page.inner_text("#account-btn"))
-        page.keyboard.press("Escape")
-        page.click("#save-btn"); page.wait_for_timeout(900); shot("07-save-dialog")
-        check("save dialog asks what to save", page.locator("[data-deck]").is_checked() and page.locator("[data-notes]").count() == 1)
-        check("recording offered and ticked", page.locator("[data-rec='rec-1']").is_checked())
-        page.click(".custom-modal-btn-ok"); page.wait_for_timeout(6000); shot("08-saved")
-        pf, uf = priv.files(), pub.files()
-        saved = pf.get(f"{L}/05 - Binary Arithmetic.saved.zip")
-        check("saved zip in private repo", saved is not None)
-        if saved:
-            resume = json.loads(zipfile.ZipFile(io.BytesIO(saved)).read("config/resume.json"))
-            check("resume point is slide 4", resume.get("slide") == 3)
-        check("notes PDF in public repo", uf.get("csc258/f26/slides/05 - Binary Arithmetic.pdf", b"")[:5] == b"%PDF-")
-        recs = [k for k in uf if k.startswith("csc258/f26/recordings/05 - Binary Arithmetic - recording (")]
-        check("recording in public repo", len(recs) == 1 and uf[recs[0]] == b"hello video")
-        check("nothing private leaked to public", not any(k.endswith(".zip") for k in uf))
+        page.click("#account-btn"); page.wait_for_timeout(300); shot("05-session-menu")
+        check("session menu: open, edit, save, sign out, end",
+              [x.get_attribute("data-menu") for x in page.locator(".account-menu [data-menu]").all()] == ["open", "edit", "save", "out", "end"])
+        page.click(".account-menu [data-menu='save']"); page.wait_for_timeout(1500); shot("06-save-window")
+        check("save window: same repository and folder", page.input_value(".gh-lib select[data-repo]") == "chandra-gummaluru/courses-private"
+              and crumbs()[-1] == "05 - Binary Arithmetic")
+        check("same name; it says it replaces it", page.input_value("[data-name]") == "05 - Binary Arithmetic" and "Replaces" in page.inner_text("[data-hint]"))
+        check("this presentation's recording is ticked", page.locator("[data-rec='rec-1']").is_checked())
+        page.click("[data-save]"); page.wait_for_timeout(6000); shot("07-saved")
+        pf = priv.files()
+        z = pf.get(f"{L}/05 - Binary Arithmetic.zip")
+        check("saved over the zip, with the slide to resume at", z is not None and json.loads(zipfile.ZipFile(io.BytesIO(z)).read("config/resume.json")).get("slide") == 3)
+        check("notes PDF beside it", pf.get(f"{L}/05 - Binary Arithmetic (notes).pdf", b"")[:5] == b"%PDF-")
+        check("recording beside it", any(k.startswith(f"{L}/05 - Binary Arithmetic recording (") for k in pf))
 
-        # 5. Ctrl+S quick save after moving on.
+        # 4. Ctrl+S saves straight away.
         page.keyboard.press("ArrowRight"); page.wait_for_timeout(400)
         n = len(priv.commits)
         page.keyboard.press("Control+s"); page.wait_for_timeout(5000)
-        check("Ctrl+S committed", len(priv.commits) == n + 1)
-        resume = json.loads(zipfile.ZipFile(io.BytesIO(priv.files()[f"{L}/05 - Binary Arithmetic.saved.zip"])).read("config/resume.json"))
-        check("resume point moved to slide 5", resume.get("slide") == 4)
+        check("Ctrl+S committed without asking", len(priv.commits) == n + 1)
 
-        # 6. A new session: Resume opens where we left off; Start over opens the original.
+        # 5. Edit presentation from the menu; the editor's close button ends it.
+        menu("edit"); page.wait_for_timeout(800)
+        check("edit mode from the menu", st("editMode") is True and page.locator("#edit-mode-btn").is_visible())
+        page.click("#edit-mode-btn"); page.wait_for_timeout(600)
+        check("closed again", not st("editMode") and not page.locator("#edit-mode-btn").is_visible())
+
+        # 6. A new session opens where you were, and the zip resumes.
         page.goto(BASE); page.wait_for_timeout(600)
-        page.click("#welcome-github-btn"); page.wait_for_url("**/s/**"); page.wait_for_timeout(3500)
-        page.wait_for_timeout(800); shot("09-library-resume")
-        check("Resume offered", page.locator(".gh-lecture[data-i='0'] [data-resume]").count() == 1)
-        page.click(".gh-lecture[data-i='0'] [data-resume]"); page.wait_for_timeout(3000)
+        page.click("#welcome-github-btn"); page.wait_for_url("**/s/**"); page.wait_for_timeout(4200); shot("08-reopen")
+        check("opens in the last folder", crumbs()[-1] == "05 - Binary Arithmetic")
+        go("05 - Binary Arithmetic.zip"); page.wait_for_timeout(3000)
         check("resumed at slide 5", st("currentSlide") == 4)
-        page.click("#account-btn"); page.click(".account-menu [data-menu='open']"); page.wait_for_timeout(1200)
-        page.click(".gh-lecture[data-i='0'] [data-orig]"); page.wait_for_timeout(3000)
-        check("start over at slide 1", st("currentSlide") == 0)
-        shot("10-start-over")
 
-        # 7. A new lecture with a deck from this computer, in a new course offering.
-        page.click("#account-btn"); page.click(".account-menu [data-menu='open']"); page.wait_for_timeout(1200)
-        page.select_option(".gh-lib select[data-off]", "__new")
-        page.fill("[data-c]", "csc258"); page.fill("[data-t]", "w27"); page.click("[data-make-off]"); page.wait_for_timeout(300)
-        page.fill("[data-name]", "01 - Intro"); shot("11-new-lecture")
+        # 7. Save somewhere else: another repository, a new folder.
+        menu("save"); page.wait_for_timeout(1500)
+        page.select_option(".gh-lib select[data-repo]", "chandra-gummaluru/courses"); page.wait_for_timeout(1200)
+        go("csc258"); go("f26")
+        page.click("[data-newdir]"); page.fill("[data-dirname]", "slides"); page.click("[data-mkdir]"); page.wait_for_timeout(500); shot("09-save-elsewhere")
+        check("new folder shows in the path", crumbs()[-1] == "slides" and "Saves csc258/f26/slides/05 - Binary Arithmetic.zip" in page.inner_text("[data-hint]"))
+        page.click("[data-save]"); page.wait_for_timeout(5000)
+        uf = pub.files()
+        check("saved in courses › csc258/f26/slides", "csc258/f26/slides/05 - Binary Arithmetic.zip" in uf and "csc258/f26/slides/05 - Binary Arithmetic (notes).pdf" in uf)
+        check("Ctrl+S now goes there", st("ghTarget.src") == "github:chandra-gummaluru/courses" and st("ghTarget.dir") == "csc258/f26/slides")
+
+        # 8. Upload a file into the folder you're in.
+        menu("open"); page.wait_for_timeout(1500)
+        check("open starts in the repository and folder in use", page.input_value(".gh-lib select[data-repo]") == "chandra-gummaluru/courses" and crumbs()[-1] == "slides")
         pdf = os.path.join(OUT, "intro.pdf")
         with open(pdf, "wb") as f:
             f.write(make_pdf(3, "Intro"))
         with page.expect_file_chooser() as fc:
-            page.click("[data-new-file]")
+            page.click("[data-upload]")
         fc.value.set_files(pdf); page.wait_for_timeout(3000)
-        check("original uploaded to new lecture", "csc258/w27/lectures/01 - Intro/intro.pdf" in priv.files())
-        check("new deck has its lecture", st("ghTarget && s.ghTarget.lecture") == "01 - Intro")
-        shot("12-new-lecture-open")
+        check("uploaded and opened", "csc258/f26/slides/intro.pdf" in pub.files() and st("deckName") == "intro")
 
-        # 8. Signed in, a dropped file doesn't open by itself: the library opens.
+        # 9. Signed in, a dropped file doesn't open by itself.
         page.evaluate("""() => { const dt = new DataTransfer(); dt.items.add(new File(['%PDF-1.4'], 'dropped.pdf', {type:'application/pdf'}));
             for (const t of ['dragenter','dragover','drop']) window.dispatchEvent(new DragEvent(t, {dataTransfer: dt, bubbles: true, cancelable: true})); }""")
-        page.wait_for_timeout(1200)
-        check("drop while signed in opens the library", page.locator(".gh-lib").count() == 1 and st("deckName") == "intro")
-        check("library has no open-from-computer link", page.locator("[data-local]").count() == 0)
-        page.keyboard.press("Escape"); page.mouse.click(5, 5); page.wait_for_timeout(300)
+        page.wait_for_timeout(1500)
+        check("drop opens the Open window instead", page.locator(".gh-lib").count() == 1 and st("deckName") == "intro")
+        check("no single-file option when signed in", page.locator("[data-single]").count() == 0)
         page.evaluate("window.BeamerModal && window.BeamerModal.close()")
-        # A deck from elsewhere (the demo, say) asks which lecture on its first save.
-        page.set_input_files("#upload-presentation", pdf); page.wait_for_timeout(2500)
-        check("local deck has no lecture", not st("ghTarget"))
-        page.keyboard.press("Control+s"); page.wait_for_timeout(1500); shot("13-save-where")
-        page.select_option(".gh-lib select[data-off]", "csc258/f26"); page.wait_for_timeout(800)
-        page.click(".gh-lecture[data-i='1'] [data-save-here]"); page.wait_for_timeout(600)
-        page.click(".custom-modal-btn-ok"); page.wait_for_timeout(5000)
-        pf = priv.files()
-        check("original and saved copy added", "csc258/f26/lectures/06 - Multiplication/intro.pdf" in pf and
-              "csc258/f26/lectures/06 - Multiplication/intro.saved.zip" in pf)
-        check("notes named for lecture + deck", "csc258/f26/slides/06 - Multiplication - intro.pdf" in pub.files())
 
-        # 9. Demo presentation from the library: loads the demo deck and starts the tour.
-        page.click("#account-btn"); page.click(".account-menu [data-menu='open']"); page.wait_for_timeout(1200)
-        page.click("[data-demo]"); page.wait_for_timeout(12000); shot("14-demo-tour")
-        check("demo deck loaded", st("deckName") == "demo")
-        check("tour running", "1 of" in page.inner_text("body"))
+        # 10. Sign out in the session: Connect GitHub; the deck stays open.
+        menu("out"); page.wait_for_timeout(600)
+        check("signed out: Connect GitHub, deck still open", "Connect GitHub" in page.inner_text("#account-btn") and st("deckName") == "intro")
 
-        # Signing out in a session: the deck stays open; the account button becomes Connect GitHub.
-        page.get_by_text("Skip", exact=True).click(); page.wait_for_timeout(400)
-        page.click("#account-btn"); page.click(".account-menu [data-menu='out']"); page.wait_for_timeout(600)
-        check("sign out in a session: Connect GitHub, deck still open", "Connect GitHub" in page.inner_text("#account-btn") and st("deckName") == "demo")
-
-        # 10. Guest: clicking the empty slide opens the file picker; it also offers the demo.
+        # 11. Signed out, the same windows browse a folder on this computer.
+        page.evaluate(SEED_FOLDER, base64.b64encode(make_zip(make_pdf(4, "Adders"))).decode())
         page.goto(BASE); page.wait_for_timeout(600)
         page.click("#welcome-create-btn"); page.wait_for_url("**/s/**"); page.wait_for_timeout(2600)
-        with page.expect_file_chooser(timeout=3000) as fc:
-            page.click("#stage-empty .stage-empty-title")
-        check("guest: clicking the empty slide opens the file picker", fc.value is not None)
-        check("guest has no library modal", page.locator(".gh-lib").count() == 0)
-        shot("15-guest-empty")
-        check("empty stage offers the demo", page.locator("#stage-empty-demo").is_visible())
-        with page.expect_file_chooser(timeout=3000) as fc:
-            page.click("#account-btn"); page.click(".account-menu [data-menu='open']")
-        check("guest menu opens the file picker", fc.value is not None)
-        check("edit button sits right of mute", page.locator("#edit-mode-btn").bounding_box()["x"] > page.locator("#mute-btn").bounding_box()["x"]
-              and abs(page.locator("#edit-mode-btn").bounding_box()["y"] - page.locator("#mute-btn").bounding_box()["y"]) < 4)
-        check("signed out, the account button says Connect GitHub", "Connect GitHub" in page.inner_text("#account-btn"))
-        check("Save is off with no deck", page.locator("#save-btn").is_disabled())
-        page.click("#account-btn"); page.wait_for_timeout(300); shot("16-guest-menu")
-        check("guest menu: sign in, open, demo, end",
-              [b.get_attribute("data-menu") for b in page.locator(".account-menu [data-menu]").all()] == ["in", "open", "demo", "end"])
-        page.click(".account-menu [data-menu='end']"); page.wait_for_url(BASE); page.wait_for_timeout(500)
+        page.click("#account-btn"); page.wait_for_timeout(300); shot("10-guest-menu")
+        check("guest menu: sign in, open, edit (off), save (off), end",
+              [x.get_attribute("data-menu") for x in page.locator(".account-menu [data-menu]").all()] == ["in", "open", "edit", "save", "end"]
+              and page.locator(".account-menu [data-menu='save']").is_disabled())
+        page.keyboard.press("Escape")
+        page.click("#stage-empty .stage-empty-title"); page.wait_for_timeout(800); shot("11-folder-none")
+        check("open window asks for a folder", "Choose a folder" in page.inner_text(".gh-lib-src") and page.locator("[data-single]").count() == 1)
+        page.click("[data-choose]"); page.wait_for_timeout(1500)
+        check("then browses it", crumbs() == ["teaching"] and items() == ["csc258"])
+        go("csc258"); shot("12-folder-browse"); go("07 - Adders.zip"); page.wait_for_timeout(2500)
+        check("opened from the folder", st("ghTarget && s.ghTarget.src") == "folder:teaching" and st("ghTarget.dir") == "csc258")
+        menu("save"); page.wait_for_timeout(1500); shot("13-folder-save")
+        page.click("[data-save]"); page.wait_for_timeout(5000)
+        files = page.evaluate(LIST_FOLDER)
+        check("saved in the folder", "csc258/07 - Adders.zip" in files and "csc258/07 - Adders (notes).pdf" in files)
+        page.click("#account-btn"); page.click(".account-menu [data-menu='end']"); page.wait_for_timeout(300)
+        page.click(".custom-modal-btn-ok"); page.wait_for_url(BASE); page.wait_for_timeout(500)
         check("End session returns to the start page", page.locator("#welcome-create-btn").is_visible())
         b.close()
 
-    bad = [e for e in errors if "favicon" not in e]
+    bad = [e for e in errors if "favicon" not in e and "ERR_TUNNEL" not in e]
     print("\nconsole errors:", *bad, sep="\n  ") if bad else print("\nno console errors")
     failed = [n for n, ok in checks if not ok]
     print(f"{len(checks) - len(failed)}/{len(checks)} checks passed")

@@ -38,10 +38,10 @@ export function showHelpModal() {
             id: 'start', label: 'Getting Started',
             html: `
 <h4 class="help-h">Loading a presentation</h4>
-<p class="help-p">Click the empty slide, drag the file anywhere onto the window, or choose <b>Open a presentation…</b> from the account menu (top-right). Signed in with GitHub, presentations open from your course lectures only. You can load two types of file:</p>
+<p class="help-p">Click the empty slide, drag the file anywhere onto the window, or choose <b>Open a presentation…</b> from the account menu (top-right). It lets you browse your GitHub repository (signed in) or a folder on this computer (signed out) and pick a file. You can load two types of file:</p>
 <ul class="help-ul">
   <li>Your bare slide deck (as a PDF). Once loaded you can annotate it and place interactive widgets on any slide.</li>
-  <li>A saved Beamer+ presentation (as a ZIP) that bundles the PDF together with all your widgets, overlays, and annotations. To create one, start from a bare slide deck, edit it in Beamer+, then click <b>Save</b> (top-right). Beamer+ packages everything into a ZIP you can reload later.</li>
+  <li>A saved Beamer+ presentation (as a ZIP) that bundles the PDF together with all your widgets, overlays, and annotations. To create one, start from a bare slide deck, edit it in Beamer+, then choose <b>Save presentation…</b> in the account menu (top-right), or press Ctrl+S (⌘S). Beamer+ packages everything into a ZIP you can reload later.</li>
 </ul>`,
         },
         {
@@ -82,7 +82,7 @@ export function showHelpModal() {
 <h4 class="help-h">Moving &amp; resizing</h4>
 <p class="help-p">Drag any overlay to reposition it, or drag its bottom-right corner to resize. The Properties panel shows exact position and size. To change what sits in front, drag the items in the slide's <strong>On this slide</strong> list — the top one is in front.</p>
 <h4 class="help-h">Saving your work</h4>
-<p class="help-p">Click <b>Save</b> (top-right). Signed in with GitHub, it asks what to save there: the deck (it reopens at the slide you were on), the notes PDF and recordings; the first time, it asks which lecture. Ctrl+S (⌘S) saves straight away. Not signed in, it saves to this computer: choose <b>Presentation</b> for a ZIP with all overlays, widgets, and annotations that you can reopen later, or <b>Notes</b> for a single PDF to hand out: every visible slide with your annotations drawn on, each widget as it stands now, videos and 3D models as pictures, and poll results.</p>`,
+<p class="help-p">Open the account menu (top-right) and choose <b>Save presentation…</b>: pick the repository (or folder), a folder in it and a file name, and what to save: the deck (it reopens at the slide you were on), the notes PDF and recordings. Ctrl+S (⌘S) then saves straight away. Without a folder, <b>Download instead</b> offers <b>Presentation</b> for a ZIP with all overlays, widgets, and annotations that you can reopen later, or <b>Notes</b> for a single PDF to hand out: every visible slide with your annotations drawn on, each widget as it stands now, videos and 3D models as pictures, and poll results.</p>`,
         },
         {
             id: 'widgets', label: 'Widgets',

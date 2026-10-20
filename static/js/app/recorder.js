@@ -295,9 +295,9 @@ async function startRecording({ mic, sound }) {
         status: 'recording',
         hasMic: !!micStream,
         hasSound: displayAudio.length > 0,
-        // The GitHub lecture the deck came from, if any ("c/t/lecture"), so
-        // Save to GitHub can offer this take with that lecture.
-        lecture: appState?.ghTarget ? `${appState.ghTarget.c}/${appState.ghTarget.t}/${appState.ghTarget.lecture}` : null,
+        // Where the deck came from ("<folder>/<name>", see library/ui.js
+        // targetKey), so Save presentation offers this take with it.
+        lecture: appState?.ghTarget ? [appState.ghTarget.dir, appState.ghTarget.name].filter(Boolean).join('/') : null,
     };
 
     active = {
