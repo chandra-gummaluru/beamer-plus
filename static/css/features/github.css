@@ -22,9 +22,6 @@
 .welcome-account b { color: var(--ink-1); font-weight: 600; }
 .welcome-avatar { width: 22px; height: 22px; border-radius: 50%; border: var(--line-soft); }
 .welcome-avatar[hidden] { display: none; }
-.welcome-keep { display: inline-flex; align-items: center; gap: var(--sp-2); cursor: pointer; font-size: var(--fs-sm); color: var(--ink-3); }
-.welcome-keep[hidden] { display: none; }
-.welcome-keep input { accent-color: var(--accent); }
 .welcome-link {
     background: none; border: 0; padding: 0; cursor: pointer;
     font: inherit; color: var(--ink-3); text-decoration: underline; text-underline-offset: 2px;
@@ -210,3 +207,17 @@
 .gh-name { display: flex; align-items: stretch; }
 .gh-name input { flex: 1 1 auto; min-width: 0; border-radius: var(--r-md) 0 0 var(--r-md) !important; }
 .gh-ext { display: inline-flex; align-items: center; padding: 0 10px; border: var(--line-hairline); border-left: 0; border-radius: 0 var(--r-md) var(--r-md) 0; background: var(--surface-cream); color: var(--ink-3); font-weight: 400; font-size: var(--fs-base); }
+
+/* Keep the windows inside the screen: the file list scrolls, and so does the
+   window itself on a short screen. */
+.custom-modal-content.gh-modal { max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); overflow-y: auto; }
+.gh-files { max-height: min(32vh, 280px); }
+.gh-lib[data-mode="save"] .gh-files { max-height: min(24vh, 200px); }
+.gh-repo-row { display: flex; gap: 6px; align-items: stretch; }
+.gh-repo-row select { flex: 1 1 auto; min-width: 0; }
+.gh-icon-btn { width: 38px; padding: 0; justify-content: center; }
+.gh-icon-btn svg { width: 16px; height: 16px; }
+.gh-field > label { font-size: var(--fs-sm); color: var(--ink-2); font-weight: 600; }
+.gh-checks-row { display: flex; flex-wrap: wrap; gap: 6px 22px; padding: 2px 0; }
+.gh-checks-row .gh-check { padding: 2px 0; align-items: center; font-weight: 600; font-size: var(--fs-base); }
+.gh-checks-row .gh-check input { margin-top: 0; }

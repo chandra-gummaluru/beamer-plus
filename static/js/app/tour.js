@@ -21,7 +21,7 @@ const STEPS = [
         sel:   '#account-btn',
         place: 'auto',
         title: 'Your session',
-        body:  'Your session: open a presentation (a plain PDF, or a saved Beamer+ ZIP with its widgets and annotations), edit it, save it, and end the session. Signed in with GitHub, presentations live in your course repository; otherwise, in a folder on this computer. Clicking the empty slide opens one too.',
+        body:  'Your session (your GitHub name, or Guest): open a presentation (a plain PDF, or a saved Beamer+ ZIP with its widgets and annotations), edit it, save it, and end the session (which signs you out of GitHub too). Signed in with GitHub, presentations live in your course repository; otherwise, in a folder on this computer. Clicking the empty slide opens one too.',
     },
     {
         sel:   '#slide-navigator',
@@ -99,7 +99,7 @@ const STEPS = [
         sel:   '#account-btn',
         place: 'auto',
         title: 'Save your work',
-        body:  'Save presentation (in this menu) picks the folder and file name, and what to save: the deck (it reopens where you left off), the notes PDF (annotations, widgets, media and poll results drawn in) and any recordings. Ctrl+S (⌘S) saves straight away after that.',
+        body:  'Save presentation (in this menu) picks the folder and file name, and what to save: the deck (it reopens where you left off), the notes PDF (annotations, widgets, media and poll results drawn in) and any recordings.',
     },
     {
         sel:   null,

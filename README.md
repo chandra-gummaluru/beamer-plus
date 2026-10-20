@@ -34,10 +34,7 @@ python app.py --http        # plain HTTP (camera widget disabled on LAN)
 ```
 
 To try the built-in demo presentation (with a guided tour), click **Or open the
-demo presentation** on the empty slide, or **Demo presentation** in the account
-menu (top-right). The account button
-(your GitHub name, or **Connect GitHub**) also changes the repository, signs you
-out, and **Ends the session** (back to the start page).
+demo presentation** on the empty slide.
 
 ## Loading a presentation
 
@@ -83,10 +80,11 @@ repository or folder instead; see below.)
 ## Sessions: GitHub or a folder
 
 The welcome screen offers **Sign in with GitHub** or **Continue as guest**. The
-account button (top-right: your GitHub name, or **Connect GitHub**) is the
+account button (top-right: your GitHub name, or **Guest**) is the
 session menu: **Open a presentation…**, **Edit presentation**, **Save
-presentation…** (Edit and Save once a presentation is open), **Sign out** and
-**End session** (back to the start page).
+presentation…** (Edit and Save once a presentation is open) and **End session**
+(back to the start page; signed in, it signs you out of GitHub too). To sign
+in, end a guest session and use **Sign in with GitHub** on the start page.
 
 Signed in, Open and Save work like a file manager: you pick a **repository**
 (any the Beamer+ GitHub App can see), then browse its folders, e.g.
@@ -99,19 +97,22 @@ and **Save** picks a **folder** on this computer (Chrome and Edge) or downloads.
   GitHub only: **Upload a file here** puts one from your computer in the folder.
   Clicking the empty slide opens this window too.
 - **Save presentation** starts in the repository and folder the presentation
-  came from. Pick a folder (or **New folder**), a file name, and what to save:
+  came from. Pick a folder (or **New folder**), a file name, and tick what to
+  save (Presentation, Notes, Recordings); each goes in that folder:
   - `<name>.zip`: the presentation, which reopens at the slide you were on
-  - `<name> (notes).pdf`: the notes PDF
-  - `<name> recording (…).webm`/`.mp4`: any recordings you tick (this
-    presentation's are ticked for you; GitHub refuses files over 100 MB)
-- **Ctrl/⌘+S** saves the presentation and notes straight away to where it was
-  last opened from or saved (and asks first when there are new recordings).
+  - `<name>.pdf`: the notes PDF (so don't name it after a slides PDF in the same
+    folder, or the notes replace it)
+  - `<name>-<yyyy-mm-dd>-<hh-mm>.mp4` (or `.webm`): recordings not saved yet
+    (GitHub refuses files over 100 MB)
+  The repository list ends with **Add another repository…**, which opens GitHub
+  to give Beamer+ access; the button beside the list refreshes it.
 
 On GitHub, each save is one commit. Saving over a `.zip` replaces it; the
 earlier version stays in the repository's history.
 
-Tokens stay in the browser (for the tab only, unless **Keep me signed in on this
-computer** is ticked); only the sign-in itself passes through the server.
+Signing in always shows GitHub's account picker, so you can choose (or switch
+to) another GitHub account. Tokens stay in the browser, for that tab only;
+only the sign-in itself passes through the server.
 
 ### Setting up sign-in (one time, per server)
 

@@ -4,11 +4,9 @@ import { signedIn, startSignIn, consumeRedirect, signOut, user } from '../github
 const ghBtn = document.getElementById('welcome-github-btn');
 const ghLabel = document.getElementById('welcome-github-label');
 const createBtn = document.getElementById('welcome-create-btn');
-const keepRow = document.getElementById('welcome-keep-row');
 const acct = document.getElementById('welcome-account');
 const acctLogin = document.getElementById('welcome-login');
 const acctAvatar = document.getElementById('welcome-avatar');
-const keepBox = document.getElementById('welcome-keep');
 const outBtn = document.getElementById('welcome-signout-btn');
 const statusEl = document.getElementById('welcome-status');
 
@@ -49,7 +47,6 @@ function drawSignedIn(u = null) {
     const on = signedIn();
     if (ghLabel) ghLabel.textContent = on ? 'Start a session' : 'Sign in with GitHub';
     if (ghBtn) ghBtn.title = on ? 'Open and save your lectures in your GitHub course repository' : 'Sign in to open and save your lectures in your GitHub course repository';
-    if (keepRow) keepRow.hidden = on;
     if (acct) acct.hidden = !on;
     if (acctLogin) acctLogin.textContent = u?.login || 'GitHub';
     if (acctAvatar) {
@@ -83,7 +80,7 @@ async function init() {
 ghBtn?.addEventListener('click', async () => {
     if (signedIn()) { handleCreate({ github: true }); return; }
     setStatus('Going to GitHub…');
-    try { await startSignIn({ keep: !!keepBox?.checked }); }
+    try { await startSignIn(); }
     catch (e) { setStatus(e.message, true); }
 });
 // A guest session ignores a GitHub sign-in this browser may hold.

@@ -1,9 +1,8 @@
 // Sign in with GitHub (a GitHub App's user login) and the authenticated
 // fetch every other GitHub module goes through.
 //
-// Tokens stay in this browser: sessionStorage by default (a lecture-room
-// computer forgets them when the tab closes), localStorage when "Keep me
-// signed in" was ticked. Only the one-time sign-in code and the 8-hourly
+// Tokens stay in this browser, in sessionStorage (a lecture-room computer
+// forgets them when the tab closes; ending the session signs out). Only the one-time sign-in code and the 8-hourly
 // refreshes pass through Beamer+'s server (server/github.py).
 //
 // Using Beamer+ as a guest is simply not having a token: nothing here runs.
@@ -86,7 +85,10 @@ export async function startSignIn({ keep = false, back = '' } = {}) {
         sessionStorage.setItem(REMEMBER, keep ? '1' : '0');
         if (back) sessionStorage.setItem(RETURN, back); else sessionStorage.removeItem(RETURN);
     } catch { /* ignore */ }
-    const q = new URLSearchParams({ client_id: cfg.client_id, redirect_uri: cfg.redirect_uri, state });
+    // prompt=select_account: GitHub always shows its account picker (with
+    // "use a different account"), instead of quietly using whoever is signed
+    // in to github.com in this browser.
+    const q = new URLSearchParams({ client_id: cfg.client_id, redirect_uri: cfg.redirect_uri, state, prompt: 'select_account' });
     location.assign(`${cfg.authorize_url}?${q}`);
 }
 

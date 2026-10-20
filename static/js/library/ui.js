@@ -1,14 +1,14 @@
 // "Open a presentation" and "Save presentation" (the session menu, the empty
-// slide, Ctrl/⌘+S). Signed in, both pick a repository and browse its folders
+// slide). Signed in, both pick a repository and browse its folders
 // like a file manager. Signed out, Open is just the file picker, and Save
 // picks a folder on this computer (or downloads).
 //
 //   Open:  click a .zip or .pdf to open it. Signed in, "Upload a file here"
 //          puts one from your computer in the folder you're in.
 //   Save:  the folder you're in, a file name, and what to save:
-//            <name>.zip              the presentation (reopens at this slide)
-//            <name> (notes).pdf      the notes PDF
-//            <name> recording (…)    any recordings you tick
+//            <name>.zip                        the presentation (reopens at this slide)
+//            <name>.pdf                        the notes PDF
+//            <name>-<yyyy-mm-dd>-<hh-mm>.mp4   recordings (or .webm)
 //          It starts in the repository and folder the presentation came from.
 //
 // Beamer+ doesn't impose a layout on the repository: you choose the folder.
@@ -23,7 +23,7 @@ import { setUploadButtonHandler, setDropHandler, chooseLocalFile, openPresentati
 import { buildPresentationZip } from '../editor/save.js';
 import { buildNotesPdf } from '../editor/notes-export.js';
 import { openDownloadMenu } from '../editor/download-menu.js';
-import { listRecordings, getRecording, updateRecording, isRecording, formatSize, formatDuration } from '../app/recorder.js';
+import { listRecordings, getRecording, updateRecording, formatSize } from '../app/recorder.js';
 
 let appState = null;
 const S = {
@@ -44,6 +44,7 @@ const ICON = {
     folder: svg('<path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H9l2 2.5h7.5A2.5 2.5 0 0 1 21 10v7.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/>'),
     deck: svg('<rect x="3" y="4" width="18" height="13" rx="1.5"/><path d="M8 21h8M12 17v4"/>'),
     pdf: svg('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>'),
+    refresh: svg('<path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/>'),
     upload: svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>'),
 };
 const extOf = name => (/\.([a-z0-9]+)$/i.exec(name || '') || [, ''])[1].toLowerCase();
@@ -81,10 +82,10 @@ const rememberFolder = (src, path) => store.set(LOC_KEY, { ...(store.get(LOC_KEY
 /** "<folder>/<name>": what a save of target t is called (recordings are matched to it). */
 export const targetKey = t => (t ? join(t.dir, t.name) : null);
 const zipPath = t => join(t.dir, `${t.name}.zip`);
-const notesPath = t => join(t.dir, `${t.name} (notes).pdf`);
+const notesPath = t => join(t.dir, `${t.name}.pdf`);
 function recordingPath(t, startedAt, ext) {
     const d = new Date(startedAt), z = n => String(n).padStart(2, '0');
-    return join(t.dir, `${t.name} recording (${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())} ${z(d.getHours())}-${z(d.getMinutes())}).${ext}`);
+    return join(t.dir, `${t.name}-${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}-${z(d.getHours())}-${z(d.getMinutes())}.${ext}`);
 }
 
 /* ─── setup ───────────────────────────────────────────────────── */
@@ -143,6 +144,7 @@ export function savePresentation() {
 function openWindow(mode) {
     const root = document.createElement('div');
     root.className = 'gh-lib';
+    root.dataset.mode = mode;
     root.innerHTML = `<div class="gh-lib-src"></div><div class="gh-lib-nav"></div><div class="gh-lib-body"></div><div class="gh-lib-foot"></div>`;
     window.BeamerModal?.show({
         kind: 'info',
@@ -208,11 +210,23 @@ async function drawRepoRow(w) {
         return;
     }
     const cur = S.repo?.full_name || '';
+    // "Add another repository…" opens GitHub's page for giving Beamer+ access;
+    // the list refreshes when you come back (or with the refresh button).
     w.srcBox.innerHTML = `
-        <label class="gh-field"><span>Repository</span>
-            <select data-repo>${cur ? '' : '<option value="" selected>Choose a repository…</option>'}${repos.map(r => `<option value="${esc(r.full_name)}"${r.full_name === cur ? ' selected' : ''}>${esc(r.full_name)}${r.private ? ' (private)' : ''}</option>`).join('')}</select></label>
-        <p class="gh-muted gh-small">Not listed? <a href="${esc(install)}" target="_blank" rel="noopener">Give Beamer+ access</a>, then <button type="button" class="gh-link" data-again>check again</button>.</p>`;
+        <div class="gh-field"><label for="gh-repo-select">Repository</label>
+            <div class="gh-repo-row">
+                <select id="gh-repo-select" data-repo>${cur ? '' : '<option value="" selected>Choose a repository…</option>'}${repos.map(r => `<option value="${esc(r.full_name)}"${r.full_name === cur ? ' selected' : ''}>${esc(r.full_name)}${r.private ? ' (private)' : ''}</option>`).join('')}
+                    <option value="__add">Add another repository…</option></select>
+                <button type="button" class="gh-btn gh-icon-btn" data-again title="Refresh the list" aria-label="Refresh the list">${ICON.refresh}</button>
+            </div></div>`;
     w.srcBox.querySelector('[data-repo]').onchange = (e) => {
+        if (e.target.value === '__add') {
+            e.target.value = cur;
+            window.open(install, '_blank', 'noopener');
+            const back = () => { window.removeEventListener('focus', back); if (document.body.contains(w.root)) { S.repos = null; refreshWindow(w); } };
+            window.addEventListener('focus', back);
+            return;
+        }
         S.repo = repos.find(r => r.full_name === e.target.value) || null;
         S.src = null;
         store.set(REPO_KEY, S.repo?.full_name || null);
@@ -322,56 +336,38 @@ function uploadHere(src, path, decks) {
 }
 
 /* Save: this folder, a name, and what to save. */
+// The takes a save offers: those recorded with this presentation (or with no
+// presentation yet) that aren't saved there already.
+async function takesFor(src, key) {
+    let recs = [];
+    try { recs = await listRecordings(); } catch { /* none */ }
+    return recs.filter(r => (r.lecture === key || !r.lecture)
+        && !(r.uploaded && r.uploaded.repo === src.id)
+        && !(src.limit && (r.size || 0) > src.limit));
+}
+
 async function drawSaveForm(w, src, path, dirs, decks) {
     const t0 = appState.ghTarget;
     if (w.name === null) w.name = t0 && t0.src === src.id ? t0.name : (GH.cleanName(appState.deckName) || 'presentation');
-    let recs = [];
-    try { recs = await listRecordings(); } catch { /* none */ }
+    const takes = await takesFor(src, t0 ? targetKey(t0) : null);
     const zips = decks.filter(d => /\.zip$/i.test(d.name));
-    const recRow = (r, on) => {
-        const done = r.uploaded && r.uploaded.repo === src.id;
-        const big = !!src.limit && (r.size || 0) > src.limit;
-        const when = new Date(r.startedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-        const note = done ? 'already saved there' : big ? 'over GitHub’s 100 MB limit' : '';
-        return `<label class="gh-check${done || big ? ' is-off' : ''}"><input type="checkbox" data-rec="${esc(r.id)}"${on && !done && !big ? ' checked' : ''}${done || big ? ' disabled' : ''}>
-            <span><b>${esc(r.label)}</b> <span class="gh-muted">${esc([r.deckName, when, formatDuration(r.durationMs || 0), formatSize(r.size || 0)].filter(Boolean).join(' · '))}</span>${note ? ` <em>${note}</em>` : ''}</span></label>`;
-    };
     w.body.innerHTML = `${listHTML(path, dirs, zips, { filesQuiet: true })}
         <div class="gh-row gh-newdir-row"><button type="button" class="gh-link" data-newdir>${ICON.plus}New folder</button>
             <span class="gh-newdir" hidden><input data-dirname placeholder="Folder name" spellcheck="false"><button type="button" class="gh-btn gh-btn--sm" data-mkdir>Create</button></span></div>
         <label class="gh-field"><span>File name</span>
-            <span class="gh-name"><input data-name value="${esc(w.name)}" spellcheck="false" autocomplete="off"><span class="gh-ext">.zip</span></span></label>
-        <p class="gh-muted gh-small" data-hint></p>
-        <div class="gh-checks">
-            <label class="gh-check"><input type="checkbox" data-deck checked><span><b>Presentation</b> <span class="gh-muted" data-p-deck></span></span></label>
-            <label class="gh-check"><input type="checkbox" data-notes${wantNotes() ? ' checked' : ''}><span><b>Notes PDF</b> <span class="gh-muted" data-p-notes></span></span></label>
-            ${recs.length || isRecording() ? `<div class="gh-recs"><div class="gh-recs-head">Recordings <span class="gh-muted">saved beside it</span></div>
-                <div data-recs></div>
-                ${isRecording() ? '<p class="gh-muted gh-small">A recording is in progress: stop it to include it.</p>' : ''}</div>` : ''}
+            <input data-name value="${esc(w.name)}" spellcheck="false" autocomplete="off"></label>
+        <div class="gh-checks-row" role="group" aria-label="What to save">
+            <label class="gh-check" title="The presentation (.zip): reopens at the slide you're on"><input type="checkbox" data-deck checked><span>Presentation</span></label>
+            <label class="gh-check" title="One PDF with your annotations and widgets drawn in"><input type="checkbox" data-notes${wantNotes() ? ' checked' : ''}><span>Notes</span></label>
+            <label class="gh-check${takes.length ? '' : ' is-off'}" title="${takes.length ? `${takes.length} recording${takes.length > 1 ? 's' : ''} not saved yet` : 'No recordings to save'}"><input type="checkbox" data-recs${takes.length ? ' checked' : ' disabled'}><span>Recordings${takes.length ? ` (${takes.length})` : ''}</span></label>
         </div>
         <p class="gh-err" data-save-err></p>
         <p class="gh-row gh-row--end"><button type="button" class="gh-btn" data-cancel>Cancel</button>
             <button type="button" class="gh-btn gh-btn--primary" data-save>Save</button></p>`;
     const nameIn = w.body.querySelector('[data-name]');
-    const recBox = w.body.querySelector('[data-recs]');
-    const sync = () => {
-        w.name = nameIn.value;
-        const n = GH.cleanName(nameIn.value);
-        w.body.querySelector('[data-hint]').textContent = !n ? 'Name the file.'
-            : zips.some(z => z.name === `${n}.zip`) ? `Replaces ${n}.zip in this folder.` : `Saves ${join(path, `${n}.zip`)}.`;
-        w.body.querySelector('[data-p-deck]').textContent = n ? `${n}.zip · opens at this slide next time` : '';
-        w.body.querySelector('[data-p-notes]').textContent = n ? `${n} (notes).pdf · annotations and widgets drawn in` : '';
-        if (recBox) {
-            const key = targetKey({ dir: path, name: n });
-            const mine = recs.filter(r => r.lecture === key), others = recs.filter(r => r.lecture !== key);
-            const ticked = new Set([...recBox.querySelectorAll('[data-rec]:checked')].map(x => x.dataset.rec));
-            recBox.innerHTML = mine.map(r => recRow(r, true)).join('') + others.map(r => recRow(r, ticked.has(r.id))).join('');
-        }
-    };
-    nameIn.addEventListener('input', sync);
-    sync();
+    nameIn.addEventListener('input', () => { w.name = nameIn.value; });
     w.body.querySelectorAll('[data-dir]').forEach(b => { b.onclick = () => browse(w, src, b.dataset.dir); });
-    w.body.querySelectorAll('[data-file]').forEach(b => { b.onclick = () => { nameIn.value = baseOf(zips[Number(b.dataset.file)].name); sync(); }; });
+    w.body.querySelectorAll('[data-file]').forEach(b => { b.onclick = () => { nameIn.value = baseOf(zips[Number(b.dataset.file)].name); w.name = nameIn.value; }; });
     const newdir = w.body.querySelector('.gh-newdir');
     w.body.querySelector('[data-newdir]').onclick = () => { newdir.hidden = false; newdir.querySelector('input').focus(); };
     const mkdir = () => {
@@ -387,32 +383,16 @@ async function drawSaveForm(w, src, path, dirs, decks) {
         if (!n) { err.textContent = 'Name the file first.'; nameIn.focus(); return; }
         const deck = w.body.querySelector('[data-deck]').checked;
         const notes = w.body.querySelector('[data-notes]').checked;
-        const ids = [...w.body.querySelectorAll('[data-rec]:checked')].map(x => x.dataset.rec);
-        if (!deck && !notes && !ids.length) { err.textContent = 'Tick something to save.'; return; }
+        const recs = w.body.querySelector('[data-recs]').checked ? takes.map(r => r.id) : [];
+        if (!deck && !notes && !recs.length) { err.textContent = 'Tick something to save.'; return; }
         try { localStorage.setItem(NOTES_KEY, notes ? '1' : '0'); } catch { /* ignore */ }
         appState.ghTarget = { src: src.id, dir: path, name: n };
         updateTitle();
         window.BeamerModal?.close();
-        setTimeout(() => saveNow(src, { deck, notes, recordings: ids }), 0);
+        setTimeout(() => saveNow(src, { deck, notes, recordings: recs }), 0);
     };
+    nameIn.addEventListener('keydown', e => { if (e.key === 'Enter') w.body.querySelector('[data-save]').click(); });
     setTimeout(() => nameIn.focus(), 0);
-}
-
-/** Ctrl/⌘+S: save straight away where the presentation came from (the deck,
- *  and the notes unless you turned them off). The window opens instead the
- *  first time, or when there are new recordings for it to ask about. */
-export async function quickSave() {
-    if (!appState.zipFile) return;
-    let src = null;
-    try { src = await source(); } catch { /* the window explains */ }
-    const t = appState.ghTarget;
-    if (!src || !t || t.src !== src.id) return savePresentation();
-    let fresh = [];
-    try {
-        fresh = (await listRecordings()).filter(r => r.lecture === targetKey(t) && !(r.uploaded && r.uploaded.repo === src.id) && !(src.limit && (r.size || 0) > src.limit));
-    } catch { /* none */ }
-    if (fresh.length) return savePresentation();
-    return saveNow(src, { deck: true, notes: wantNotes(), recordings: [] });
 }
 
 let saving = false;
