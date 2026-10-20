@@ -176,7 +176,7 @@ def run():
               and crumbs()[-1] == "05 - Binary Arithmetic")
         check("same name", page.input_value("[data-name]") == "05 - Binary Arithmetic")
         check("three checkboxes: Presentation, Notes, Recordings (1)",
-              [x.inner_text().strip() for x in page.locator(".gh-checks-row .gh-check").all()] == ["Presentation", "Notes", "Recordings (1)"]
+              [" ".join(x.inner_text().split()) for x in page.locator(".gh-chips .gh-chip").all()] == ["Presentation", "Notes", "Recordings 1"]
               and page.locator("[data-recs]").is_checked())
         box = page.locator(".custom-modal-content").bounding_box()
         check("the window fits the screen", box["y"] >= 0 and box["y"] + box["height"] <= 860)
@@ -209,29 +209,24 @@ def run():
         menu("save"); page.wait_for_timeout(1500)
         page.select_option(".gh-lib select[data-repo]", "chandra-gummaluru/courses"); page.wait_for_timeout(1200)
         go("csc258"); go("f26")
-        page.click("[data-newdir]"); page.fill("[data-dirname]", "slides"); page.click("[data-mkdir]"); page.wait_for_timeout(500); shot("09-save-elsewhere")
-        check("new folder shows in the path", crumbs()[-1] == "slides")
+        shot("09-save-elsewhere")
+        check("no New folder button in Save", page.locator("[data-newdir]").count() == 0)
         page.click("[data-save]"); page.wait_for_timeout(5000)
         uf = pub.files()
-        check("saved in courses › csc258/f26/slides", "csc258/f26/slides/05 - Binary Arithmetic.zip" in uf and "csc258/f26/slides/05 - Binary Arithmetic.pdf" in uf)
-        check("the next save starts there", st("ghTarget.src") == "github:chandra-gummaluru/courses" and st("ghTarget.dir") == "csc258/f26/slides")
+        check("saved in courses › csc258/f26", "csc258/f26/05 - Binary Arithmetic.zip" in uf and "csc258/f26/05 - Binary Arithmetic.pdf" in uf)
+        check("the next save starts there", st("ghTarget.src") == "github:chandra-gummaluru/courses" and st("ghTarget.dir") == "csc258/f26")
 
-        # 8. Upload a file into the folder you're in.
+        # 8. Open shows only the browser: no New folder or Upload buttons.
         menu("open"); page.wait_for_timeout(1500)
-        check("open starts in the repository and folder in use", page.input_value(".gh-lib select[data-repo]") == "chandra-gummaluru/courses" and crumbs()[-1] == "slides")
-        pdf = os.path.join(OUT, "intro.pdf")
-        with open(pdf, "wb") as f:
-            f.write(make_pdf(3, "Intro"))
-        with page.expect_file_chooser() as fc:
-            page.click("[data-upload]")
-        fc.value.set_files(pdf); page.wait_for_timeout(3000)
-        check("uploaded and opened", "csc258/f26/slides/intro.pdf" in pub.files() and st("deckName") == "intro")
+        check("open starts in the repository and folder in use", page.input_value(".gh-lib select[data-repo]") == "chandra-gummaluru/courses" and crumbs()[-1] == "f26")
+        check("no New folder or Upload buttons", page.locator(".gh-lib [data-newdir], .gh-lib [data-upload]").count() == 0)
+        page.evaluate("window.BeamerModal && window.BeamerModal.close()")
 
         # 9. Signed in, a dropped file doesn't open by itself.
         page.evaluate("""() => { const dt = new DataTransfer(); dt.items.add(new File(['%PDF-1.4'], 'dropped.pdf', {type:'application/pdf'}));
             for (const t of ['dragenter','dragover','drop']) window.dispatchEvent(new DragEvent(t, {dataTransfer: dt, bubbles: true, cancelable: true})); }""")
         page.wait_for_timeout(1500)
-        check("drop opens the Open window instead", page.locator(".gh-lib").count() == 1 and st("deckName") == "intro")
+        check("drop opens the Open window instead", page.locator(".gh-lib").count() == 1 and st("deckName") == "05 - Binary Arithmetic")
         check("no single-file option when signed in", page.locator("[data-single]").count() == 0)
         page.evaluate("window.BeamerModal && window.BeamerModal.close()")
 

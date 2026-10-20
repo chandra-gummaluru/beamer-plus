@@ -3,8 +3,7 @@
 // like a file manager. Signed out, Open is just the file picker, and Save
 // picks a folder on this computer (or downloads).
 //
-//   Open:  click a .zip or .pdf to open it. Signed in, "Upload a file here"
-//          puts one from your computer in the folder you're in.
+//   Open:  click a .zip or .pdf to open it.
 //   Save:  the folder you're in, a file name, and what to save:
 //            <name>.zip                        the presentation (reopens at this slide)
 //            <name>.pdf                        the notes PDF
@@ -39,13 +38,13 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const svg = (d, w = 1.8) => `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
 const ICON = {
     gh: '<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>',
-    plus: svg('<path d="M12 5v14M5 12h14"/>', 2),
     up: svg('<path d="M12 19V5M5 12l7-7 7 7"/>'),
     folder: svg('<path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H9l2 2.5h7.5A2.5 2.5 0 0 1 21 10v7.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/>'),
     deck: svg('<rect x="3" y="4" width="18" height="13" rx="1.5"/><path d="M8 21h8M12 17v4"/>'),
     pdf: svg('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>'),
     refresh: svg('<path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/>'),
-    upload: svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>'),
+    rec: svg('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/>'),
+    tick: '<svg class="gh-chip-tick" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
 };
 const extOf = name => (/\.([a-z0-9]+)$/i.exec(name || '') || [, ''])[1].toLowerCase();
 const baseOf = name => String(name || '').replace(/\.(zip|pdf)$/i, '');
@@ -58,19 +57,6 @@ const loading = (title, message = '') => window.BeamerModal?.show({ kind: 'loadi
 function setLoading(message) {
     const el = window.BeamerModal?.open?.querySelector('.custom-modal-message');
     if (el) el.textContent = message;
-}
-function pickFile(accept, cb) {
-    const input = Object.assign(document.createElement('input'), { type: 'file', accept, hidden: true });
-    input.addEventListener('change', () => { const f = input.files?.[0]; input.remove(); if (f) cb(f); });
-    document.body.appendChild(input);
-    input.click();
-}
-function confirmBox(title, message, yes) {
-    return new Promise(res => window.BeamerModal?.show({
-        kind: 'warning', title, message,
-        buttons: [{ label: 'Cancel', kind: 'cancel', onClick: () => res(false) }, { label: yes, kind: 'ok', onClick: () => res(true) }],
-        canClose: () => { res(false); return true; },
-    }));
 }
 const store = {
     get(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch { return null; } },
@@ -97,7 +83,7 @@ export function initLibrary(state) {
     setDropHandler((file) => {
         if (!githubActive()) { appState.pendingGhTarget = null; openPresentationFile(file); return; }
         openPresentation();
-        toast('Signed in, presentations open from GitHub. Use “Upload a file here” to put this one in the repository.');
+        toast('Signed in, presentations open from your GitHub repository.');
     });
     bus.on('github:changed', () => { S.src = null; if (!githubActive()) S.repo = null; });
     bus.on('library:open', () => openPresentation());
@@ -289,11 +275,9 @@ function listHTML(path, dirs, files, { filesQuiet = false } = {}) {
 
 /* Open: folders and presentations (.zip, .pdf). */
 function drawOpenList(w, src, path, dirs, decks) {
-    w.body.innerHTML = `${listHTML(path, dirs, decks)}
-        ${src.kind === 'github' ? `<p class="gh-row"><button type="button" class="gh-btn" data-upload>${ICON.upload}Upload a file here</button></p>` : ''}`;
+    w.body.innerHTML = listHTML(path, dirs, decks);
     w.body.querySelectorAll('[data-dir]').forEach(b => { b.onclick = () => browse(w, src, b.dataset.dir); });
     w.body.querySelectorAll('[data-file]').forEach(b => { b.onclick = () => openDeck(src, decks[Number(b.dataset.file)]); });
-    w.body.querySelector('[data-upload]')?.addEventListener('click', () => uploadHere(src, path, decks));
 }
 
 async function openDeck(src, entry) {
@@ -313,28 +297,6 @@ async function openDeck(src, entry) {
     }
 }
 
-/* Signed in: put a file from this computer in this folder, then open it. */
-function uploadHere(src, path, decks) {
-    pickFile('.pdf,.zip,application/pdf,application/zip', async (file) => {
-        if (!isDeck(file.name)) return showError('Can’t add that file', new Error(`“${file.name}” isn’t a PDF or a Beamer+ ZIP.`));
-        if (src.limit && file.size > src.limit) return showError('Too large for GitHub', new Error(`${file.name} is ${formatSize(file.size)}; GitHub doesn’t accept files over 100 MB.`));
-        const name = GH.cleanName(file.name) || 'presentation.pdf';
-        if (decks.some(d => d.name === name) && !(await confirmBox('Replace it?', `This folder already has “${name}”. Replace it with this file?`, 'Replace'))) return;
-        loading(`Uploading to ${src.where}…`, name);
-        try {
-            await src.write([{ path: join(path, name), blob: file }], `Beamer+: add ${join(path, name)}`, setLoading);
-            appState.pendingGhTarget = { src: src.id, dir: path, name: baseOf(name) };
-            window.BeamerModal?.close();
-            openPresentationFile(new File([file], name, { type: file.type }));
-            toast(`Uploaded to ${join(path, name)}.`);
-        } catch (e) {
-            appState.pendingGhTarget = null;
-            window.BeamerModal?.close();
-            showError('Couldn’t upload it', e);
-        }
-    });
-}
-
 /* Save: this folder, a name, and what to save. */
 // The takes a save offers: those recorded with this presentation (or with no
 // presentation yet) that aren't saved there already.
@@ -352,15 +314,14 @@ async function drawSaveForm(w, src, path, dirs, decks) {
     const takes = await takesFor(src, t0 ? targetKey(t0) : null);
     const zips = decks.filter(d => /\.zip$/i.test(d.name));
     w.body.innerHTML = `${listHTML(path, dirs, zips, { filesQuiet: true })}
-        <div class="gh-row gh-newdir-row"><button type="button" class="gh-link" data-newdir>${ICON.plus}New folder</button>
-            <span class="gh-newdir" hidden><input data-dirname placeholder="Folder name" spellcheck="false"><button type="button" class="gh-btn gh-btn--sm" data-mkdir>Create</button></span></div>
         <label class="gh-field"><span>File name</span>
             <input data-name value="${esc(w.name)}" spellcheck="false" autocomplete="off"></label>
-        <div class="gh-checks-row" role="group" aria-label="What to save">
-            <label class="gh-check" title="The presentation (.zip): reopens at the slide you're on"><input type="checkbox" data-deck checked><span>Presentation</span></label>
-            <label class="gh-check" title="One PDF with your annotations and widgets drawn in"><input type="checkbox" data-notes${wantNotes() ? ' checked' : ''}><span>Notes</span></label>
-            <label class="gh-check${takes.length ? '' : ' is-off'}" title="${takes.length ? `${takes.length} recording${takes.length > 1 ? 's' : ''} not saved yet` : 'No recordings to save'}"><input type="checkbox" data-recs${takes.length ? ' checked' : ' disabled'}><span>Recordings${takes.length ? ` (${takes.length})` : ''}</span></label>
-        </div>
+        <div class="gh-field"><span>Save</span>
+            <div class="gh-chips" role="group" aria-label="What to save">
+                <label class="gh-chip" title="The presentation: reopens at the slide you're on"><input type="checkbox" data-deck checked><span>${ICON.deck}Presentation${ICON.tick}</span></label>
+                <label class="gh-chip" title="One PDF with your annotations and widgets drawn in"><input type="checkbox" data-notes${wantNotes() ? ' checked' : ''}><span>${ICON.pdf}Notes${ICON.tick}</span></label>
+                <label class="gh-chip" title="${takes.length ? `${takes.length} recording${takes.length > 1 ? 's' : ''} not saved yet` : 'No recordings to save'}"><input type="checkbox" data-recs${takes.length ? ' checked' : ' disabled'}><span>${ICON.rec}Recordings${takes.length ? ` <small>${takes.length}</small>` : ''}${ICON.tick}</span></label>
+            </div></div>
         <p class="gh-err" data-save-err></p>
         <p class="gh-row gh-row--end"><button type="button" class="gh-btn" data-cancel>Cancel</button>
             <button type="button" class="gh-btn gh-btn--primary" data-save>Save</button></p>`;
@@ -368,14 +329,6 @@ async function drawSaveForm(w, src, path, dirs, decks) {
     nameIn.addEventListener('input', () => { w.name = nameIn.value; });
     w.body.querySelectorAll('[data-dir]').forEach(b => { b.onclick = () => browse(w, src, b.dataset.dir); });
     w.body.querySelectorAll('[data-file]').forEach(b => { b.onclick = () => { nameIn.value = baseOf(zips[Number(b.dataset.file)].name); w.name = nameIn.value; }; });
-    const newdir = w.body.querySelector('.gh-newdir');
-    w.body.querySelector('[data-newdir]').onclick = () => { newdir.hidden = false; newdir.querySelector('input').focus(); };
-    const mkdir = () => {
-        const n = GH.cleanName(newdir.querySelector('input').value);
-        if (n) browse(w, src, join(path, n));         // made when something is saved in it
-    };
-    w.body.querySelector('[data-mkdir]').onclick = mkdir;
-    newdir.querySelector('input').addEventListener('keydown', e => { if (e.key === 'Enter') mkdir(); });
     w.body.querySelector('[data-cancel]').onclick = () => window.BeamerModal?.close();
     w.body.querySelector('[data-save]').onclick = () => {
         const n = GH.cleanName(nameIn.value);

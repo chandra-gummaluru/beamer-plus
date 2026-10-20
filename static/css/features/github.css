@@ -221,3 +221,30 @@
 .gh-checks-row { display: flex; flex-wrap: wrap; gap: 6px 22px; padding: 2px 0; }
 .gh-checks-row .gh-check { padding: 2px 0; align-items: center; font-weight: 600; font-size: var(--fs-base); }
 .gh-checks-row .gh-check input { margin-top: 0; }
+.gh-row > [hidden] { display: none; }
+.gh-newdir input { min-height: 34px; }
+
+/* What to save: three toggle chips */
+.gh-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.gh-chip { position: relative; cursor: pointer; }
+.gh-chip input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.gh-chip > span {
+    display: inline-flex; align-items: center; gap: 7px;
+    min-height: 36px; padding: 0 12px 0 10px;
+    border: 1px solid oklch(84% 0.005 260); border-radius: var(--r-pill);
+    background: var(--surface-paper); color: var(--ink-2);
+    font-size: var(--fs-sm); font-weight: 600;
+    transition: background var(--dur-fast, .12s), border-color var(--dur-fast, .12s), color var(--dur-fast, .12s);
+    user-select: none;
+}
+.gh-chip > span svg { width: 15px; height: 15px; }
+.gh-chip > span small { font-size: var(--fs-xs); font-weight: 600; padding: 0 6px; border-radius: var(--r-pill); background: var(--surface-cream-2); color: var(--ink-2); }
+.gh-chip .gh-chip-tick { width: 0; margin-left: -7px; opacity: 0; transition: width var(--dur-fast, .12s), margin var(--dur-fast, .12s), opacity var(--dur-fast, .12s); }
+.gh-chip:hover > span { border-color: var(--ink-3); color: var(--ink-1); }
+.gh-chip > span { color: var(--ink-3); }
+.gh-chip input:checked + span { background: var(--accent-soft); border-color: var(--ink-2); color: var(--ink-1); }
+.gh-chip input:checked + span small { background: var(--surface-paper); color: var(--ink-1); }
+.gh-chip input:checked + span .gh-chip-tick { width: 14px; margin-left: 0; opacity: 1; }
+.gh-chip input:focus-visible + span { outline: 2px solid var(--ink-1); outline-offset: 2px; }
+.gh-chip input:disabled + span { opacity: 0.45; cursor: default; border-style: dashed; }
+.gh-chip:has(input:disabled) { cursor: default; }

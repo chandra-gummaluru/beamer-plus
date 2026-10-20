@@ -94,10 +94,10 @@ and **Save** picks a **folder** on this computer (Chrome and Edge) or downloads.
 
 - **Open a presentation** (signed in) lists the folders and the `.zip` / `.pdf`
   files in the one you're in; click one to open it. Signed in, presentations come from
-  GitHub only: **Upload a file here** puts one from your computer in the folder.
+  GitHub only (put files in the repository on GitHub or with git).
   Clicking the empty slide opens this window too.
 - **Save presentation** starts in the repository and folder the presentation
-  came from. Pick a folder (or **New folder**), a file name, and tick what to
+  came from. Pick a folder, a file name, and tick what to
   save (Presentation, Notes, Recordings); each goes in that folder:
   - `<name>.zip`: the presentation, which reopens at the slide you were on
   - `<name>.pdf`: the notes PDF (so don't name it after a slides PDF in the same
