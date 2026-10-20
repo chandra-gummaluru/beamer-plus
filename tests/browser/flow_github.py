@@ -221,21 +221,29 @@ def run():
         check("no New folder or Upload buttons", page.locator(".gh-lib [data-newdir], .gh-lib [data-upload]").count() == 0)
         page.evaluate("window.BeamerModal && window.BeamerModal.close()")
 
-        # 8b. Signed in, a window can use a folder on this computer instead of a repository.
+        # 8b. Signed in: open a file from this computer, save to a folder on it (system pickers).
         page.evaluate(SEED_FOLDER, base64.b64encode(make_zip(make_pdf(4, "Adders"))).decode())
+        adders = os.path.join(OUT, "07 - Adders.zip")
+        with open(adders, "wb") as f:
+            f.write(make_zip(make_pdf(4, "Adders")))
         menu("open"); page.wait_for_timeout(1500)
-        check("repository list offers a folder on this computer",
+        check("open list offers a file on this computer",
+              "A file on this computer…" in [o.inner_text() for o in page.locator(".gh-lib select[data-repo] option").all()])
+        with page.expect_file_chooser(timeout=3000) as fc:
+            page.select_option(".gh-lib select[data-repo]", "__folder")
+        fc.value.set_files(adders); page.wait_for_timeout(2500)
+        check("it's the file picker; the file opens", st("deckName") == "07 - Adders" and not st("ghTarget") and page.locator(".gh-lib").count() == 0)
+        menu("save"); page.wait_for_timeout(1500)
+        check("save list offers a folder on this computer",
               "A folder on this computer…" in [o.inner_text() for o in page.locator(".gh-lib select[data-repo] option").all()])
-        page.select_option(".gh-lib select[data-repo]", "__folder"); page.wait_for_timeout(1500); shot("10b-open-folder")
-        check("choosing it goes straight to the folder picker, then browses what you pick", crumbs() == ["teaching"] and items() == ["csc258"])
-        go("csc258"); go("07 - Adders.zip"); page.wait_for_timeout(2500)
-        check("opened from the folder while signed in", st("ghTarget && s.ghTarget.src") == "folder:teaching")
-        menu("save"); page.wait_for_timeout(1500); shot("10c-save-folder")
-        check("save starts in that folder", page.input_value(".gh-lib select[data-repo]") == "__folder" and crumbs()[-1] == "csc258")
+        page.select_option(".gh-lib select[data-repo]", "__folder"); page.wait_for_timeout(1500); shot("10c-save-folder")
+        check("the folder picker; then just the folder, a name and what to save", "teaching" in page.inner_text(".gh-lib-src")
+              and page.locator(".gh-files").count() == 0 and page.input_value("[data-name]") == "07 - Adders")
         page.click("[data-save]"); page.wait_for_timeout(4000)
         files = page.evaluate(LIST_FOLDER)
-        check("saved to the folder while signed in", "csc258/07 - Adders.pdf" in files)
+        check("saved into that folder", "07 - Adders.zip" in files and "07 - Adders.pdf" in files)
         menu("save"); page.wait_for_timeout(1500)
+        check("the next save starts there", page.input_value(".gh-lib select[data-repo]") == "__folder")
         page.select_option(".gh-lib select[data-repo]", "chandra-gummaluru/courses"); page.wait_for_timeout(1200)
         check("switching back to a repository browses it", crumbs()[0] == "courses")
         page.evaluate("window.BeamerModal && window.BeamerModal.close()")
@@ -285,17 +293,12 @@ def run():
         page.keyboard.press("Escape")
         # Save picks a folder on this computer (or downloads).
         menu("save"); page.wait_for_timeout(800); shot("11-folder-none")
-        check("save window uses the folder this browser remembers (or Download instead)",
+        check("save window: the remembered folder (Change…) or Download instead; no browsing",
               "teaching" in page.inner_text(".gh-lib-src") and "Change" in page.inner_text(".gh-lib-src")
-              and page.locator("[data-download]").count() == 1 and page.locator(".gh-lib select[data-repo]").count() == 0)
-        page.locator(".gh-crumb", has_text="teaching").click(); page.wait_for_timeout(500)
-        check("then browses it", crumbs() == ["teaching"] and items() == ["csc258"])
-        go("csc258"); shot("12-folder-save")
-        check("it shows what's there", any("07 - Adders.zip" in i for i in items()))
-        page.click("[data-save]"); page.wait_for_timeout(5000)
+              and page.locator("[data-download]").count() == 1 and page.locator(".gh-files").count() == 0); shot("12-folder-save")
+        page.fill("[data-name]", "adders guest"); page.click("[data-save]"); page.wait_for_timeout(5000)
         files = page.evaluate(LIST_FOLDER)
-        check("saved in the folder", "csc258/07 - Adders.zip" in files and "csc258/07 - Adders.pdf" in files)
-        check("the next save starts there", st("ghTarget.src") == "folder:teaching" and st("ghTarget.dir") == "csc258")
+        check("saved in the folder", "adders guest.zip" in files and "adders guest.pdf" in files)
         page.click("#account-btn"); page.click(".account-menu [data-menu='end']"); page.wait_for_timeout(300)
         page.click(".custom-modal-btn-ok"); page.wait_for_url(BASE); page.wait_for_timeout(500)
         check("End session returns to the start page", page.locator("#welcome-create-btn").is_visible())

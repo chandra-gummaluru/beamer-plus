@@ -151,7 +151,7 @@ function openWindow(mode) {
         name: null,                // save: the file name typed so far
         // A folder on this computer rather than a repository: always when
         // signed out; signed in, when the presentation came from one.
-        useFolder: !githubActive() || !!appState.ghTarget?.src?.startsWith('folder:'),
+        useFolder: mode === 'save' && (!githubActive() || !!appState.ghTarget?.src?.startsWith('folder:')),
     };
     drawFoot(w);
     refreshWindow(w);
@@ -165,6 +165,9 @@ async function refreshWindow(w) {
         if (w.useFolder) await drawFolderRow(w);
         const src = await source(w);
         if (!src) return;
+        // A folder on this computer is chosen with the system picker and saved
+        // into directly; only repositories are browsed here.
+        if (src.kind === 'folder') return drawSaveForm(w, src, '', [], []);
         if (w.cwd === null) {
             const t = appState.ghTarget;
             w.cwd = t && t.src === src.id ? t.dir : lastFolder(src);
@@ -200,21 +203,23 @@ async function drawRepoRow(w) {
         w.srcBox.innerHTML = `<p><b>Beamer+ can’t see any of your repositories yet.</b> On GitHub, give it access to the repository your presentations are in, then check again.</p>
             <p class="gh-row"><a class="gh-btn gh-btn--primary" href="${esc(install)}" target="_blank" rel="noopener">${ICON.gh}Give Beamer+ access</a><button type="button" class="gh-btn" data-again>Check again</button></p>`;
         w.srcBox.querySelector('[data-again]').onclick = () => { S.repos = null; refreshWindow(w); };
-        if (F.supported() && !w.useFolder) {
-            w.srcBox.insertAdjacentHTML('beforeend', `<p class="gh-row"><button type="button" class="gh-link" data-use-folder>${ICON.folder}Use a folder on this computer instead</button></p>`);
-            w.srcBox.querySelector('[data-use-folder]').onclick = () => { w.useFolder = true; w.cwd = null; refreshWindow(w); };
+        if (w.mode === 'open' || (F.supported() && !w.useFolder)) {
+            w.srcBox.insertAdjacentHTML('beforeend', `<p class="gh-row"><button type="button" class="gh-link" data-use-folder>${ICON.folder}${w.mode === 'open' ? 'Open a file from this computer instead' : 'Save to a folder on this computer instead'}</button></p>`);
+            w.srcBox.querySelector('[data-use-folder]').onclick = () => { w.useFolder = true; useComputer(w); };
         }
         return;
     }
     const cur = w.useFolder ? '__folder' : (S.repo?.full_name || '');
-    // "A folder on this computer…" browses a folder instead (Chrome, Edge).
+    // "A file on this computer…" (Open) is the system file picker; "A folder on
+    // this computer…" (Save) the system folder picker (Chrome, Edge).
     // "Add another repository…" opens GitHub's page for giving Beamer+ access;
     // the list refreshes when you come back (or with the refresh button).
     w.srcBox.innerHTML = `
         <div class="gh-field"><label for="gh-repo-select">${w.mode === 'save' ? 'Save to' : 'Open from'}</label>
             <div class="gh-repo-row">
                 <select id="gh-repo-select" data-repo>${cur ? '' : '<option value="" selected>Choose a repository…</option>'}${repos.map(r => `<option value="${esc(r.full_name)}"${r.full_name === cur ? ' selected' : ''}>${esc(r.full_name)}${r.private ? ' (private)' : ''}</option>`).join('')}
-                    ${F.supported() ? `<option value="__folder"${cur === '__folder' ? ' selected' : ''}>A folder on this computer…</option>` : ''}
+                    ${w.mode === 'open' ? '<option value="__folder">A file on this computer…</option>'
+                        : F.supported() ? `<option value="__folder"${cur === '__folder' ? ' selected' : ''}>A folder on this computer…</option>` : ''}
                     <option value="__add">Add another repository…</option></select>
                 <button type="button" class="gh-btn gh-icon-btn" data-again title="Refresh the list" aria-label="Refresh the list">${ICON.refresh}</button>
             </div></div>`;
@@ -227,7 +232,10 @@ async function drawRepoRow(w) {
             return;
         }
         w.cwd = null;
-        if (e.target.value === '__folder') { w.useFolder = true; useComputer(w); return; }
+        if (e.target.value === '__folder') {
+            if (w.mode === 'open') e.target.value = cur;
+            w.useFolder = true; useComputer(w); return;
+        }
         w.useFolder = false;
         S.repo = repos.find(r => r.full_name === e.target.value) || null;
         S.src = null;
@@ -237,14 +245,18 @@ async function drawRepoRow(w) {
     w.srcBox.querySelector('[data-again]').onclick = () => { S.repos = null; refreshWindow(w); };
 }
 
-// "A folder on this computer…": straight into the folder you used last time,
-// or the system folder picker if there isn't one yet (or access lapsed).
+// This computer: Open is the system file picker (a .zip or .pdf); Save is
+// the system folder picker, then saves into that folder.
 async function useComputer(w) {
+    if (w.mode === 'open') {
+        window.BeamerModal?.close();
+        appState.pendingGhTarget = null;
+        chooseLocalFile();
+        return;
+    }
     try {
-        if (await F.remembered()) {
-            if ((await F.permission()) === 'granted' || await F.reconnect()) { S.fsSrc = null; return refreshWindow(w); }
-        }
         if (await F.choose()) S.fsSrc = null;
+        else if (!(await F.remembered())) w.useFolder = false;      // cancelled with nothing chosen
     } catch (e) { showError('Couldn’t open that folder', e); }
     refreshWindow(w);
 }
@@ -340,7 +352,7 @@ async function drawSaveForm(w, src, path, dirs, decks) {
     if (w.name === null) w.name = t0 && t0.src === src.id ? t0.name : (GH.cleanName(appState.deckName) || 'presentation');
     const takes = await takesFor(src, t0 ? targetKey(t0) : null);
     const zips = decks.filter(d => /\.zip$/i.test(d.name));
-    w.body.innerHTML = `${listHTML(path, dirs, zips, { filesQuiet: true })}
+    w.body.innerHTML = `${src.kind === 'folder' ? '' : listHTML(path, dirs, zips, { filesQuiet: true })}
         <label class="gh-field"><span>File name</span>
             <input data-name value="${esc(w.name)}" spellcheck="false" autocomplete="off"></label>
         <div class="gh-field"><span>Save</span>
