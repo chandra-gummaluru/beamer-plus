@@ -1,5 +1,5 @@
-// Where presentations live: a GitHub repository (signed in) or a folder on
-// this computer (signed out). The browser in library/ui.js sees both the same:
+// Where presentations live on GitHub: a repository, as the browser in
+// library/ui.js sees it:
 //
 //   { kind, id, name, limit, where,
 //     list(path) → [{ name, path, type: 'dir'|'file', size?, ... }],
@@ -8,7 +8,6 @@
 // Beamer+ imposes no layout: you browse the folders and pick.
 
 import * as GH from '../github/library.js';
-import * as F from './folder.js';
 
 export function githubSource(repo) {
     // The whole tree is read once, then browsed here; a save adds to it.
@@ -54,20 +53,5 @@ export function githubSource(repo) {
             index = null;                       // read it again next time
         },
         refresh() { index = null; },
-    };
-}
-
-export function folderSource(handle) {
-    return {
-        kind: 'folder',
-        id: `folder:${handle.name}`,
-        name: handle.name,
-        limit: null,
-        where: 'your folder',
-        list: path => F.list(path),
-        read: e => F.read(e),
-        changed: e => F.changed(e),
-        write: (files, msg, onStep) => F.write(files, onStep),
-        refresh() {},
     };
 }

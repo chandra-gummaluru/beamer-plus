@@ -1,7 +1,8 @@
 // "Open a presentation" and "Save presentation" (the session menu, the empty
-// slide). Signed in, both pick a repository and browse its folders
-// like a file manager. Signed out, Open is just the file picker, and Save
-// picks a folder on this computer (or downloads).
+// slide). Signed in, both pick a repository and browse its folders like a
+// file manager, with "Or choose a file from this computer" / "Or save to this
+// computer" underneath. Signed out, Open is just the file picker, and Save
+// saves to this computer (the browser's downloads folder).
 //
 //   Open:  click a .zip or .pdf to open it.
 //   Save:  the folder you're in, a file name, and what to save:
@@ -14,14 +15,12 @@
 
 import { bus } from '../core/events.js';
 import * as GH from '../github/library.js';
-import * as F from './folder.js';
-import { githubSource, folderSource } from './sources.js';
+import { githubSource } from './sources.js';
 import { githubActive, toast, updateTitle } from '../github/ui.js';
 import { api, appConfig, startSignIn } from '../github/auth.js';
 import { setUploadButtonHandler, setDropHandler, chooseLocalFile, openPresentationFile } from '../app/uploader.js';
 import { buildPresentationZip } from '../editor/save.js';
 import { buildNotesPdf } from '../editor/notes-export.js';
-import { openDownloadMenu } from '../editor/download-menu.js';
 import { listRecordings, getRecording, updateRecording, formatSize } from '../app/recorder.js';
 
 let appState = null;
@@ -29,7 +28,21 @@ const S = {
     repos: null,         // GitHub: the repositories the app can see (cached for the page)
     repo: null,          // GitHub: the repository in use
     src: null,           // the GitHub source in use (see sources.js)
-    fsSrc: null,         // the folder on this computer, once chosen
+};
+
+// "This computer": files go to the browser's downloads folder, one download each.
+const COMPUTER = {
+    kind: 'computer', id: 'computer', name: 'this computer', where: 'this computer', limit: null,
+    async write(files) {
+        for (const f of files) {
+            const url = URL.createObjectURL(f.blob);
+            const a = Object.assign(document.createElement('a'), { href: url, download: f.path.split('/').pop() });
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 60_000);
+            await new Promise(r => setTimeout(r, 400));          // so the browser takes each one
+        }
+    },
+    refresh() {},
 };
 const NOTES_KEY = 'beamer.library.notes';
 const REPO_KEY = 'beamer.library.repo';        // full name of the last repository
@@ -43,6 +56,7 @@ const ICON = {
     folder: svg('<path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H9l2 2.5h7.5A2.5 2.5 0 0 1 21 10v7.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/>'),
     deck: svg('<rect x="3" y="4" width="18" height="13" rx="1.5"/><path d="M8 21h8M12 17v4"/>'),
     pdf: svg('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>'),
+    down: svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>'),
     refresh: svg('<path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/>'),
     rec: svg('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/>'),
     tick: '<svg class="gh-chip-tick" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
@@ -92,15 +106,14 @@ export function initLibrary(state) {
 
 /** The repository or folder in use, for display (or ''). */
 export function sourceLabel() {
-    if (githubActive()) return S.repo ? S.repo.full_name : (store.get(REPO_KEY) || '');
-    return S.fsSrc ? `Folder: ${S.fsSrc.name}` : '';
+    return githubActive() ? (S.repo ? S.repo.full_name : (store.get(REPO_KEY) || '')) : '';
 }
 
-// The source a window uses right now, or null while one still has to be
-// chosen. Signed in, a window can use a folder on this computer instead of a
-// repository ("A folder on this computer…" in the repository list).
+// The source a window uses right now, or null while a repository still has
+// to be chosen. Saving to this computer uses COMPUTER.
 async function source(w) {
-    if (githubActive() && !w?.useFolder) {
+    if (w?.local || !githubActive()) return COMPUTER;
+    {
         if (!S.repo) {
             const name = store.get(REPO_KEY);
             if (name) {
@@ -112,9 +125,6 @@ async function source(w) {
         if (!S.src || S.src.kind !== 'github' || S.src.repo.full_name !== S.repo.full_name) S.src = githubSource(S.repo);
         return S.src;
     }
-    if (!F.supported() || !(await F.remembered()) || (await F.permission()) !== 'granted') return null;
-    if (!S.fsSrc) S.fsSrc = folderSource(await F.remembered());
-    return S.fsSrc;
 }
 
 /* ─── the window ──────────────────────────────────────────────── */
@@ -149,9 +159,9 @@ function openWindow(mode) {
         body: root.querySelector('.gh-lib-body'),
         foot: root.querySelector('.gh-lib-foot'),
         name: null,                // save: the file name typed so far
-        // A folder on this computer rather than a repository: always when
-        // signed out; signed in, when the presentation came from one.
-        useFolder: mode === 'save' && (!githubActive() || !!appState.ghTarget?.src?.startsWith('folder:')),
+        // Save to this computer rather than a repository: always when signed
+        // out; signed in, when last saved there.
+        local: mode === 'save' && (!githubActive() || appState.ghTarget?.src === 'computer'),
     };
     drawFoot(w);
     refreshWindow(w);
@@ -161,13 +171,12 @@ async function refreshWindow(w) {
     w.nav.innerHTML = ''; w.body.innerHTML = '';
     try {
         w.srcBox.innerHTML = '';
-        if (githubActive()) await drawRepoRow(w);
-        if (w.useFolder) await drawFolderRow(w);
+        drawFoot(w);
+        if (w.local) drawComputerRow(w);
+        else await drawRepoRow(w);
         const src = await source(w);
         if (!src) return;
-        // A folder on this computer is chosen with the system picker and saved
-        // into directly; only repositories are browsed here.
-        if (src.kind === 'folder') return drawSaveForm(w, src, '', [], []);
+        if (src.kind === 'computer') return drawSaveForm(w, src, '', [], []);
         if (w.cwd === null) {
             const t = appState.ghTarget;
             w.cwd = t && t.src === src.id ? t.dir : lastFolder(src);
@@ -185,11 +194,24 @@ async function refreshWindow(w) {
     }
 }
 
-// Signed out, saving can also just download (no folder needed).
+// Signed in: "Or choose a file from this computer" (Open, the system file
+// picker) and "Or save to this computer" (Save, the downloads folder).
 function drawFoot(w) {
-    if (githubActive() || w.mode !== 'save') { w.foot.innerHTML = ''; return; }
-    w.foot.innerHTML = `<button type="button" class="gh-link" data-download>${ICON.pdf}Download instead</button>`;
-    w.foot.querySelector('[data-download]').addEventListener('click', () => { window.BeamerModal?.close(); openDownloadMenu(); });
+    if (!githubActive() || w.local) { w.foot.innerHTML = ''; return; }
+    w.foot.innerHTML = w.mode === 'open'
+        ? `<button type="button" class="gh-link" data-local>Or choose a file from this computer</button>`
+        : `<button type="button" class="gh-link" data-local>Or save to this computer</button>`;
+    w.foot.querySelector('[data-local]').onclick = () => {
+        if (w.mode === 'open') { window.BeamerModal?.close(); appState.pendingGhTarget = null; chooseLocalFile(); return; }
+        w.local = true; w.cwd = null; refreshWindow(w);
+    };
+}
+
+// Saving to this computer: where it goes, and (signed in) the way back.
+function drawComputerRow(w) {
+    w.srcBox.innerHTML = `<p class="gh-muted gh-small gh-local-note">${ICON.down}Saves to this computer, in your browser’s downloads folder.
+        ${githubActive() ? '<button type="button" class="gh-link" data-repo-back>Save to GitHub instead</button>' : ''}</p>`;
+    w.srcBox.querySelector('[data-repo-back]')?.addEventListener('click', () => { w.local = false; w.cwd = null; refreshWindow(w); });
 }
 
 /* Signed in: the repository. */
@@ -203,23 +225,15 @@ async function drawRepoRow(w) {
         w.srcBox.innerHTML = `<p><b>Beamer+ can’t see any of your repositories yet.</b> On GitHub, give it access to the repository your presentations are in, then check again.</p>
             <p class="gh-row"><a class="gh-btn gh-btn--primary" href="${esc(install)}" target="_blank" rel="noopener">${ICON.gh}Give Beamer+ access</a><button type="button" class="gh-btn" data-again>Check again</button></p>`;
         w.srcBox.querySelector('[data-again]').onclick = () => { S.repos = null; refreshWindow(w); };
-        if (w.mode === 'open' || (F.supported() && !w.useFolder)) {
-            w.srcBox.insertAdjacentHTML('beforeend', `<p class="gh-row"><button type="button" class="gh-link" data-use-folder>${ICON.folder}${w.mode === 'open' ? 'Open a file from this computer instead' : 'Save to a folder on this computer instead'}</button></p>`);
-            w.srcBox.querySelector('[data-use-folder]').onclick = () => { w.useFolder = true; useComputer(w); };
-        }
         return;
     }
-    const cur = w.useFolder ? '__folder' : (S.repo?.full_name || '');
-    // "A file on this computer…" (Open) is the system file picker; "A folder on
-    // this computer…" (Save) the system folder picker (Chrome, Edge).
+    const cur = S.repo?.full_name || '';
     // "Add another repository…" opens GitHub's page for giving Beamer+ access;
     // the list refreshes when you come back (or with the refresh button).
     w.srcBox.innerHTML = `
         <div class="gh-field"><label for="gh-repo-select">${w.mode === 'save' ? 'Save to' : 'Open from'}</label>
             <div class="gh-repo-row">
                 <select id="gh-repo-select" data-repo>${cur ? '' : '<option value="" selected>Choose a repository…</option>'}${repos.map(r => `<option value="${esc(r.full_name)}"${r.full_name === cur ? ' selected' : ''}>${esc(r.full_name)}${r.private ? ' (private)' : ''}</option>`).join('')}
-                    ${w.mode === 'open' ? '<option value="__folder">A file on this computer…</option>'
-                        : F.supported() ? `<option value="__folder"${cur === '__folder' ? ' selected' : ''}>A folder on this computer…</option>` : ''}
                     <option value="__add">Add another repository…</option></select>
                 <button type="button" class="gh-btn gh-icon-btn" data-again title="Refresh the list" aria-label="Refresh the list">${ICON.refresh}</button>
             </div></div>`;
@@ -232,53 +246,12 @@ async function drawRepoRow(w) {
             return;
         }
         w.cwd = null;
-        if (e.target.value === '__folder') {
-            if (w.mode === 'open') e.target.value = cur;
-            w.useFolder = true; useComputer(w); return;
-        }
-        w.useFolder = false;
         S.repo = repos.find(r => r.full_name === e.target.value) || null;
         S.src = null;
         store.set(REPO_KEY, S.repo?.full_name || null);
         refreshWindow(w);
     };
     w.srcBox.querySelector('[data-again]').onclick = () => { S.repos = null; refreshWindow(w); };
-}
-
-// This computer: Open is the system file picker (a .zip or .pdf); Save is
-// the system folder picker, then saves into that folder.
-async function useComputer(w) {
-    if (w.mode === 'open') {
-        window.BeamerModal?.close();
-        appState.pendingGhTarget = null;
-        chooseLocalFile();
-        return;
-    }
-    try {
-        if (await F.choose()) S.fsSrc = null;
-        else if (!(await F.remembered())) w.useFolder = false;      // cancelled with nothing chosen
-    } catch (e) { showError('Couldn’t open that folder', e); }
-    refreshWindow(w);
-}
-
-/* Signed out: the folder. */
-async function drawFolderRow(w) {
-    if (!F.supported()) {
-        w.srcBox.insertAdjacentHTML('beforeend', `<p class="gh-note">This browser can’t save into folders (Chrome and Edge can). You can still download the presentation below.</p>`);
-        return;
-    }
-    const h = await F.remembered();
-    const perm = await F.permission();
-    w.srcBox.insertAdjacentHTML('beforeend', `
-        <div class="gh-field gh-folder-field"><span>Folder</span>
-            <div class="gh-folder">${ICON.folder}<span class="gh-folder-name">${h ? esc(h.name) : '<span class="gh-muted">No folder chosen</span>'}</span>
-                ${h && perm !== 'granted' ? `<button type="button" class="gh-btn gh-btn--primary gh-btn--sm" data-allow>Allow access</button>` : ''}
-                <button type="button" class="gh-btn gh-btn--sm${h ? '' : ' gh-btn--primary'}" data-choose>${h ? 'Change…' : 'Choose a folder…'}</button></div></div>`);
-    w.srcBox.querySelector('[data-allow]')?.addEventListener('click', async () => { if (await F.reconnect()) { S.fsSrc = null; refreshWindow(w); } });
-    w.srcBox.querySelector('[data-choose]').onclick = async () => {
-        try { if (await F.choose()) { S.fsSrc = null; w.cwd = null; refreshWindow(w); } }
-        catch (e) { showError('Couldn’t open that folder', e); }
-    };
 }
 
 /* The folder browser: where you are, and what's in it. */
@@ -352,7 +325,7 @@ async function drawSaveForm(w, src, path, dirs, decks) {
     if (w.name === null) w.name = t0 && t0.src === src.id ? t0.name : (GH.cleanName(appState.deckName) || 'presentation');
     const takes = await takesFor(src, t0 ? targetKey(t0) : null);
     const zips = decks.filter(d => /\.zip$/i.test(d.name));
-    w.body.innerHTML = `${src.kind === 'folder' ? '' : listHTML(path, dirs, zips, { filesQuiet: true })}
+    w.body.innerHTML = `${src.kind === 'computer' ? '' : listHTML(path, dirs, zips, { filesQuiet: true })}
         <label class="gh-field"><span>File name</span>
             <input data-name value="${esc(w.name)}" spellcheck="false" autocomplete="off"></label>
         <div class="gh-field"><span>Save</span>

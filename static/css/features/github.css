@@ -248,3 +248,6 @@
 .gh-chip input:focus-visible + span { outline: 2px solid var(--ink-1); outline-offset: 2px; }
 .gh-chip input:disabled + span { opacity: 0.45; cursor: default; border-style: dashed; }
 .gh-chip:has(input:disabled) { cursor: default; }
+.gh-local-note { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0; }
+.gh-local-note svg { width: 14px; height: 14px; }
+.gh-lib-foot .gh-link { font-size: var(--fs-sm); }

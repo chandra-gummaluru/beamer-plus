@@ -1,5 +1,5 @@
 """Walk through Beamer+'s session menu, Open / Save presentation on GitHub (a fake one,
-fakegh.py) and in a folder (the browser's private file system standing in).
+fakegh.py) and on this computer (the file picker and downloads).
 
   python app.py --http --port 5001        (in another terminal)
   python tests/browser/flow_github.py     screenshots land in tests/browser/shots/
@@ -85,31 +85,6 @@ FAKE_TAKE = """async () => {
 }"""
 
 
-# Signed out, "Choose a folder" gets a folder in the browser's private file system
-# (Playwright can't drive the real folder picker), laid out like the repositories.
-FAKE_FOLDER = r"""() => {
-  window.showDirectoryPicker = async () => {
-    const root = await (await navigator.storage.getDirectory()).getDirectoryHandle('teaching', { create: true });
-    return root;
-  };
-}"""
-SEED_FOLDER = r"""async (zipB64) => {
-  const bytes = Uint8Array.from(atob(zipB64), c => c.charCodeAt(0));
-  const top = await navigator.storage.getDirectory();
-  try { await top.removeEntry('teaching', { recursive: true }); } catch (e) {}
-  const root = await top.getDirectoryHandle('teaching', { create: true });
-  const d = await root.getDirectoryHandle('csc258', { create: true });
-  const fh = await d.getFileHandle('07 - Adders.zip', { create: true });
-  const w = await fh.createWritable(); await w.write(bytes); await w.close();
-}"""
-LIST_FOLDER = r"""async () => {
-  const out = [];
-  const walk = async (d, pre) => { for await (const [n, h] of d.entries()) { if (h.kind === 'directory') await walk(h, pre + n + '/'); else out.push(pre + n); } };
-  await walk(await (await navigator.storage.getDirectory()).getDirectoryHandle('teaching'), '');
-  return out.sort();
-}"""
-
-
 def menu_keys(page):
     return [b.get_attribute("data-menu") for b in page.locator(".account-menu [data-menu]").all()]
 
@@ -126,9 +101,8 @@ def run():
 
     with sync_playwright() as p:
         b = p.chromium.launch()
-        ctx = b.new_context(viewport={"width": 1360, "height": 860})
+        ctx = b.new_context(viewport={"width": 1360, "height": 860}, accept_downloads=True)
         ctx.route("https://api.github.com/**", gh.handle)
-        ctx.add_init_script(f"({FAKE_FOLDER})()")
         page = ctx.new_page()
         page.on("console", lambda m: errors.append(f"{m.type}: {m.text}") if m.type == "error" else None)
         page.on("pageerror", lambda e: errors.append(f"pageerror: {e}"))
@@ -221,31 +195,30 @@ def run():
         check("no New folder or Upload buttons", page.locator(".gh-lib [data-newdir], .gh-lib [data-upload]").count() == 0)
         page.evaluate("window.BeamerModal && window.BeamerModal.close()")
 
-        # 8b. Signed in: open a file from this computer, save to a folder on it (system pickers).
-        page.evaluate(SEED_FOLDER, base64.b64encode(make_zip(make_pdf(4, "Adders"))).decode())
+        # 8b. Signed in: "Or choose a file from this computer" / "Or save to this computer".
         adders = os.path.join(OUT, "07 - Adders.zip")
         with open(adders, "wb") as f:
             f.write(make_zip(make_pdf(4, "Adders")))
         menu("open"); page.wait_for_timeout(1500)
-        check("open list offers a file on this computer",
-              "A file on this computer…" in [o.inner_text() for o in page.locator(".gh-lib select[data-repo] option").all()])
+        check("open: only repositories in the list", not any("computer" in o.inner_text() for o in page.locator(".gh-lib select[data-repo] option").all()))
+        check("open: a line underneath to choose a file", page.inner_text(".gh-lib-foot").strip() == "Or choose a file from this computer")
         with page.expect_file_chooser(timeout=3000) as fc:
-            page.select_option(".gh-lib select[data-repo]", "__folder")
+            page.click(".gh-lib-foot [data-local]")
         fc.value.set_files(adders); page.wait_for_timeout(2500)
-        check("it's the file picker; the file opens", st("deckName") == "07 - Adders" and not st("ghTarget") and page.locator(".gh-lib").count() == 0)
+        check("the file picker; the file opens", st("deckName") == "07 - Adders" and not st("ghTarget") and page.locator(".gh-lib").count() == 0)
         menu("save"); page.wait_for_timeout(1500)
-        check("save list offers a folder on this computer",
-              "A folder on this computer…" in [o.inner_text() for o in page.locator(".gh-lib select[data-repo] option").all()])
-        page.select_option(".gh-lib select[data-repo]", "__folder"); page.wait_for_timeout(1500); shot("10c-save-folder")
-        check("the folder picker; then just the folder, a name and what to save", "teaching" in page.inner_text(".gh-lib-src")
+        check("save: a line underneath to save to this computer", page.inner_text(".gh-lib-foot").strip() == "Or save to this computer")
+        page.click(".gh-lib-foot [data-local]"); page.wait_for_timeout(800); shot("10c-save-computer")
+        check("then just a name and what to save", "downloads folder" in page.inner_text(".gh-lib-src")
               and page.locator(".gh-files").count() == 0 and page.input_value("[data-name]") == "07 - Adders")
-        page.click("[data-save]"); page.wait_for_timeout(4000)
-        files = page.evaluate(LIST_FOLDER)
-        check("saved into that folder", "07 - Adders.zip" in files and "07 - Adders.pdf" in files)
+        got = []
+        page.on("download", lambda d: got.append(d.suggested_filename))
+        page.click("[data-save]"); page.wait_for_timeout(5000)
+        check("downloads the presentation and notes", sorted(got) == ["07 - Adders.pdf", "07 - Adders.zip"])
         menu("save"); page.wait_for_timeout(1500)
-        check("the next save starts there", page.input_value(".gh-lib select[data-repo]") == "__folder")
-        page.select_option(".gh-lib select[data-repo]", "chandra-gummaluru/courses"); page.wait_for_timeout(1200)
-        check("switching back to a repository browses it", crumbs()[0] == "courses")
+        check("the next save starts there, with a way back", "downloads folder" in page.inner_text(".gh-lib-src") and page.locator("[data-repo-back]").count() == 1)
+        page.click("[data-repo-back]"); page.wait_for_timeout(1200)
+        check("Save to GitHub instead browses the repository", page.locator(".gh-lib select[data-repo]").count() == 1 and len(crumbs()) >= 1)
         page.evaluate("window.BeamerModal && window.BeamerModal.close()")
 
         # 9. Signed in, a dropped file doesn't open by itself.
@@ -264,7 +237,6 @@ def run():
               and page.evaluate("!sessionStorage.getItem('beamer.github') && !localStorage.getItem('beamer.github')"))
 
         # 11. Signed out, the same windows browse a folder on this computer.
-        page.evaluate(SEED_FOLDER, base64.b64encode(make_zip(make_pdf(4, "Adders"))).decode())
         page.goto(BASE); page.wait_for_timeout(600)
         page.click("#welcome-create-btn"); page.wait_for_url("**/s/**"); page.wait_for_timeout(2600)
         page.click("#account-btn"); page.wait_for_timeout(300); shot("10-guest-menu")
@@ -291,14 +263,13 @@ def run():
             menu("open")
         check("the menu's Open is the file picker too", fc.value is not None)
         page.keyboard.press("Escape")
-        # Save picks a folder on this computer (or downloads).
-        menu("save"); page.wait_for_timeout(800); shot("11-folder-none")
-        check("save window: the remembered folder (Change…) or Download instead; no browsing",
-              "teaching" in page.inner_text(".gh-lib-src") and "Change" in page.inner_text(".gh-lib-src")
-              and page.locator("[data-download]").count() == 1 and page.locator(".gh-files").count() == 0); shot("12-folder-save")
+        # Save: to this computer (the downloads folder).
+        menu("save"); page.wait_for_timeout(800); shot("12-guest-save")
+        check("guest save: just a name and what to save, to this computer", "downloads folder" in page.inner_text(".gh-lib-src")
+              and page.locator(".gh-lib select[data-repo]").count() == 0 and page.locator(".gh-lib-foot [data-local]").count() == 0)
+        got.clear()
         page.fill("[data-name]", "adders guest"); page.click("[data-save]"); page.wait_for_timeout(5000)
-        files = page.evaluate(LIST_FOLDER)
-        check("saved in the folder", "adders guest.zip" in files and "adders guest.pdf" in files)
+        check("downloaded", sorted(got) == ["adders guest.pdf", "adders guest.zip"])
         page.click("#account-btn"); page.click(".account-menu [data-menu='end']"); page.wait_for_timeout(300)
         page.click(".custom-modal-btn-ok"); page.wait_for_url(BASE); page.wait_for_timeout(500)
         check("End session returns to the start page", page.locator("#welcome-create-btn").is_visible())
