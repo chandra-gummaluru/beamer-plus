@@ -226,9 +226,8 @@ def run():
         menu("open"); page.wait_for_timeout(1500)
         check("repository list offers a folder on this computer",
               "A folder on this computer…" in [o.inner_text() for o in page.locator(".gh-lib select[data-repo] option").all()])
-        page.select_option(".gh-lib select[data-repo]", "__folder"); page.wait_for_timeout(600)
-        page.click("[data-choose]"); page.wait_for_timeout(1500); shot("10b-open-folder")
-        check("then browses that folder", crumbs() == ["teaching"] and items() == ["csc258"])
+        page.select_option(".gh-lib select[data-repo]", "__folder"); page.wait_for_timeout(1500); shot("10b-open-folder")
+        check("choosing it goes straight to the folder picker, then browses what you pick", crumbs() == ["teaching"] and items() == ["csc258"])
         go("csc258"); go("07 - Adders.zip"); page.wait_for_timeout(2500)
         check("opened from the folder while signed in", st("ghTarget && s.ghTarget.src") == "folder:teaching")
         menu("save"); page.wait_for_timeout(1500); shot("10c-save-folder")

@@ -54,7 +54,10 @@ export async function reconnect() {
 /** Choose a folder (needs a click). Returns false if cancelled. */
 export async function choose() {
     let h;
-    try { h = await window.showDirectoryPicker({ id: 'beamer-library', mode: 'readwrite' }); }
+    // Browsers don't let a page into your home folder by itself: the system
+    // picker opens (in Documents the first time, then wherever you last
+    // were), and the folder you choose is remembered.
+    try { h = await window.showDirectoryPicker({ id: 'beamer-library', mode: 'readwrite', startIn: 'documents' }); }
     catch (e) { if (e?.name === 'AbortError') return false; throw e; }
     root = h;
     await idbSet(h);

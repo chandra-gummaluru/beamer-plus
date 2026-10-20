@@ -227,7 +227,7 @@ async function drawRepoRow(w) {
             return;
         }
         w.cwd = null;
-        if (e.target.value === '__folder') { w.useFolder = true; refreshWindow(w); return; }
+        if (e.target.value === '__folder') { w.useFolder = true; useComputer(w); return; }
         w.useFolder = false;
         S.repo = repos.find(r => r.full_name === e.target.value) || null;
         S.src = null;
@@ -235,6 +235,18 @@ async function drawRepoRow(w) {
         refreshWindow(w);
     };
     w.srcBox.querySelector('[data-again]').onclick = () => { S.repos = null; refreshWindow(w); };
+}
+
+// "A folder on this computer…": straight into the folder you used last time,
+// or the system folder picker if there isn't one yet (or access lapsed).
+async function useComputer(w) {
+    try {
+        if (await F.remembered()) {
+            if ((await F.permission()) === 'granted' || await F.reconnect()) { S.fsSrc = null; return refreshWindow(w); }
+        }
+        if (await F.choose()) S.fsSrc = null;
+    } catch (e) { showError('Couldn’t open that folder', e); }
+    refreshWindow(w);
 }
 
 /* Signed out: the folder. */
