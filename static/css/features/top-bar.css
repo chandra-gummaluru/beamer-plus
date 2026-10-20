@@ -13,39 +13,48 @@
     gap: var(--sp-2);
 }
 
-/* Save — a dark text button, like Lectern's — with a small menu button
-   joined to it (open another presentation, downloads, the demo). */
-.save-split { display: flex; align-items: stretch; }
-#top-right-controls .save-btn {
+/* The account button — same paper look as every other control: who you are
+   (GitHub avatar and name, or "Guest") and a menu with the session's
+   actions. */
+#top-right-controls .account-btn {
+    gap: var(--sp-2);
     min-height: var(--hit-min);
-    padding: 0 var(--sp-4);
+    max-width: 220px;
+    padding: 0 10px 0 6px;
+    font-size: var(--fs-sm);
     font-weight: 600;
-    background: var(--ink-1);
-    border-color: var(--ink-1);
-    color: var(--ink-on-accent);
-    border-radius: var(--r-md) 0 0 var(--r-md);
 }
-#top-right-controls .save-btn:hover:not(:disabled) { background: var(--accent-strong); border-color: var(--accent-strong); }
-#top-right-controls .save-btn:disabled { opacity: 0.45; cursor: default; }
-#top-right-controls .save-more-btn {
-    min-width: 30px;
-    width: 30px;
-    min-height: var(--hit-min);
-    padding: 0;
-    margin-left: 1px;
-    background: var(--ink-1);
-    border-color: var(--ink-1);
-    color: var(--ink-on-accent);
-    border-radius: 0 var(--r-md) var(--r-md) 0;
+.account-avatar {
+    width: 26px;
+    height: 26px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    object-fit: cover;
 }
-#top-right-controls .save-more-btn:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
-#top-right-controls .save-more-btn svg { width: 14px; height: 14px; }
+.account-mark { display: inline-flex; width: 18px; height: 18px; margin-left: 4px; color: var(--ink-1); flex: 0 0 auto; }
+.account-mark svg { width: 100%; height: 100%; }
 
-/* The menu under it */
-.save-menu {
+/* Save — the same paper button as every other control, with a label. */
+#top-right-controls .save-btn {
+    gap: 6px;
+    min-height: var(--hit-min);
+    padding: 0 14px 0 12px;
+    font-size: var(--fs-sm);
+    font-weight: 600;
+}
+#top-right-controls .save-btn svg { width: 16px; height: 16px; }
+#top-right-controls .save-btn:disabled { opacity: 0.45; cursor: default; }
+body.gh-saving #top-right-controls .save-btn svg { animation: account-saving 0.8s ease-in-out infinite alternate; }
+.account-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#top-right-controls .account-btn .account-chevron { width: 13px; height: 13px; color: var(--ink-3); flex: 0 0 auto; }
+#top-right-controls .account-btn[aria-expanded="true"] { --_bg: var(--surface-cream-2); --_bd: var(--ink-4); }
+@keyframes account-saving { to { opacity: 0.35; } }
+
+/* Its menu */
+.account-menu {
     position: fixed;
     z-index: 9500;
-    min-width: 230px;
+    width: 260px;
     padding: 6px;
     display: flex;
     flex-direction: column;
@@ -54,17 +63,38 @@
     border-radius: var(--r-lg);
     box-shadow: var(--shadow-3);
     font-family: var(--font-sans);
+    animation: account-menu-in var(--dur-fast, .12s) var(--ease-out);
 }
-.save-menu button {
-    display: flex; align-items: center; gap: var(--sp-2);
-    padding: 8px 10px;
+@keyframes account-menu-in { from { opacity: 0; transform: translateY(-4px); } }
+.account-menu-head {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 10px 10px;
+    margin-bottom: 4px;
+    border-bottom: var(--line-soft);
+    font-size: var(--fs-sm);
+    color: var(--ink-1);
+}
+.account-menu-sub { color: var(--ink-3); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-menu-lecture { color: var(--ink-2); }
+.account-menu button {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 10px;
     background: none; border: 0; border-radius: var(--r-sm);
     font: inherit; font-size: var(--fs-base); color: var(--ink-1);
     text-align: left; cursor: pointer;
 }
-.save-menu button:hover, .save-menu button:focus-visible { background: var(--surface-cream-2); outline: none; }
-.save-menu button svg { width: 16px; height: 16px; color: var(--ink-2); flex: 0 0 auto; }
-.save-menu hr { border: 0; border-top: var(--line-soft); margin: 4px 2px; }
+.account-menu button:hover:not(:disabled), .account-menu button:focus-visible { background: var(--surface-cream-2); outline: none; }
+.account-menu button:disabled { color: var(--ink-4); cursor: default; }
+.account-menu button svg { width: 16px; height: 16px; color: var(--ink-2); flex: 0 0 auto; }
+.account-menu button:disabled svg { color: var(--ink-4); }
+.account-menu-label { flex: 1 1 auto; }
+.account-menu button.is-strong { font-weight: 600; }
+.account-menu button.is-strong svg { color: var(--ink-1); }
+.account-menu button.is-danger:hover, .account-menu button.is-danger:focus-visible { color: var(--danger); }
+.account-menu button.is-danger:hover svg { color: var(--danger); }
+.account-menu hr { border: 0; border-top: var(--line-soft); margin: 4px 2px; }
 
 /* Top-controls panel (legacy hidden) */
 #top-controls-panel { display: none; }
@@ -78,7 +108,7 @@ body.focus-mode #slide-navigator,
 body.focus-mode #floating-annotation-toolbar,
 body.focus-mode #edit-mode-container,
 body.focus-mode #mute-container,
-body.focus-mode #top-right-controls #save-container {
+body.focus-mode #top-right-controls {
     display: none !important;
 }
 

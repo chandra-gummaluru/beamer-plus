@@ -5,6 +5,9 @@ const ghBtn = document.getElementById('welcome-github-btn');
 const ghLabel = document.getElementById('welcome-github-label');
 const createBtn = document.getElementById('welcome-create-btn');
 const keepRow = document.getElementById('welcome-keep-row');
+const acct = document.getElementById('welcome-account');
+const acctLogin = document.getElementById('welcome-login');
+const acctAvatar = document.getElementById('welcome-avatar');
 const keepBox = document.getElementById('welcome-keep');
 const outBtn = document.getElementById('welcome-signout-btn');
 const statusEl = document.getElementById('welcome-status');
@@ -40,11 +43,19 @@ async function handleCreate({ tour = false, github = false, guest = false } = {}
     }
 }
 
-function drawSignedIn(login) {
+// Signed out: "Sign in with GitHub". Signed in: who you are above the
+// buttons (with Sign out), and the GitHub button just starts a session.
+function drawSignedIn(u = null) {
     const on = signedIn();
-    if (ghLabel) ghLabel.textContent = on ? (login ? `Continue as ${login}` : 'Continue with GitHub') : 'Sign in with GitHub';
+    if (ghLabel) ghLabel.textContent = on ? 'Start a session' : 'Sign in with GitHub';
+    if (ghBtn) ghBtn.title = on ? 'Open and save your lectures in your GitHub course repository' : 'Sign in to open and save your lectures in your GitHub course repository';
     if (keepRow) keepRow.hidden = on;
-    if (outBtn) outBtn.hidden = !on;
+    if (acct) acct.hidden = !on;
+    if (acctLogin) acctLogin.textContent = u?.login || 'GitHub';
+    if (acctAvatar) {
+        acctAvatar.hidden = !u?.avatar_url;
+        if (u?.avatar_url) acctAvatar.src = `${u.avatar_url}${u.avatar_url.includes('?') ? '&' : '?'}s=48`;
+    }
 }
 
 async function init() {
@@ -63,7 +74,7 @@ async function init() {
     }
     drawSignedIn();
     if (signedIn()) {
-        user().then(u => drawSignedIn(u.login)).catch(e => {
+        user().then(u => drawSignedIn(u)).catch(e => {
             if (e.status === 401) { signOut(); drawSignedIn(); }
         });
     }

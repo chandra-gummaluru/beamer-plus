@@ -18,10 +18,10 @@ const STEPS = [
         body:  'Beamer+ is an interactive presentation tool that turns a PDF slide deck into a live lecture: draw on your slides, and drop in videos, 3D models, live polls and interactive widgets.',
     },
     {
-        sel:   '#save-more-btn',
+        sel:   '#account-btn',
         place: 'auto',
-        title: 'Opening a presentation',
-        body:  'Click the empty slide, drop a file anywhere, or use this menu: a plain PDF slide deck, or a saved Beamer+ ZIP that already has widgets, annotations, and overlays bundled in. Signed in with GitHub, it opens your course lectures.',
+        title: 'Your session',
+        body:  'Your GitHub account (or Connect GitHub). Its menu opens a presentation (a plain PDF, or a saved Beamer+ ZIP with its widgets and annotations), changes the course repository, signs out, and ends the session. Clicking the empty slide opens one too.',
     },
     {
         sel:   '#slide-navigator',
@@ -87,7 +87,7 @@ const STEPS = [
         sel:   '#record-btn',
         place: 'left',
         title: 'Record the lecture',
-        body:  'Record this tab as a video: slides, ink, widgets, your microphone and the tab\'s sound. Takes are saved every second, so a reload or crash loses nothing, and they are listed under Download… in the menu beside Save.',
+        body:  'Record this tab as a video: slides, ink, widgets, your microphone and the tab\'s sound. Takes are saved every second, so a reload or crash loses nothing, and they are offered when you Save.',
     },
     {
         sel:   '#mute-btn',
@@ -99,7 +99,7 @@ const STEPS = [
         sel:   '#save-btn',
         place: 'auto',
         title: 'Save your work',
-        body:  'Signed in with GitHub, Save keeps the deck in its lecture (it reopens where you left off) along with a notes PDF. As a guest, it downloads the presentation as a Beamer+ ZIP, or as notes: one PDF with your annotations, widgets, media, and poll results drawn in.',
+        body:  'Signed in with GitHub, Save puts the deck in its lecture (it reopens where you left off), the notes PDF and any recordings you pick on GitHub; Ctrl+S (⌘S) saves straight away. Not signed in, it saves to this computer: the presentation as a Beamer+ ZIP, or notes: one PDF with your annotations, widgets, media, and poll results drawn in.',
     },
     {
         sel:   null,

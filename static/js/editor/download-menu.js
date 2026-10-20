@@ -2,7 +2,6 @@
 // reopens) or the notes version (one flat PDF with everything drawn in),
 // followed by every screen recording made with the record button.
 import { savePresentation } from './save.js';
-import { githubSaveChoice } from '../github/ui.js';
 import { downloadNotes } from './notes-export.js';
 import { listRecordings, downloadRecording, deleteRecording, onRecordingsChange,
          isRecording, stopRecording, formatDuration, formatSize } from '../app/recorder.js';
@@ -24,15 +23,12 @@ const CHOICES = [
 export function openDownloadMenu() {
     const root = document.createElement('div');
     root.className = 'download-choices';
-    // Signed in with GitHub, Save to GitHub comes first.
-    const gh = githubSaveChoice();
-    for (const c of gh ? [gh, ...CHOICES] : CHOICES) {
+    for (const c of CHOICES) {
         const card = document.createElement('button');
         card.type = 'button';
         card.className = 'download-choice';
         card.dataset.choice = c.key;
-        if (c.key === 'github') card.classList.add('download-choice--primary');
-        card.innerHTML = `<span class="download-choice-icon">${c.icon || ICONS[c.key]}</span>
+        card.innerHTML = `<span class="download-choice-icon">${ICONS[c.key]}</span>
             <span class="download-choice-text">
                 <span class="download-choice-title"></span>
                 <span class="download-choice-desc"></span>
@@ -62,7 +58,7 @@ export function openDownloadMenu() {
 
     window.BeamerModal?.show({
         kind: 'info',
-        title: gh ? 'Save or download' : 'Download',
+        title: 'Save to this computer',
         body: root,
         buttons: [{ label: 'Cancel', kind: 'cancel' }],
     });

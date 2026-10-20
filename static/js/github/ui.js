@@ -1,6 +1,6 @@
 // GitHub in the presenter: the lecture library behind "open a presentation"
-// (the empty slide, the menu beside Save), and Save to GitHub behind Save
-// (and Ctrl/⌘+S; see app/save-button.js).
+// (the empty slide, the account menu), and Save to GitHub (the account menu,
+// and Ctrl/⌘+S; see app/account-menu.js).
 //
 //   Open → "Open a lecture": course offering → lecture → its decks.
 //     A deck saved before opens where it left off (Resume); "Start over"
@@ -15,7 +15,7 @@
 import { bus } from '../core/events.js';
 import { signedIn, user, signOut, startSignIn, appConfig, schedule, GhError } from './auth.js';
 import * as L from './library.js';
-import { setUploadButtonHandler, chooseLocalFile, openPresentationFile } from '../app/uploader.js';
+import { setUploadButtonHandler, setDropHandler, openPresentationFile } from '../app/uploader.js';
 import { buildPresentationZip } from '../editor/save.js';
 import { buildNotesPdf } from '../editor/notes-export.js';
 import { listRecordings, getRecording, updateRecording, isRecording, formatSize, formatDuration } from '../app/recorder.js';
@@ -67,10 +67,17 @@ export function initGitHub(state) {
     active = true;
     document.body.classList.add('gh-signed-in');
     setUploadButtonHandler(() => { openLibrary(); });
+    // Signed in, decks come from GitHub: a file dropped on the window doesn't
+    // open by itself; the library opens so it can go into a lecture first.
+    setDropHandler(() => {
+        openLibrary();
+        toast('Signed in, presentations open from GitHub. Put this file in a lecture with “Add a deck” or “New lecture”.');
+    });
     bus.emit('github:changed');
 
-    bus.on('deck:loaded', () => updateTitle());
-    user().then(u => { G.me = u; }).catch(e => { if (e.status === 401) { signOut(); location.reload(); } });
+    bus.on('deck:loaded', () => { updateTitle(); bus.emit('github:changed'); });
+    user().then(u => { G.me = u; bus.emit('github:changed'); }).catch(e => { if (e.status === 401) githubSignOut(); });
+    ensurePair().then(() => bus.emit('github:changed')).catch(() => {});
 
     // Just signed in from the welcome page: open the library once the splash is gone.
     const params = new URLSearchParams(location.search);
@@ -90,9 +97,9 @@ function updateTitle() {
 /** True when this session saves to GitHub (signed in, not a guest session). */
 export const githubActive = () => active && signedIn();
 
-/** The Save button. The first save asks which lecture the deck belongs in;
- *  new recordings for the lecture bring up the dialog so you can pick them;
- *  otherwise it saves straight away (the deck, and the notes unless you
+/** Ctrl/⌘+S: a quick save. The first save asks which lecture the deck belongs
+ *  in; new recordings for the lecture bring up the dialog so you can pick
+ *  them; otherwise it saves straight away (the deck, and the notes unless you
  *  turned them off). */
 export async function saveToGitHub() {
     if (!appState.zipFile) return;
@@ -108,17 +115,9 @@ export async function saveToGitHub() {
     return saveNow({ notes: wantNotes(), recordings: [] });
 }
 
-/** The download menu's first card when signed in (null for a guest). */
-export function githubSaveChoice() {
-    if (!githubActive()) return null;
-    const t = appState?.ghTarget;
-    return {
-        key: 'github', title: 'Save to GitHub', format: 'GITHUB', icon: ICON.gh,
-        desc: t ? `${t.c}/${t.t} › ${t.lecture}. Opens here next time; also the notes PDF and any recordings you pick.`
-                : 'Keep this deck in a course lecture, so it opens where you left off next time.',
-        run: openSaveDialog,
-    };
-}
+/** The Save button: the dialog asking what to save to GitHub (the deck,
+ *  the notes PDF, recordings). The first time, it asks which lecture. */
+export function openGitHubSave() { return openSaveDialog(); }
 
 /* ─── small UI helpers ────────────────────────────────────────── */
 
@@ -183,7 +182,10 @@ function library(force = false) {
 // mode 'open': pick a deck to open. mode 'save': pick the lecture this deck
 // goes in (then the save dialog follows).
 
-function openLibrary({ mode = 'open' } = {}) {
+/** "Change repository" (the account menu). */
+export function openRepoChooser() { openLibrary({ mode: 'open', repo: true }); }
+
+function openLibrary({ mode = 'open', repo = false } = {}) {
     const root = document.createElement('div');
     root.className = 'gh-lib';
     root.innerHTML = `<div class="gh-lib-body"><p class="gh-muted">Connecting to GitHub…</p></div>
@@ -204,7 +206,7 @@ function openLibrary({ mode = 'open' } = {}) {
         try {
             if (!G.me) G.me = await user();
             drawFoot(ctxt);
-            if (!(await ensurePair())) return repoPicker(ctxt);
+            if (repo || !(await ensurePair())) return repoPicker(ctxt);
             drawFoot(ctxt);
             await drawLibrary(ctxt);
         } catch (e) {
@@ -226,25 +228,40 @@ function drawFoot(ctxt) {
     const who = G.me ? esc(G.me.login) : '…';
     const repo = G.pair ? (L.twoRepos(G.pair) ? `${G.pair.pub.full_name} + -private` : G.pair.priv.full_name) : '';
     ctxt.foot.innerHTML = `
-        ${ctxt.mode === 'open' ? `<div class="gh-row gh-row--between"><button type="button" class="gh-link" data-local>${ICON.laptop}Open a file from this computer instead</button>
-            <button type="button" class="gh-link" data-demo title="Opens a demo deck with a guided tour">${ICON.play}Demo presentation</button></div>` : ''}
+        ${ctxt.mode === 'open' ? `<div class="gh-row"><button type="button" class="gh-link" data-demo title="Opens a demo deck with a guided tour">${ICON.play}Demo presentation</button></div>` : ''}
         <div class="gh-acct">${ICON.gh}<span>${who}${repo ? ` · <span title="Your course repository">${esc(repo)}</span>` : ''}</span>
             ${G.pair ? '<button type="button" class="gh-link" data-repo>Change</button>' : ''}
             <button type="button" class="gh-link" data-out>Sign out</button></div>`;
-    ctxt.foot.querySelector('[data-local]')?.addEventListener('click', () => { window.BeamerModal?.close(); chooseLocalFile(); });
     ctxt.foot.querySelector('[data-demo]')?.addEventListener('click', () => { window.BeamerModal?.close(); bus.emit('demo:open'); });
     ctxt.foot.querySelector('[data-repo]')?.addEventListener('click', () => repoPicker(ctxt));
-    ctxt.foot.querySelector('[data-out]')?.addEventListener('click', () => {
-        signOut();
-        window.BeamerModal?.close();
-        // Back to being a guest; the open deck stays open.
-        document.body.classList.remove('gh-signed-in');
-        setUploadButtonHandler(null);
-        appState.ghTarget = null;
-        active = false;
-        bus.emit('github:changed');
-        toast('Signed out of GitHub. Beamer+ works as a guest until you sign in again.');
-    });
+    ctxt.foot.querySelector('[data-out]')?.addEventListener('click', () => { window.BeamerModal?.close(); githubSignOut(); });
+}
+
+/** Sign out, staying in this session as a guest (the open deck stays open). */
+export function githubSignOut() {
+    signOut();
+    document.body.classList.remove('gh-signed-in');
+    setUploadButtonHandler(null);
+    setDropHandler(null);
+    if (appState) appState.ghTarget = null;
+    active = false;
+    G.me = null;
+    updateTitle();
+    bus.emit('github:changed');
+    toast('Signed out of GitHub. Beamer+ works as a guest until you sign in again.');
+}
+
+/** Who's signed in ({ login, avatar_url }), or null. */
+export async function githubUser() {
+    if (!githubActive()) return null;
+    if (!G.me) { try { G.me = await user(); } catch { return null; } }
+    return G.me;
+}
+
+/** The course repository, for display ("courses-utor + -private"), or ''. */
+export function githubRepoLabel() {
+    if (!G.pair) return '';
+    return L.twoRepos(G.pair) ? `${G.pair.pub.full_name} (+ -private)` : G.pair.priv.full_name;
 }
 
 /* Choosing the course repository (once; remembered in this browser). */
@@ -489,7 +506,7 @@ async function openSaveDialog() {
     root.innerHTML = `
         <p class="gh-target">${ICON.gh}<span><b>${esc(t.c)}/${esc(t.t)} › ${esc(t.lecture)}</b><br><span class="gh-muted">${esc(t.deck)}</span></span>
             <button type="button" class="gh-link" data-move>Change</button></p>
-        <label class="gh-check is-fixed"><input type="checkbox" checked disabled><span><b>Presentation</b> <span class="gh-muted">opens at this slide next time · ${ICON.lock} ${esc(G.pair.priv.name)}</span></span></label>
+        <label class="gh-check"><input type="checkbox" data-deck checked><span><b>Presentation</b> <span class="gh-muted">opens at this slide next time · ${ICON.lock} ${esc(G.pair.priv.name)}</span></span></label>
         <label class="gh-check"><input type="checkbox" data-notes${wantNotes() ? ' checked' : ''}><span><b>Notes PDF</b> <span class="gh-muted">annotations and widgets drawn in · ${pub.private ? ICON.lock : ICON.globe} ${esc(pub.name)}</span></span></label>
         ${recs.length || isRecording() ? `<div class="gh-recs"><div class="gh-recs-head">Recordings <span class="gh-muted">· ${pub.private ? ICON.lock : ICON.globe} ${esc(pub.name)}</span></div>
             ${mine.map(r => recRow(r, true)).join('')}${others.map(r => recRow(r, false)).join('')}
@@ -500,10 +517,12 @@ async function openSaveDialog() {
         buttons: [
             { label: 'Cancel', kind: 'cancel' },
             { label: 'Save', kind: 'ok', onClick: () => {
+                const deck = root.querySelector('[data-deck]').checked;
                 const notes = root.querySelector('[data-notes]').checked;
                 try { localStorage.setItem(NOTES_KEY, notes ? '1' : '0'); } catch { /* ignore */ }
                 const ids = [...root.querySelectorAll('[data-rec]:checked')].map(x => x.dataset.rec);
-                setTimeout(() => saveNow({ notes, recordings: ids }), 0);
+                if (!deck && !notes && !ids.length) return;
+                setTimeout(() => saveNow({ deck, notes, recordings: ids }), 0);
             } },
         ],
     });
@@ -511,21 +530,22 @@ async function openSaveDialog() {
 }
 
 let saving = false;
-async function saveNow({ notes, recordings }) {
+async function saveNow({ deck = true, notes, recordings }) {
     const t = appState.ghTarget;
     if (!t || saving) return;
     saving = true;
-    const btn = document.getElementById('save-btn');
-    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+    document.body.classList.add('gh-saving');
     loading('Saving to GitHub…', 'Building the presentation…');
     try {
         if (!(await ensurePair())) throw new GhError(0, 'Choose your course repository first.');
         bus.emit('annotations:flush');
         const privFiles = [], pubFiles = [];
-        const zip = await buildPresentationZip({
-            extra: { 'config/resume.json': JSON.stringify({ slide: appState.currentSlide, savedAt: new Date().toISOString() }) },
-        });
-        privFiles.push({ path: L.savedPath(t), blob: zip });
+        if (deck) {
+            const zip = await buildPresentationZip({
+                extra: { 'config/resume.json': JSON.stringify({ slide: appState.currentSlide, savedAt: new Date().toISOString() }) },
+            });
+            privFiles.push({ path: L.savedPath(t), blob: zip });
+        }
         if (t.needsOriginal && appState.sourceFile) {
             const ext = extOf(appState.sourceFile.name) === 'pdf' ? 'pdf' : 'zip';
             const path = `${L.lectureDir(t.c, t.t, t.lecture)}/${t.deck}.${ext}`;
@@ -547,7 +567,7 @@ async function saveNow({ notes, recordings }) {
         const msg = `Beamer+: save ${t.c}/${t.t} ${t.lecture}`;
         const pub = L.twoRepos(G.pair) ? G.pair.pub : null;
         if (pub) {
-            await L.commitFiles(G.pair.priv, privFiles, msg, setLoading);
+            if (privFiles.length) await L.commitFiles(G.pair.priv, privFiles, msg, setLoading);
             if (pubFiles.length) await L.commitFiles(pub, pubFiles, msg, setLoading);
         } else {
             await L.commitFiles(G.pair.priv, [...privFiles, ...pubFiles], msg, setLoading);
@@ -557,7 +577,7 @@ async function saveNow({ notes, recordings }) {
         t.needsOriginal = false;
         G.lib = null;
         window.BeamerModal?.close();
-        const extra = [notes && 'notes', uploaded.length && `${uploaded.length} recording${uploaded.length > 1 ? 's' : ''}`].filter(Boolean);
+        const extra = [notes && (deck ? 'notes' : 'the notes'), uploaded.length && `${uploaded.length} recording${uploaded.length > 1 ? 's' : ''}`].filter(Boolean);
         toast(`Saved to ${t.c}/${t.t} › ${t.lecture}${extra.length ? `, with ${extra.join(' and ')}` : ''}.`);
     } catch (e) {
         console.error('[github] save failed', e);
@@ -565,6 +585,6 @@ async function saveNow({ notes, recordings }) {
         showError('Save to GitHub failed', e);
     } finally {
         saving = false;
-        if (btn) { btn.textContent = 'Save'; btn.disabled = !appState.zipFile; }
+        document.body.classList.remove('gh-saving');
     }
 }

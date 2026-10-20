@@ -234,9 +234,9 @@ body.welcome-page {
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
-    align-items: stretch;
+    align-items: flex-start;
     width: 100%;
-    max-width: 340px;
+    max-width: 440px;
     /* Nudge left to line the button edge up with the wordmark (which carries a
        small negative margin). Reset when centered on mobile. */
     margin-left: -3px;
@@ -244,31 +244,28 @@ body.welcome-page {
 
 .welcome-actions-row {
     display: flex;
-    gap: var(--sp-3);
-    align-items: stretch;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    align-items: center;
 }
 
 .welcome-btn {
     font-family: var(--font-sans);
-    font-size: var(--fs-lg);
+    font-size: var(--fs-md);
     font-weight: 600;
-    min-height: 56px;
-    width: 100%;
-    padding: 0 var(--sp-6);
+    min-height: 44px;
+    width: auto;
+    padding: 0 var(--sp-5);
     border-radius: var(--r-md);
+    white-space: nowrap;
     border: var(--line-hairline);
     cursor: pointer;
     transition: background var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
 }
 
-.welcome-actions-row .welcome-btn--primary {
-    flex: 1 1 auto;
-    white-space: nowrap;
-}
-
 .welcome-btn--help {
     flex: 0 0 auto;
-    width: 56px;
+    width: 44px;
     padding: 0;
     display: flex;
     align-items: center;
@@ -299,12 +296,9 @@ body.welcome-page {
     background: var(--accent-strong);
 }
 
-/* "Take a tour" — sits beside New Session, quieter than it. */
+/* "Continue as guest" — beside the GitHub button, quieter than it. */
 .welcome-btn--secondary {
     flex: 0 0 auto;
-    width: auto;
-    white-space: nowrap;
-    padding: 0 var(--sp-5);
     background: var(--surface-paper);
     color: var(--ink-1);
     border-color: var(--ink-4);
@@ -353,9 +347,11 @@ body.welcome-page {
     }
 
     .welcome-actions {
-        max-width: 340px;
+        max-width: 440px;
         margin-left: 0;
+        align-items: center;
     }
+    .welcome-actions-row { justify-content: center; }
 
     /* Pull the help "?" out of the button row and pin it to the top-right so the
        New Session button spans the full width and reads as centered. */

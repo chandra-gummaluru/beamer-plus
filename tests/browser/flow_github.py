@@ -107,7 +107,8 @@ def run():
         check("welcome offers sign-in", "Sign in with GitHub" in page.inner_text("#welcome-github-btn"))
         check("welcome offers guest, no tour", page.locator("#welcome-create-btn").is_visible() and page.locator("#welcome-tour-btn").count() == 0)
         page.evaluate(SIGN_IN); page.reload(); page.wait_for_timeout(800); shot("02-welcome-signed-in")
-        check("welcome greets the user", "Continue as chandra-gummaluru" in page.inner_text("#welcome-github-btn"))
+        check("welcome shows who is signed in", "chandra-gummaluru" in page.inner_text("#welcome-account")
+              and "Start a session" in page.inner_text("#welcome-github-btn"))
 
         # 2. Continue → session; the library opens by itself; choose the repository.
         page.click("#welcome-github-btn"); page.wait_for_url("**/s/**"); page.wait_for_timeout(3200); shot("03-repo-picker")
@@ -127,10 +128,13 @@ def run():
 
         # 4. Save dialog from the download button, with a recording to pick.
         page.evaluate(FAKE_TAKE)
-        page.click("#save-more-btn"); page.wait_for_timeout(300); shot("06-save-menu")
-        check("menu offers open, download, demo", page.locator(".save-menu [data-menu]").count() == 3)
+        page.click("#account-btn"); page.wait_for_timeout(300); shot("06-account-menu")
+        check("account menu: open, demo, change repo, sign out, end",
+              [b.get_attribute("data-menu") for b in page.locator(".account-menu [data-menu]").all()] == ["open", "demo", "repo", "out", "end"])
+        check("account button shows the GitHub login", "chandra-gummaluru" in page.inner_text("#account-btn"))
         page.keyboard.press("Escape")
         page.click("#save-btn"); page.wait_for_timeout(900); shot("07-save-dialog")
+        check("save dialog asks what to save", page.locator("[data-deck]").is_checked() and page.locator("[data-notes]").count() == 1)
         check("recording offered and ticked", page.locator("[data-rec='rec-1']").is_checked())
         page.click(".custom-modal-btn-ok"); page.wait_for_timeout(6000); shot("08-saved")
         pf, uf = priv.files(), pub.files()
@@ -159,13 +163,13 @@ def run():
         check("Resume offered", page.locator(".gh-lecture[data-i='0'] [data-resume]").count() == 1)
         page.click(".gh-lecture[data-i='0'] [data-resume]"); page.wait_for_timeout(3000)
         check("resumed at slide 5", st("currentSlide") == 4)
-        page.click("#save-more-btn"); page.click(".save-menu [data-menu='open']"); page.wait_for_timeout(1200)
+        page.click("#account-btn"); page.click(".account-menu [data-menu='open']"); page.wait_for_timeout(1200)
         page.click(".gh-lecture[data-i='0'] [data-orig]"); page.wait_for_timeout(3000)
         check("start over at slide 1", st("currentSlide") == 0)
         shot("10-start-over")
 
         # 7. A new lecture with a deck from this computer, in a new course offering.
-        page.click("#save-more-btn"); page.click(".save-menu [data-menu='open']"); page.wait_for_timeout(1200)
+        page.click("#account-btn"); page.click(".account-menu [data-menu='open']"); page.wait_for_timeout(1200)
         page.select_option(".gh-lib select[data-off]", "__new")
         page.fill("[data-c]", "csc258"); page.fill("[data-t]", "w27"); page.click("[data-make-off]"); page.wait_for_timeout(300)
         page.fill("[data-name]", "01 - Intro"); shot("11-new-lecture")
@@ -179,13 +183,18 @@ def run():
         check("new deck has its lecture", st("ghTarget && s.ghTarget.lecture") == "01 - Intro")
         shot("12-new-lecture-open")
 
-        # 8. A deck from this computer, then Save to GitHub → choose where.
-        page.click("#save-more-btn"); page.click(".save-menu [data-menu='open']"); page.wait_for_timeout(800)
-        with page.expect_file_chooser() as fc:
-            page.click("[data-local]")
-        fc.value.set_files(pdf); page.wait_for_timeout(2500)
+        # 8. Signed in, a dropped file doesn't open by itself: the library opens.
+        page.evaluate("""() => { const dt = new DataTransfer(); dt.items.add(new File(['%PDF-1.4'], 'dropped.pdf', {type:'application/pdf'}));
+            for (const t of ['dragenter','dragover','drop']) window.dispatchEvent(new DragEvent(t, {dataTransfer: dt, bubbles: true, cancelable: true})); }""")
+        page.wait_for_timeout(1200)
+        check("drop while signed in opens the library", page.locator(".gh-lib").count() == 1 and st("deckName") == "intro")
+        check("library has no open-from-computer link", page.locator("[data-local]").count() == 0)
+        page.keyboard.press("Escape"); page.mouse.click(5, 5); page.wait_for_timeout(300)
+        page.evaluate("window.BeamerModal && window.BeamerModal.close()")
+        # A deck from elsewhere (the demo, say) asks which lecture on its first save.
+        page.set_input_files("#upload-presentation", pdf); page.wait_for_timeout(2500)
         check("local deck has no lecture", not st("ghTarget"))
-        page.click("#save-btn"); page.wait_for_timeout(1500); shot("13-save-where")
+        page.keyboard.press("Control+s"); page.wait_for_timeout(1500); shot("13-save-where")
         page.select_option(".gh-lib select[data-off]", "csc258/f26"); page.wait_for_timeout(800)
         page.click(".gh-lecture[data-i='1'] [data-save-here]"); page.wait_for_timeout(600)
         page.click(".custom-modal-btn-ok"); page.wait_for_timeout(5000)
@@ -195,10 +204,15 @@ def run():
         check("notes named for lecture + deck", "csc258/f26/slides/06 - Multiplication - intro.pdf" in pub.files())
 
         # 9. Demo presentation from the library: loads the demo deck and starts the tour.
-        page.click("#save-more-btn"); page.click(".save-menu [data-menu='open']"); page.wait_for_timeout(1200)
+        page.click("#account-btn"); page.click(".account-menu [data-menu='open']"); page.wait_for_timeout(1200)
         page.click("[data-demo]"); page.wait_for_timeout(12000); shot("14-demo-tour")
         check("demo deck loaded", st("deckName") == "demo")
         check("tour running", "1 of" in page.inner_text("body"))
+
+        # Signing out in a session: the deck stays open; the account button becomes Connect GitHub.
+        page.get_by_text("Skip", exact=True).click(); page.wait_for_timeout(400)
+        page.click("#account-btn"); page.click(".account-menu [data-menu='out']"); page.wait_for_timeout(600)
+        check("sign out in a session: Connect GitHub, deck still open", "Connect GitHub" in page.inner_text("#account-btn") and st("deckName") == "demo")
 
         # 10. Guest: clicking the empty slide opens the file picker; it also offers the demo.
         page.goto(BASE); page.wait_for_timeout(600)
@@ -210,10 +224,17 @@ def run():
         shot("15-guest-empty")
         check("empty stage offers the demo", page.locator("#stage-empty-demo").is_visible())
         with page.expect_file_chooser(timeout=3000) as fc:
-            page.click("#save-more-btn"); page.click(".save-menu [data-menu='open']")
+            page.click("#account-btn"); page.click(".account-menu [data-menu='open']")
         check("guest menu opens the file picker", fc.value is not None)
         check("edit button sits right of mute", page.locator("#edit-mode-btn").bounding_box()["x"] > page.locator("#mute-btn").bounding_box()["x"]
               and abs(page.locator("#edit-mode-btn").bounding_box()["y"] - page.locator("#mute-btn").bounding_box()["y"]) < 4)
+        check("signed out, the account button says Connect GitHub", "Connect GitHub" in page.inner_text("#account-btn"))
+        check("Save is off with no deck", page.locator("#save-btn").is_disabled())
+        page.click("#account-btn"); page.wait_for_timeout(300); shot("16-guest-menu")
+        check("guest menu: sign in, open, demo, end",
+              [b.get_attribute("data-menu") for b in page.locator(".account-menu [data-menu]").all()] == ["in", "open", "demo", "end"])
+        page.click(".account-menu [data-menu='end']"); page.wait_for_url(BASE); page.wait_for_timeout(500)
+        check("End session returns to the start page", page.locator("#welcome-create-btn").is_visible())
         b.close()
 
     bad = [e for e in errors if "favicon" not in e]

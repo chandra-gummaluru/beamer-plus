@@ -33,7 +33,7 @@ import { startTour } from './app/tour.js';
 import { initEditor } from './editor/editor.js';
 import { initRecorder } from './app/recorder.js';
 import { initGitHub } from './github/ui.js';
-import { initSaveButton } from './app/save-button.js';
+import { initAccountMenu } from './app/account-menu.js';
 import { getSessionId, sessionUrl, saveLastSession } from './app/session.js';
 
 /* ─── Render generation counters ─────────────────────────────── */
@@ -159,7 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initEditor(state);
     initRecorder(state);
     initGitHub(state);
-    initSaveButton(state);
+    initAccountMenu(state);
     initSettings();
     // Must run before applyDefaultPen(): that call emits a 'tool:change' to
     // sync other modules' tracked "previous tool" state (see below), and
