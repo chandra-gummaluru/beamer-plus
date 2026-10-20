@@ -31,12 +31,6 @@
                 <p class="welcome-lede">Bring your static slides to life by embedding them with modern multimedia, all in one place.</p>
 
                 <div class="welcome-actions">
-                    <!-- Signed in already: who, and a way out (welcome.js fills it). -->
-                    <div class="welcome-account" id="welcome-account" hidden>
-                        <img class="welcome-avatar" id="welcome-avatar" alt="" hidden>
-                        <span>Signed in as <b id="welcome-login">GitHub</b></span>
-                        <button type="button" class="welcome-link" id="welcome-signout-btn">Sign out</button>
-                    </div>
                     <div class="welcome-actions-row">
                         <button type="button" class="welcome-btn welcome-btn--primary welcome-btn--gh" id="welcome-github-btn"
                                 title="Open and save your lectures in your GitHub course repository">
@@ -55,6 +49,12 @@
                                 <circle cx="12" cy="17.4" r="0.4" fill="currentColor" stroke="none"/>
                             </svg>
                         </a>
+                    </div>
+                    <!-- Signed in already: who, and a way out (welcome.js fills it), under the buttons. -->
+                    <div class="welcome-account" id="welcome-account" hidden>
+                        <img class="welcome-avatar" id="welcome-avatar" alt="" hidden>
+                        <span>Signed in as <b id="welcome-login">GitHub</b></span>
+                        <button type="button" class="welcome-link" id="welcome-signout-btn">Sign out</button>
                     </div>
                 </div>
 

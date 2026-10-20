@@ -143,11 +143,9 @@ def run():
         page.goto(BASE); page.wait_for_timeout(700); shot("01-welcome")
         check("start page: Sign in with GitHub / Continue as guest",
               "Sign in with GitHub" in page.inner_text("#welcome-github-btn") and page.locator("#welcome-create-btn").is_visible())
-        page.evaluate(SIGN_IN); page.reload(); page.wait_for_timeout(800)
-        check("start page shows who is signed in", "chandra-gummaluru" in page.inner_text("#welcome-account"))
-
-        # 2. Open: choose a repository, then browse its folders.
-        page.click("#welcome-github-btn"); page.wait_for_url("**/s/**"); page.wait_for_timeout(3200); shot("02-open-repo")
+        # 2. Signed in, the start page goes straight to a new session; Open: choose a repository, then browse.
+        page.evaluate(SIGN_IN); page.reload(); page.wait_for_url("**/s/**", timeout=5000); page.wait_for_timeout(3200); shot("02-open-repo")
+        check("signed in: the start page goes straight to a new session", "/s/" in page.url)
         check("open window asks for a repository first", page.locator(".gh-lib select[data-repo]").count() == 1 and page.locator(".gh-files").count() == 0)
         page.select_option(".gh-lib select[data-repo]", "chandra-gummaluru/courses-private"); page.wait_for_timeout(1200); shot("03-browse-root")
         check("then its top folder", crumbs() == ["courses-private"] and items() == ["csc108", "csc258"])
@@ -199,8 +197,9 @@ def run():
         check("closed again", not st("editMode") and not page.locator("#edit-mode-btn").is_visible())
 
         # 6. A new session opens where you were, and the zip resumes.
-        page.goto(BASE); page.wait_for_timeout(600)
-        page.click("#welcome-github-btn"); page.wait_for_url("**/s/**"); page.wait_for_timeout(4200); shot("08-reopen")
+        first = page.url
+        page.goto(BASE); page.wait_for_url("**/s/**", timeout=5000); page.wait_for_timeout(4200); shot("08-reopen")
+        check("typing the bare address while signed in starts a new session", "/s/" in page.url and page.url != first)
         check("opens in the last folder", crumbs()[-1] == "05 - Binary Arithmetic")
         go("05 - Binary Arithmetic.zip"); page.wait_for_timeout(3000)
         check("resumed at slide 4", st("currentSlide") == 3)
@@ -250,8 +249,14 @@ def run():
         adders = os.path.join(OUT, "07 - Adders.zip")
         with open(adders, "wb") as f:
             f.write(make_zip(make_pdf(4, "Adders")))
+        check("empty slide: one line, two links", " ".join(page.inner_text(".stage-empty-hint").split()) == "Open a presentation or try the demo.")
+        page.click("#stage-empty .stage-empty-title"); page.wait_for_timeout(500)
+        check("the slide itself isn't clickable", page.locator(".gh-lib").count() == 0)
+        bg = page.evaluate("getComputedStyle(document.getElementById('stage-empty')).backgroundColor")
+        page.hover("#stage-empty .stage-empty-icon"); page.wait_for_timeout(300)
+        check("no hover colour on the slide", page.evaluate("getComputedStyle(document.getElementById('stage-empty')).backgroundColor") == bg)
         with page.expect_file_chooser(timeout=3000) as fc:
-            page.click("#stage-empty .stage-empty-title")
+            page.click("#stage-empty-open")
         check("signed out, Open is just the file picker", page.locator(".gh-lib").count() == 0)
         fc.value.set_files(adders); page.wait_for_timeout(2500)
         check("opened from this computer", st("deckName") == "07 - Adders" and not st("ghTarget"))

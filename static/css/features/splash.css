@@ -230,6 +230,7 @@ body.welcome-page {
     }
 }
 
+.welcome-actions[hidden] { display: none; }
 .welcome-actions {
     display: flex;
     flex-direction: column;

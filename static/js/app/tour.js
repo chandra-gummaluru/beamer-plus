@@ -21,7 +21,7 @@ const STEPS = [
         sel:   '#account-btn',
         place: 'auto',
         title: 'Your session',
-        body:  'Your session (your GitHub name, or Guest): open a presentation (a plain PDF, or a saved Beamer+ ZIP with its widgets and annotations), edit it, save it, and end the session (which signs you out of GitHub too). Signed in with GitHub, presentations live in your course repository; otherwise, in a folder on this computer. Clicking the empty slide opens one too.',
+        body:  'Your session (your GitHub name, or Guest): open a presentation (a plain PDF, or a saved Beamer+ ZIP with its widgets and annotations), edit it, save it, and end the session (which signs you out of GitHub too). Signed in with GitHub, presentations live in your course repository; otherwise, in a folder on this computer. The empty slide has a link to open one too.',
     },
     {
         sel:   '#slide-navigator',

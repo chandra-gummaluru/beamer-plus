@@ -33,12 +33,12 @@ python app.py               # ad-hoc HTTPS cert (needs `cryptography`)
 python app.py --http        # plain HTTP (camera widget disabled on LAN)
 ```
 
-To try the built-in demo presentation (with a guided tour), click **Or open the
-demo presentation** on the empty slide.
+To try the built-in demo presentation (with a guided tour), click **try the
+demo** on the empty slide.
 
 ## Loading a presentation
 
-Click the empty slide, drag the file onto the window, or use **Open a presentation…** in the account menu (top-right) to load either:
+Click **Open a presentation** on the empty slide, drag the file onto the window, or use **Open a presentation…** in the account menu (top-right) to load either:
 
 - **A plain PDF** — every page becomes a slide.
 - **A presentation ZIP** — a PDF plus saved configuration, media, widgets and
@@ -95,7 +95,7 @@ and **Save** picks a **folder** on this computer (Chrome and Edge) or downloads.
 - **Open a presentation** (signed in) lists the folders and the `.zip` / `.pdf`
   files in the one you're in; click one to open it. Signed in, presentations come from
   GitHub only (put files in the repository on GitHub or with git).
-  Clicking the empty slide opens this window too.
+  **Open a presentation** on the empty slide opens it too.
 - **Save presentation** starts in the repository and folder the presentation
   came from. Pick a folder, a file name, and tick what to
   save (Presentation, Notes, Recordings); each goes in that folder:

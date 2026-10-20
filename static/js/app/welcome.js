@@ -69,6 +69,21 @@ async function init() {
         handleCreate({ github: true });
         return;
     }
+    // Already signed in (say, back here from a session by address): no need
+    // for the start page, just start a new session. If that fails, the page
+    // shows as usual.
+    if (signedIn() && !back?.error) {
+        document.querySelector('.welcome-actions')?.setAttribute('hidden', '');
+        setStatus('Starting a session…');
+        try {
+            const data = await createSession();
+            goToSession(data.session_id, { github: true });
+            return;
+        } catch {
+            document.querySelector('.welcome-actions')?.removeAttribute('hidden');
+            setStatus('Could not create a session. Try again.', true);
+        }
+    }
     drawSignedIn();
     if (signedIn()) {
         user().then(u => drawSignedIn(u)).catch(e => {

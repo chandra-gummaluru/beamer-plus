@@ -41,7 +41,7 @@ export function initAccountMenu(state) {
     appState = state;
     const btn = document.getElementById('account-btn');
     btn?.addEventListener('click', (e) => { e.stopPropagation(); menu ? closeMenu() : openMenu(btn); });
-    document.getElementById('stage-empty')?.addEventListener('click', () => openUpload());
+    document.getElementById('stage-empty-open')?.addEventListener('click', () => openUpload());
     bus.on('github:changed', refresh);
     refresh();
 }

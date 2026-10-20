@@ -183,7 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
     wireResizeAndFullscreen();
     document.getElementById('mute-btn')?.addEventListener('click', () => toggleMute());
     updateStageEmptyState();
-    document.getElementById('stage-empty-demo')?.addEventListener('click', (e) => { e.stopPropagation(); bus.emit('demo:open'); });
+    document.getElementById('stage-empty-demo')?.addEventListener('click', () => bus.emit('demo:open'));
     maybeStartTourFromUrl();
 
     // annotation sync + active-pane tracking

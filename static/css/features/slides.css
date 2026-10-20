@@ -201,25 +201,22 @@ model-viewer { pointer-events: auto !important; }
 }
 
 .stage-empty[hidden] { display: none; }
-/* The empty slide is the way in: click it to open a presentation. */
-.stage-empty { cursor: pointer; transition: background var(--dur-fast, .15s); }
-.stage-empty:hover { background: var(--_hover); }
-.stage-empty:hover .stage-empty-title { text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
-.stage-empty-demo {
-    margin-top: var(--sp-3);
-    padding: 4px 10px;
+/* "Open a presentation or try the demo.": two links in one line. */
+.stage-empty-link {
+    padding: 0;
     background: none;
     border: 0;
-    border-radius: var(--r-sm);
     font: inherit;
-    font-size: var(--fs-sm);
-    color: var(--_ink-soft);
+    color: var(--_ink);
+    font-weight: 600;
     text-decoration: underline;
-    text-underline-offset: 2px;
+    text-decoration-color: var(--_line);
+    text-decoration-thickness: 1.5px;
+    text-underline-offset: 3px;
     cursor: pointer;
-    user-select: none;
 }
-.stage-empty-demo:hover { color: var(--_ink); background: var(--_hover); }
+.stage-empty-link:hover { text-decoration-color: var(--_ink); }
+.stage-empty-link:focus-visible { outline: 2px solid var(--_ink); outline-offset: 3px; border-radius: 3px; }
 
 .stage-empty-icon {
     width: 90px;
