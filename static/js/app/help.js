@@ -38,7 +38,7 @@ export function showHelpModal() {
             id: 'start', label: 'Getting Started',
             html: `
 <h4 class="help-h">Loading a presentation</h4>
-<p class="help-p">Click the empty slide, drag the file anywhere onto the window, or choose <b>Open a presentation…</b> from the account menu (top-right). It lets you browse your GitHub repository (signed in) or a folder on this computer (signed out) and pick a file. You can load two types of file:</p>
+<p class="help-p">Click the empty slide, drag the file anywhere onto the window, or choose <b>Open a presentation…</b> from the account menu (top-right). Signed in with GitHub, it browses your repository; otherwise it's the usual file picker. You can load two types of file:</p>
 <ul class="help-ul">
   <li>Your bare slide deck (as a PDF). Once loaded you can annotate it and place interactive widgets on any slide.</li>
   <li>A saved Beamer+ presentation (as a ZIP) that bundles the PDF together with all your widgets, overlays, and annotations. To create one, start from a bare slide deck, edit it in Beamer+, then choose <b>Save presentation…</b> in the account menu (top-right), or press Ctrl+S (⌘S). Beamer+ packages everything into a ZIP you can reload later.</li>

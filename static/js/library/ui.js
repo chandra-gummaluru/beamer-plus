@@ -1,6 +1,7 @@
 // "Open a presentation" and "Save presentation" (the session menu, the empty
-// slide, Ctrl/⌘+S): pick a repository (signed in) or a folder on this
-// computer (signed out), then browse its folders like a file manager.
+// slide, Ctrl/⌘+S). Signed in, both pick a repository and browse its folders
+// like a file manager. Signed out, Open is just the file picker, and Save
+// picks a folder on this computer (or downloads).
 //
 //   Open:  click a .zip or .pdf to open it. Signed in, "Upload a file here"
 //          puts one from your computer in the folder you're in.
@@ -128,7 +129,12 @@ async function source() {
 
 /* ─── the window ──────────────────────────────────────────────── */
 
-export function openPresentation() { openWindow('open'); }
+/** Signed in: the repository browser. Signed out: just the file picker
+ *  (a .zip or .pdf from this computer). */
+export function openPresentation() {
+    if (!githubActive()) { appState.pendingGhTarget = null; chooseLocalFile(); return; }
+    openWindow('open');
+}
 export function savePresentation() {
     if (!appState.zipFile) return;
     openWindow('save');
@@ -181,15 +187,11 @@ async function refreshWindow(w) {
     }
 }
 
-// Signed out, a single file can still be opened (or the deck downloaded)
-// without choosing a folder.
+// Signed out, saving can also just download (no folder needed).
 function drawFoot(w) {
-    if (githubActive()) { w.foot.innerHTML = ''; return; }
-    w.foot.innerHTML = w.mode === 'open'
-        ? `<button type="button" class="gh-link" data-single>${ICON.pdf}Open a single file instead</button>`
-        : `<button type="button" class="gh-link" data-download>${ICON.pdf}Download instead</button>`;
-    w.foot.querySelector('[data-single]')?.addEventListener('click', () => { window.BeamerModal?.close(); appState.pendingGhTarget = null; chooseLocalFile(); });
-    w.foot.querySelector('[data-download]')?.addEventListener('click', () => { window.BeamerModal?.close(); openDownloadMenu(); });
+    if (githubActive() || w.mode !== 'save') { w.foot.innerHTML = ''; return; }
+    w.foot.innerHTML = `<button type="button" class="gh-link" data-download>${ICON.pdf}Download instead</button>`;
+    w.foot.querySelector('[data-download]').addEventListener('click', () => { window.BeamerModal?.close(); openDownloadMenu(); });
 }
 
 /* Signed in: the repository. */
@@ -223,7 +225,7 @@ async function drawRepoRow(w) {
 /* Signed out: the folder. */
 async function drawFolderRow(w) {
     if (!F.supported()) {
-        w.srcBox.innerHTML = `<p class="gh-note">This browser can’t open folders (Chrome and Edge can). ${w.mode === 'open' ? 'You can still open a single file below.' : 'You can still download the presentation below.'}</p>`;
+        w.srcBox.innerHTML = `<p class="gh-note">This browser can’t save into folders (Chrome and Edge can). You can still download the presentation below.</p>`;
         return;
     }
     const h = await F.remembered();

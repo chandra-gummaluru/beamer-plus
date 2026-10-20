@@ -88,14 +88,14 @@ session menu: **Open a presentation…**, **Edit presentation**, **Save
 presentation…** (Edit and Save once a presentation is open), **Sign out** and
 **End session** (back to the start page).
 
-Open and Save work like a file manager. Signed in, you pick a **repository**
-(any the Beamer+ GitHub App can see); signed out, you pick a **folder** on this
-computer (Chrome and Edge; elsewhere, open a single file or download instead).
-Then you browse its folders, e.g. `csc258 › f26 › lectures`. Beamer+ doesn't
-impose a layout: you choose where things go.
+Signed in, Open and Save work like a file manager: you pick a **repository**
+(any the Beamer+ GitHub App can see), then browse its folders, e.g.
+`csc258 › f26 › lectures`. Beamer+ doesn't impose a layout: you choose where
+things go. Signed out, **Open** is simply the file picker (a `.zip` or `.pdf`),
+and **Save** picks a **folder** on this computer (Chrome and Edge) or downloads.
 
-- **Open a presentation** lists the folders and the `.zip` / `.pdf` files in
-  the one you're in; click one to open it. Signed in, presentations come from
+- **Open a presentation** (signed in) lists the folders and the `.zip` / `.pdf`
+  files in the one you're in; click one to open it. Signed in, presentations come from
   GitHub only: **Upload a file here** puts one from your computer in the folder.
   Clicking the empty slide opens this window too.
 - **Save presentation** starts in the repository and folder the presentation
