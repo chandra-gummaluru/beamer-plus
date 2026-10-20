@@ -28,7 +28,8 @@ let appState = null;
 const S = {
     repos: null,         // GitHub: the repositories the app can see (cached for the page)
     repo: null,          // GitHub: the repository in use
-    src: null,           // the current source (see sources.js)
+    src: null,           // the GitHub source in use (see sources.js)
+    fsSrc: null,         // the folder on this computer, once chosen
 };
 const NOTES_KEY = 'beamer.library.notes';
 const REPO_KEY = 'beamer.library.repo';        // full name of the last repository
@@ -92,12 +93,14 @@ export function initLibrary(state) {
 /** The repository or folder in use, for display (or ''). */
 export function sourceLabel() {
     if (githubActive()) return S.repo ? S.repo.full_name : (store.get(REPO_KEY) || '');
-    return S.src ? `Folder: ${S.src.name}` : '';
+    return S.fsSrc ? `Folder: ${S.fsSrc.name}` : '';
 }
 
-// The source to use right now, or null while one still has to be chosen.
-async function source() {
-    if (githubActive()) {
+// The source a window uses right now, or null while one still has to be
+// chosen. Signed in, a window can use a folder on this computer instead of a
+// repository ("A folder on this computer…" in the repository list).
+async function source(w) {
+    if (githubActive() && !w?.useFolder) {
         if (!S.repo) {
             const name = store.get(REPO_KEY);
             if (name) {
@@ -110,8 +113,8 @@ async function source() {
         return S.src;
     }
     if (!F.supported() || !(await F.remembered()) || (await F.permission()) !== 'granted') return null;
-    if (!S.src || S.src.kind !== 'folder') S.src = folderSource(await F.remembered());
-    return S.src;
+    if (!S.fsSrc) S.fsSrc = folderSource(await F.remembered());
+    return S.fsSrc;
 }
 
 /* ─── the window ──────────────────────────────────────────────── */
@@ -146,6 +149,9 @@ function openWindow(mode) {
         body: root.querySelector('.gh-lib-body'),
         foot: root.querySelector('.gh-lib-foot'),
         name: null,                // save: the file name typed so far
+        // A folder on this computer rather than a repository: always when
+        // signed out; signed in, when the presentation came from one.
+        useFolder: !githubActive() || !!appState.ghTarget?.src?.startsWith('folder:'),
     };
     drawFoot(w);
     refreshWindow(w);
@@ -154,9 +160,10 @@ function openWindow(mode) {
 async function refreshWindow(w) {
     w.nav.innerHTML = ''; w.body.innerHTML = '';
     try {
+        w.srcBox.innerHTML = '';
         if (githubActive()) await drawRepoRow(w);
-        else await drawFolderRow(w);
-        const src = await source();
+        if (w.useFolder) await drawFolderRow(w);
+        const src = await source(w);
         if (!src) return;
         if (w.cwd === null) {
             const t = appState.ghTarget;
@@ -193,15 +200,21 @@ async function drawRepoRow(w) {
         w.srcBox.innerHTML = `<p><b>Beamer+ can’t see any of your repositories yet.</b> On GitHub, give it access to the repository your presentations are in, then check again.</p>
             <p class="gh-row"><a class="gh-btn gh-btn--primary" href="${esc(install)}" target="_blank" rel="noopener">${ICON.gh}Give Beamer+ access</a><button type="button" class="gh-btn" data-again>Check again</button></p>`;
         w.srcBox.querySelector('[data-again]').onclick = () => { S.repos = null; refreshWindow(w); };
+        if (F.supported() && !w.useFolder) {
+            w.srcBox.insertAdjacentHTML('beforeend', `<p class="gh-row"><button type="button" class="gh-link" data-use-folder>${ICON.folder}Use a folder on this computer instead</button></p>`);
+            w.srcBox.querySelector('[data-use-folder]').onclick = () => { w.useFolder = true; w.cwd = null; refreshWindow(w); };
+        }
         return;
     }
-    const cur = S.repo?.full_name || '';
+    const cur = w.useFolder ? '__folder' : (S.repo?.full_name || '');
+    // "A folder on this computer…" browses a folder instead (Chrome, Edge).
     // "Add another repository…" opens GitHub's page for giving Beamer+ access;
     // the list refreshes when you come back (or with the refresh button).
     w.srcBox.innerHTML = `
-        <div class="gh-field"><label for="gh-repo-select">Repository</label>
+        <div class="gh-field"><label for="gh-repo-select">${w.mode === 'save' ? 'Save to' : 'Open from'}</label>
             <div class="gh-repo-row">
                 <select id="gh-repo-select" data-repo>${cur ? '' : '<option value="" selected>Choose a repository…</option>'}${repos.map(r => `<option value="${esc(r.full_name)}"${r.full_name === cur ? ' selected' : ''}>${esc(r.full_name)}${r.private ? ' (private)' : ''}</option>`).join('')}
+                    ${F.supported() ? `<option value="__folder"${cur === '__folder' ? ' selected' : ''}>A folder on this computer…</option>` : ''}
                     <option value="__add">Add another repository…</option></select>
                 <button type="button" class="gh-btn gh-icon-btn" data-again title="Refresh the list" aria-label="Refresh the list">${ICON.refresh}</button>
             </div></div>`;
@@ -213,10 +226,12 @@ async function drawRepoRow(w) {
             window.addEventListener('focus', back);
             return;
         }
+        w.cwd = null;
+        if (e.target.value === '__folder') { w.useFolder = true; refreshWindow(w); return; }
+        w.useFolder = false;
         S.repo = repos.find(r => r.full_name === e.target.value) || null;
         S.src = null;
         store.set(REPO_KEY, S.repo?.full_name || null);
-        w.cwd = null;
         refreshWindow(w);
     };
     w.srcBox.querySelector('[data-again]').onclick = () => { S.repos = null; refreshWindow(w); };
@@ -225,19 +240,19 @@ async function drawRepoRow(w) {
 /* Signed out: the folder. */
 async function drawFolderRow(w) {
     if (!F.supported()) {
-        w.srcBox.innerHTML = `<p class="gh-note">This browser can’t save into folders (Chrome and Edge can). You can still download the presentation below.</p>`;
+        w.srcBox.insertAdjacentHTML('beforeend', `<p class="gh-note">This browser can’t save into folders (Chrome and Edge can). You can still download the presentation below.</p>`);
         return;
     }
     const h = await F.remembered();
     const perm = await F.permission();
-    w.srcBox.innerHTML = `
-        <div class="gh-field"><span>Folder</span>
+    w.srcBox.insertAdjacentHTML('beforeend', `
+        <div class="gh-field gh-folder-field"><span>Folder</span>
             <div class="gh-folder">${ICON.folder}<span class="gh-folder-name">${h ? esc(h.name) : '<span class="gh-muted">No folder chosen</span>'}</span>
                 ${h && perm !== 'granted' ? `<button type="button" class="gh-btn gh-btn--primary gh-btn--sm" data-allow>Allow access</button>` : ''}
-                <button type="button" class="gh-btn gh-btn--sm${h ? '' : ' gh-btn--primary'}" data-choose>${h ? 'Change…' : 'Choose a folder…'}</button></div></div>`;
-    w.srcBox.querySelector('[data-allow]')?.addEventListener('click', async () => { if (await F.reconnect()) { S.src = null; refreshWindow(w); } });
+                <button type="button" class="gh-btn gh-btn--sm${h ? '' : ' gh-btn--primary'}" data-choose>${h ? 'Change…' : 'Choose a folder…'}</button></div></div>`);
+    w.srcBox.querySelector('[data-allow]')?.addEventListener('click', async () => { if (await F.reconnect()) { S.fsSrc = null; refreshWindow(w); } });
     w.srcBox.querySelector('[data-choose]').onclick = async () => {
-        try { if (await F.choose()) { S.src = null; w.cwd = null; refreshWindow(w); } }
+        try { if (await F.choose()) { S.fsSrc = null; w.cwd = null; refreshWindow(w); } }
         catch (e) { showError('Couldn’t open that folder', e); }
     };
 }

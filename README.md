@@ -87,7 +87,8 @@ presentation…** (Edit and Save once a presentation is open) and **End session*
 in, end a guest session and use **Sign in with GitHub** on the start page.
 
 Signed in, Open and Save work like a file manager: you pick a **repository**
-(any the Beamer+ GitHub App can see), then browse its folders, e.g.
+(any the Beamer+ GitHub App can see), or **A folder on this computer…** from the
+same list (Chrome and Edge), then browse its folders, e.g.
 `csc258 › f26 › lectures`. Beamer+ doesn't impose a layout: you choose where
 things go. Signed out, **Open** is simply the file picker (a `.zip` or `.pdf`),
 and **Save** picks a **folder** on this computer (Chrome and Edge) or downloads.

@@ -221,11 +221,31 @@ def run():
         check("no New folder or Upload buttons", page.locator(".gh-lib [data-newdir], .gh-lib [data-upload]").count() == 0)
         page.evaluate("window.BeamerModal && window.BeamerModal.close()")
 
+        # 8b. Signed in, a window can use a folder on this computer instead of a repository.
+        page.evaluate(SEED_FOLDER, base64.b64encode(make_zip(make_pdf(4, "Adders"))).decode())
+        menu("open"); page.wait_for_timeout(1500)
+        check("repository list offers a folder on this computer",
+              "A folder on this computer…" in [o.inner_text() for o in page.locator(".gh-lib select[data-repo] option").all()])
+        page.select_option(".gh-lib select[data-repo]", "__folder"); page.wait_for_timeout(600)
+        page.click("[data-choose]"); page.wait_for_timeout(1500); shot("10b-open-folder")
+        check("then browses that folder", crumbs() == ["teaching"] and items() == ["csc258"])
+        go("csc258"); go("07 - Adders.zip"); page.wait_for_timeout(2500)
+        check("opened from the folder while signed in", st("ghTarget && s.ghTarget.src") == "folder:teaching")
+        menu("save"); page.wait_for_timeout(1500); shot("10c-save-folder")
+        check("save starts in that folder", page.input_value(".gh-lib select[data-repo]") == "__folder" and crumbs()[-1] == "csc258")
+        page.click("[data-save]"); page.wait_for_timeout(4000)
+        files = page.evaluate(LIST_FOLDER)
+        check("saved to the folder while signed in", "csc258/07 - Adders.pdf" in files)
+        menu("save"); page.wait_for_timeout(1500)
+        page.select_option(".gh-lib select[data-repo]", "chandra-gummaluru/courses"); page.wait_for_timeout(1200)
+        check("switching back to a repository browses it", crumbs()[0] == "courses")
+        page.evaluate("window.BeamerModal && window.BeamerModal.close()")
+
         # 9. Signed in, a dropped file doesn't open by itself.
         page.evaluate("""() => { const dt = new DataTransfer(); dt.items.add(new File(['%PDF-1.4'], 'dropped.pdf', {type:'application/pdf'}));
             for (const t of ['dragenter','dragover','drop']) window.dispatchEvent(new DragEvent(t, {dataTransfer: dt, bubbles: true, cancelable: true})); }""")
         page.wait_for_timeout(1500)
-        check("drop opens the Open window instead", page.locator(".gh-lib").count() == 1 and st("deckName") == "05 - Binary Arithmetic")
+        check("drop opens the Open window instead", page.locator(".gh-lib").count() == 1 and st("deckName") == "07 - Adders")
         check("no single-file option when signed in", page.locator("[data-single]").count() == 0)
         page.evaluate("window.BeamerModal && window.BeamerModal.close()")
 
@@ -266,8 +286,10 @@ def run():
         page.keyboard.press("Escape")
         # Save picks a folder on this computer (or downloads).
         menu("save"); page.wait_for_timeout(800); shot("11-folder-none")
-        check("save window asks for a folder", "Choose a folder" in page.inner_text(".gh-lib-src") and page.locator("[data-download]").count() == 1)
-        page.click("[data-choose]"); page.wait_for_timeout(1500)
+        check("save window uses the folder this browser remembers (or Download instead)",
+              "teaching" in page.inner_text(".gh-lib-src") and "Change" in page.inner_text(".gh-lib-src")
+              and page.locator("[data-download]").count() == 1 and page.locator(".gh-lib select[data-repo]").count() == 0)
+        page.locator(".gh-crumb", has_text="teaching").click(); page.wait_for_timeout(500)
         check("then browses it", crumbs() == ["teaching"] and items() == ["csc258"])
         go("csc258"); shot("12-folder-save")
         check("it shows what's there", any("07 - Adders.zip" in i for i in items()))
