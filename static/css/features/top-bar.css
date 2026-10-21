@@ -19,14 +19,14 @@
 #top-right-controls .account-btn {
     gap: var(--sp-2);
     min-height: var(--hit-min);
-    max-width: 220px;
-    padding: 0 10px 0 6px;
-    font-size: var(--fs-sm);
-    font-weight: 600;
+    max-width: 260px;
+    padding: 0 11px 0 7px;
+    font-size: 14px;          /* Lectern's account button: 14px, regular weight */
+    font-weight: 400;
 }
 .account-avatar {
-    width: 26px;
-    height: 26px;
+    width: 22px;
+    height: 22px;
     flex: 0 0 auto;
     border-radius: 50%;
     object-fit: cover;
@@ -36,7 +36,8 @@
 
 body.gh-saving #top-right-controls .account-btn .account-chevron { animation: account-saving 0.8s ease-in-out infinite alternate; }
 .account-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#top-right-controls .account-btn .account-chevron { width: 13px; height: 13px; color: var(--ink-3); flex: 0 0 auto; }
+#top-right-controls .account-btn .account-chevron { width: 14px; height: 14px; margin-left: -2px; opacity: .6; color: var(--ink-1); flex: 0 0 auto; transition: transform .15s; }
+#top-right-controls .account-btn[aria-expanded="true"] .account-chevron { transform: rotate(180deg); }
 #top-right-controls .account-btn[aria-expanded="true"] { --_bg: var(--surface-cream-2); --_bd: var(--ink-4); }
 @keyframes account-saving { to { opacity: 0.35; } }
 
@@ -44,7 +45,8 @@ body.gh-saving #top-right-controls .account-btn .account-chevron { animation: ac
 .account-menu {
     position: fixed;
     z-index: 9500;
-    width: 260px;
+    min-width: 240px;
+    max-width: 300px;
     padding: 6px;
     display: flex;
     flex-direction: column;
@@ -60,19 +62,21 @@ body.gh-saving #top-right-controls .account-btn .account-chevron { animation: ac
     display: flex;
     flex-direction: column;
     gap: 2px;
-    padding: 8px 10px 10px;
-    margin-bottom: 4px;
+    padding: 6px 10px 8px;
+    margin-bottom: 5px;
     border-bottom: var(--line-soft);
-    font-size: var(--fs-sm);
-    color: var(--ink-1);
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: var(--ink-3);
 }
-.account-menu-sub { color: var(--ink-3); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-menu-sub { color: var(--ink-3); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .account-menu-lecture { color: var(--ink-2); }
+.account-menu-head b { color: var(--ink-1); font-weight: 600; }
 .account-menu button {
     display: flex; align-items: center; gap: 10px;
-    padding: 7px 10px;
+    height: 34px; padding: 0 10px;
     background: none; border: 0; border-radius: var(--r-sm);
-    font: inherit; font-size: var(--fs-base); color: var(--ink-1);
+    font: inherit; font-size: 14px; color: var(--ink-1);
     text-align: left; cursor: pointer;
 }
 .account-menu button:hover:not(:disabled), .account-menu button:focus-visible { background: var(--surface-cream-2); outline: none; }
@@ -83,11 +87,11 @@ body.gh-saving #top-right-controls .account-btn .account-chevron { animation: ac
 .account-menu button.is-strong { font-weight: 600; }
 .account-menu button:disabled { color: var(--ink-4); cursor: default; }
 .account-menu button:disabled svg { color: var(--ink-4); }
-.account-menu kbd { font-family: var(--font-sans); font-size: var(--fs-xs); color: var(--ink-3); }
+.account-menu kbd { font: 500 11.5px var(--font-sans); color: var(--ink-3); }
 .account-menu button.is-strong svg { color: var(--ink-1); }
 .account-menu button.is-danger:hover, .account-menu button.is-danger:focus-visible { color: var(--danger); }
 .account-menu button.is-danger:hover svg { color: var(--danger); }
-.account-menu hr { border: 0; border-top: var(--line-soft); margin: 4px 2px; }
+.account-menu hr { border: 0; border-top: var(--line-soft); margin: 5px 2px; }
 
 /* Top-controls panel (legacy hidden) */
 #top-controls-panel { display: none; }

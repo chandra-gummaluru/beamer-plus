@@ -38,9 +38,10 @@
     --line-strong:      1px solid oklch(70% 0.008 260);
 
     /* ---------- Type ---------- */
-    --font-sans: "Computer Modern Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-    --font-serif: "EB Garamond", "Computer Modern Serif", Georgia, serif;
-    --font-mono: "Computer Modern Sans", ui-monospace, "SF Mono", Menlo, monospace;
+    /* Same stacks as Lectern (static/css/shell.css there), so the two apps match. */
+    --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-serif: "EB Garamond", Garamond, Georgia, serif;
+    --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
     --fs-xs:   11px;
     --fs-sm:   13px;
