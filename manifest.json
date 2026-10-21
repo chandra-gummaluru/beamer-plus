@@ -10,6 +10,12 @@
   "orientation": "any",
   "icons": [
     {
+      "src": "/static/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
       "src": "/static/icons/icon-72x72.png",
       "sizes": "72x72",
       "type": "image/png",
@@ -55,8 +61,12 @@
       "src": "/static/icons/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ],
-  "categories": ["education", "productivity", "utilities"]
+  "categories": [
+    "education",
+    "productivity",
+    "utilities"
+  ]
 }
