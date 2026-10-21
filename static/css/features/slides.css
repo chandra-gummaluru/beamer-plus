@@ -141,7 +141,7 @@ model-viewer { pointer-events: auto !important; }
 .slide-loading-overlay {
     position: absolute;
     top: 50%;
-    left: 50%;
+    left: calc(50% - var(--stage-shift, 0px));   /* follows the slide when it is nudged left (main.js) */
     transform: translate(-50%, -50%);
     display: flex;
     align-items: center;
@@ -186,7 +186,7 @@ model-viewer { pointer-events: auto !important; }
 
     position: absolute;
     top: 50%;
-    left: 50%;
+    left: calc(50% - var(--stage-shift, 0px));   /* follows the slide when it is nudged left (main.js) */
     transform: translate(-50%, -50%);
     z-index: 5;
     display: flex;
@@ -1281,7 +1281,7 @@ body.edit-mode #slide-nav-slides .slide-nav-item.current-slide { pointer-events:
 
     position: absolute;
     top: 50%;
-    left: 50%;
+    left: calc(50% - var(--stage-shift, 0px));   /* follows the slide when it is nudged left (main.js) */
     transform: translate(-50%, -50%);
     z-index: 9;
     display: flex;

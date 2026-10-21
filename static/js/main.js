@@ -1551,6 +1551,7 @@ function sizeSlideCanvases() {
         } else {
             w = availW; h = w * 3 / 4;   // width is the binding axis
         }
+        ({ w, h } = _clearTopRightControls(pane, w, h));
         cv.style.width  = `${w}px`;
         cv.style.height = `${h}px`;
         if (ann) { ann.style.width = `${w}px`; ann.style.height = `${h}px`; }
@@ -1577,7 +1578,58 @@ function _updateAllOverlayPositions() {
     }
 }
 
+/**
+ * On narrower windows the slide can reach up under the account button in the
+ * top-right corner. When it would, first nudge it left into whatever spare
+ * room its pane has (extra right padding; --stage-shift moves the 50%-centred
+ * overlays with it), then, if it still overlaps, shrink it just enough to
+ * clear the button. Wide windows are left untouched.
+ */
+function _clearTopRightControls(pane, w, h) {
+    pane.style.paddingRight = '';
+    pane.style.removeProperty('--stage-shift');
+    const ctrls = document.getElementById('top-right-controls');
+    const c = ctrls?.getBoundingClientRect();
+    if (!c || !c.width || !c.height) return { w, h };   // hidden (focus mode)
+    const r  = pane.getBoundingClientRect();
+    const cs = getComputedStyle(pane);
+    const pl = parseFloat(cs.paddingLeft)  || 0, pr = parseFloat(cs.paddingRight)  || 0;
+    const pt = parseFloat(cs.paddingTop)   || 0, pb = parseFloat(cs.paddingBottom) || 0;
+    let cx = (r.left + pl + r.right - pr) / 2;
+    const cy = (r.top + pt + r.bottom - pb) / 2;
+    const GAP = 8;
+    const maxH = 2 * (cy - c.bottom - GAP);             // tallest slide that starts below the button
+    if (h <= maxH) return { w, h };
+    let overlap = (cx + w / 2) - (c.left - GAP);
+    if (overlap <= 0) return { w, h };
+    // 1. Move it left into the pane's spare room on that side.
+    const shift = Math.min(overlap, Math.max(0, (cx - w / 2) - r.left));
+    if (shift > 0) {
+        pane.style.paddingRight = `${pr + 2 * shift}px`;
+        pane.style.setProperty('--stage-shift', `${shift}px`);
+        cx -= shift; overlap -= shift;
+    }
+    if (overlap <= 0) return { w, h };
+    // 2. Still under the button: shrink it just enough, either clearing the
+    //    button sideways or dropping its top below it, whichever keeps it bigger.
+    const ratio = w / h;
+    const w2 = Math.max(w - 2 * overlap, maxH * ratio, w * 0.5);
+    return { w: w2, h: w2 / ratio };
+}
+
 function wireResizeAndFullscreen() {
+    // The account button changes width (sign-in, edit mode's extra buttons):
+    // re-fit the slide when it does.
+    const ctrls = document.getElementById('top-right-controls');
+    if (ctrls && 'ResizeObserver' in window) {
+        let last = 0;
+        new ResizeObserver(([e]) => {
+            const wNow = Math.round(e.contentRect.width);
+            if (wNow === last) return;
+            last = wNow;
+            window.dispatchEvent(new Event('resize'));
+        }).observe(ctrls);
+    }
     window.addEventListener('resize', () => {
         sizeSlideCanvases();
         state.annCvs?.resize?.();

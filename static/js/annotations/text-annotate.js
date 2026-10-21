@@ -2,15 +2,16 @@
 //
 // Click anywhere on the slide with the text tool active and a small,
 // borderless textbox opens right there. Font is fixed (one simple sans),
-// size is one of three dots (small/regular/large) in the flyout sidebar.
+// size is one of four dots (small … extra large) and colour one of the
+// swatches (or a custom pick) in the flyout sidebar.
 // Segments wrapped in $...$ are rendered as LaTeX (via a vendored,
 // offline copy of MathJax's SVG output) and baked onto the annotation
 // canvas bitmap alongside the plain text when the box is committed.
 import { bus } from '../core/events.js';
 
 const FONT_FAMILY = 'Arial, Helvetica, sans-serif';
-const SIZE_PX = { small: 16, regular: 22, large: 32 };
-const TEXT_COLOR = '#242424';
+const SIZE_PX = { small: 16, regular: 22, large: 32, xlarge: 44 };
+const TEXT_COLOR = '#242424';   // default; each box can pick its own (state.textColor)
 const MATHJAX_SRC = '/static/vendor/mathjax/tex-svg.js';
 
 // The editor textarea (.text-annotation-editor, in annotations.css) has a
@@ -261,7 +262,7 @@ function firstBaselineOffset(ctx, fontSizePx, lineHeight) {
 // text). Note this rect is *not* the same as the (x, y) origin passed in:
 // rendered math can be wider than the editor box was, so the ink can extend
 // past the box on either side.
-async function commitTextAnnotation(cvs, x, y, rawText, size, oldBox, boxWidth) {
+async function commitTextAnnotation(cvs, x, y, rawText, size, oldBox, boxWidth, color = TEXT_COLOR) {
     const ctx = cvs.ctx;
     const text = rawText.replace(/\r\n/g, '\n');
 
@@ -360,7 +361,8 @@ async function commitTextAnnotation(cvs, x, y, rawText, size, oldBox, boxWidth) 
                 else ctx.rect(cursorX, top, w, h);
                 ctx.fill();
             }
-            ctx.fillStyle = ln.kind === 'quote' ? QUOTE_COLOR : TEXT_COLOR;
+            // Quotes stay muted only in the default ink; a picked colour wins.
+            ctx.fillStyle = (ln.kind === 'quote' && color === TEXT_COLOR) ? QUOTE_COLOR : color;
             const tx = cursorX + (seg.code ? CODE_PAD : 0);
             ctx.fillText(value, tx, baselineY);
             if (seg.strike) {
@@ -453,6 +455,7 @@ function openTextEditor(cvs, state, pos) {
     const editingBox = findBoxAt(state, slideIdx, pos);
 
     const size = editingBox ? editingBox.size : (state.textSize || 'regular');
+    const color = editingBox ? (editingBox.color || TEXT_COLOR) : (state.textColor || TEXT_COLOR);
     // editingBox.x/y (like pos) is a content-box origin — where the rendered
     // ink actually starts — so back it out to the wrapper anchor the DOM box
     // is placed at; applyWrapperPos() re-adds the same inset implicitly via
@@ -494,6 +497,7 @@ function openTextEditor(cvs, state, pos) {
     box.spellcheck = false;
     box.placeholder = 'Type here…';
     box.style.fontSize = `${SIZE_PX[size] || SIZE_PX.regular}px`;
+    box.style.color = color;
     if (editingBox) box.value = editingBox.text;
 
     wrapper.appendChild(handle);
@@ -504,7 +508,8 @@ function openTextEditor(cvs, state, pos) {
     // in canvas-relative CSS px — the wrapper's actual on-screen (fixed)
     // position is just a projection of it, recomputed on open and on every
     // drag move rather than read back out of computed style.
-    const entry = { wrapper, box, cvs, size, editingBox, slideIdx, restoreSnapshot, pos: { ...start } };
+    const entry = { wrapper, box, cvs, size, color, editingBox, slideIdx, restoreSnapshot, pos: { ...start } };
+    syncFlyout(size, color);   // show this box's own size/colour when reopening it
     state._textEditor = entry;
 
     applyWrapperPos(cvs, wrapper, entry.pos);
@@ -590,7 +595,7 @@ function closeActiveEditor(state, commit, revert = false) {
     if (!entry) return Promise.resolve();
     state._textEditor = null;
 
-    const { wrapper, box, cvs, size, editingBox, slideIdx, restoreSnapshot, pos } = entry;
+    const { wrapper, box, cvs, size, color, editingBox, slideIdx, restoreSnapshot, pos } = entry;
     const text = box.value;
     // pos is the wrapper's anchor; shift by the same border+padding inset the
     // textarea itself has, so the canvas draws starting from where the text
@@ -621,14 +626,14 @@ function closeActiveEditor(state, commit, revert = false) {
         return Promise.resolve();
     }
 
-    return commitTextAnnotation(cvs, x, y, text, size, editingBox, boxWidth).then((rect) => {
+    return commitTextAnnotation(cvs, x, y, text, size, editingBox, boxWidth, color).then((rect) => {
         const boxes = boxesForSlide(state, slideIdx);
         if (editingBox) {
             const i = boxes.indexOf(editingBox);
             if (i !== -1) boxes.splice(i, 1);
         }
         if (rect) {
-            boxes.push({ x, y, rect, size, text });
+            boxes.push({ x, y, rect, size, color, text });
         }
         bus.emit('textbox:committed');
         if (revert) restorePreviousSelection();
@@ -661,29 +666,76 @@ function restorePreviousSelection() {
     }
 }
 
+/* ─── the flyout's selection marks ────────────────────────────────── */
+function syncFlyout(size, color) {
+    const sidebar = document.getElementById('text-size-sidebar');
+    if (!sidebar) return;
+    sidebar.querySelectorAll('.btn[data-size]').forEach(b => b.classList.toggle('btn_selected', b.dataset.size === size));
+    const c = (color || TEXT_COLOR).toLowerCase();
+    let preset = false;
+    sidebar.querySelectorAll('.text-color-swatch[data-color]').forEach(b => {
+        const on = b.dataset.color.toLowerCase() === c;
+        b.classList.toggle('is-selected', on);
+        if (on) preset = true;
+    });
+    const custom = sidebar.querySelector('.text-color-custom');
+    if (custom) {
+        custom.classList.toggle('is-selected', !preset);
+        custom.style.setProperty('--c', c);
+        const input = custom.querySelector('input');
+        if (input && /^#[0-9a-f]{6}$/.test(c)) input.value = c;
+    }
+}
+
 /* ─── public API ────────────────────────────────────────────────────── */
-// Wires the small size sidebar (small/regular/large dots). Call once at
+// Wires the flyout sidebar (size dots + colour swatches). Call once at
 // startup, same as the other annotation feature modules.
 export function initTextAnnotations(state) {
     state.textSize = state.textSize || 'regular';
+    state.textColor = state.textColor || TEXT_COLOR;
 
     const sidebar = document.getElementById('text-size-sidebar');
     if (sidebar) {
-        const buttons = sidebar.querySelectorAll('.btn[data-size]');
-        buttons.forEach(btn => {
-            btn.classList.toggle('btn_selected', btn.dataset.size === state.textSize);
+        sidebar.querySelectorAll('.btn[data-size]').forEach(btn => {
             btn.addEventListener('click', () => {
-                buttons.forEach(b => b.classList.toggle('btn_selected', b === btn));
                 state.textSize = btn.dataset.size;
                 bus.emit('textsize:select', state.textSize);
             });
         });
+        sidebar.querySelectorAll('.text-color-swatch[data-color]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                state.textColor = btn.dataset.color;
+                bus.emit('textcolor:select', state.textColor);
+            });
+        });
+        const custom = document.getElementById('text-color-custom');
+        // 'input' fires live while dragging in the picker; don't steal focus
+        // back then (that can close the native picker), only once it's done.
+        custom?.addEventListener('input', () => {
+            state.textColor = custom.value;
+            bus.emit('textcolor:select', state.textColor, { refocus: false });
+        });
+        custom?.addEventListener('change', () => {
+            state.textColor = custom.value;
+            bus.emit('textcolor:select', state.textColor);
+        });
+        syncFlyout(state.textSize, state.textColor);
     }
+
+    bus.on('textcolor:select', (color, opts = {}) => {
+        const entry = state._textEditor;
+        syncFlyout(entry ? entry.size : state.textSize, color);
+        if (!entry) return;
+        entry.color = color;
+        entry.box.style.color = color;
+        if (opts.refocus !== false) entry.box.focus();
+    });
 
     // Live-resize the box that's currently being edited (if any) and hand
     // focus straight back to it so typing can continue uninterrupted.
     bus.on('textsize:select', (size) => {
         const entry = state._textEditor;
+        syncFlyout(size, entry ? entry.color : state.textColor);
         if (!entry) return;
         entry.size = size;
         entry.box.style.fontSize = `${SIZE_PX[size] || SIZE_PX.regular}px`;
