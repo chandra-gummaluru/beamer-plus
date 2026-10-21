@@ -89,7 +89,7 @@ body.split-view-active #split-view-divider { display: block; }
     position: absolute;
     z-index: 1;
     background: #ffffff;
-    border-radius: var(--r-md);
+    border-radius: 0;
     box-shadow: var(--shadow-3);
     box-sizing: border-box;
     overflow: hidden;
@@ -148,7 +148,7 @@ model-viewer { pointer-events: auto !important; }
     justify-content: center;
     z-index: 10;
     background: var(--surface-paper);
-    border-radius: var(--r-md);
+    border-radius: 0;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.1s ease;
@@ -196,7 +196,7 @@ model-viewer { pointer-events: auto !important; }
     text-align: center;
     padding: var(--sp-5);
     box-sizing: border-box;
-    border-radius: var(--r-md);
+    border-radius: 0;
     user-select: none;
 }
 
@@ -718,8 +718,8 @@ body.split-view-active #bookmark-pins {
     transition: background var(--dur-fast);
 }
 
-.slide-split-zone--left  { left: 0;  border-right: 1px solid oklch(60% 0.005 260 / 0.2); border-radius: var(--r-md) 0 0 var(--r-md); }
-.slide-split-zone--right { right: 0; border-radius: 0 var(--r-md) var(--r-md) 0; }
+.slide-split-zone--left  { left: 0;  border-right: 1px solid oklch(60% 0.005 260 / 0.2); border-radius: 0; }
+.slide-split-zone--right { right: 0; border-radius: 0; }
 
 
 /* ── Show in split view ─────────────────────────────────────── */
@@ -1292,7 +1292,7 @@ body.edit-mode #slide-nav-slides .slide-nav-item.current-slide { pointer-events:
     padding: var(--sp-5);
     box-sizing: border-box;
     background: #ffffff;
-    border-radius: var(--r-md);
+    border-radius: 0;
     box-shadow: var(--shadow-3);
     pointer-events: auto;
     user-select: none;
