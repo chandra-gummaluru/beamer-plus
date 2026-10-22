@@ -9,6 +9,9 @@
 // Takes are written to IndexedDB a second at a time while recording, so a
 // reload or a crashed tab loses at most the last second. If IndexedDB is not
 // available (private window, quota), chunks are kept in memory instead.
+//
+// A long take is split into parts (PART_BYTES each at most), each a complete
+// file of its own, so every part can be saved to GitHub.
 
 import { getSessionId } from './session.js';
 
@@ -16,6 +19,11 @@ const PREFS_KEY = 'beamer-recorder-prefs';
 const TIMESLICE_MS = 1000;
 const VIDEO_BPS = 3_000_000;
 const AUDIO_BPS = 128_000;
+// Takes are split into parts of at most ~PART_BYTES so each file can be saved
+// to GitHub (its API takes a file as one base64 request; 100 MB is the hard
+// cap, and large requests fail well before that). A new part starts at ROTATE_AT.
+export const PART_BYTES = 45e6;
+const ROTATE_AT = 40e6;
 
 let appState = null;
 let active = null;              // the take in progress, or null
@@ -62,7 +70,7 @@ export function onRecordingsChange(fn) {
 export async function listRecordings() {
     const all = await store.allMeta();
     return all
-        .filter(m => !active || m.id !== active.id)
+        .filter(m => !(active && m.status === 'recording'))
         .sort((a, b) => b.startedAt - a.startedAt);
 }
 
@@ -94,7 +102,7 @@ export async function updateRecording(id, patch) {
 }
 
 export async function deleteRecording(id) {
-    if (active && active.id === id) return;
+    if (active && (await store.allMeta()).some(m => m.id === id && m.status === 'recording')) return;
     await store.remove(id);
     emitChange();
 }
@@ -256,17 +264,19 @@ async function startRecording({ mic, sound }) {
     }
     const stream = new MediaStream(tracks);
 
-    // 4 — the recorder.
-    let mr;
+    // 4 — the recorder. A take is written as one or more parts: each part is
+    // its own complete, playable file, and a new one starts (seamlessly, see
+    // rotatePart) before it passes PART_BYTES, so every file fits on GitHub.
     const mimeType = pickMimeType(sources.length > 0);
-    try {
-        mr = new MediaRecorder(stream, {
-            ...(mimeType ? { mimeType } : {}),
-            videoBitsPerSecond: VIDEO_BPS,
-            audioBitsPerSecond: AUDIO_BPS,
-        });
-    } catch {
-        try { mr = new MediaRecorder(stream); }
+    const recOpts = {
+        ...(mimeType ? { mimeType } : {}),
+        videoBitsPerSecond: VIDEO_BPS,
+        audioBitsPerSecond: AUDIO_BPS,
+    };
+    let probe;
+    try { probe = new MediaRecorder(stream, recOpts); }
+    catch {
+        try { probe = new MediaRecorder(stream); }
         catch (err) {
             stopTracks(display); stopTracks(micStream); audioCtx?.close();
             showError('Could not start recording', err);
@@ -274,60 +284,37 @@ async function startRecording({ mic, sound }) {
         }
     }
 
-    const finalType = (mr.mimeType || mimeType || 'video/webm').split(';')[0];
-    const ext = finalType.includes('mp4') ? 'mp4' : 'webm';
+    const finalType = (probe.mimeType || mimeType || 'video/webm').split(';')[0];
     const startedAt = Date.now();
     const sessionId = getSessionId();
-    const existing = (await store.allMeta()).filter(m => m.sessionId === sessionId).length;
-    const number = existing + 1;
+    // Number takes, not parts: count the distinct takes of this session.
+    const groups = new Set((await store.allMeta()).filter(m => m.sessionId === sessionId).map(m => m.group || m.id));
+    const number = groups.size + 1;
     const deck = (appState?.deckName || 'Beamer+').trim();
 
-    const meta = {
-        id: `rec-${startedAt}-${Math.random().toString(36).slice(2, 8)}`,
-        sessionId,
-        deckName: deck,
-        label: `Recording ${number}`,
-        fileName: `${safeName(deck)} - recording ${number} (${stamp(startedAt)}).${ext}`,
-        mimeType: finalType,
-        startedAt,
-        durationMs: 0,
-        size: 0,
-        status: 'recording',
-        hasMic: !!micStream,
-        hasSound: displayAudio.length > 0,
+    active = {
+        group: `rec-${startedAt}-${Math.random().toString(36).slice(2, 8)}`,
+        stream, display, micStream, audioCtx, recOpts,
+        ext: finalType.includes('mp4') ? 'mp4' : 'webm',
+        finalType, number, deck, sessionId, startedAt,
+        hasMic: !!micStream, hasSound: displayAudio.length > 0,
         // Where the deck came from ("<folder>/<name>", see library/ui.js
         // targetKey), so Save presentation offers this take with it.
         lecture: appState?.ghTarget ? [appState.ghTarget.dir, appState.ghTarget.name].filter(Boolean).join('/') : null,
+        part: null, partCount: 0, doneMs: 0, closing: [],
+        paused: false, timer: null, stopping: null,
     };
+    try { await startPart(active, probe); }
+    catch (err) {
+        const a = active; active = null;
+        stopTracks(a.display); stopTracks(a.micStream); a.audioCtx?.close();
+        showError('Could not start recording', err);
+        return;
+    }
 
-    active = {
-        id: meta.id, meta, mr, display, micStream, audioCtx,
-        seq: 0, writes: Promise.resolve(),
-        activeMs: 0, resumedAt: performance.now(), paused: false,
-        timer: null, stopping: null,
-    };
-    await store.putMeta(meta);
-
-    mr.addEventListener('dataavailable', (e) => {
-        if (!e.data || !e.data.size || !active) return;
-        const a = active;
-        const seq = a.seq++;
-        a.meta.size += e.data.size;
-        a.meta.durationMs = elapsed(a);
-        const data = e.data;
-        a.writes = a.writes
-            .then(() => store.addChunk(a.id, seq, data))
-            .then(() => store.putMeta({ ...a.meta }))
-            .catch(err => console.warn('[recorder] chunk write failed', err));
-    });
-    mr.addEventListener('error', (e) => {
-        console.error('[recorder] MediaRecorder error', e.error || e);
-        stopRecording();
-    });
     // "Stop sharing" in the browser's own bar ends the take too.
     display.getVideoTracks()[0]?.addEventListener('ended', () => stopRecording());
 
-    mr.start(TIMESLICE_MS);
     showBar();
     emitChange();
 
@@ -336,18 +323,127 @@ async function startRecording({ mic, sound }) {
     }
 }
 
+function partName(a, n, t) {
+    const part = n > 1 || a.partCount > 1 ? ` part ${n}` : '';
+    return {
+        label: `Recording ${a.number}${part ? ` · part ${n}` : ''}`,
+        fileName: `${safeName(a.deck)} - recording ${a.number}${part} (${stamp(t)}).${a.ext}`,
+    };
+}
+
+/** Start the next part of take a (with mr, if one is already made). */
+async function startPart(a, mr = null) {
+    if (!mr) {
+        try { mr = new MediaRecorder(a.stream, a.recOpts); }
+        catch { mr = new MediaRecorder(a.stream); }
+    }
+    const n = ++a.partCount;
+    const t = Date.now();
+    const meta = {
+        id: `${a.group}-p${n}`,
+        group: a.group,
+        part: n,
+        groupStartedAt: a.startedAt,
+        sessionId: a.sessionId,
+        deckName: a.deck,
+        ...partName(a, n, t),
+        mimeType: a.finalType,
+        startedAt: t,
+        durationMs: 0,
+        size: 0,
+        status: 'recording',
+        hasMic: a.hasMic,
+        hasSound: a.hasSound,
+        lecture: a.lecture,
+    };
+    const p = { id: meta.id, meta, mr, seq: 0, writes: Promise.resolve(),
+                activeMs: 0, resumedAt: performance.now(), closed: null };
+    await store.putMeta(meta);
+    if (a.stopping) {                  // stopped while this part was being set up
+        await store.remove(meta.id);
+        throw new Error('The recording was stopped.');
+    }
+
+    mr.addEventListener('dataavailable', (e) => {
+        if (!e.data || !e.data.size) return;
+        const seq = p.seq++;
+        p.meta.size += e.data.size;
+        if (!p.closed) p.meta.durationMs = Math.round(partElapsed(a, p));
+        const data = e.data;
+        p.writes = p.writes
+            .then(() => store.addChunk(p.id, seq, data))
+            .then(() => store.putMeta({ ...p.meta }))
+            .catch(err => console.warn('[recorder] chunk write failed', err));
+        // Nearly full: carry on in a new part.
+        if (a === active && a.part === p && !a.paused && !a.stopping && p.meta.size >= ROTATE_AT) rotatePart(a);
+    });
+    mr.addEventListener('error', (e) => {
+        console.error('[recorder] MediaRecorder error', e.error || e);
+        if (a === active && a.part === p) stopRecording();
+    });
+    a.part = p;
+    mr.start(TIMESLICE_MS);
+    if (a.paused) mr.pause();
+}
+
+// The new part starts before the old one stops, so nothing is missed
+// between them (at most a few frames appear at the end of one and the start
+// of the next).
+async function rotatePart(a) {
+    const old = a.part;
+    if (old.rotating) return;
+    old.rotating = true;
+    if (a.partCount === 1) Object.assign(old.meta, partName({ ...a, partCount: 2 }, 1, old.meta.startedAt));
+    try { await startPart(a); }
+    catch (err) {
+        console.warn('[recorder] could not start the next part; this one carries on', err);
+        old.rotating = false;
+        return;
+    }
+    a.doneMs += partElapsed(a, old);
+    a.closing.push(closePart(a, old));
+    emitChange();
+}
+
+/** Stop part p's recorder; resolves once all of it is saved. */
+function closePart(a, p) {
+    if (p.closed) return p.closed;
+    p.closed = new Promise((resolve) => {
+        if (!a.paused) p.activeMs += performance.now() - p.resumedAt;
+        p.frozenMs = p.activeMs;
+        const finish = async () => {
+            try { await p.writes; } catch { /* logged already */ }
+            p.meta.durationMs = Math.round(p.frozenMs);
+            p.meta.status = 'done';
+            try { await store.putMeta({ ...p.meta }); } catch (err) { console.warn('[recorder]', err); }
+            emitChange();
+            resolve();
+        };
+        if (p.mr.state === 'inactive') { finish(); return; }
+        p.mr.addEventListener('stop', () => { setTimeout(finish, 0); }, { once: true });
+        try { p.mr.stop(); } catch { finish(); }
+    });
+    return p.closed;
+}
+
+function partElapsed(a, p) {
+    if (p.frozenMs != null) return p.frozenMs;
+    return p.activeMs + (a.paused ? 0 : performance.now() - p.resumedAt);
+}
+
 function togglePause() {
     const a = active;
     if (!a || a.stopping) return;
+    const p = a.part;
     if (a.paused) {
-        a.mr.resume();
-        a.resumedAt = performance.now();
+        p.mr.resume();
+        p.resumedAt = performance.now();
         a.paused = false;
     } else {
-        a.mr.pause();
-        a.activeMs += performance.now() - a.resumedAt;
+        p.mr.pause();
+        p.activeMs += performance.now() - p.resumedAt;
         a.paused = true;
-        a.mr.requestData?.();   // save what we have now
+        p.mr.requestData?.();   // save what we have now
     }
     renderBar();
 }
@@ -357,33 +453,26 @@ export function stopRecording() {
     const a = active;
     if (!a) return Promise.resolve();
     if (a.stopping) return a.stopping;
-    a.stopping = new Promise((resolve) => {
-        const finish = async () => {
-            if (!a.paused) a.activeMs += performance.now() - a.resumedAt;
-            a.paused = true;
-            try { await a.writes; } catch { /* logged already */ }
-            a.meta.durationMs = Math.round(a.activeMs);
-            a.meta.status = 'done';
-            try { await store.putMeta({ ...a.meta }); } catch (err) { console.warn('[recorder]', err); }
-            stopTracks(a.display);
-            stopTracks(a.micStream);
-            try { await a.audioCtx?.close(); } catch { /* already closed */ }
-            if (active === a) active = null;
-            hideBar();
-            emitChange();
-            toast(`${a.meta.label} saved — find it under Download.`);
-            resolve();
-        };
-        if (a.mr.state === 'inactive') { finish(); return; }
-        a.mr.addEventListener('stop', () => { setTimeout(finish, 0); }, { once: true });
-        try { a.mr.stop(); } catch { finish(); }
-    });
+    a.stopping = (async () => {
+        renderBar();
+        await Promise.all([...a.closing, closePart(a, a.part)]);
+        a.paused = true;
+        stopTracks(a.display);
+        stopTracks(a.micStream);
+        try { await a.audioCtx?.close(); } catch { /* already closed */ }
+        if (active === a) active = null;
+        hideBar();
+        emitChange();
+        toast(a.partCount > 1
+            ? `Recording ${a.number} saved in ${a.partCount} parts — find them under Download.`
+            : `Recording ${a.number} saved — find it under Download.`);
+    })();
     renderBar();
     return a.stopping;
 }
 
 function elapsed(a) {
-    return a.activeMs + (a.paused ? 0 : performance.now() - a.resumedAt);
+    return a.doneMs + partElapsed(a, a.part);
 }
 
 /* ─── recording bar ───────────────────────────────────────────── */
@@ -506,7 +595,7 @@ async function recoverInterrupted() {
     let changed = false;
     for (const m of all) {
         if (m.status !== 'recording') continue;
-        if (active && active.id === m.id) continue;
+        if (active && m.group === active.group) continue;
         const chunks = await store.chunks(m.id);
         if (!chunks.length) { await store.remove(m.id); changed = true; continue; }
         m.status = 'done';

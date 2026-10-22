@@ -21,7 +21,7 @@ import { api, appConfig, startSignIn } from '../github/auth.js';
 import { setUploadButtonHandler, setDropHandler, chooseLocalFile, openPresentationFile } from '../app/uploader.js';
 import { buildPresentationZip } from '../editor/save.js';
 import { buildNotesPdf } from '../editor/notes-export.js';
-import { listRecordings, getRecording, updateRecording, formatSize } from '../app/recorder.js';
+import { listRecordings, getRecording, updateRecording, downloadRecording, formatSize } from '../app/recorder.js';
 
 let appState = null;
 const S = {
@@ -84,9 +84,11 @@ const rememberFolder = (src, path) => store.set(LOC_KEY, { ...(store.get(LOC_KEY
 export const targetKey = t => (t ? join(t.dir, t.name) : null);
 const zipPath = t => join(t.dir, `${t.name}.zip`);
 const notesPath = t => join(t.dir, `${t.name}.pdf`);
-function recordingPath(t, startedAt, ext) {
-    const d = new Date(startedAt), z = n => String(n).padStart(2, '0');
-    return join(t.dir, `${t.name}-${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}-${z(d.getHours())}-${z(d.getMinutes())}.${ext}`);
+function recordingPath(t, meta, ext) {
+    // A take split into parts: all parts carry the take's start time, plus "-part<n>".
+    const d = new Date(meta.groupStartedAt || meta.startedAt), z = n => String(n).padStart(2, '0');
+    const part = meta.part && (meta.part > 1 || / part 1 /.test(meta.fileName || '')) ? `-part${meta.part}` : '';
+    return join(t.dir, `${t.name}-${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}-${z(d.getHours())}-${z(d.getMinutes())}${part}.${ext}`);
 }
 
 /* ─── setup ───────────────────────────────────────────────────── */
@@ -311,19 +313,23 @@ async function openDeck(src, entry) {
 
 /* Save: this folder, a name, and what to save. */
 // The takes a save offers: those recorded with this presentation (or with no
-// presentation yet) that aren't saved there already.
+// presentation yet) that aren't saved there already. Takes too big for the
+// destination (made before recordings were split into parts) come back
+// separately, so the window can offer to download them instead of hiding them.
 async function takesFor(src, key) {
     let recs = [];
     try { recs = await listRecordings(); } catch { /* none */ }
-    return recs.filter(r => (r.lecture === key || !r.lecture)
-        && !(r.uploaded && r.uploaded.repo === src.id)
-        && !(src.limit && (r.size || 0) > src.limit));
+    const mine = recs.filter(r => (r.lecture === key || !r.lecture)
+        && !(r.uploaded && r.uploaded.repo === src.id))
+        .sort((a, b) => a.startedAt - b.startedAt);
+    const fits = r => !(src.limit && (r.size || 0) > src.limit);
+    return { takes: mine.filter(fits), tooBig: mine.filter(r => !fits(r)) };
 }
 
 async function drawSaveForm(w, src, path, dirs, decks) {
     const t0 = appState.ghTarget;
     if (w.name === null) w.name = t0 && t0.src === src.id ? t0.name : (GH.cleanName(appState.deckName) || 'presentation');
-    const takes = await takesFor(src, t0 ? targetKey(t0) : null);
+    const { takes, tooBig } = await takesFor(src, t0 ? targetKey(t0) : null);
     const zips = decks.filter(d => /\.zip$/i.test(d.name));
     w.body.innerHTML = `${src.kind === 'computer' ? '' : listHTML(path, dirs, zips, { filesQuiet: true })}
         <label class="gh-field"><span>File name</span>
@@ -334,6 +340,8 @@ async function drawSaveForm(w, src, path, dirs, decks) {
                 <label class="gh-chip" title="One PDF with your annotations and widgets drawn in"><input type="checkbox" data-notes${wantNotes() ? ' checked' : ''}><span>${ICON.pdf}Notes${ICON.tick}</span></label>
                 <label class="gh-chip" title="${takes.length ? `${takes.length} recording${takes.length > 1 ? 's' : ''} not saved yet` : 'No recordings to save'}"><input type="checkbox" data-recs${takes.length ? ' checked' : ' disabled'}><span>${ICON.rec}Recordings${takes.length ? ` <small>${takes.length}</small>` : ''}${ICON.tick}</span></label>
             </div></div>
+        ${tooBig.length ? `<p class="gh-muted gh-small gh-toobig">${tooBig.length === 1 ? '1 recording is' : `${tooBig.length} recordings are`} too big for GitHub (over 100 MB).
+            <button type="button" class="gh-link" data-toobig>Save ${tooBig.length === 1 ? 'it' : 'them'} to this computer</button></p>` : ''}
         <p class="gh-err" data-save-err></p>
         <p class="gh-row gh-row--end"><button type="button" class="gh-btn" data-cancel>Cancel</button>
             <button type="button" class="gh-btn gh-btn--primary" data-save>Save</button></p>`;
@@ -342,6 +350,11 @@ async function drawSaveForm(w, src, path, dirs, decks) {
     w.body.querySelectorAll('[data-dir]').forEach(b => { b.onclick = () => browse(w, src, b.dataset.dir); });
     w.body.querySelectorAll('[data-file]').forEach(b => { b.onclick = () => { nameIn.value = baseOf(zips[Number(b.dataset.file)].name); w.name = nameIn.value; }; });
     w.body.querySelector('[data-cancel]').onclick = () => window.BeamerModal?.close();
+    w.body.querySelector('[data-toobig]')?.addEventListener('click', async (e) => {
+        e.currentTarget.disabled = true;
+        for (const r of tooBig) { await downloadRecording(r.id); await new Promise(res => setTimeout(res, 700)); }
+        e.currentTarget.disabled = false;
+    });
     w.body.querySelector('[data-save]').onclick = () => {
         const n = GH.cleanName(nameIn.value);
         const err = w.body.querySelector('[data-save-err]');
@@ -367,9 +380,9 @@ async function saveNow(src, { deck = true, notes, recordings }) {
     saving = true;
     document.body.classList.add('gh-saving');
     loading(`Saving to ${src.where}…`, 'Building the presentation…');
+    const files = [], saved = [];
     try {
         bus.emit('annotations:flush');
-        const files = [];
         if (deck) {
             const zip = await buildPresentationZip({
                 extra: { 'config/resume.json': JSON.stringify({ slide: appState.currentSlide, savedAt: new Date().toISOString() }) },
@@ -380,23 +393,56 @@ async function saveNow(src, { deck = true, notes, recordings }) {
             setLoading('Building the notes PDF…');
             files.push({ path: notesPath(t), blob: await buildNotesPdf() });
         }
-        const saved = [];
         for (const id of recordings) {
             const r = await getRecording(id);
             if (!r || (src.limit && r.blob.size > src.limit)) continue;
-            const path = recordingPath(t, r.meta.startedAt, extOf(r.meta.fileName) || 'webm');
+            const path = recordingPath(t, r.meta, extOf(r.meta.fileName) || 'webm');
             files.push({ path, blob: r.blob });
             saved.push({ id, path });
         }
-        await src.write(files, `Beamer+: save ${zipPath(t)}`, setLoading);
-        for (const u of saved) await updateRecording(u.id, { uploaded: { repo: src.id, path: u.path, at: Date.now() } });
-        window.BeamerModal?.close();
-        const extra = [notes && (deck ? 'notes' : 'the notes'), saved.length && `${saved.length} recording${saved.length > 1 ? 's' : ''}`].filter(Boolean);
-        toast(`Saved ${deck ? zipPath(t) : `to ${t.dir || src.name}`}${extra.length ? `, with ${extra.join(' and ')}` : ''}.`);
     } catch (e) {
         console.error('[library] save failed', e);
         window.BeamerModal?.close();
         showError('Save failed', e);
+        saving = false;
+        document.body.classList.remove('gh-saving');
+        return;
+    }
+    await writeOut(src, t, files, saved, { deck, notes });
+}
+
+// Write what saveNow built. If it fails, nothing is lost (recordings stay in
+// Beamer+ until deleted): offer to try again or to save to this computer.
+async function writeOut(src, t, files, saved, { deck, notes }) {
+    saving = true;
+    document.body.classList.add('gh-saving');
+    loading(`Saving to ${src.where}…`, '');
+    try {
+        await src.write(files, `Beamer+: save ${zipPath(t)}`, setLoading);
+        if (src.kind !== 'computer') {
+            for (const u of saved) await updateRecording(u.id, { uploaded: { repo: src.id, path: u.path, at: Date.now() } });
+        }
+        window.BeamerModal?.close();
+        const extra = [notes && (deck ? 'notes' : 'the notes'), saved.length && `${saved.length} recording${saved.length > 1 ? 's' : ''}`].filter(Boolean);
+        toast(src.kind === 'computer'
+            ? `Saved to this computer${extra.length ? `, with ${extra.join(' and ')}` : ''}.`
+            : `Saved ${deck ? zipPath(t) : `to ${t.dir || src.name}`}${extra.length ? `, with ${extra.join(' and ')}` : ''}.`);
+    } catch (e) {
+        console.error('[library] save failed', e);
+        const kept = saved.length ? ' Your recordings are still in Beamer+ (Download menu) until you delete them.' : '';
+        const buttons = [
+            { label: 'Close', kind: 'cancel' },
+            { label: 'Try again', kind: src.kind === 'computer' ? 'ok' : 'cancel', onClick: () => setTimeout(() => writeOut(src, t, files, saved, { deck, notes }), 0) },
+        ];
+        if (src.kind !== 'computer') {
+            buttons.push({ label: 'Save to this computer', kind: 'ok', onClick: () => setTimeout(() => writeOut(COMPUTER, t, files, saved, { deck, notes }), 0) });
+        }
+        window.BeamerModal?.show({
+            kind: 'error',
+            title: `Couldn’t save to ${src.where}`,
+            message: `${e?.message || String(e)}${kept}`,
+            buttons,
+        });
     } finally {
         saving = false;
         document.body.classList.remove('gh-saving');

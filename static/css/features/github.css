@@ -251,3 +251,6 @@
 .gh-local-note { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0; }
 .gh-local-note svg { width: 14px; height: 14px; }
 .gh-lib-foot .gh-link { font-size: var(--fs-sm); }
+
+/* Save window: takes too big for GitHub, offered as a download instead */
+.gh-toobig { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: var(--sp-2) 0 0; }

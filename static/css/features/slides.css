@@ -51,8 +51,10 @@ body.split-view-active #main-content {
     background: var(--surface-stage);
     gap: 0;
 }
-body.split-view-active #pdf-container { padding: var(--sp-3); }
-body.split-view-active #pdf-container-2 { display: flex; padding: var(--sp-3); }
+/* min-width: 0 so a pane's canvas (still sized for the previous layout) can't
+   hold the pane open and squeeze the other one while the split is measured. */
+body.split-view-active #pdf-container { padding: var(--sp-3); min-width: 0; }
+body.split-view-active #pdf-container-2 { display: flex; padding: var(--sp-3); min-width: 0; }
 
 
 #split-view-divider {

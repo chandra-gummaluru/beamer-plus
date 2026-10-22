@@ -53,6 +53,11 @@ const state = {
     rightSlideIndex: 0,
     currentViewIndex: null,   // deck index of the view slide driving the active split (null for manual splits)
     splitRatio: 50,
+    // The ratio a split you open yourself uses (50/50 until you drag the
+    // divider in one). Kept apart from splitRatio, which a view slide sets to
+    // its own ratio: a manual split used to inherit that (say 34/66), which
+    // shrank both slides and left wide side margins until the divider moved.
+    manualSplitRatio: 50,
     annotationTool: 'hand',
     activePenSlot: 0,
     zipFile: null,
@@ -607,7 +612,7 @@ function wireSplitViewButton(annContainer2, pdfContainer2) {
         // Show overlay(s) immediately before any layout work
         _slideOverlay(false)?.classList.add('visible');
         if (enteringSplit) _slideOverlay(true)?.classList.add('visible');
-        await setSplitActive(enteringSplit);
+        await setSplitActive(enteringSplit, null, enteringSplit ? state.manualSplitRatio : null);
         if (state.zipFile) {
             if (state.splitView) {
                 await renderSplitSlides(state.currentSlide, state.rightSlideIndex);
@@ -637,6 +642,8 @@ function wireSplitViewButton(annContainer2, pdfContainer2) {
                 bus.emit('view:ratio-dragged', view.ratio);
             }
         }
+        // A split you opened yourself remembers where you put the divider.
+        if (wasDragging && state.currentViewIndex == null) state.manualSplitRatio = state.splitRatio;
         // Re-render both panes after divider resize — only if we were actually dragging
         if (wasDragging && state.splitView) {
             setTimeout(async () => {
@@ -808,7 +815,7 @@ async function showViewWithUndefinedPane(viewIdx, L, R, direction) {
     if (L != null || R != null) resetRevealsOnArrival(state.slideStructure[anchor], direction);
     state.missingPanes = { left: L == null, right: R == null };
     // Edit mode previews the view as it will present: at its own ratio.
-    const ratio = obj?.ratio ?? (state.editMode ? 50 : null);
+    const ratio = obj?.ratio ?? (state.editMode ? 50 : state.manualSplitRatio);
     // setSplitActive renders the right pane itself unless the split was
     // already up with this right index.
     const rightRendered = !(state.splitView && state.rightSlideIndex === anchor);
@@ -952,7 +959,7 @@ async function _goToSlide(i, direction = null, isSplitPaneNav = false) {
         // arriving backwards); the left pane's goToSlide below won't reset.
         resetRevealsOnArrival(state.slideStructure[leftIdx], direction);
         resetRevealsOnArrival(state.slideStructure[rightIdx], direction);
-        const previewRatio = prelimObj.ratio ?? (state.editMode ? 50 : null);
+        const previewRatio = prelimObj.ratio ?? (state.editMode ? 50 : state.manualSplitRatio);
         if (leftIdx !== rightIdx) await setSplitActive(true, rightIdx, previewRatio);
         state.currentViewIndex = i;   // remember which view slide drives this split
         await _goToSlide(leftIdx, null, true);  // isSplitPaneNav — skip auto-close
@@ -1047,8 +1054,12 @@ async function setSplitActive(active, rightIndex = null, splitRatio = null) {
         applySplitRatio(splitRatio ?? state.splitRatio);
     }
 
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // The stage slides to its new width (#main-content's margin-left
+    // transition, 260ms). Measuring part-way through sized the slides for a
+    // narrower stage, leaving wide empty margins until the divider was dragged.
+    await waitForStageLayout();
     sizeSlideCanvases(); // recompute 4:3 sizes for the new split / single layout
+    sizeSlideCanvases(); // again: each pane's old canvas size can skew the other's first measurement
     state.annCvs.resizeOnly?.();
     state.pdfCvs.resizeOnly?.();
     if (state.annCvs2) state.annCvs2.resizeOnly?.();
@@ -1532,6 +1543,28 @@ function populateBookmarkPins() {
  * Called on init, window resize, focus-mode toggle, and split-view
  * toggle so the ratio is always correct on every device / orientation.
  */
+/**
+ * Resolves once the stage (#main-content) has stopped moving — e.g. after
+ * split view toggles its margin transition — or after maxMs at the latest.
+ */
+function waitForStageLayout(maxMs = 450) {
+    const mc = document.getElementById('main-content');
+    if (!mc) return Promise.resolve();
+    const start = performance.now();
+    // rAF doesn't run in a hidden tab: fall back to a short timeout.
+    const frame = () => new Promise(r => { requestAnimationFrame(() => r()); setTimeout(r, 50); });
+    return (async () => {
+        let last = '', stable = 0;
+        while (performance.now() - start < maxMs) {
+            await frame();
+            const r = mc.getBoundingClientRect();
+            const key = `${Math.round(r.left)},${Math.round(r.width)},${Math.round(r.height)}`;
+            if (key === last) { if (++stable >= 2) return; }
+            else { last = key; stable = 0; }
+        }
+    })();
+}
+
 function sizeSlideCanvases() {
     const pairs = [
         ['pdf-container',   'pdf-canvas',   'ann-canvas'],
