@@ -33,7 +33,7 @@ import { startTour } from './app/tour.js';
 import { initEditor } from './editor/editor.js';
 import { initRecorder } from './app/recorder.js';
 import { initLibrary } from './library/ui.js';
-import { initSessionMenu } from './app/session-menu.js';
+import { initSessionButtons } from './app/session-buttons.js';
 import { initLastSession } from './app/last-session.js';
 import { getSessionId, sessionUrl, saveLastSession } from './app/session.js';
 
@@ -165,7 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initEditor(state);
     initRecorder(state);
     initLibrary(state);
-    initSessionMenu(state);
+    initSessionButtons(state);
     initLastSession(state);
     initSettings();
     // Must run before applyDefaultPen(): that call emits a 'tool:change' to

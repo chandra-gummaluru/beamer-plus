@@ -90,7 +90,7 @@ def run():
         page.on("pageerror", lambda e: errors.append(f"pageerror: {e}"))
         shot = lambda n: page.screenshot(path=f"{OUT}/{n}.png")
         go = lambda name: (page.locator(".lib-files .lib-item", has_text=name).first.click(), page.wait_for_timeout(400))
-        menu = lambda key: (page.click("#session-btn"), page.click(f".session-menu [data-menu='{key}']"))
+        menu = lambda key: page.click({"open": "#session-open-btn", "save": "#session-save-btn", "record": "#record-btn"}[key])
         folder = lambda: page.evaluate(FOLDER_LS)
 
         page.goto(BASE); page.wait_for_timeout(500)

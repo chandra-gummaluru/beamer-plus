@@ -1166,37 +1166,6 @@ body.edit-mode #mute-overlay { display: none; }
 /* The text tool lifts the ink canvas high above the slide; not while muted. */
 body.slide-muted #ann-canvas, body.slide-muted #ann-canvas-2 { z-index: 2 !important; }
 
-/* ============================================================
-   Delete a slide — edit mode, top-right of the hovered preview
-   ============================================================ */
-.slide-del-btn {
-    display: none;
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    z-index: 12;
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid oklch(20% 0.01 260 / 0.12);
-    border-radius: var(--r-sm);
-    background: oklch(99% 0 0 / 0.92);
-    color: var(--ink-2);
-    cursor: pointer;
-    pointer-events: auto;
-    box-shadow: 0 1px 2px oklch(20% 0.01 260 / 0.10);
-    transition: background var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast);
-}
-.slide-del-btn svg { width: 13px; height: 13px; }
-.slide-del-btn:hover { color: var(--danger, #c0392b); border-color: currentColor; }
-.slide-del-btn.is-armed { background: var(--danger, #c0392b); color: #fff; border-color: transparent; }
-body.edit-mode #slide-nav-slides .slide-nav-item:hover .slide-del-btn,
-body.edit-mode #slide-nav-slides .slide-del-btn.is-armed { display: flex; }
-/* The current slide's card is click-through (pointer-events:none) — its
-   delete button still has to be reachable. */
-body.edit-mode #slide-nav-slides .slide-nav-item.current-slide { pointer-events: auto; cursor: default; }
 
 /* ============================================================
    Add page chooser (slides/structure.js openAddPageModal)

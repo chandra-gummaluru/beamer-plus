@@ -32,6 +32,11 @@ const changeListeners = new Set();
 
 export function initRecorder(state) {
     appState = state;
+    document.getElementById('record-btn')?.addEventListener('click', () => openRecorder());
+    if (!recordingSupported()) {
+        const btn = document.getElementById('record-btn');
+        if (btn) btn.title = 'Recording is not supported in this browser';
+    }
     document.getElementById('recorder-pause-btn')?.addEventListener('click', togglePause);
     document.getElementById('recorder-stop-btn')?.addEventListener('click', () => stopRecording());
 
@@ -50,7 +55,7 @@ export function initRecorder(state) {
 /** Can this browser record the tab? */
 export const recordingSupported = () => !!navigator.mediaDevices?.getDisplayMedia && typeof MediaRecorder !== 'undefined';
 
-/** "Start recording…" (the session menu): the recorder's start dialog. */
+/** The record button: the recorder's start dialog. */
 export function openRecorder() {
     if (active) return;
     openStartDialog();

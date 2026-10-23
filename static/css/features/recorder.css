@@ -1,9 +1,13 @@
 /* ============================================================
-   Recorder — recording bar, start dialog, toast
+   Recorder — record button, recording bar, start dialog, toast
    (app/recorder.js)
    ============================================================ */
 
-/* ── Recording bar — bottom-right, beside Mute, while a take runs ─ */
+/* Record button: the inner dot is red. */
+#record-btn svg circle[fill] { color: var(--recording); }
+
+/* ── Recording bar — bottom-right, in the record button's place ─ */
+body.is-recording #record-btn { display: none; }
 
 #recorder-bar {
     display: flex;

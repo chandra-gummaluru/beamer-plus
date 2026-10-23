@@ -38,7 +38,7 @@ demo** on the empty slide.
 
 ## Loading a presentation
 
-Click **Open a presentation** on the empty slide, drag the file onto the window, or use **Open a presentation…** in the session menu (top-right) to load either:
+Click **Open a presentation** on the empty slide, drag the file onto the window, or use the **Open** button (top-right) to load either:
 
 - **A plain PDF** — every page becomes a slide.
 - **A presentation ZIP** — a PDF plus saved configuration, media, widgets and
@@ -93,10 +93,9 @@ drawing, editing or clicking (and when the tab is hidden or the session ends);
 moving between slides only updates which slide you're on. It's per browser,
 and only the most recent presentation is kept.
 
-The session button (top-right: **Session ABC123**, the session's code)
-is the session menu: **Open a presentation…**, **Edit presentation**, **Save
-presentation…** (Edit and Save once a presentation is open), **Start recording…** / **Stop recording**, and **End session** (back to
-the start page).
+Four buttons top-right run the session: **Open**, **Edit**, **Save** (Edit
+and Save once a presentation is open) and **Close session** (back to the
+start page).
 
 ## Opening and saving: folders on this computer
 
@@ -132,11 +131,10 @@ browsers Open is the file picker and Save downloads.
 
 ## Recording
 
-**Start recording…** in the session menu records this tab — slides, ink and
-widgets — as a video, with your microphone and/or the tab's sound (videos,
-audio, widgets). While recording, a small bar (bottom-right, next to the
-hide-slide button) shows the time, pause / resume and stop; the menu offers
-**Stop recording** too. Stop and start again as often
+The record button (bottom-right, next to the hide-slide button) records this
+tab — slides, ink and widgets — as a video, with your microphone and/or the
+tab's sound (videos, audio, widgets). While recording, the button turns into a
+small bar with the time, pause / resume and stop. Stop and start again as often
 as you like — every take is kept and offered when you **Save**, where
 each can be downloaded (MP4 in Chrome/Edge, WebM elsewhere) or deleted.
 

@@ -311,7 +311,7 @@ export function isDeletableSlide(obj) {
     return obj?.type === 'blank' || (obj?.type === 'pdf' && !!obj.cfgId);
 }
 
-// Delete any slide (from the navigator's hover button in edit mode). A PDF
+// Delete any slide (Remove slide in the editor panel, edit mode). A PDF
 // page removed this way leaves the deck; its page stays in slides.pdf, so
 // re-uploading the deck brings it back.
 function deleteSlideAt(idx) {

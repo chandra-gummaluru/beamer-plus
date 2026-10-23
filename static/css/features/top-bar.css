@@ -1,5 +1,5 @@
 /* ============================================================
-    Top-right controls — Upload, Save, Focus
+    Top-right controls — Open, Edit, Save, Close session
    ============================================================ */
 
 #top-right-controls {
@@ -13,88 +13,18 @@
     gap: var(--sp-2);
 }
 
-/* The session button — same paper look as every other control: the open
-   presentation's name (or "Session") and a menu with the session's actions
-   (app/session-menu.js). */
-#top-right-controls .session-btn {
-    gap: var(--sp-2);
+/* The session's buttons (Open, Edit, Save, Close): square icon buttons,
+   same paper look as every other control (app/session-buttons.js). */
+#top-right-controls .btn {
+    width: var(--hit-min);
+    min-width: var(--hit-min);
     min-height: var(--hit-min);
-    max-width: 260px;
-    padding: 0 11px 0 7px;
-    font-size: 14px;
-    font-weight: 400;
+    padding: 0;
 }
-.session-avatar {
-    width: 22px;
-    height: 22px;
-    flex: 0 0 auto;
-    border-radius: 50%;
-    object-fit: cover;
-}
-.session-mark { display: inline-flex; width: 18px; height: 18px; margin-left: 4px; color: var(--ink-1); flex: 0 0 auto; }
-.session-mark svg { width: 100%; height: 100%; }
-
-body.lib-saving #top-right-controls .session-btn .session-chevron { animation: session-saving 0.8s ease-in-out infinite alternate; }
-.session-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#top-right-controls .session-btn .session-chevron { width: 14px; height: 14px; margin-left: -2px; opacity: .6; color: var(--ink-1); flex: 0 0 auto; transition: transform .15s; }
-#top-right-controls .session-btn[aria-expanded="true"] .session-chevron { transform: rotate(180deg); }
-#top-right-controls .session-btn[aria-expanded="true"] { --_bg: var(--surface-cream-2); --_bd: var(--ink-4); }
+#top-right-controls .btn:disabled { opacity: 0.4; cursor: default; }
+/* Saving: the Save button pulses. */
+body.lib-saving #session-save-btn svg { animation: session-saving 0.8s ease-in-out infinite alternate; }
 @keyframes session-saving { to { opacity: 0.35; } }
-
-/* Its menu */
-.session-menu {
-    position: fixed;
-    z-index: 9500;
-    min-width: 240px;
-    max-width: 300px;
-    padding: 6px;
-    display: flex;
-    flex-direction: column;
-    background: var(--surface-paper);
-    border: var(--line-soft);
-    border-radius: var(--r-lg);
-    box-shadow: var(--shadow-3);
-    font-family: var(--font-sans);
-    animation: session-menu-in var(--dur-fast, .12s) var(--ease-out);
-}
-@keyframes session-menu-in { from { opacity: 0; transform: translateY(-4px); } }
-.session-menu-head {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: 6px 10px 8px;
-    margin-bottom: 5px;
-    border-bottom: var(--line-soft);
-    font-size: 12.5px;
-    line-height: 1.45;
-    color: var(--ink-3);
-}
-.session-menu-sub { color: var(--ink-3); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.session-menu-lecture { color: var(--ink-2); }
-.session-menu-head b { color: var(--ink-1); font-weight: 600; }
-.session-menu button {
-    display: flex; align-items: center; gap: 10px;
-    height: 34px; padding: 0 10px;
-    background: none; border: 0; border-radius: var(--r-sm);
-    font: inherit; font-size: 14px; color: var(--ink-1);
-    text-align: left; cursor: pointer;
-}
-.session-menu button:hover:not(:disabled), .session-menu button:focus-visible { background: var(--surface-cream-2); outline: none; }
-.session-menu button:disabled { color: var(--ink-4); cursor: default; }
-.session-menu button svg { width: 16px; height: 16px; color: var(--ink-2); flex: 0 0 auto; }
-.session-menu button:disabled svg { color: var(--ink-4); }
-.session-menu-label { flex: 1 1 auto; }
-.session-menu button.is-strong { font-weight: 600; }
-.session-menu button:disabled { color: var(--ink-4); cursor: default; }
-.session-menu button:disabled svg { color: var(--ink-4); }
-.session-menu kbd { font: 500 11.5px var(--font-sans); color: var(--ink-3); margin-left: var(--sp-3); }
-/* Start recording: the dot is red, as on the recording bar. */
-.session-menu button .session-rec-icon circle[fill] { color: var(--recording); }
-.session-menu button:disabled .session-rec-icon circle[fill] { color: var(--ink-4); }
-.session-menu button.is-strong svg { color: var(--ink-1); }
-.session-menu button.is-danger:hover, .session-menu button.is-danger:focus-visible { color: var(--danger); }
-.session-menu button.is-danger:hover svg { color: var(--danger); }
-.session-menu hr { border: 0; border-top: var(--line-soft); margin: 5px 2px; }
 
 /* Top-controls panel (legacy hidden) */
 #top-controls-panel { display: none; }
@@ -140,7 +70,7 @@ body.focus-mode #main-content {
     }
 }
 
-/* ── Mute (and the recording bar) — bottom-right corner ─────────────────────────── */
+/* ── Record, Mute — bottom-right corner ─────────────────────────── */
 #mute-container {
     position: fixed;
     right: var(--sp-3);

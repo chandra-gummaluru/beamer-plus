@@ -1,6 +1,6 @@
-"""Walk through the start page (New Session / Last Session), the session menu,
+"""Walk through the start page (New Session / Last Session), the session buttons,
 Open / Save presentation in a folder on this computer, recording from
-the menu, and Last Session bringing a presentation back as it was left.
+the record button, and Last Session bringing a presentation back as it was left.
 
   python app.py --http --port 5001        (in another terminal)
   python tests/browser/flow_sessions.py   screenshots land in tests/browser/shots/
@@ -63,8 +63,9 @@ def run():
         page.on("crash", lambda: print("PAGE CRASHED"))
         shot = lambda n: page.screenshot(path=f"{OUT}/{n}.png")
         go = lambda name: (page.locator(".lib-files .lib-item", has_text=name).first.click(), page.wait_for_timeout(400))
-        open_menu = lambda: (page.click("#session-btn"), page.wait_for_timeout(150))
-        menu = lambda key: (open_menu(), page.click(f".session-menu [data-menu='{key}']"))
+        BTN = {"open": "#session-open-btn", "edit": "#session-edit-btn", "save": "#session-save-btn",
+               "end": "#session-close-btn", "record": "#record-btn"}
+        menu = lambda key: page.click(BTN[key])
         sid = lambda: re.search(r"/s/([^/]+)/", page.url).group(1)
 
         # 1. The start page, first time: New Session, and Last Session greyed out.
@@ -80,18 +81,15 @@ def run():
               and page.locator("#welcome-last").is_hidden())
         check("…no GitHub anywhere", "GitHub" not in page.content())
 
-        # 2. New Session: the session menu, nothing open yet.
+        # 2. New Session: Open, Edit, Save, Close; nothing open yet.
         page.click("#welcome-new-btn"); page.wait_for_url("**/s/**"); page.wait_for_timeout(2200)
         first = sid()
-        check("session button names the session", page.inner_text("#session-btn").strip() == f"Session {first}")
-        check("no record button in the corner", page.locator("#record-btn").count() == 0)
-        open_menu(); shot("s02-menu-empty")
-        keys = page.eval_on_selector_all(".session-menu [data-menu]", "els => els.map(e => [e.dataset.menu, e.disabled])")
-        print("   menu:", keys)
-        check("menu: open, edit, save, record, end", [k for k, _ in keys] == ["open", "edit", "save", "record", "end"])
-        check("…edit and save need a presentation", dict(keys)["edit"] and dict(keys)["save"] and not dict(keys)["open"])
-        check("…the head names the session", first in page.inner_text(".session-menu-head"))
-        page.keyboard.press("Escape")
+        shot("s02-buttons-empty")
+        btns = page.eval_on_selector_all("#top-right-controls button", "els => els.map(e => [e.id, e.disabled])")
+        print("   buttons:", btns)
+        check("top-right: open, edit, save, close", [k for k, _ in btns] == ["session-open-btn", "session-edit-btn", "session-save-btn", "session-close-btn"])
+        check("…edit and save need a presentation", dict(btns)["session-edit-btn"] and dict(btns)["session-save-btn"] and not dict(btns)["session-open-btn"])
+        check("record button in the corner", page.locator("#record-btn").is_visible())
 
         # 3. Open: choose the folder, browse, open a deck.
         menu("open"); page.wait_for_timeout(500); shot("s03-open-choose")
@@ -104,11 +102,8 @@ def run():
         check(f"…the lecture folder ({items})", items == ["..", f"{DECK}.zip", "06 - Multiplication.pdf"])
         go(f"{DECK}.zip"); page.wait_for_timeout(2500); shot("s05-opened")
         check("deck opened (6 slides)", page.evaluate("() => window.beamerState.totalSlides") == 6)
-        check("session button still names the session", page.inner_text("#session-btn").strip() == f"Session {first}")
+        check("…edit and save now on", not page.locator("#session-edit-btn").is_disabled() and not page.locator("#session-save-btn").is_disabled())
         check("tab title", page.title() == f"{DECK} · Beamer+")
-        open_menu()
-        check("menu head: where it came from", f"in Courses/{L}" in page.inner_text(".session-menu-head"))
-        page.keyboard.press("Escape")
 
         # 4. Draw on slide 2 and stay on slide 3: the browser keeps a copy.
         page.keyboard.press("ArrowRight"); page.wait_for_timeout(700)
@@ -143,9 +138,6 @@ def run():
         check("saved into the save folder", "05 - saved.zip" in files)
         check("…not the open folder", not any(k.endswith("05 - saved.zip") for k in page.evaluate(FOLDER_LS)))
         check("…toast says where", "Saved Saves/05 - saved.zip" in page.inner_text("#recorder-toast"))
-        open_menu()
-        check("…menu head follows the new name and folder", "05 - saved · in Saves" in page.inner_text(".session-menu-head"))
-        page.keyboard.press("Escape")
         # A subfolder of the save folder, saved again: Save starts there next time.
         menu("save"); page.wait_for_timeout(800)
         page.evaluate("async () => { const r = await (await navigator.storage.getDirectory()).getDirectoryHandle('Saves'); await r.getDirectoryHandle('csc258', { create: true }); }")
@@ -158,20 +150,20 @@ def run():
         page.keyboard.press("Control+s"); page.wait_for_timeout(1200)
         check("Ctrl+S does nothing in Beamer+", page.locator(".lib").count() == 0 and page.evaluate(FOLDER_LS, "Saves") == files)
 
-        # 7. Record from the menu.
+        # 7. Record with the record button.
         if not os.environ.get("SKIPREC"):
             menu("record"); page.wait_for_timeout(400)
             page.locator(".custom-modal-btn", has_text="Start recording").click(); page.wait_for_timeout(2500)
             check("recording: the bar shows", page.locator("#recorder-bar").is_visible())
-            open_menu(); shot("s07-recording-menu")
-            check("…menu offers Stop recording", page.inner_text(".session-menu [data-menu='record']").strip() == "Stop recording")
-            page.click(".session-menu [data-menu='record']"); page.wait_for_timeout(2000)
+            shot("s07-recording")
+            check("…in the record button's place", page.locator("#record-btn").is_hidden())
+            page.click("#recorder-stop-btn"); page.wait_for_timeout(2000)
             check("…stopped", page.locator("#recorder-bar").is_hidden())
 
-        # 8. End session; Last Session brings it back, same code, same slide, same ink.
+        # 8. Close session; Last Session brings it back, same code, same slide, same ink.
         menu("end"); page.wait_for_timeout(300); shot("s08-end")
-        check("end session says Last Session picks up", "Last Session" in page.inner_text(".custom-modal-overlay"))
-        page.locator(".custom-modal-btn", has_text="End session").click()
+        check("close session says Last Session picks up", "Last Session" in page.inner_text(".custom-modal-overlay"))
+        page.locator(".custom-modal-btn", has_text="Close session").click()
         page.wait_for_url(BASE); page.wait_for_timeout(800); shot("s09-start-again")
         line = page.inner_text("#welcome-last")
         print("   ", line)
@@ -180,11 +172,11 @@ def run():
         page.click("#welcome-last-btn"); page.wait_for_url("**/s/**"); page.wait_for_timeout(4500); shot("s10-resumed")
         check("same session code (still on the server)", sid() == first)
         check("…the ?resume is gone from the address", "resume" not in page.url)
-        st = page.evaluate("() => ({ n: window.beamerState.totalSlides, at: window.beamerState.currentSlide, ink: Object.keys(window.beamerState.annotations), btn: document.getElementById('session-btn').innerText.trim(), target: window.beamerState.target })")
+        st = page.evaluate("() => ({ n: window.beamerState.totalSlides, at: window.beamerState.currentSlide, ink: Object.keys(window.beamerState.annotations), target: window.beamerState.target })")
         print("   resumed:", st)
         check("…deck back, on slide 3", st["n"] == 6 and st["at"] == 2)
         check("…with the ink on slide 2", "1" in st["ink"])
-        check("…and its place in the folder (Save goes back there)", st["btn"] == f"Session {first}" and st["target"]["name"] == "05 - saved" and st["target"]["src"] == "save" and st["target"]["dir"] == "csc258")
+        check("…and its place in the folder (Save goes back there)", st["target"]["name"] == "05 - saved" and st["target"]["src"] == "save" and st["target"]["dir"] == "csc258")
 
         # 9. The server lost that session: Last Session opens it in a new one.
         page.evaluate(SET_LAST_SESSION, "ZZZZZZ")
@@ -215,7 +207,7 @@ def run():
         p2 = ctx2.new_page()
         p2.goto(BASE); p2.wait_for_timeout(500); p2.click("#welcome-new-btn"); p2.wait_for_url("**/s/**"); p2.wait_for_timeout(2200)
         with p2.expect_file_chooser(timeout=3000) as fc:
-            p2.click("#session-btn"); p2.click(".session-menu [data-menu='open']")
+            p2.click("#session-open-btn")
         check("no folder support: Open is the file picker", fc.value is not None)
         ctx2.close()
 
