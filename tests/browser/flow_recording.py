@@ -164,7 +164,8 @@ def run():
               len({m["group"] for m in metas}) == 1 and abs(sum(m["durationMs"] for m in metas) - 12000) < 2500)
 
         # 3. Saving into the folder fails: nothing lost, try again or download instead.
-        menu("save"); page.wait_for_timeout(1500); shot("r03-save")
+        menu("save"); page.wait_for_timeout(800)
+        page.click(".lib [data-adopt]"); page.wait_for_timeout(1200); shot("r03-save")   # save in the Open folder too
         chip = " ".join(page.locator(".lib-chip", has_text="Recordings").inner_text().split())
         check(f"save offers every part ({chip})", chip == f"Recordings {len(metas)}")
         before = set(folder())

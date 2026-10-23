@@ -22,7 +22,6 @@ import { applySlideReorder, removeSlideReorder } from './reorder.js';
 import { initWidgetSettings } from './widget-settings.js';
 import { initNumberSteppers } from './number-stepper.js';
 import { realSlideCount } from '../slides/structure.js';
-import { initPanelResize } from './panel-resize.js';
 import { PAPER_STYLES, PAPER_SPACING, PAPER_THICKNESS, PAPER_COLORS, normalizePaper } from '../slides/paper.js';
 
 /* ─── init ──────────────────────────────────────────────────── */
@@ -31,7 +30,6 @@ export function initEditor(state) {
     ctx.state = state;
     state.editMode = false;
     state.editorNewFiles = {};
-    initPanelResize();
 
     document.getElementById('edit-mode-btn')?.addEventListener('click', toggleEditMode);
     document.getElementById('edit-add-video-btn')?.addEventListener('click', () => pickMediaFile('video', 'video/*'));
@@ -62,6 +60,21 @@ export function initEditor(state) {
         if (e.target.checked) obj.hidden = true;
         else delete obj.hidden;
         bus.emit('nav:refresh');
+    });
+
+    // Remove slide: two clicks — the first arms it — since there's no undo.
+    const delBtn = document.getElementById('slide-delete');
+    delBtn?.addEventListener('click', () => {
+        const i = ctx.state?.currentSlide;
+        if (i == null || !ctx.state?.slideStructure?.[i]) return;
+        if (!delBtn.classList.contains('is-armed')) {
+            armSlideDelete(true);
+            clearTimeout(armSlideDelete.timer);
+            armSlideDelete.timer = setTimeout(() => armSlideDelete(false), 3000);
+            return;
+        }
+        armSlideDelete(false);
+        bus.emit('slide:delete', i);
     });
 
     const fileInput = document.getElementById('edit-media-input');
@@ -244,6 +257,16 @@ function updateSlideSettingsPanel() {
     if (title && document.activeElement !== title) title.value = obj?.title || '';
     syncPaperSettings(obj);
     refreshSlideItems();
+    armSlideDelete(false);
+    const del = document.getElementById('slide-delete');
+    if (del) del.disabled = !obj || (ctx.state?.slideStructure?.length || 0) <= 1;
+}
+
+function armSlideDelete(on) {
+    const btn = document.getElementById('slide-delete');
+    if (!btn) return;
+    btn.classList.toggle('is-armed', on);
+    btn.querySelector('span').textContent = on ? 'Click again to remove' : 'Remove slide';
 }
 
 /* ─── blank-slide paper ─────────────────────────────────────── */

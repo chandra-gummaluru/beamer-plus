@@ -3,7 +3,7 @@
    ============================================================ */
 
 :root {
-    --editor-panel-width: 320px;   /* drag its left edge to change (editor/panel-resize.js) */
+    --editor-panel-width: 360px;
 }
 
 /* ─── Edit-mode button ───────────────────────────────────────────
@@ -81,30 +81,6 @@ body.edit-mode #pdf-canvas .widget-iframe { display: none !important; }
 }
 
 body.edit-mode #editor-panel { display: flex; }
-
-/* The panel's left edge: drag to resize. A thin line that darkens on hover. */
-#editor-panel-resize {
-    position: absolute;
-    left: 0; top: 0; bottom: 0;
-    width: 7px;
-    z-index: 5;
-    cursor: col-resize;
-    touch-action: none;
-}
-#editor-panel-resize::after {
-    content: '';
-    position: absolute;
-    left: 0; top: 0; bottom: 0;
-    width: 2px;
-    background: transparent;
-    transition: background var(--dur-fast);
-}
-#editor-panel-resize:hover::after,
-#editor-panel-resize:focus-visible::after,
-body.is-resizing-editor #editor-panel-resize::after { background: var(--ink-3); }
-#editor-panel-resize:focus-visible { outline: none; }
-body.is-resizing-editor { cursor: col-resize; user-select: none; }
-body.is-resizing-editor iframe { pointer-events: none; }
 
 /* Panel header — height 58px puts the 1px hairline at y=57,
    matching the centre of the nav's 2px border at y=56-58 */
