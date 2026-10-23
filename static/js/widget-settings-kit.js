@@ -1,11 +1,13 @@
 // Beamer+ widget settings kit — runs INSIDE each widget iframe.
 //
-// A widget's declared fields are edited in the editor's properties panel, which
-// reads the same schema block from the parent side (see editor/widget-schema.js).
-// What this kit provides to a widget is the rest of the host contract: the
-// server origin, presentation scale, saving files into the deck, and an
-// optional in-widget panel a widget can open for itself via
-// BeamerWidget.openSettings().
+// Every widget is self-contained: its own settings are edited from the widget
+// itself — the pencil in its top bar (or, laid over part of a slide with no
+// bar, the pencil that shows on hover) asks the host to open the widget's
+// settings dialog (editor/widget-settings-dialog.js), drawn from the same
+// schema block. The editor's panel keeps only Name, Text size and layout.
+// The kit also provides the rest of the host contract: the server origin,
+// presentation scale, saving files into the deck. BeamerWidget.openSettings()
+// opens the same dialog.
 //
 // This file is injected into every widget iframe (see iframe-widget-renderer.js),
 // right after window.WIDGET_CONFIG. It reads the widget's OWN schema block —
@@ -81,6 +83,28 @@
     }
 
     function cfg() { return window.WIDGET_CONFIG || (window.WIDGET_CONFIG = {}); }
+
+    /* ─── its own settings (the pencil) ─────────────────────────── */
+    // Does the widget have settings of its own, beyond the Name and Text size
+    // every widget has (those are in the editor's panel)?
+    function hasOwnSettings() {
+        if (!readSchema()) return false;
+        if (customSettings) return true;
+        return fields.some(function (f) { return f.key !== 'title' && f.key !== 'scale'; });
+    }
+
+    // Open them: the host's settings dialog, or — for a widget that draws its
+    // own ("customSettings": true) — the widget's handler.
+    function editSettings() {
+        readSchema();
+        if (customSettings) {
+            try { window.dispatchEvent(new MessageEvent('message', { data: { type: 'widget-open-settings' } })); } catch (e) {}
+            return;
+        }
+        post({ type: 'widget-edit-settings', widgetId: cfg().id });
+    }
+
+    var PENCIL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>';
 
     /**
      * The origin to talk to the Beamer+ server on — for socket.io, fetch, or
@@ -852,6 +876,12 @@
 
         var utils = el('div', 'bw-topbar-utils');
 
+        if (hasOwnSettings()) {
+            utils.appendChild(makeBtn({
+                variant: 'icon', title: 'Widget settings', icon: PENCIL_ICON, onClick: editSettings,
+            }));
+        }
+
         if (!(schema && schema.fontSize === false)) {
             var group = el('div', 'bw-fontsize');
             scaleDown = makeBtn({
@@ -906,6 +936,16 @@
         body.appendChild(wrap);
         body.classList.add('bw-has-topbar');
 
+        // No bar to hold the pencil (an overlay, or an inset without the
+        // utilities): a small one in the corner, shown while the pointer is
+        // over the widget (widget-base.css).
+        var floatEdit = null;
+        if (cfg().role !== 'viewer' && hasOwnSettings()) {
+            floatEdit = makeBtn({ variant: 'icon', title: 'Widget settings', icon: PENCIL_ICON, onClick: editSettings });
+            floatEdit.classList.add('bw-edit-float');
+            body.appendChild(floatEdit);
+        }
+
         adoptOwnBar(wrap);
 
         // A widget that appends to <body> after this ran would land beside the
@@ -918,7 +958,7 @@
                     var added = records[i].addedNodes;
                     for (var j = 0; j < added.length; j++) {
                         var n = added[j];
-                        if (n === barEl || n === wrap) continue;
+                        if (n === barEl || n === wrap || n === floatEdit) continue;
                         // Never re-parent an iframe: moving one reloads it and
                         // throws away its document. html2canvas renders into a
                         // hidden iframe it appends to <body>; moving that emptied
@@ -1361,7 +1401,7 @@
         serverUrl:     serverUrl,
         saveFile:      saveFile,
         onFlushFiles:  onFlushFiles,
-        openSettings:  function () { readSchema(); if (hasSettings) openPanel(); },
+        openSettings:  editSettings,
         closeSettings: function () { closePanel(); },
         hasSettings:   function () { readSchema(); return hasSettings; },
         topbar:        topbarApi,

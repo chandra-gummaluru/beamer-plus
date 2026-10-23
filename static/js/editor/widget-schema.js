@@ -7,11 +7,9 @@
 //   </script>
 //
 // The settings kit inside the iframe reads that block to draw the widget's own
-// panel. The editor reads it here, from the widget's HTML directly, so the
-// properties panel can offer the same fields without a live iframe — which
-// matters because a widget added in edit mode has no iframe yet (it is only
-// created when the slide re-renders on exit), and because edit mode hides
-// widget iframes outright.
+// panel. The editor reads it here, from the widget's HTML directly: the
+// editor panel's Name / Text size / layout (widget-panel.js), and the
+// widget's own settings dialog (widget-settings-dialog.js).
 //
 // The HTML comes from wherever the widget itself would be loaded from: the
 // server for a built-in, the deck's ZIP (or the pending-files map) for one the

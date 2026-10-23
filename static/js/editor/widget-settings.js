@@ -46,7 +46,7 @@ function onWidgetMessage(e) {
 // Find a widget's config item by id. Scans every slide's config rather than
 // just the current one: in split view a widget on the other pane is equally
 // live, and a settings write must land on the right item either way.
-function findWidgetItem(widgetId) {
+export function findWidgetItem(widgetId) {
     const id = String(widgetId);
     const configs = ctx.state?.slideConfigs;
     if (!configs) return null;

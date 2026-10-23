@@ -831,6 +831,13 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
     margin-bottom: 2px;
 }
 #editor-widget .wf-group + .wf-group { padding-top: var(--sp-1); }
+/* Under the list: where the widget's own settings are (its pencil). */
+#editor-widget .wp-own-note {
+    margin: var(--sp-4) 0 0;
+    font-size: var(--fs-sm);
+    color: var(--ink-3);
+    line-height: 1.45;
+}
 
 /* Text boxes keep their size — no drag handle. Long ones grow with their
    text, and a field with "expand" opens in the large editor. */
@@ -1582,3 +1589,44 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 .wf-cc-pop .wf-cc-choice:disabled { opacity: 0.25; cursor: default; transform: none; }
 @keyframes wf-cc-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 .wf-list-add[hidden] { display: none; }
+
+/* ─── A widget's own settings dialog (editor/widget-settings-dialog.js) ──
+   Opened from the pencil in the widget's top bar. Two columns of cards: long
+   content (a question, an answer list, a template) on the left, short
+   settings on the right (buildWidgetForm's 'modal' variant); one column when
+   there's only one kind. */
+.custom-modal-content.widget-settings-modal {
+    max-width: min(920px, 94vw);
+    width: 94vw;
+    text-align: left;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+}
+.widget-settings-modal:has(.wf--modal.is-single) { max-width: min(560px, 94vw); }
+.widget-settings-modal .custom-modal-title { text-align: left; }
+.widget-settings-modal .custom-modal-body { overflow-y: auto; min-height: 0; padding-right: 2px; }
+.wf--modal {
+    display: grid;
+    grid-template-columns: minmax(0, 1.75fr) minmax(250px, 1fr);
+    align-items: start;
+    gap: var(--sp-4);
+}
+.wf--modal.is-single { grid-template-columns: minmax(0, 1fr); }
+.wf-col { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
+.wf--modal .wf-group {
+    padding: var(--sp-4);
+    background: var(--surface-cream);
+    border: var(--line-soft);
+    border-radius: var(--r-md);
+}
+.wf--modal .wf-group[hidden],
+.wf-col[hidden] { display: none; }
+@media (max-width: 820px) {
+    .wf--modal { grid-template-columns: minmax(0, 1fr); }
+}
+.wf--modal .editor-prop-input,
+.wf--modal .editor-prop-select { min-height: 34px; font-size: var(--fs-base); }
+.wf--modal .wf-mono,
+.wf--modal .wf-code-mirror,
+.wf--modal .wf-code-input { font-size: 13.5px; }

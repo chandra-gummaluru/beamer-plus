@@ -62,7 +62,7 @@ export function showHelpModal() {
   <li>${_hbtn('hand','Hand')} <strong>Hand</strong>: default mode, no drawing.</li>
   <li>${_hbtn('spotlight','Spotlight')} <strong>Spotlight</strong>: dims the slide and highlights your cursor position.</li>
   <li>${_hbtn('magnify','Magnifier')} <strong>Magnifier</strong>: a lens that enlarges the part of the slide under your cursor. Scroll to zoom in or out; click to put it away.</li>
-  <li>${_hbtn('pen','Pen')} <strong>Pen</strong>: freehand drawing. Click the pen icon again to change colour and size.</li>
+  <li>${_hbtn('pen','Pen')} <strong>Pen</strong>: freehand drawing. Clicking a pen opens its options beside the toolbar — pen or highlighter, size and colour (they're remembered); click it again, or start drawing, to put them away.</li>
   <li>${_hbtn('eraser','Eraser')} <strong>Eraser</strong>: erase individual strokes.</li>
 </ul>`,
         },
@@ -70,7 +70,7 @@ export function showHelpModal() {
             id: 'edit', label: 'Editing',
             html: `
 <h4 class="help-h">Entering edit mode</h4>
-<p class="help-p">Click the edit button ${_hbtn('edit','Edit mode')} in the bottom-right corner, beside the hide-slide button. A panel opens on the right where you can select, configure, and delete anything on the current slide.</p>
+<p class="help-p">Click the edit button ${_hbtn('edit','Edit mode')} in the top-right corner. A panel opens on the right where you can select, configure, and delete anything on the current slide.</p>
 <h4 class="help-h">Adding overlays</h4>
 <p class="help-p">The buttons at the bottom of the editor panel let you add content on top of your slides:</p>
 <ul class="help-ul">
@@ -95,7 +95,7 @@ export function showHelpModal() {
 <h4 class="help-h">Building a custom widget</h4>
 <p class="help-p">A widget is a single self-contained ${_hic('.html')} file. Beamer+ loads it in an isolated iframe and handles the rest: persistence, resizing, and state saving.</p>
 <h4 class="help-h">1 · Declare your settings</h4>
-<p class="help-p">Put a schema block at the top of ${_hic('&lt;head&gt;')}. Beamer+ builds the editor's properties panel from it: select your widget in edit mode and your fields appear there, under its position and size. Nothing else is needed — the fields are read from this block, so they are available the moment your widget is added to a slide:</p>
+<p class="help-p">Put a schema block at the top of ${_hic('&lt;head&gt;')}. Beamer+ builds your widget's settings dialog from it: while presenting, the pencil in your widget's top bar opens it (the editor panel only holds the Name, Text size and position every widget has). Nothing else is needed — the fields are read from this block:</p>
 <code class="help-code">&lt;script id="widget-schema" type="application/json"&gt;
 {
   "label": "My Widget",
@@ -110,7 +110,7 @@ export function showHelpModal() {
 <p class="help-p">Supported types: ${_hic('text')}, ${_hic('password')}, ${_hic('number')}, ${_hic('number-nullable')}, ${_hic('checkbox')}, ${_hic('select')}, ${_hic('textarea')}, ${_hic('textarea-lines')}, ${_hic('file')}, ${_hic('ai-model')}.</p>
 <p class="help-p">Field values reach you through ${_hic('window.WIDGET_CONFIG')} (below); a field the presenter leaves empty is omitted, so your own ${_hic('default')} applies.</p>
 <h4 class="help-h">2 · The top bar</h4>
-<p class="help-p">Beamer+ draws the same bar at the top of every widget — the widget's name, its own controls, then a text-size stepper and a reset button. You don't build it; whatever your widget renders is placed below it automatically.</p>
+<p class="help-p">Beamer+ draws the same bar at the top of every widget — the widget's own controls, then a pencil (its settings, when it declares any fields), a text-size stepper and a reset button. You don't build it; whatever your widget renders is placed below it automatically.</p>
 <p class="help-p">If your widget already has a bar of its own, mark it ${_hic('data-bw-topbar')} and its contents move into the shared one, keeping every id and event handler intact:</p>
 <code class="help-code">&lt;div id="toolbar" data-bw-topbar&gt;
   &lt;button id="run"&gt;Run&lt;/button&gt;
@@ -120,7 +120,7 @@ export function showHelpModal() {
 BeamerWidget.topbar.setTitle('lecture-3.ipynb');
 BeamerWidget.topbar.onReset(() =&gt; clearEverything());</code>
 <p class="help-p">Without an ${_hic('onReset')} handler, reset reloads your widget, which restores it to how the slide first rendered it. The stepper drives ${_hic('--u')}, the presentation scale every content-sized token in the base stylesheet is built on — size your readable text with ${_hic('var(--fs-body)')} and friends and it follows along. A widget whose content it can't reach (a remote page, a video) hides the stepper with ${_hic('"fontSize": false')} in its schema; one that wants no bar at all sets ${_hic('"topbar": false')}.</p>
-<p class="help-p">A widget is shown <strong>Full</strong> (the whole slide, with the bar) or as an <strong>Overlay</strong> (a small box over part of a content slide — no bar, just a simplified view). It says which with ${_hic('"modes": ["full", "overlay"]')} in its schema — the first is the default — and the Layout card in its settings switches between them. As an overlay the kit sets ${_hic('body.bw-overlay')}; restyle for it in CSS and put any controls in a ${_hic('.bw-overlay-controls')} cluster. A widget that only makes sense as the whole slide — a notebook, a workspace — declares ${_hic('"fullSlide": true')}; the editor then locks it to fill the slide. One with no ${_hic('modes')} placed on part of a slide drops the bar's title, text-size stepper and reset, keeping only its own controls as a slim strip.</p>
+<p class="help-p">A widget is shown <strong>Full</strong> (the whole slide, with the bar) or as an <strong>Overlay</strong> (a small box over part of a content slide — no bar, just a simplified view). It says which with ${_hic('"modes": ["full", "overlay"]')} in its schema — the first is the default — and the Full slide switch in the editor panel switches between them. As an overlay the kit sets ${_hic('body.bw-overlay')}; restyle for it in CSS and put any controls in a ${_hic('.bw-overlay-controls')} cluster. A widget that only makes sense as the whole slide — a notebook, a workspace — declares ${_hic('"fullSlide": true')}; the editor then locks it to fill the slide. One with no ${_hic('modes')} placed on part of a slide drops the bar's title, text-size stepper and reset, keeping only its own controls as a slim strip.</p>
 <h4 class="help-h">3 · Read configuration</h4>
 <p class="help-p">Beamer+ injects ${_hic('window.WIDGET_CONFIG')} before your widget loads. It contains the field values the presenter set, plus layout info:</p>
 <code class="help-code">const cfg = window.WIDGET_CONFIG || {};
@@ -135,7 +135,7 @@ BeamerWidget.topbar.onReset(() =&gt; clearEverything());</code>
   <dt>widget-hidden</dt><dd>Received when the slide is navigated away from. The iframe stays alive, so pause any audio or video here.</dd>
   <dt>widget-shown</dt><dd>Received when the slide is shown again.</dd>
   <dt>widget-cleanup</dt><dd>Received when the widget is removed. Stop timers and release resources.</dd>
-  <dt>widget-settings</dt><dd>Post ${_hic('{ widgetId, patch, remove }')} to save settings into your config item, where they persist with the deck. Use this if your widget changes its own configuration at run time; the presenter's own edits come from the editor panel.</dd>
+  <dt>widget-settings</dt><dd>Post ${_hic('{ widgetId, patch, remove }')} to save settings into your config item, where they persist with the deck. Use this if your widget changes its own configuration at run time; the presenter's own edits come from the settings dialog the pencil in your top bar opens.</dd>
 </dl>
 <p class="help-p">Calling a Beamer+ route? Build the URL from ${_hic('BeamerWidget.serverUrl()')}, not from ${_hic('serverOrigin()')}. Every API route lives under this session's ${_hic('/s/&lt;code&gt;')} prefix, which ${_hic('serverUrl()')} includes and ${_hic('serverOrigin()')} does not — the latter is the bare origin, for ${_hic('io()')}. Mixing them up gives a 404 that looks like a missing file:</p>
 <code class="help-code">const res = await fetch(BeamerWidget.serverUrl() + '/api/zip-asset/' + cfg.pdf);

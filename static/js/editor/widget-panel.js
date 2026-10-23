@@ -1,27 +1,26 @@
-// Widget settings, in the editor's right panel.
+// A widget's properties, in the editor's right panel.
 //
 // Selecting a widget on the slide (or Edit in the slide's item list, or
-// adding one) shows its settings here, in place of the slide's properties —
-// the same way a video or a reveal box shows its own. Where the widget sits
-// and how big it is are edited on the slide itself (drag it, drag its
-// corner) or typed in here. The panel holds the widget's own settings (form
-// from widget-fields.js, read from its `widget-schema` block) in sections:
-// General (Name, Text size), Layout (a Full slide switch, X / Y / Width /
-// Height, its reveal step), and the widget's own settings always last.
-// Every change is applied to the config item live. (Removing a widget is
-// the slide's item list, or Delete on the slide.)
+// adding one) shows them here, in place of the slide's properties — the same
+// way a video or a reveal box shows its own. Only what every widget has, in
+// one list: Name, Text size, Full slide, X / Y / Width / Height and the
+// reveal step it appears on. Where it sits and how big it is can also be
+// changed on the slide itself (drag it, drag its corner).
 //
-// The cards stack: the widget's settings, then Layout. A long text field
-// that declares "expand": true gets an Expand button that opens it in a
-// roomy editor (widget-fields.js).
+// Everything specific to the widget (a poll's question, a timer's duration…)
+// is edited from the widget itself: the pencil in its top bar opens its
+// settings dialog (widget-settings-dialog.js). Every change here is applied
+// to the config item live. (Removing a widget is the slide's item list, or
+// Delete on the slide.)
 import { buildWidgetForm } from './widget-fields.js';
 import { widgetDisplay, setWidgetDisplay } from './widget-schema.js';
+import { GENERAL_KEYS, ownFields } from './widget-settings-dialog.js';
 
 const near = (a, b) => Math.abs((a ?? 0) - b) < 0.005;
 const isFullBox = (it) => near(it.x, 0) && near(it.y, 0) && near(it.width ?? 1, 1) && near(it.height ?? 1, 1);
 
 /**
- * Fill `host` with a widget's settings.
+ * Fill `host` with a widget's properties.
  * @param {HTMLElement} host
  * @param {object} item     the widget's config item (edited in place)
  * @param {object} schema   from getWidgetSchema(item)
@@ -32,20 +31,33 @@ const isFullBox = (it) => near(it.x, 0) && near(it.y, 0) && near(it.width ?? 1, 
  */
 export function renderWidgetPanel(host, item, schema, { onLayout, onName } = {}) {
     host.textContent = '';
-    const form = buildWidgetForm(schema, item, 'panel');
+    const general = { ...schema, fields: (schema.fields || []).filter(f => GENERAL_KEYS.has(f.key)) };
+    const form = buildWidgetForm(general, item, 'panel');
     const layout = buildLayoutCard(item, schema, () => onLayout?.());
-    // General (Name, Text size, Appear on step), then Layout, then the
-    // widget's own settings.
-    if (form.commonNode) {
-        form.commonNode.after(layout.node);
-        form.commonNode.querySelector('.wf-group-body').appendChild(layout.stepRow);
-    } else form.node.insertBefore(layout.node, form.node.firstChild);
-    // A full-slide-only widget has no layout to set.
-    if (!layout.node.querySelector('.wf-group-body').children.length) layout.node.remove();
+    // One list, no headings: Name and Text size, then the layout rows.
+    let group = form.commonNode;
+    if (!group) {
+        group = document.createElement('div');
+        group.className = 'wf-group';
+        group.innerHTML = '<div class="wf-group-body"></div>';
+        form.node.insertBefore(group, form.node.firstChild);
+    }
+    group.querySelector(':scope > .wf-group-title')?.remove();
+    const body = group.querySelector('.wf-group-body');
+    const layoutBody = layout.node.querySelector('.wf-group-body');
+    while (layoutBody.firstChild) body.appendChild(layoutBody.firstChild);
     host.appendChild(form.node);
 
+    // Where its own settings are.
+    if (ownFields(schema).length) {
+        const note = document.createElement('p');
+        note.className = 'wp-own-note';
+        note.textContent = 'Its own settings: the pencil in the widget’s top bar, while presenting.';
+        host.appendChild(note);
+    }
+
     const apply = (e) => {
-        if (layout.node.contains(e.target)) return;   // the Layout card applies itself
+        if (e.target.closest('[data-k]')) return;   // the layout rows apply themselves
         form.apply(item);
         form.syncVisibility();
         onName?.();

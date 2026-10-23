@@ -466,6 +466,27 @@ body.bw-partial .bw-topbar-utils {
   display: none;
 }
 
+/* The pencil for a widget's own settings when there's no bar to hold it
+   (an overlay, or an inset without the utilities): top-right corner, shown
+   while the pointer is over the widget. In full view it lives in the bar. */
+.bw-edit-float {
+  position: fixed;
+  top: 6px;
+  right: 6px;
+  z-index: 50;
+  display: none;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+body.bw-overlay .bw-edit-float,
+body.bw-partial .bw-edit-float { display: inline-flex; }
+body.bw-overlay:hover .bw-edit-float,
+body.bw-partial:hover .bw-edit-float,
+.bw-edit-float:focus-visible { opacity: 1; }
+
 /* Widgets no longer show a title in the top-left of their bar.
    The title node stays in the DOM (widgets and setTitle() still write to it)
    but is never drawn, and neither is the separator that used to follow it.

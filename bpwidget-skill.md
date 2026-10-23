@@ -54,7 +54,9 @@ Rules:
 
 ## 2. The widget schema block
 
-The first thing in `<head>`. Beamer+ reads it to build the slide's config panel.
+The first thing in `<head>`. Beamer+ reads it to build the widget's settings dialog,
+opened from the pencil in the widget's own top bar (the editor's side panel only holds
+Name, Text size and layout — every widget is self-contained).
 
 ```html
 <script id="widget-schema" type="application/json">
@@ -119,16 +121,16 @@ fields keep their values.
 #### Editor hints
 
 Optional keys that make a widget with a lot to configure pleasant to set up.
-The editor's widget panel (`static/js/editor/widget-fields.js`)
-uses them; the in-widget settings kit ignores them and falls back to the plain
+The widget's settings dialog (`static/js/editor/widget-fields.js`, opened by
+`editor/widget-settings-dialog.js`) uses them; the in-widget settings kit ignores them and falls back to the plain
 control, so they are always safe to add. `audience-response.html` uses all of them.
 
 | Key | On | Effect |
 |-----|----|--------|
-| `section: "Answers"` | any field | Starts a titled group; later fields without one join it. A group whose fields are all hidden by `showIf` hides too. Groups are cards, stacked in the editor's side panel. |
+| `section: "Answers"` | any field | Starts a titled group; later fields without one join it. A group whose fields are all hidden by `showIf` hides too. Groups are cards in the settings dialog (long content on the left, short settings on the right). |
 | `note: "Markdown & $LaTeX$"` | any field | Short aside next to the label. Keep labels short and put qualifiers here. |
 | `mono: true` | `textarea` | Monospace, for code or JSON. |
-| `expand: true` | `textarea` | A small expand icon in the field's top-right corner opens it in a large editor over the page (Tab indents; Escape or Done closes). Every keystroke is written back to the field. Use it for code and anything longer than a few lines — the settings panel is narrow. |
+| `expand: true` | `textarea` | A small expand icon in the field's top-right corner opens it in a large editor over the page (Tab indents; Escape or Done closes). Every keystroke is written back to the field. Use it for code and anything longer than a few lines. |
 | `editor: "list"` | `textarea-lines` | One input per line: add/remove, Enter for a new row, multi-line paste splits into rows. Still stored as an array of strings. `itemLabel` / `itemPlaceholder` name the rows ("Add option", "Option 1"). |
 | `correct: { "key": "correctAnswer", "base": 1 }` | with `editor: "list"` | Adds a "correct answer" toggle to each row, written as a base-indexed position to that key (kept in step as rows are added/removed). Keep declaring the target field too — the kit still edits it directly — the editor hides it. |
 | `blanks: { "pattern": "\\bBLANK\\b\|_{3,}", "insert": "BLANK" }` | `textarea` | Template editor: highlights every match of `pattern`, counts them, and has an "Insert blank" button that turns the selection into `insert`. Match `pattern` to how the widget itself finds its blanks. |

@@ -295,6 +295,69 @@ body.split-view-active #text-size-sidebar {
     transform: translateX(-50%);
     flex-direction: row;
 }
+/* ============================================================
+   Pen flyout (pen / highlighter, size, colour) — the same flyout as the
+   text tool's, beside the toolbar, while a pen's options are open
+   (annotations/pen-slots.js).
+   ============================================================ */
+#pen-flyout {
+    display: none;
+    flex-direction: column;
+    gap: var(--sp-1);
+    padding: var(--sp-2);
+    background: oklch(99% 0.003 80 / 0.86);
+    backdrop-filter: blur(12px) saturate(1.4);
+    -webkit-backdrop-filter: blur(12px) saturate(1.4);
+    border: var(--line-hairline);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-3);
+    position: fixed;
+    top: 50%;
+    right: calc(var(--toolbar-w) + var(--sp-3));
+    transform: translateY(-50%);
+    z-index: 560;
+    align-items: center;
+}
+#pen-flyout .btn {
+    width: var(--hit-min);
+    height: var(--hit-min);
+    padding: 0;
+    border-color: transparent;
+    background: transparent;
+    border-radius: var(--r-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink-1);
+}
+#pen-flyout .btn svg { width: 16px; height: 16px; }
+#pen-flyout .btn:hover { background: var(--surface-cream-2); border-color: oklch(82% 0.005 260); }
+#pen-flyout .btn.btn_selected { background: var(--accent); border-color: var(--accent-strong); color: var(--ink-on-accent); }
+.pen-size-dot { display: block; border-radius: 50%; background: var(--ink-1); }
+#pen-flyout .btn.btn_selected .pen-size-dot { background: var(--ink-on-accent); }
+body.split-view-active #pen-flyout {
+    top: calc(var(--sp-3) + var(--hit-min) + var(--sp-3));
+    right: auto;
+    left: 50%;
+    transform: translateX(-50%);
+    flex-direction: row;
+}
+body.split-view-active #pen-flyout .text-color-row { grid-template-columns: none; grid-template-rows: repeat(2, 20px); grid-auto-flow: column; }
+body.split-view-active #pen-flyout .text-flyout-sep { border-top: 0; border-left: var(--line-soft); margin: 4px 2px; }
+@media (max-width: 1024px) {
+    #pen-flyout {
+        top: auto;
+        bottom: calc(100px + var(--sp-3) + var(--hit-min) + var(--sp-4));
+        right: 50%;
+        transform: translateX(50%);
+        flex-direction: row;
+        max-width: calc(100vw - var(--sp-4));
+        overflow-x: auto;
+    }
+    #pen-flyout .text-color-row { grid-template-columns: none; grid-template-rows: repeat(2, 20px); grid-auto-flow: column; }
+    #pen-flyout .text-flyout-sep { border-top: 0; border-left: var(--line-soft); margin: 4px 2px; }
+}
+
 body.split-view-active .text-color-row { grid-template-columns: none; grid-template-rows: repeat(2, 20px); grid-auto-flow: column; }
 body.split-view-active .text-flyout-sep { border-top: 0; border-left: var(--line-soft); margin: 4px 2px; }
 

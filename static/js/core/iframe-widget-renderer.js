@@ -71,11 +71,12 @@ const _SETTINGS_KIT_INJECT = `<script src="/static/js/widget-settings-kit.js"></
 //   { "label": "...", "category": "...", "fields": [ ... ] }
 //   </script>
 //
-// The settings kit injected into every widget reads this and renders the
-// widget's own settings panel from it — Beamer+ itself never renders these
-// fields, and the editor panel shows only the widget's geometry. A widget that
-// wants a settings UI of its own declares "customSettings": true and handles
-// the widget-open-settings message itself.
+// The settings kit injected into every widget reads it and, when there are
+// fields beyond Name and Text size, puts a pencil in the widget's top bar that
+// opens the widget's settings dialog (editor/widget-settings-dialog.js); the
+// editor panel shows only Name, Text size and layout. A widget that wants a
+// settings UI of its own declares "customSettings": true and handles the
+// widget-open-settings message itself.
 // The fields array:
 //   { key, label, type, placeholder?, default?, min?, max?, step?, note?,
 //     options?: [{v, l}], rows? }
