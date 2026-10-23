@@ -1,8 +1,7 @@
 // Save — rebuilds the presentation ZIP from the in-memory state (slide
 // configs, slide order, annotations, widget states, newly added files) and
 // downloads it. buildPresentationZip() is the same ZIP as a Blob, for Save
-// presentation (library/ui.js) and the copy Last Session reopens
-// (app/last-session.js).
+// presentation (library/ui.js).
 import { collectWidgetStates, getLoadedWidgetStates } from '../core/iframe-widget-renderer.js';
 import { requestWidgetFileFlush } from './widget-settings.js';
 import { ctx } from './context.js';

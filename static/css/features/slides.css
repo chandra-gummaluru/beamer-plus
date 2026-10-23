@@ -203,23 +203,6 @@ model-viewer { pointer-events: auto !important; }
 }
 
 .stage-empty[hidden] { display: none; }
-/* "Open a presentation or try the demo.": two links in one line. */
-.stage-empty-link {
-    padding: 0;
-    background: none;
-    border: 0;
-    font: inherit;
-    color: var(--_ink);
-    font-weight: 600;
-    text-decoration: underline;
-    text-decoration-color: var(--_line);
-    text-decoration-thickness: 1.5px;
-    text-underline-offset: 3px;
-    cursor: pointer;
-}
-.stage-empty-link:hover { text-decoration-color: var(--_ink); }
-.stage-empty-link:focus-visible { outline: 2px solid var(--_ink); outline-offset: 3px; border-radius: 3px; }
-
 .stage-empty-icon {
     width: 90px;
     height: 65px;
@@ -251,20 +234,10 @@ model-viewer { pointer-events: auto !important; }
     margin: 0;
 }
 
-.stage-empty-hint {
-    font-family: var(--font-sans);
-    font-size: var(--fs-md);
-    color: var(--_ink-soft);
-    line-height: 1.5;
-    max-width: 28em;
-    margin: var(--sp-2) 0 0;
-}
-
-/* Narrow stages (phones, tiny split panes): drop to the icon + one line. */
+/* Narrow stages (phones, tiny split panes): smaller. */
 @media (max-width: 600px), (max-height: 460px) {
     .stage-empty-icon { width: 68px; height: 49px; margin-bottom: var(--sp-3); }
     .stage-empty-title { font-size: var(--fs-lg); }
-    .stage-empty-hint { font-size: var(--fs-sm); }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -34,7 +34,6 @@ import { initEditor } from './editor/editor.js';
 import { initRecorder } from './app/recorder.js';
 import { initLibrary } from './library/ui.js';
 import { initSessionButtons } from './app/session-buttons.js';
-import { initLastSession } from './app/last-session.js';
 import { getSessionId, sessionUrl, saveLastSession } from './app/session.js';
 
 /* ─── Render generation counters ─────────────────────────────── */
@@ -166,7 +165,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initRecorder(state);
     initLibrary(state);
     initSessionButtons(state);
-    initLastSession(state);
     initSettings();
     // Must run before applyDefaultPen(): that call emits a 'tool:change' to
     // sync other modules' tracked "previous tool" state (see below), and
@@ -188,7 +186,6 @@ document.addEventListener('DOMContentLoaded', () => {
     wireResizeAndFullscreen();
     document.getElementById('mute-btn')?.addEventListener('click', () => toggleMute());
     updateStageEmptyState();
-    document.getElementById('stage-empty-demo')?.addEventListener('click', () => bus.emit('demo:open'));
     maybeStartTourFromUrl();
 
     // annotation sync + active-pane tracking
@@ -523,7 +520,7 @@ function toggleMute(force) {
 }
 
 /* ─── guided tour ─────────────────────────────────────────────── */
-// Launched from the welcome page's "Take a tour" button, which creates a
+// Launched from the welcome page's "Try Demo" button, which creates a
 // session and lands here with ?tour=1. Loads the demo deck if nothing is
 // loaded yet, so every step has something to point at.
 function launchTour({ demo = false } = {}) {

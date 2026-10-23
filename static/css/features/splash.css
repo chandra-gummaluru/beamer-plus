@@ -282,7 +282,7 @@ body.welcome-page {
     transform: none;
 }
 
-/* Greyed out: Last Session with nothing to reopen; while starting, both. */
+/* Greyed out while a session is starting. */
 .welcome-btn:disabled {
     opacity: 0.45;
     cursor: default;
@@ -302,7 +302,7 @@ body.is-busy .welcome-btn:disabled {
     background: var(--accent-strong);
 }
 
-/* "Last Session" — beside "New Session", quieter than it. */
+/* "Try Demo" — beside "New Session", quieter than it. */
 .welcome-btn--secondary {
     flex: 0 0 auto;
     background: var(--surface-paper);
@@ -313,15 +313,6 @@ body.is-busy .welcome-btn:disabled {
 .welcome-btn--secondary:hover:not(:disabled) {
     background: var(--surface-cream-2);
 }
-
-/* What Last Session reopens, under the buttons. */
-.welcome-last {
-    margin: 0;
-    font-size: var(--fs-sm);
-    color: var(--ink-3);
-    overflow-wrap: anywhere;
-}
-.welcome-last[hidden] { display: none; }
 
 
 .welcome-hint {
