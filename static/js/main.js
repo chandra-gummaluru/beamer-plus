@@ -1585,6 +1585,7 @@ function sizeSlideCanvases() {
             w = availW; h = w * 3 / 4;   // width is the binding axis
         }
         ({ w, h } = _clearTopRightControls(pane, w, h));
+        if (containerId === 'pdf-container' && !state.splitView) _leanLeft(pane, w);
         cv.style.width  = `${w}px`;
         cv.style.height = `${h}px`;
         if (ann) { ann.style.width = `${w}px`; ann.style.height = `${h}px`; }
@@ -1609,6 +1610,25 @@ function _updateAllOverlayPositions() {
         updateWidgetPositions(right);
         updateMediaPositions(right);
     }
+}
+
+// A single slide sits a little left of centre: it moves left by LEAN_LEFT of
+// the spare room on its left (the gap between the navigator and the slide),
+// leaving the extra space on the right, where the toolbar floats. Only uses
+// room that's there, so the slide never shrinks for it. Same mechanism as
+// _clearTopRightControls (extra right padding + --stage-shift).
+const LEAN_LEFT = 0.6;
+function _leanLeft(pane, w) {
+    const cs = getComputedStyle(pane);
+    const pl = parseFloat(cs.paddingLeft) || 0, pr = parseFloat(cs.paddingRight) || 0;
+    const r = pane.getBoundingClientRect();
+    const cx = (r.left + pl + r.right - pr) / 2;
+    const spare = (cx - w / 2) - (r.left + pl);
+    if (spare <= 1) return;
+    const lean = Math.round(spare * LEAN_LEFT);
+    const prev = parseFloat(pane.style.getPropertyValue('--stage-shift')) || 0;
+    pane.style.paddingRight = `${pr + 2 * lean}px`;
+    pane.style.setProperty('--stage-shift', `${prev + lean}px`);
 }
 
 /**
