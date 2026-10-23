@@ -5,7 +5,7 @@
 // is one click), and each is remembered across sessions, along with the
 // subfolder you were last in.
 //
-//   Open:  click a .zip or .pdf to open it ("Or open a single file instead"
+//   Open:  click a .zip or .pdf to open it ("Or upload from somewhere else instead"
 //          for anything outside the folder).
 //   Save:  the folder you're in, a file name, and what to save:
 //            <name>.zip                        the presentation (reopens at this slide)
@@ -184,7 +184,7 @@ async function refreshWindow(w) {
 function drawFoot(w) {
     if (w.local) { w.foot.innerHTML = ''; return; }
     w.foot.innerHTML = w.mode === 'open'
-        ? `<button type="button" class="lib-link" data-local>Or open a single file instead</button>`
+        ? `<button type="button" class="lib-link" data-local>Or upload from somewhere else instead</button>`
         : `<button type="button" class="lib-link" data-local>Or download instead</button>`;
     w.foot.querySelector('[data-local]').onclick = () => {
         if (w.mode === 'open') { window.BeamerModal?.close(); appState.pendingTarget = null; chooseLocalFile(); return; }

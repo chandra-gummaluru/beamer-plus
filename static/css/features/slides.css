@@ -234,10 +234,21 @@ model-viewer { pointer-events: auto !important; }
     margin: 0;
 }
 
+/* The line under it: how to start (plain text, no links). */
+.stage-empty-hint {
+    font-family: var(--font-sans);
+    font-size: var(--fs-md);
+    color: var(--_ink-soft);
+    line-height: 1.5;
+    max-width: 28em;
+    margin: var(--sp-2) 0 0;
+}
+
 /* Narrow stages (phones, tiny split panes): smaller. */
 @media (max-width: 600px), (max-height: 460px) {
     .stage-empty-icon { width: 68px; height: 49px; margin-bottom: var(--sp-3); }
     .stage-empty-title { font-size: var(--fs-lg); }
+    .stage-empty-hint { font-size: var(--fs-sm); }
 }
 
 @media (prefers-reduced-motion: reduce) {

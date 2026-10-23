@@ -1,6 +1,6 @@
-"""Walk through the start page (New Session / Last Session), the session buttons,
-Open / Save presentation in a folder on this computer, recording from
-the record button, and Last Session bringing a presentation back as it was left.
+"""Walk through the start page (New Session / Try Demo), the session buttons,
+Open / Save presentation in folders on this computer (remembered across
+sessions), the record button, and Close session.
 
   python app.py --http --port 5001        (in another terminal)
   python tests/browser/flow_sessions.py   screenshots land in tests/browser/shots/
@@ -19,20 +19,6 @@ from common import BASE, OUT, make_pdf, make_zip, FAKE_FOLDER, FOLDER_RESET, FOL
 
 L = "csc258/lectures"
 DECK = "05 - Binary Arithmetic"
-LAST = """async () => {
-  const db = await new Promise(r => { const q = indexedDB.open('beamer-last-session', 1);
-    q.onupgradeneeded = () => q.result.createObjectStore('kv'); q.onsuccess = () => r(q.result); });
-  const get = k => new Promise(r => { const q = db.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => r(q.result || null); });
-  const meta = await get('meta'), deck = await get('deck');
-  return { meta, deckSize: deck?.blob?.size || 0, deckAt: deck?.savedAt || null };
-}"""
-SET_LAST_SESSION = """async (id) => {
-  const db = await new Promise(r => { const q = indexedDB.open('beamer-last-session', 1); q.onsuccess = () => r(q.result); });
-  const tx = db.transaction('kv', 'readwrite'), st = tx.objectStore('kv');
-  const meta = await new Promise(r => { const q = st.get('meta'); q.onsuccess = () => r(q.result); });
-  st.put({ ...meta, sessionId: id }, 'meta');
-  await new Promise(r => tx.oncomplete = r);
-}"""
 FAKE_SCREEN = """
 (() => {
   const c = document.createElement('canvas'); c.width = 320; c.height = 240;
@@ -68,18 +54,16 @@ def run():
         menu = lambda key: page.click(BTN[key])
         sid = lambda: re.search(r"/s/([^/]+)/", page.url).group(1)
 
-        # 1. The start page, first time: New Session, and Last Session greyed out.
+        # 1. The start page: New Session and Try Demo.
         page.goto(BASE); page.wait_for_timeout(600)
         page.evaluate(FOLDER_RESET)
         page.evaluate(FOLDER_PUT, {f"{L}/{DECK}.zip": b64(make_zip(make_pdf())),
                                    f"{L}/06 - Multiplication.pdf": b64(make_pdf(4, "Multiplication")),
                                    "csc258/grades.json": b64(b"{}")})
         shot("s01-start")
-        check("start page: New Session and Last Session", page.inner_text("#welcome-new-btn").strip() == "New Session"
-              and page.inner_text("#welcome-last-btn").strip() == "Last Session")
-        check("…Last Session greyed out with nothing to reopen", page.locator("#welcome-last-btn").is_disabled()
-              and page.locator("#welcome-last").is_hidden())
-        check("…no GitHub anywhere", "GitHub" not in page.content())
+        check("start page: New Session and Try Demo", page.inner_text("#welcome-new-btn").strip() == "New Session"
+              and page.inner_text("#welcome-demo-btn").strip() == "Try Demo")
+        check("…no Last Session, no GitHub", page.locator("#welcome-last-btn").count() == 0 and "GitHub" not in page.content())
 
         # 2. New Session: Open, Edit, Save, Close; nothing open yet.
         page.click("#welcome-new-btn"); page.wait_for_url("**/s/**"); page.wait_for_timeout(2200)
@@ -90,6 +74,9 @@ def run():
         check("top-right: open, edit, save, close", [k for k, _ in btns] == ["session-open-btn", "session-edit-btn", "session-save-btn", "session-close-btn"])
         check("…edit and save need a presentation", dict(btns)["session-edit-btn"] and dict(btns)["session-save-btn"] and not dict(btns)["session-open-btn"])
         check("record button in the corner", page.locator("#record-btn").is_visible())
+        check("empty slide: 'Nothing here yet…' and how to start", page.inner_text("#stage-empty .stage-empty-title").strip() == "Nothing here yet…"
+              and "opening a presentation" in page.inner_text("#stage-empty .stage-empty-hint")
+              and page.locator("#stage-empty button").count() == 0)
 
         # 3. Open: choose the folder, browse, open a deck.
         menu("open"); page.wait_for_timeout(500); shot("s03-open-choose")
@@ -105,21 +92,8 @@ def run():
         check("…edit and save now on", not page.locator("#session-edit-btn").is_disabled() and not page.locator("#session-save-btn").is_disabled())
         check("tab title", page.title() == f"{DECK} · Beamer+")
 
-        # 4. Draw on slide 2 and stay on slide 3: the browser keeps a copy.
-        page.keyboard.press("ArrowRight"); page.wait_for_timeout(700)
-        box = page.locator("#ann-canvas canvas").first.bounding_box()
-        page.mouse.move(box["x"] + 100, box["y"] + 100); page.mouse.down()
-        for i in range(12):
-            page.mouse.move(box["x"] + 100 + i * 20, box["y"] + 100 + (i % 3) * 15)
-        page.mouse.up(); page.wait_for_timeout(300)
-        page.keyboard.press("ArrowRight"); page.wait_for_timeout(5500)
-        last = page.evaluate(LAST)
-        print("   kept:", last["meta"], last["deckSize"])
-        check("a copy is kept: on slide 3, with the deck", last["meta"]["slide"] == 2 and last["deckSize"] > 1000
-              and last["meta"]["sessionId"] == first and last["meta"]["name"] == DECK)
-        page.keyboard.press("ArrowLeft"); page.wait_for_timeout(1500)
-        check("moving slides updates only the slide", page.evaluate(LAST)["meta"]["slide"] == 1 and page.evaluate(LAST)["deckAt"] == last["deckAt"])
-        page.keyboard.press("ArrowRight"); page.wait_for_timeout(1500)
+        # 4. Go to slide 3 (Save keeps the slide you're on).
+        page.keyboard.press("ArrowRight"); page.keyboard.press("ArrowRight"); page.wait_for_timeout(800)
 
         # 5. Save has its own folder: the first time, choose one (or use Open's).
         menu("save"); page.wait_for_timeout(800); shot("s06-save-choose")
@@ -160,34 +134,15 @@ def run():
             page.click("#recorder-stop-btn"); page.wait_for_timeout(2000)
             check("…stopped", page.locator("#recorder-bar").is_hidden())
 
-        # 8. Close session; Last Session brings it back, same code, same slide, same ink.
-        menu("end"); page.wait_for_timeout(300); shot("s08-end")
-        check("close session says Last Session picks up", "Last Session" in page.inner_text(".custom-modal-overlay"))
+        # 8. Close session: asks first (a deck is open), then the start page.
+        menu("end"); page.wait_for_timeout(300); shot("s08-close")
+        check("close session warns about unsaved work", "haven’t saved" in page.inner_text(".custom-modal-overlay"))
         page.locator(".custom-modal-btn", has_text="Close session").click()
-        page.wait_for_url(BASE); page.wait_for_timeout(800); shot("s09-start-again")
-        line = page.inner_text("#welcome-last")
-        print("   ", line)
-        check("start page: Last Session ready, says what and where", not page.locator("#welcome-last-btn").is_disabled()
-              and "05 - saved" in line and "slide 3 of 6" in line)
-        page.click("#welcome-last-btn"); page.wait_for_url("**/s/**"); page.wait_for_timeout(4500); shot("s10-resumed")
-        check("same session code (still on the server)", sid() == first)
-        check("…the ?resume is gone from the address", "resume" not in page.url)
-        st = page.evaluate("() => ({ n: window.beamerState.totalSlides, at: window.beamerState.currentSlide, ink: Object.keys(window.beamerState.annotations), target: window.beamerState.target })")
-        print("   resumed:", st)
-        check("…deck back, on slide 3", st["n"] == 6 and st["at"] == 2)
-        check("…with the ink on slide 2", "1" in st["ink"])
-        check("…and its place in the folder (Save goes back there)", st["target"]["name"] == "05 - saved" and st["target"]["src"] == "save" and st["target"]["dir"] == "csc258")
+        page.wait_for_url(BASE); page.wait_for_timeout(800)
+        check("…back on the start page", page.locator("#welcome-new-btn").is_visible())
 
-        # 9. The server lost that session: Last Session opens it in a new one.
-        page.evaluate(SET_LAST_SESSION, "ZZZZZZ")
-        page.goto(BASE); page.wait_for_timeout(600)
-        page.click("#welcome-last-btn"); page.wait_for_url("**/s/**"); page.wait_for_timeout(4500)
-        check("gone from the server: a new session, deck back", sid() not in (first, "ZZZZZZ")
-              and page.evaluate("() => window.beamerState.totalSlides") == 6)
-
-        # 10. New Session starts empty (the kept copy stays for Last Session);
-        #     both folders are remembered, each where you last were in it.
-        page.goto(BASE); page.wait_for_timeout(600)
+        # 9. New Session starts empty; both folders are remembered, each where
+        #    you last were in it; the saved deck reopens at the slide it was saved on.
         page.click("#welcome-new-btn"); page.wait_for_url("**/s/**"); page.wait_for_timeout(2500)
         check("New Session: nothing open", not page.evaluate("() => !!window.beamerState.zipFile"))
         menu("open"); page.wait_for_timeout(800)
@@ -197,9 +152,19 @@ def run():
         menu("save"); page.wait_for_timeout(800); shot("s11-save-remembered")
         check("…Save: Saves, where I last saved",
               "Saves" in page.inner_text(".lib-folder") and page.inner_text(".lib-crumbs").replace("\n", " ").strip() == "Saves › csc258")
-        page.keyboard.press("Escape")
+        page.evaluate("() => window.BeamerModal.close()"); page.wait_for_timeout(300)
+        page.evaluate("() => { window.__pick = 'Saves'; }")
+        menu("open"); page.wait_for_timeout(500)
+        page.click(".lib [data-change]"); page.wait_for_timeout(700)
+        go("csc258"); go("05 - saved.zip"); page.wait_for_timeout(2500)
+        check("saved deck reopens on slide 3", page.evaluate("() => window.beamerState.currentSlide") == 2)
+
+        # 10. Try Demo: a session with the demo deck and the tour.
         page.goto(BASE); page.wait_for_timeout(600)
-        check("…Last Session still there", not page.locator("#welcome-last-btn").is_disabled())
+        page.click("#welcome-demo-btn"); page.wait_for_url("**/s/**")
+        page.wait_for_function("() => window.beamerState?.totalSlides > 3", timeout=60000); page.wait_for_timeout(2500); shot("s12-demo")
+        check("Try Demo: demo deck loaded, tour running", page.evaluate("() => window.beamerState.totalSlides") > 3
+              and page.locator(".tour-card, .tour-popover, [class*='tour']").count() > 0)
 
         # 11. A browser without folders: Open is the file picker.
         ctx2 = b.new_context(viewport={"width": 1200, "height": 800})
@@ -212,8 +177,7 @@ def run():
         ctx2.close()
 
         b.close()
-    # (the 404 is step 9 asking the server for the session it no longer has)
-    errors = [e for e in errors if "ERR_TUNNEL" not in e and "404 (NOT FOUND)" not in e]
+    errors = [e for e in errors if "ERR_TUNNEL" not in e]
     print("\nconsole errors:\n  " + "\n  ".join(errors) if errors else "\nno console errors")
     print(f"{sum(ok for _, ok in checks)}/{len(checks)} checks passed")
     return all(ok for _, ok in checks) and not errors
