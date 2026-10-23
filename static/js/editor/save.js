@@ -1,7 +1,8 @@
 // Save — rebuilds the presentation ZIP from the in-memory state (slide
 // configs, slide order, annotations, widget states, newly added files) and
-// downloads it. buildPresentationZip() is the same ZIP as a Blob, for
-// Save to GitHub (github/ui.js).
+// downloads it. buildPresentationZip() is the same ZIP as a Blob, for Save
+// presentation (library/ui.js) and the copy Last Session reopens
+// (app/last-session.js).
 import { collectWidgetStates, getLoadedWidgetStates } from '../core/iframe-widget-renderer.js';
 import { requestWidgetFileFlush } from './widget-settings.js';
 import { ctx } from './context.js';
@@ -53,8 +54,9 @@ export async function savePresentation() {
 }
 
 /** The presentation as it stands now, as a ZIP Blob. `extra` maps more
- *  ZIP paths to their contents (Save to GitHub adds config/resume.json). */
-export async function buildPresentationZip({ extra = {} } = {}) {
+ *  ZIP paths to their contents (Save adds config/resume.json); `store`
+ *  skips compression (quicker, for the copy kept in the browser). */
+export async function buildPresentationZip({ extra = {}, store = false } = {}) {
     if (!ctx.state.zipFile) throw new Error('No presentation loaded.');
     {
         // Ask file-owning widgets to write their files out now; the uploads
@@ -98,7 +100,7 @@ export async function buildPresentationZip({ extra = {} } = {}) {
             if (path === 'config/slide-order.json') continue;
             if (path === 'config/annotations.json') continue;
             if (path === 'config/widget-states.json') continue;
-            if (path === 'config/resume.json') continue;    // only Save to GitHub writes it, fresh
+            if (path === 'config/resume.json') continue;    // only Save writes it, fresh
             const m = /^config\/s(.+)\.json$/.exec(path);
             if (m) {
                 const key = m[1];
@@ -160,6 +162,8 @@ export async function buildPresentationZip({ extra = {} } = {}) {
             newZip.file(path, data);
         }
 
-        return newZip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+        return newZip.generateAsync(store
+            ? { type: 'blob', compression: 'STORE' }
+            : { type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
     }
 }

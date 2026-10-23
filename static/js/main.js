@@ -32,9 +32,9 @@ import { initUploader } from './app/uploader.js';
 import { startTour } from './app/tour.js';
 import { initEditor } from './editor/editor.js';
 import { initRecorder } from './app/recorder.js';
-import { initGitHub } from './github/ui.js';
 import { initLibrary } from './library/ui.js';
-import { initAccountMenu } from './app/account-menu.js';
+import { initSessionMenu } from './app/session-menu.js';
+import { initLastSession } from './app/last-session.js';
 import { getSessionId, sessionUrl, saveLastSession } from './app/session.js';
 
 /* ─── Render generation counters ─────────────────────────────── */
@@ -164,9 +164,9 @@ document.addEventListener('DOMContentLoaded', () => {
     initUploader(state);
     initEditor(state);
     initRecorder(state);
-    initGitHub(state);
     initLibrary(state);
-    initAccountMenu(state);
+    initSessionMenu(state);
+    initLastSession(state);
     initSettings();
     // Must run before applyDefaultPen(): that call emits a 'tool:change' to
     // sync other modules' tracked "previous tool" state (see below), and
@@ -1612,7 +1612,7 @@ function _updateAllOverlayPositions() {
 }
 
 /**
- * On narrower windows the slide can reach up under the account button in the
+ * On narrower windows the slide can reach up under the session button in the
  * top-right corner. When it would, first nudge it left into whatever spare
  * room its pane has (extra right padding; --stage-shift moves the 50%-centred
  * overlays with it), then, if it still overlaps, shrink it just enough to
@@ -1651,7 +1651,7 @@ function _clearTopRightControls(pane, w, h) {
 }
 
 function wireResizeAndFullscreen() {
-    // The account button changes width (sign-in, edit mode's extra buttons):
+    // The session button changes width (the presentation's name, edit mode):
     // re-fit the slide when it does.
     const ctrls = document.getElementById('top-right-controls');
     if (ctrls && 'ResizeObserver' in window) {
@@ -1797,7 +1797,7 @@ export async function loadZipPresentation(file) {
             } catch (_) {}
         }
 
-        // Where the last Save to GitHub left off (config/resume.json).
+        // Where the last save left off (config/resume.json).
         let resumeAt = 0;
         const resumeFile = zip.file('config/resume.json');
         if (resumeFile) {
@@ -1876,13 +1876,14 @@ export async function loadPdfPresentation(file) {
     }
 }
 
-// The file the deck was opened from, and — when it came from GitHub — the
-// lecture it belongs to (github/ui.js sets pendingGhTarget just before
-// opening it). Any other way in (upload, drop, the tour) leaves no target.
+// The file the deck was opened from, and — when it came from your folder —
+// where it lives there (library/ui.js sets pendingTarget just before opening
+// it), so Save starts there. Any other way in (a single file, a drop, the
+// tour) leaves no target.
 function adoptSource(file) {
     state.sourceFile = file;
-    state.ghTarget = state.pendingGhTarget || null;
-    state.pendingGhTarget = null;
+    state.target = state.pendingTarget || null;
+    state.pendingTarget = null;
 }
 
 function enableControls() {

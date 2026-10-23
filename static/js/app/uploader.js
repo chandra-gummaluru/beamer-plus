@@ -1,21 +1,21 @@
 // Upload — loading a presentation from a PDF or a saved Beamer+ ZIP.
-// Ways in: clicking the empty slide or "Open a presentation…" in the account
-// menu (openUpload), or dropping the file anywhere on the window. Signed in
-// with GitHub, both open the lecture library instead: decks come from GitHub. Both route by file type and hand
-// off through bus events, keeping this decoupled from main.js.
+// Ways in: clicking the empty slide or "Open a presentation…" in the session
+// menu (openUpload), or dropping the file anywhere on the window. Opening
+// shows the folder browser (library/ui.js registers it here); both route by
+// file type and hand off through bus events, keeping this decoupled from
+// main.js.
 import { bus } from '../core/events.js';
 
-// Signed in with GitHub, opening a presentation shows the lecture library
-// instead of the file picker (github/ui.js registers that here).
+// Opening a presentation shows the folder browser instead of the file picker
+// (library/ui.js registers that here).
 let buttonHandler = null;
 export function setUploadButtonHandler(fn) { buttonHandler = fn; }
-// …and a file dropped on the window goes here instead of opening (signed in,
-// decks come from GitHub).
+// …and a file dropped on the window goes here.
 let dropHandler = null;
 export function setDropHandler(fn) { dropHandler = fn; }
 /** The computer's file picker, whatever openUpload does. */
 export function chooseLocalFile() { document.getElementById('upload-presentation')?.click(); }
-/** Open a presentation: the lecture library when signed in, else the file picker. */
+/** Open a presentation: the folder browser, or the file picker without one. */
 export function openUpload() {
     if (!uploadAllowed()) return;
     if (buttonHandler && buttonHandler() !== false) return;

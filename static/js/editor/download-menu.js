@@ -129,7 +129,7 @@ async function renderRecordings(section) {
         });
         const parts = [r.deckName && r.deckName !== 'Beamer+' ? r.deckName : null, when,
                        formatDuration(r.durationMs || 0), formatSize(r.size || 0),
-                       r.uploaded ? 'on GitHub' : null];
+                       r.uploaded ? 'saved' : null];
         const row = recordingRow({
             name: r.label + (r.recovered ? ' (recovered)' : ''),
             meta: parts.filter(Boolean).join(' · '),

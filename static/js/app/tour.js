@@ -18,10 +18,10 @@ const STEPS = [
         body:  'Beamer+ is an interactive presentation tool that turns a PDF slide deck into a live lecture: draw on your slides, and drop in videos, 3D models, live polls and interactive widgets.',
     },
     {
-        sel:   '#account-btn',
+        sel:   '#session-btn',
         place: 'auto',
         title: 'Your session',
-        body:  'Your session (your GitHub name, or Guest): open a presentation (a plain PDF, or a saved Beamer+ ZIP with its widgets and annotations), edit it, save it, and end the session (which signs you out of GitHub too). Signed in with GitHub, presentations live in your course repository; otherwise, in a folder on this computer. The empty slide has a link to open one too.',
+        body:  'Your session: open a presentation (a plain PDF, or a saved Beamer+ ZIP with its widgets and annotations) from a folder on this computer, edit it, save it, record the lecture, and end the session. Last Session on the start page brings back what you had open. The empty slide has a link to open one too.',
     },
     {
         sel:   '#slide-navigator',
@@ -78,16 +78,16 @@ const STEPS = [
         body:  'Click anywhere on a slide to type a note. Wrap math in $…$ and it is typeset as LaTeX, right on the slide.',
     },
     {
-        sel:   '#account-btn',
+        sel:   '#session-btn',
         place: 'auto',
         title: 'Edit mode',
         body:  'Edit presentation (in this menu) opens the editing panel where you can add videos, audio, 3D models, and interactive widgets to any slide. Drag and resize overlays freely.',
     },
     {
-        sel:   '#record-btn',
-        place: 'left',
+        sel:   '#session-btn',
+        place: 'auto',
         title: 'Record the lecture',
-        body:  'Record this tab as a video: slides, ink, widgets, your microphone and the tab\'s sound. Takes are saved every second, so a reload or crash loses nothing, and they are offered when you Save.',
+        body:  'Start recording (in this menu) records this tab as a video: slides, ink, widgets, your microphone and the tab\'s sound. Takes are saved every second, so a reload or crash loses nothing, and they are offered when you Save.',
     },
     {
         sel:   '#mute-btn',
@@ -96,7 +96,7 @@ const STEPS = [
         body:  'Blank the stage for a moment (or press .), handy for a question or a pause. You can keep moving through slides while it is hidden.',
     },
     {
-        sel:   '#account-btn',
+        sel:   '#session-btn',
         place: 'auto',
         title: 'Save your work',
         body:  'Save presentation (in this menu) picks the folder and file name, and what to save: the deck (it reopens where you left off), the notes PDF (annotations, widgets, media and poll results drawn in) and any recordings.',

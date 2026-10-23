@@ -20,9 +20,9 @@ pip install -r requirements.txt
 python launch.py            # production launcher: HTTPS with a self-signed cert
 ```
 
-Open the `https://...` URL the launcher prints, then **Start a new session**
-on the welcome screen (or go directly to `/s/{code}/` if you already have a
-code). Browsers warn about the
+Open the `https://...` URL the launcher prints, then **New Session** on the
+welcome screen (or **Last Session** to pick up where you left off; or go
+directly to `/s/{code}/` if you already have a code). Browsers warn about the
 self-signed certificate — click **Advanced → Proceed**. HTTPS is needed so
 camera/microphone widgets work on LAN addresses.
 
@@ -38,7 +38,7 @@ demo** on the empty slide.
 
 ## Loading a presentation
 
-Click **Open a presentation** on the empty slide, drag the file onto the window, or use **Open a presentation…** in the account menu (top-right) to load either:
+Click **Open a presentation** on the empty slide, drag the file onto the window, or use **Open a presentation…** in the session menu (top-right) to load either:
 
 - **A plain PDF** — every page becomes a slide.
 - **A presentation ZIP** — a PDF plus saved configuration, media, widgets and
@@ -62,9 +62,9 @@ presentation.zip
 
 ## Downloading
 
-Signed out without a folder, **Download instead** (in the Save window) offers two files, plus any screen
-recordings (see Recording below). (Normally **Save presentation…** saves them in your
-repository or folder instead; see below.)
+**Download instead** (in the Save window) offers two files, plus any screen
+recordings (see Recording below). (Normally **Save presentation…** saves them in
+your folder instead; see below.)
 
 - **Presentation (ZIP)** — everything above, to reopen and keep presenting.
 - **Notes (PDF)** — one flat PDF to hand out. Every visible slide (hidden and
@@ -77,76 +77,64 @@ repository or folder instead; see below.)
   placeholder box. Built in the browser with pdf-lib; PDF slides are copied as
   vector pages, so their text stays selectable.
 
-## Sessions: GitHub or a folder
+## Sessions
 
-The welcome screen offers **Sign in with GitHub** or **Continue as guest**. The
-account button (top-right: your GitHub name, or **Guest**) is the
-session menu: **Open a presentation…**, **Edit presentation**, **Save
-presentation…** (Edit and Save once a presentation is open) and **End session**
-(back to the start page; signed in, it signs you out of GitHub too). To sign
-in, end a guest session and use **Sign in with GitHub** on the start page.
+The welcome screen offers **New Session** (nothing open) and **Last Session**,
+which reopens the presentation you had open last exactly as you left it —
+annotations, edits, widget states and the slide you were on, saved or not. It
+is greyed out until there is something to reopen; underneath, a line says what
+(`Last: <name> · slide 12 of 40 · today, 10:41`). Last Session goes back to the
+same session code when the server still has it (so audience QR codes keep
+working), otherwise to a new one.
 
-Signed in, Open and Save work like a file manager: you pick a **repository**
-(any the Beamer+ GitHub App can see), then browse its folders, e.g.
-`csc258 › f26 › lectures`. Beamer+ doesn't impose a layout: you choose where
-things go. Underneath, **Or choose a file from this computer** (Open) is the
-system file picker, and **Or save to this computer** (Save) saves to your
-browser's downloads folder. Signed out, that's all Open and Save use.
+While a presentation is open, Beamer+ keeps a copy of it in the browser
+(IndexedDB, `app/last-session.js`): rebuilt a few seconds after you stop
+drawing, editing or clicking (and when the tab is hidden or the session ends);
+moving between slides only updates which slide you're on. It's per browser,
+and only the most recent presentation is kept.
 
-- **Open a presentation** (signed in) lists the folders and the `.zip` / `.pdf`
-  files in the one you're in; click one to open it. Signed in, presentations come from
-  GitHub only (put files in the repository on GitHub or with git).
-  **Open a presentation** on the empty slide opens it too.
-- **Save presentation** starts in the repository and folder the presentation
-  came from. Pick a folder, a file name, and tick what to
-  save (Presentation, Notes, Recordings); each goes in that folder:
+The session button (top-right: the open presentation's name, or **Session**)
+is the session menu: **Open a presentation…**, **Edit presentation**, **Save
+presentation…** (Edit and Save once a presentation is open; Ctrl/⌘+S saves
+too), **Start recording…** / **Stop recording**, and **End session** (back to
+the start page).
+
+## Opening and saving: a folder on this computer
+
+Open and Save work like a file manager on a folder you choose once (your
+course folder, say; e.g. `csc258 › f26 › lectures` inside it). Beamer+
+remembers it; after a reload the browser asks once to allow it again. Beamer+
+doesn't impose a layout: you choose where things go. **Change folder…** picks
+another. Underneath, **Or open a single file instead** (Open) is the system
+file picker, and **Or download instead** (Save) saves to your browser's
+downloads folder.
+
+- **Open a presentation** lists the folders and the `.zip` / `.pdf` files in
+  the one you're in; click one to open it. **Open a presentation** on the empty
+  slide, and dropping a file on the window, open one too.
+- **Save presentation** starts in the folder the presentation came from. Pick a
+  folder, a file name, and tick what to save (Presentation, Notes,
+  Recordings); each goes in that folder:
   - `<name>.zip`: the presentation, which reopens at the slide you were on
   - `<name>.pdf`: the notes PDF (so don't name it after a slides PDF in the same
     folder, or the notes replace it)
-  - `<name>-<yyyy-mm-dd>-<hh-mm>.mp4` (or `.webm`): recordings not saved yet
-    (GitHub refuses files over 100 MB)
-  The repository list ends with **Add another repository…**, which opens GitHub
-  to give Beamer+ access; the button beside the list refreshes it.
+  - `<name>-<yyyy-mm-dd>-<hh-mm>[-part<n>].mp4` (or `.webm`): recordings not
+    saved yet
+- **Ctrl/⌘+S** saves the presentation again to where it was last saved or
+  opened from, without asking (the first time, it opens Save).
 
-On GitHub, each save is one commit. Saving over a `.zip` replaces it; the
-earlier version stays in the repository's history.
+Choosing a folder needs the File System Access API (Chrome, Edge). In other
+browsers Open is the file picker and Save downloads.
 
-Signing in always shows GitHub's account picker, so you can choose (or switch
-to) another GitHub account. Tokens stay in the browser, for that tab only;
-only the sign-in itself passes through the server.
-
-### Setting up sign-in (one time, per server)
-
-Beamer+ uses its own GitHub App (separate from Lectern's):
-
-1. **GitHub → Settings → Developer settings → GitHub Apps → New GitHub App**
-   (<https://github.com/settings/apps/new>). Name it e.g. `Beamer+ UofT`.
-2. **Homepage URL:** where Beamer+ runs, e.g. `https://beamer.changapp.net`.
-3. **Callback URL:** `<that address>/api/github/callback`. Add one per address
-   you open Beamer+ at (e.g. `https://localhost:5001/api/github/callback`, or
-   the LAN address `launch.py` prints).
-4. Leave **Expire user authorization tokens** ticked; leave **Request user
-   authorization during installation** and **Device Flow** unticked; untick
-   **Webhook → Active**.
-5. **Repository permissions → Contents: Read and write.** Nothing else.
-6. **Where can this GitHub App be installed? Any account.** Create it.
-7. Copy the **Client ID**, generate a **client secret**, and note the app's
-   address `github.com/apps/<slug>`.
-8. Copy `.env.example` to `.env` beside `app.py` and fill in
-   `BEAMER_GH_CLIENT_ID`, `BEAMER_GH_CLIENT_SECRET` and `BEAMER_GH_APP_SLUG`
-   (`BEAMER_APP_URL` too if the server sits behind another address). `.env` is
-   git-ignored. Both `app.py` and `launch.py` read it.
-9. **Install App** on your account, with access to your course repository and
-   its `-private` twin. Beamer+'s repository chooser links here too.
-
-`tests/browser/flow_github.py` walks through all of this against a fake GitHub.
+`tests/browser/flow_sessions.py` walks through all of this.
 
 ## Recording
 
-The record button (bottom-right, next to the hide-slide button) records this
-tab — slides, ink and widgets — as a video, with your microphone and/or the
-tab's sound (videos, audio, widgets). While recording, the button turns into a
-small bar with the time, pause / resume and stop. Stop and start again as often
+**Start recording…** in the session menu records this tab — slides, ink and
+widgets — as a video, with your microphone and/or the tab's sound (videos,
+audio, widgets). While recording, a small bar (bottom-right, next to the
+hide-slide button) shows the time, pause / resume and stop; the menu offers
+**Stop recording** too. Stop and start again as often
 as you like — every take is kept and offered when you **Save**, where
 each can be downloaded (MP4 in Chrome/Edge, WebM elsewhere) or deleted.
 

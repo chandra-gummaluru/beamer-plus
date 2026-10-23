@@ -1,14 +1,16 @@
-import { createSession, saveLastSession, sessionExists } from './session.js';
-import { signedIn, startSignIn, consumeRedirect, signOut, user } from '../github/auth.js';
+// The start page: "New Session" starts an empty session; "Last Session"
+// reopens the presentation you had open last, as you left it (kept in this
+// browser by app/last-session.js). With nothing kept, Last Session is greyed out.
 
-const ghBtn = document.getElementById('welcome-github-btn');
-const ghLabel = document.getElementById('welcome-github-label');
-const createBtn = document.getElementById('welcome-create-btn');
-const acct = document.getElementById('welcome-account');
-const acctLogin = document.getElementById('welcome-login');
-const acctAvatar = document.getElementById('welcome-avatar');
-const outBtn = document.getElementById('welcome-signout-btn');
+import { createSession, sessionExists } from './session.js';
+import { lastSessionInfo } from './last-session.js';
+
+const newBtn = document.getElementById('welcome-new-btn');
+const lastBtn = document.getElementById('welcome-last-btn');
+const lastLine = document.getElementById('welcome-last');
 const statusEl = document.getElementById('welcome-status');
+
+let last = null;
 
 function setStatus(msg, isError = false) {
     if (!statusEl) return;
@@ -17,89 +19,70 @@ function setStatus(msg, isError = false) {
 }
 
 function setBusy(on) {
-    for (const b of [ghBtn, createBtn]) if (b) b.disabled = on;
+    document.body.classList.toggle('is-busy', on);
+    if (newBtn) newBtn.disabled = on;
+    if (lastBtn) lastBtn.disabled = on || !last;
 }
 
-function goToSession(sessionId, { tour = false, github = false, guest = false } = {}) {
-    saveLastSession(sessionId);
-    const q = [tour && 'tour=1', github && 'gh=1', guest && 'guest=1'].filter(Boolean).join('&');
-    window.location.href = `/s/${sessionId}/` + (q ? `?${q}` : '');
+const go = (id, query = '') => { window.location.href = `/s/${id}/${query}`; };
+
+// "Today, 10:41", "Yesterday, 16:05", or "Mon 20 Oct, 9:12".
+function when(iso) {
+    const d = new Date(iso);
+    if (Number.isNaN(+d)) return '';
+    const t = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    const day = new Date(); day.setHours(0, 0, 0, 0);
+    const diff = Math.round((day - new Date(d).setHours(0, 0, 0, 0)) / 864e5);
+    if (diff === 0) return `today, ${t}`;
+    if (diff === 1) return `yesterday, ${t}`;
+    return `${d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })}, ${t}`;
 }
 
-// Both buttons start a fresh session. Signed in with GitHub, the session
-// opens and saves lectures there; as a guest, files come from and go to this
-// computer. (The demo deck and its tour are offered inside the session.)
-async function handleCreate({ tour = false, github = false, guest = false } = {}) {
-    setStatus(tour ? 'Setting up the tour…' : 'Creating session…');
+async function startNew() {
+    setStatus('Creating session…');
     setBusy(true);
     try {
         const data = await createSession();
-        goToSession(data.session_id, { tour, github, guest });
+        go(data.session_id);
     } catch {
         setStatus('Could not create a session. Try again.', true);
         setBusy(false);
     }
 }
 
-// Signed out: "Sign in with GitHub". Signed in: who you are above the
-// buttons (with Sign out), and the GitHub button just starts a session.
-function drawSignedIn(u = null) {
-    const on = signedIn();
-    if (ghLabel) ghLabel.textContent = on ? 'Start a session' : 'Sign in with GitHub';
-    if (ghBtn) ghBtn.title = on ? 'Open and save your lectures in your GitHub course repository' : 'Sign in to open and save your lectures in your GitHub course repository';
-    if (acct) acct.hidden = !on;
-    if (acctLogin) acctLogin.textContent = u?.login || 'GitHub';
-    if (acctAvatar) {
-        acctAvatar.hidden = !u?.avatar_url;
-        if (u?.avatar_url) acctAvatar.src = `${u.avatar_url}${u.avatar_url.includes('?') ? '&' : '?'}s=48`;
+// The last session's own code when the server still has it (audience links
+// keep working), else a new session; either way the kept copy opens there.
+async function reopenLast() {
+    if (!last) return;
+    setStatus('Reopening your last session…');
+    setBusy(true);
+    try {
+        if (last.sessionId && await sessionExists(last.sessionId).catch(() => false)) {
+            go(last.sessionId, '?resume=1');
+            return;
+        }
+        const data = await createSession();
+        go(data.session_id, '?resume=1');
+    } catch {
+        setStatus('Could not reopen it. Try again.', true);
+        setBusy(false);
     }
 }
 
 async function init() {
-    // Back from GitHub's sign-in page?
-    const back = consumeRedirect();
-    if (back?.error) setStatus(back.error, true);
-    else if (back?.ok) {
-        // Signed in from a presenter session (its sign-in had ended): go back to it.
-        if (back.back && /^\/s\/[^/]+\/?$/.test(back.back)) {
-            const id = back.back.split('/')[2];
-            if (await sessionExists(id).catch(() => false)) { window.location.replace(back.back); return; }
-        }
-        setStatus('Signed in. Starting a session…');
-        handleCreate({ github: true });
-        return;
-    }
-    // Already signed in (say, back here from a session by address): no need
-    // for the start page, just start a new session. If that fails, the page
-    // shows as usual.
-    if (signedIn() && !back?.error) {
-        document.querySelector('.welcome-actions')?.setAttribute('hidden', '');
-        setStatus('Starting a session…');
-        try {
-            const data = await createSession();
-            goToSession(data.session_id, { github: true });
-            return;
-        } catch {
-            document.querySelector('.welcome-actions')?.removeAttribute('hidden');
-            setStatus('Could not create a session. Try again.', true);
-        }
-    }
-    drawSignedIn();
-    if (signedIn()) {
-        user().then(u => drawSignedIn(u)).catch(e => {
-            if (e.status === 401) { signOut(); drawSignedIn(); }
-        });
+    try { last = await lastSessionInfo(); } catch { last = null; }
+    if (!last) return;
+    lastBtn.disabled = false;
+    const slide = Number(last.slide) || 0;
+    const bits = [last.name, last.totalSlides ? `slide ${slide + 1} of ${last.totalSlides}` : null, when(last.savedAt)].filter(Boolean);
+    lastBtn.title = `Reopen ${last.name || 'your last presentation'} where you left off`;
+    if (lastLine) {
+        lastLine.textContent = `Last: ${bits.join(' · ')}`;
+        lastLine.hidden = false;
     }
 }
 
-ghBtn?.addEventListener('click', async () => {
-    if (signedIn()) { handleCreate({ github: true }); return; }
-    setStatus('Going to GitHub…');
-    try { await startSignIn(); }
-    catch (e) { setStatus(e.message, true); }
-});
-// A guest session ignores a GitHub sign-in this browser may hold.
-createBtn?.addEventListener('click', () => handleCreate({ guest: signedIn() }));
-outBtn?.addEventListener('click', () => { signOut(); drawSignedIn(); setStatus('Signed out of GitHub.'); });
+newBtn?.addEventListener('click', startNew);
+lastBtn?.addEventListener('click', reopenLast);
 
 init();

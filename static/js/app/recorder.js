@@ -11,7 +11,7 @@
 // available (private window, quota), chunks are kept in memory instead.
 //
 // A long take is split into parts (PART_BYTES each at most), each a complete
-// file of its own, so every part can be saved to GitHub.
+// file of its own, so no single file gets unwieldy to save or upload.
 
 import { getSessionId } from './session.js';
 
@@ -19,9 +19,8 @@ const PREFS_KEY = 'beamer-recorder-prefs';
 const TIMESLICE_MS = 1000;
 const VIDEO_BPS = 3_000_000;
 const AUDIO_BPS = 128_000;
-// Takes are split into parts of at most ~PART_BYTES so each file can be saved
-// to GitHub (its API takes a file as one base64 request; 100 MB is the hard
-// cap, and large requests fail well before that). A new part starts at ROTATE_AT.
+// Takes are split into parts of at most ~PART_BYTES, so no one file gets too
+// big to save, upload or play comfortably. A new part starts at ROTATE_AT.
 export const PART_BYTES = 45e6;
 const ROTATE_AT = 40e6;
 
@@ -33,17 +32,8 @@ const changeListeners = new Set();
 
 export function initRecorder(state) {
     appState = state;
-    document.getElementById('record-btn')?.addEventListener('click', () => {
-        if (active) return;
-        openStartDialog();
-    });
     document.getElementById('recorder-pause-btn')?.addEventListener('click', togglePause);
     document.getElementById('recorder-stop-btn')?.addEventListener('click', () => stopRecording());
-
-    if (!navigator.mediaDevices?.getDisplayMedia || typeof MediaRecorder === 'undefined') {
-        const btn = document.getElementById('record-btn');
-        if (btn) btn.title = 'Recording is not supported in this browser';
-    }
 
     window.addEventListener('beforeunload', (e) => {
         if (!active) return;
@@ -55,6 +45,15 @@ export function initRecorder(state) {
 
     // A take left "recording" by a reload or crash is closed out as-is.
     recoverInterrupted().catch(err => console.warn('[recorder] recovery failed', err));
+}
+
+/** Can this browser record the tab? */
+export const recordingSupported = () => !!navigator.mediaDevices?.getDisplayMedia && typeof MediaRecorder !== 'undefined';
+
+/** "Start recording…" (the session menu): the recorder's start dialog. */
+export function openRecorder() {
+    if (active) return;
+    openStartDialog();
 }
 
 /** True while a take is in progress (recording or paused). */
@@ -93,7 +92,7 @@ export async function getRecording(id) {
     return { meta, blob: new Blob(await store.chunks(id), { type: meta.mimeType }) };
 }
 
-/** Add details to a take (Save to GitHub notes where it uploaded it). */
+/** Add details to a take (Save notes where it saved it). */
 export async function updateRecording(id, patch) {
     const meta = (await store.allMeta()).find(m => m.id === id);
     if (!meta) return;
@@ -266,7 +265,7 @@ async function startRecording({ mic, sound }) {
 
     // 4 — the recorder. A take is written as one or more parts: each part is
     // its own complete, playable file, and a new one starts (seamlessly, see
-    // rotatePart) before it passes PART_BYTES, so every file fits on GitHub.
+    // rotatePart) before it passes PART_BYTES.
     const mimeType = pickMimeType(sources.length > 0);
     const recOpts = {
         ...(mimeType ? { mimeType } : {}),
@@ -300,7 +299,7 @@ async function startRecording({ mic, sound }) {
         hasMic: !!micStream, hasSound: displayAudio.length > 0,
         // Where the deck came from ("<folder>/<name>", see library/ui.js
         // targetKey), so Save presentation offers this take with it.
-        lecture: appState?.ghTarget ? [appState.ghTarget.dir, appState.ghTarget.name].filter(Boolean).join('/') : null,
+        lecture: appState?.target ? [appState.target.dir, appState.target.name].filter(Boolean).join('/') : null,
         part: null, partCount: 0, doneMs: 0, closing: [],
         paused: false, timer: null, stopping: null,
     };

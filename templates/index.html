@@ -129,24 +129,23 @@
         </button>
     </div>
 
-    <!-- Top-right: the account button (your GitHub name, or "Guest").
-         Its menu saves (to GitHub when signed in, to this computer otherwise),
-         opens a presentation, the demo, changes the repository, signs out and
-         ends the session (app/account-menu.js). Ctrl/⌘+S saves too; opening is
-         also a click on the empty slide. -->
+    <!-- Top-right: the session button (the open presentation's name, or
+         "Session"). Its menu opens, edits and saves the presentation (in a
+         folder on this computer), starts and stops a recording, and ends the
+         session (app/session-menu.js). Ctrl/⌘+S saves too; opening is also a
+         click on the empty slide. -->
     <div id="top-right-controls">
-        <button class="btn account-btn" id="account-btn" aria-haspopup="menu" aria-expanded="false" title="Guest session">
-            <span class="account-name">Guest</span>
+        <button class="btn session-btn" id="session-btn" aria-haspopup="menu" aria-expanded="false" title="Session">
+            <span class="session-name">Session</span>
         </button>
     </div>
 
-    <!-- Record + Mute — bottom-right corner. Record opens the recorder
-         (app/recorder.js); Mute blanks the stage until pressed again
-         (shortcut "."; main.js toggleMute). -->
+    <!-- Mute — bottom-right corner; blanks the stage until pressed again
+         (shortcut "."; main.js toggleMute). Recording starts from the session
+         menu; while it runs, its bar sits here (app/recorder.js). -->
     <div id="mute-container">
-        <button class="btn" id="record-btn" title="Record this tab"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/></svg></button>
-        <!-- Recording bar — takes the record button's place while a take
-             is in progress (app/recorder.js). Stays up in edit and focus mode. -->
+        <!-- Recording bar — shown while a take is in progress
+             (app/recorder.js). Stays up in edit and focus mode. -->
         <div id="recorder-bar" role="group" aria-label="Recording" hidden>
             <span class="recorder-dot" aria-hidden="true"></span>
             <span class="recorder-state visually-hidden">Recording</span>

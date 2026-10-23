@@ -258,7 +258,7 @@ export async function downloadNotes() {
     }
 }
 
-/** The notes PDF as a Blob (Save to GitHub uploads it). Shows its own
+/** The notes PDF as a Blob (Save presentation writes it). Shows its own
  *  progress in the loading modal; leaves the modal open when done. */
 export async function buildNotesPdf() {
     const s = ctx.state;

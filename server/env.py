@@ -1,8 +1,8 @@
 """Settings from a .env file (KEY=value per line), so they needn't be set each time.
 
 Looked for beside the repository root (app.py / launch.py) and, in a frozen
-build, beside the executable. Values already in the environment win. The file
-holds the GitHub App's client secret, so it is in .gitignore.
+build, beside the executable. Values already in the environment win. It is in
+.gitignore, since it is per-machine.
 """
 import os
 import sys

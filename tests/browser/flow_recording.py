@@ -1,5 +1,5 @@
-"""Recordings split into parts, saving them to GitHub (and what happens when that
-fails), and split view filling the stage.
+"""Recordings split into parts, saving them into the folder (and what happens
+when that fails), and split view filling the stage.
 
   python app.py --http --port 5001        (in another terminal)
   python tests/browser/flow_recording.py  screenshots land in tests/browser/shots/
@@ -8,13 +8,26 @@ The tab is faked with a canvas full of noise, and parts are made to start
 every ~600 KB instead of every 40 MB, so a few seconds of recording make
 several parts.
 """
+import base64
 import os
 import re
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from playwright.sync_api import sync_playwright  # noqa: E402
-from flow_github import BASE, OUT, L, SIGN_IN, make_gh  # noqa: E402
+from common import BASE, OUT, make_pdf, make_zip, FAKE_FOLDER, FOLDER_RESET, FOLDER_PUT, FOLDER_LS  # noqa: E402
+
+L = "csc258/f26/lectures/05 - Binary Arithmetic"
+# Writes into the folder fail while window.__failWrites is true.
+FAIL_WRITES = """
+(() => {
+  const cw = FileSystemFileHandle.prototype.createWritable;
+  FileSystemFileHandle.prototype.createWritable = function (...a) {
+    if (window.__failWrites) return Promise.reject(new DOMException('The disk is full.', 'QuotaExceededError'));
+    return cw.apply(this, a);
+  };
+})();
+"""
 
 FAKE_SCREEN = """
 (() => {
@@ -43,16 +56,6 @@ METAS = """async () => {
   }
   return out.sort((a, b) => a.startedAt - b.startedAt);
 }"""
-BIG_TAKE = """async () => {
-  const db = await new Promise(r => { const q = indexedDB.open('beamer-recordings', 1); q.onsuccess = () => r(q.result); });
-  const tx = db.transaction(['meta','chunks'], 'readwrite');
-  tx.objectStore('meta').put({ id:'rec-big', sessionId:'old', deckName:'x', label:'Recording 9', fileName:'x - recording 9 (y).webm',
-    mimeType:'video/webm', startedAt: Date.now() - 9e6, durationMs: 3e6, size: 150e6, status:'done', lecture: null });
-  tx.objectStore('chunks').add({ recId:'rec-big', seq:0, blob: new Blob(['big'], {type:'video/webm'}) });
-  await new Promise(r => tx.oncomplete = r);
-}"""
-
-
 FIT1 = """() => { const pane = document.getElementById('pdf-container'), r = pane.querySelector('canvas').getBoundingClientRect();
     return Math.max(r.width / (pane.clientWidth * 0.95), r.height / (pane.clientHeight * 0.95)); }"""
 
@@ -64,10 +67,7 @@ def playable(head):
 
 
 def run():
-    gh = make_gh()
-    priv = gh.repos["chandra-gummaluru/courses-private"]
     errors, checks = [], []
-    fail_blobs = {"on": False}
 
     def check(name, ok):
         checks.append((name, bool(ok)))
@@ -78,29 +78,27 @@ def run():
         body = r.text().replace("const ROTATE_AT = 40e6;", "const ROTATE_AT = 600e3;")
         route.fulfill(response=r, body=body)
 
-    def blobs(route):
-        if fail_blobs["on"] and route.request.method == "POST":
-            route.fulfill(status=502, body='{"message":"Server Error"}', content_type="application/json")
-        else:
-            route.fallback()
-
     with sync_playwright() as p:
         b = p.chromium.launch()
         ctx = b.new_context(viewport={"width": 1360, "height": 860}, accept_downloads=True)
-        ctx.route("https://api.github.com/**", gh.handle)
-        ctx.route("https://api.github.com/repos/*/*/git/blobs", blobs)
         ctx.route(re.compile(r".*/static/js/app/recorder\.js(\?.*)?$"), patch_recorder)
         ctx.add_init_script(FAKE_SCREEN)
+        ctx.add_init_script(FAKE_FOLDER)
+        ctx.add_init_script(FAIL_WRITES)
         page = ctx.new_page()
         page.on("console", lambda m: errors.append(f"{m.type}: {m.text}") if m.type == "error" else None)
         page.on("pageerror", lambda e: errors.append(f"pageerror: {e}"))
         shot = lambda n: page.screenshot(path=f"{OUT}/{n}.png")
-        go = lambda name: (page.locator(".gh-files .gh-item", has_text=name).first.click(), page.wait_for_timeout(400))
-        menu = lambda key: (page.click("#account-btn"), page.click(f".account-menu [data-menu='{key}']"))
+        go = lambda name: (page.locator(".lib-files .lib-item", has_text=name).first.click(), page.wait_for_timeout(400))
+        menu = lambda key: (page.click("#session-btn"), page.click(f".session-menu [data-menu='{key}']"))
+        folder = lambda: page.evaluate(FOLDER_LS)
 
         page.goto(BASE); page.wait_for_timeout(500)
-        page.evaluate(SIGN_IN); page.reload(); page.wait_for_url("**/s/**", timeout=5000); page.wait_for_timeout(3200)
-        page.select_option(".gh-lib select[data-repo]", "chandra-gummaluru/courses-private"); page.wait_for_timeout(1200)
+        page.evaluate(FOLDER_RESET)
+        page.evaluate(FOLDER_PUT, {f"{L}/05 - Binary Arithmetic.zip": base64.b64encode(make_zip(make_pdf())).decode()})
+        page.click("#welcome-new-btn"); page.wait_for_url("**/s/**"); page.wait_for_timeout(2200)
+        menu("open"); page.wait_for_timeout(500)
+        page.click(".lib [data-choose]"); page.wait_for_timeout(600)
         for n in ["csc258", "f26", "lectures", "05 - Binary Arithmetic", "05 - Binary Arithmetic.zip"]:
             go(n)
         page.wait_for_timeout(2500)
@@ -149,7 +147,7 @@ def run():
         page.evaluate("""() => { window.beamerState.slideStructure.pop(); }""")
 
         # 2. A long take is split into parts, each a complete file.
-        page.click("#record-btn"); page.wait_for_timeout(300)
+        menu("record"); page.wait_for_timeout(300)
         page.locator(".custom-modal-btn", has_text="Start recording").click()
         page.wait_for_timeout(12000)
         page.click("#recorder-stop-btn"); page.wait_for_timeout(2500); shot("r02-stopped")
@@ -165,44 +163,41 @@ def run():
         check("one take: same group, durations add up",
               len({m["group"] for m in metas}) == 1 and abs(sum(m["durationMs"] for m in metas) - 12000) < 2500)
 
-        # 3. Saving to GitHub fails: nothing lost, try again or save to this computer.
-        page.evaluate(BIG_TAKE)
+        # 3. Saving into the folder fails: nothing lost, try again or download instead.
         menu("save"); page.wait_for_timeout(1500); shot("r03-save")
-        chip = " ".join(page.locator(".gh-chip", has_text="Recordings").inner_text().split())
+        chip = " ".join(page.locator(".lib-chip", has_text="Recordings").inner_text().split())
         check(f"save offers every part ({chip})", chip == f"Recordings {len(metas)}")
-        check("a take too big for GitHub is shown, with a way to download it",
-              page.locator(".gh-toobig [data-toobig]").count() == 1 and "too big for GitHub" in page.inner_text(".gh-toobig"))
-        fail_blobs["on"] = True
+        before = set(folder())
+        page.evaluate("() => { window.__failWrites = true; }")
         page.click("[data-save]"); page.wait_for_timeout(4000); shot("r04-failed")
         btns = [x.inner_text().strip() for x in page.locator(".custom-modal-btn").all()]
-        check(f"failed save: Close / Try again / Save to this computer ({btns})", btns == ["Close", "Try again", "Save to this computer"])
+        check(f"failed save: Close / Try again / Download instead ({btns})", btns == ["Close", "Try again", "Download instead"])
         check("…and says the recordings are still safe", "still in Beamer+" in page.inner_text(".custom-modal-overlay"))
-        before = set(priv.files())
         got = []
         page.on("download", lambda d: got.append(d.suggested_filename))
-        page.locator(".custom-modal-btn", has_text="Save to this computer").click()
+        page.locator(".custom-modal-btn", has_text="Download instead").click()
         page.wait_for_timeout(1500 + 500 * len(metas))
         print("   downloaded:", got)
-        check("save to this computer downloads everything that was built",
+        check("download instead gets everything that was built",
               "05 - Binary Arithmetic.zip" in got and sum(1 for g in got if re.search(r"-part\d+\.(webm|mp4)$", g)) == len(metas))
-        check("nothing reached GitHub", set(priv.files()) == before)
+        check("nothing reached the folder", set(folder()) == before)
         menu("save"); page.wait_for_timeout(1500)
-        check("the parts are still offered for GitHub", " ".join(page.locator(".gh-chip", has_text="Recordings").inner_text().split()) == f"Recordings {len(metas)}")
+        check("the parts are still offered for the folder", " ".join(page.locator(".lib-chip", has_text="Recordings").inner_text().split()) == f"Recordings {len(metas)}")
         page.click("[data-save]"); page.wait_for_timeout(3000)
         page.locator(".custom-modal-btn", has_text="Try again").click()
         page.wait_for_timeout(1000)
-        fail_blobs["on"] = False
+        page.evaluate("() => { window.__failWrites = false; }")
         page.locator(".custom-modal-btn", has_text="Try again").click()
-        page.wait_for_timeout(5000); shot("r05-saved")
-        parts = sorted(k for k in priv.files() if re.match(rf"{re.escape(L)}/05 - Binary Arithmetic-\d{{4}}(-\d\d){{4}}-part\d+\.(webm|mp4)$", k))
-        print("   on GitHub:", parts)
-        check("try again saves every part to GitHub, numbered", len(parts) == len(metas))
+        page.wait_for_timeout(4000); shot("r05-saved")
+        parts = sorted(k for k in folder() if re.match(rf"{re.escape(L)}/05 - Binary Arithmetic-\d{{4}}(-\d\d){{4}}-part\d+\.(webm|mp4)$", k))
+        print("   in the folder:", parts)
+        check("try again saves every part into the folder, numbered", len(parts) == len(metas))
         menu("save"); page.wait_for_timeout(1500)
-        check("…and they aren't offered again", "Recordings" in page.inner_text(".gh-chips") and page.locator("[data-recs]").is_disabled())
+        check("…and they aren't offered again", "Recordings" in page.inner_text(".lib-chips") and page.locator("[data-recs]").is_disabled())
         page.keyboard.press("Escape")
 
         b.close()
-    errors = [e for e in errors if "ERR_TUNNEL" not in e and "502" not in e and "Server Error" not in e and "save failed" not in e]
+    errors = [e for e in errors if "ERR_TUNNEL" not in e and "save failed" not in e]
     print("\nconsole errors:\n  " + "\n  ".join(errors) if errors else "\nno console errors")
     print(f"{sum(ok for _, ok in checks)}/{len(checks)} checks passed")
     return all(ok for _, ok in checks) and not errors

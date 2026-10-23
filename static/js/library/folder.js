@@ -1,5 +1,5 @@
-// A folder on this computer to browse for presentations and save them in,
-// when signed out of GitHub (the folder plays the repository's part).
+// The folder on this computer that Open and Save browse (library/ui.js):
+// presentations are opened from it and saved into it.
 //
 // Uses the File System Access API (Chrome, Edge). The chosen folder is
 // remembered in this browser (IndexedDB); after a reload the browser asks
@@ -41,6 +41,8 @@ export async function remembered() {
     if (!root) root = await idbGet();
     return root;
 }
+/** The remembered folder's name ('' if none). */
+export const rootName = () => root?.name || '';
 /** 'granted', 'prompt' or 'denied' for the remembered folder. */
 export async function permission() {
     if (!root) return 'none';
