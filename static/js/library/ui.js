@@ -1,6 +1,9 @@
 // "Open a presentation" and "Save presentation" (the session menu, the empty
-// slide, Ctrl/⌘+S). Both browse a folder on this computer that you choose once
-// (your course folder, say; Beamer+ remembers it), like a file manager:
+// slide). Each browses a folder on this computer, like a file manager: Open
+// the folder you open presentations from, Save the folder you save them in.
+// They're chosen separately (the same folder or not, "Use <the other one>"
+// is one click), and each is remembered across sessions, along with the
+// subfolder you were last in.
 //
 //   Open:  click a .zip or .pdf to open it ("Or open a single file instead"
 //          for anything outside the folder).
@@ -8,10 +11,9 @@
 //            <name>.zip                        the presentation (reopens at this slide)
 //            <name>.pdf                        the notes PDF
 //            <name>-<yyyy-mm-dd>-<hh-mm>.mp4   recordings (or .webm)
-//          It starts in the folder the presentation came from. "Or download
-//          instead" puts the files in the browser's downloads folder.
-//   Ctrl/⌘+S saves the presentation again, to where it was last saved or
-//          opened from (or asks, the first time).
+//          It starts where the presentation was last saved (or opened from,
+//          when that's inside the save folder), else where you last saved.
+//          "Or download instead" puts the files in the downloads folder.
 //
 // Choosing a folder needs the File System Access API (Chrome, Edge). Other
 // browsers: Open is the file picker and Save downloads.
@@ -28,15 +30,19 @@ import { listRecordings, getRecording, updateRecording, downloadRecording, forma
 
 let appState = null;
 
-// The chosen folder (folder.js), as the browser below sees it.
-const FOLDER = {
-    kind: 'folder', id: 'folder', where: 'your folder', limit: null,
-    get name() { return Folder.rootName() || 'your folder'; },
-    list: path => Folder.list(path),
+// The chosen folders (folder.js), as the browser below sees them: one for
+// Open, one for Save (the same folder or not).
+const folderSource = role => ({
+    kind: 'folder', id: role, role, where: 'your folder', limit: null,
+    get name() { return Folder.rootName(role) || 'your folder'; },
+    list: path => Folder.list(role, path),
     read: entry => Folder.read(entry),
-    write: (files, _msg, onStep) => Folder.write(files, onStep),
+    write: (files, _msg, onStep) => Folder.write(role, files, onStep),
     refresh() {},
-};
+});
+const FOLDERS = { open: folderSource('open'), save: folderSource('save') };
+// Where a target lives ('folder' is from before Open and Save had their own).
+const roleOf = t => (t?.src === 'save' ? 'save' : (t?.src === 'open' || t?.src === 'folder') ? 'open' : null);
 // "Download instead": files go to the browser's downloads folder, one download each.
 const COMPUTER = {
     kind: 'computer', id: 'computer', name: 'this computer', where: 'this computer', limit: null,
@@ -52,7 +58,7 @@ const COMPUTER = {
     refresh() {},
 };
 const NOTES_KEY = 'beamer.library.notes';
-const LOC_KEY = 'beamer.library.where';        // { [source id]: last folder path }
+const LOC_KEY = 'beamer.library.where';        // { open|save: last subfolder browsed there }
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const svg = (d, w = 1.8) => `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
@@ -106,13 +112,7 @@ export function initLibrary(state) {
     setDropHandler((file) => { appState.pendingTarget = null; openPresentationFile(file); });
     bus.on('library:open', () => openPresentation());
     bus.on('deck:loaded', updateTitle);
-    Folder.remembered().catch(() => null);
-    window.addEventListener('keydown', (e) => {
-        if (!(e.ctrlKey || e.metaKey) || e.altKey || e.key.toLowerCase() !== 's') return;
-        e.preventDefault();
-        if (document.querySelector('.custom-modal-overlay')) return;
-        quickSave();
-    }, true);
+    Folder.remembered('open').catch(() => null);
 }
 
 /** The tab's title: the presentation's name. */
@@ -122,8 +122,8 @@ export function updateTitle() {
     document.title = name ? `${name} · Beamer+` : 'Beamer+';
 }
 
-/** The chosen folder's name, for display (or ''). */
-export const folderLabel = () => Folder.rootName();
+/** The name of the folder a target lives in, for display (or ''). */
+export const folderLabel = t => (roleOf(t) ? Folder.rootName(roleOf(t)) : '');
 
 /* ─── the window ──────────────────────────────────────────────── */
 
@@ -136,19 +136,6 @@ export function openPresentation() {
 export function savePresentation() {
     if (!appState.zipFile) return;
     openWindow('save');
-}
-
-/** Ctrl/⌘+S: save the presentation where it was last saved or opened from;
- *  the first time (or without the folder), the Save window. */
-export async function quickSave() {
-    if (!appState.zipFile || saving) return;
-    const t = appState.target;
-    if (t?.src === 'folder' && Folder.supported() && await Folder.remembered()) {
-        let ok = (await Folder.permission()) === 'granted';
-        if (!ok) ok = await Folder.reconnect();          // the key press lets the browser ask
-        if (ok) { saveNow(FOLDER, { deck: true, notes: false, recordings: [] }); return; }
-    }
-    savePresentation();
 }
 
 function openWindow(mode) {
@@ -183,11 +170,9 @@ async function refreshWindow(w) {
     try {
         if (w.local) { drawComputerRow(w); return drawSaveForm(w, COMPUTER, '', [], []); }
         if (!(await drawFolderRow(w))) return;
-        if (w.cwd === null) {
-            const t = appState.target;
-            w.cwd = t && t.src === 'folder' ? t.dir : lastFolder(FOLDER);
-        }
-        await browse(w, FOLDER, w.cwd);
+        const src = FOLDERS[w.mode];
+        if (w.cwd === null) w.cwd = await startFolder(w.mode);
+        await browse(w, src, w.cwd);
     } catch (e) {
         if (e?.name === 'NotFoundError' && w.cwd) { w.cwd = ''; return refreshWindow(w); }   // that folder is gone
         w.body.innerHTML = `<p class="lib-err">${esc(e?.message || e)}</p><p><button type="button" class="lib-btn" data-retry>Try again</button></p>`;
@@ -214,35 +199,64 @@ function drawComputerRow(w) {
     w.srcBox.querySelector('[data-folder-back]')?.addEventListener('click', () => { w.local = false; w.cwd = null; refreshWindow(w); });
 }
 
-// The folder: choose one (the first time), allow it again (after a reload the
-// browser asks once), or change it. True when it's ready to browse.
+// Where a window starts: in the folder the presentation was last saved to
+// or opened from, when that's in this window's folder; otherwise wherever
+// you last were in it (remembered across sessions).
+async function startFolder(role) {
+    const t = appState.target, from = roleOf(t);
+    if (from === role || (from && await Folder.same(from, role))) return t.dir;
+    return lastFolder(FOLDERS[role]);
+}
+
+// This window's folder (Open's or Save's, chosen separately): choose it the
+// first time, allow it again (after the browser restarts it asks once), or
+// change it. True when it's ready to browse.
 async function drawFolderRow(w) {
-    const had = await Folder.remembered();
-    const perm = had ? await Folder.permission() : 'none';
+    const role = w.mode, other = role === 'open' ? 'save' : 'open';
+    const had = await Folder.remembered(role);
+    const perm = had ? await Folder.permission(role) : 'none';
     const choose = async () => {
-        try { if (await Folder.choose()) { w.cwd = ''; refreshWindow(w); } }
+        try { if (await Folder.choose(role)) { w.cwd = ''; refreshWindow(w); } }
         catch (e) { showError('Couldn’t use that folder', e); }
     };
+    const what = role === 'save' ? 'Save to' : 'Open from';
     if (perm === 'granted') {
-        w.srcBox.innerHTML = `<div class="lib-folder">${ICON.folder}<span class="lib-folder-name"></span>
+        w.srcBox.innerHTML = `<div class="lib-folder"><span class="lib-folder-what">${what}</span>${ICON.folder}<span class="lib-folder-name"></span>
             <button type="button" class="lib-link" data-change>Change folder…</button></div>`;
-        w.srcBox.querySelector('.lib-folder-name').textContent = Folder.rootName();
+        w.srcBox.querySelector('.lib-folder-name').textContent = Folder.rootName(role);
         w.srcBox.querySelector('[data-change]').onclick = choose;
         return true;
     }
     if (had) {
-        w.body.innerHTML = `<p>Beamer+ needs your OK to use <b></b> again.</p>
+        w.body.innerHTML = `<p>Beamer+ needs your OK to ${role === 'save' ? 'save in' : 'open from'} <b></b> again.</p>
             <p class="lib-row"><button type="button" class="lib-btn lib-btn--primary" data-allow>${ICON.folder}Allow access</button>
             <button type="button" class="lib-btn" data-choose>Choose another folder…</button></p>`;
-        w.body.querySelector('b').textContent = Folder.rootName();
-        w.body.querySelector('[data-allow]').onclick = async () => { if (await Folder.reconnect()) refreshWindow(w); };
+        w.body.querySelector('b').textContent = Folder.rootName(role);
+        w.body.querySelector('[data-allow]').onclick = async () => { if (await Folder.reconnect(role)) refreshWindow(w); };
         w.body.querySelector('[data-choose]').onclick = choose;
         return false;
     }
-    w.body.innerHTML = `<p>Choose the folder your presentations are in (your course folder, say).
-        Beamer+ ${w.mode === 'save' ? 'saves into it' : 'opens from it'} and remembers it for next time.</p>
-        <p class="lib-row"><button type="button" class="lib-btn lib-btn--primary" data-choose>${ICON.folder}Choose a folder…</button></p>`;
+    // Nothing chosen for this window yet. The other window's folder is one click away.
+    const otherName = (await Folder.remembered(other)) ? Folder.rootName(other) : '';
+    w.body.innerHTML = role === 'save'
+        ? `<p>Choose the folder to save presentations in. Beamer+ remembers it for next time
+            (it can be a different folder from the one you open them from).</p>`
+        : `<p>Choose the folder your presentations are in (your course folder, say).
+            Beamer+ remembers it for next time.</p>`;
+    w.body.insertAdjacentHTML('beforeend', `<p class="lib-row"><button type="button" class="lib-btn lib-btn--primary" data-choose>${ICON.folder}Choose a folder…</button>
+        ${otherName ? `<button type="button" class="lib-btn" data-adopt></button>` : ''}</p>`);
     w.body.querySelector('[data-choose]').onclick = choose;
+    const adopt = w.body.querySelector('[data-adopt]');
+    if (adopt) {
+        adopt.textContent = `Use ${otherName}`;
+        adopt.title = `The folder you ${other === 'open' ? 'open presentations from' : 'save presentations in'}`;
+        adopt.onclick = async () => {
+            if (await Folder.adopt(role, other)) {
+                if ((await Folder.permission(role)) !== 'granted') await Folder.reconnect(role);
+                w.cwd = null; refreshWindow(w);
+            }
+        };
+    }
     return false;
 }
 
@@ -310,7 +324,7 @@ async function takesFor(src, key) {
     let recs = [];
     try { recs = await listRecordings(); } catch { /* none */ }
     const mine = recs.filter(r => (r.lecture === key || !r.lecture)
-        && !(r.uploaded && r.uploaded.repo === src.id))
+        && !r.uploaded)
         .sort((a, b) => a.startedAt - b.startedAt);
     const fits = r => !(src.limit && (r.size || 0) > src.limit);
     return { takes: mine.filter(fits), tooBig: mine.filter(r => !fits(r)) };
@@ -318,7 +332,7 @@ async function takesFor(src, key) {
 
 async function drawSaveForm(w, src, path, dirs, decks) {
     const t0 = appState.target;
-    if (w.name === null) w.name = t0 && t0.src === src.id ? t0.name : (cleanName(appState.deckName) || 'presentation');
+    if (w.name === null) w.name = t0?.name || cleanName(appState.deckName) || 'presentation';
     const { takes, tooBig } = await takesFor(src, t0 ? targetKey(t0) : null);
     const zips = decks.filter(d => /\.zip$/i.test(d.name));
     w.body.innerHTML = `${src.kind === 'computer' ? '' : listHTML(path, dirs, zips, { filesQuiet: true })}

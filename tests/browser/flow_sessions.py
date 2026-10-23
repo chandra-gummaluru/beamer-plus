@@ -1,5 +1,5 @@
 """Walk through the start page (New Session / Last Session), the session menu,
-Open / Save presentation in a folder on this computer, Ctrl+S, recording from
+Open / Save presentation in a folder on this computer, recording from
 the menu, and Last Session bringing a presentation back as it was left.
 
   python app.py --http --port 5001        (in another terminal)
@@ -83,7 +83,7 @@ def run():
         # 2. New Session: the session menu, nothing open yet.
         page.click("#welcome-new-btn"); page.wait_for_url("**/s/**"); page.wait_for_timeout(2200)
         first = sid()
-        check("session button says Session", page.inner_text("#session-btn").strip() == "Session")
+        check("session button names the session", page.inner_text("#session-btn").strip() == f"Session {first}")
         check("no record button in the corner", page.locator("#record-btn").count() == 0)
         open_menu(); shot("s02-menu-empty")
         keys = page.eval_on_selector_all(".session-menu [data-menu]", "els => els.map(e => [e.dataset.menu, e.disabled])")
@@ -104,7 +104,7 @@ def run():
         check(f"…the lecture folder ({items})", items == ["..", f"{DECK}.zip", "06 - Multiplication.pdf"])
         go(f"{DECK}.zip"); page.wait_for_timeout(2500); shot("s05-opened")
         check("deck opened (6 slides)", page.evaluate("() => window.beamerState.totalSlides") == 6)
-        check("session button shows its name", page.inner_text("#session-btn").strip() == DECK)
+        check("session button still names the session", page.inner_text("#session-btn").strip() == f"Session {first}")
         check("tab title", page.title() == f"{DECK} · Beamer+")
         open_menu()
         check("menu head: where it came from", f"in Courses/{L}" in page.inner_text(".session-menu-head"))
@@ -126,25 +126,37 @@ def run():
         check("moving slides updates only the slide", page.evaluate(LAST)["meta"]["slide"] == 1 and page.evaluate(LAST)["deckAt"] == last["deckAt"])
         page.keyboard.press("ArrowRight"); page.wait_for_timeout(1500)
 
-        # 5. Save: starts in the deck's folder with its name; writes it there.
-        menu("save"); page.wait_for_timeout(800); shot("s06-save")
+        # 5. Save has its own folder: the first time, choose one (or use Open's).
+        menu("save"); page.wait_for_timeout(800); shot("s06-save-choose")
+        check("save, first time: choose a folder, or use the Open one",
+              page.locator(".lib [data-choose]").count() == 1 and page.inner_text(".lib [data-adopt]").strip() == "Use Courses")
+        page.evaluate("() => { window.__pick = 'Saves'; }")
+        page.click(".lib [data-choose]"); page.wait_for_timeout(700); shot("s06-save")
+        check("…a different folder for saving", "Save to" in page.inner_text(".lib-folder") and "Saves" in page.inner_text(".lib-folder"))
         crumbs = page.inner_text(".lib-crumbs").replace("\n", " ")
-        check(f"save starts where it came from ({crumbs})", "csc258" in crumbs and "lectures" in crumbs)
-        check("…with its name", page.input_value("[data-name]") == DECK)
+        check(f"…starts at its top (the deck isn't in it) ({crumbs})", crumbs.strip() == "Saves")
+        check("…with the deck's name", page.input_value("[data-name]") == DECK)
         check("…and a way to download instead", page.locator("[data-local]").inner_text().strip() == "Or download instead")
         page.locator(".lib-chip", has_text="Notes").click()            # just the deck
         page.fill("[data-name]", "05 - saved"); page.click("[data-save]"); page.wait_for_timeout(2500)
-        files = page.evaluate(FOLDER_LS)
-        check("saved into the folder", f"{L}/05 - saved.zip" in files)
-        check("…toast says where", "Saved Courses/csc258/lectures/05 - saved.zip" in page.inner_text("#recorder-toast"))
-        check("…button follows the new name", page.inner_text("#session-btn").strip() == "05 - saved")
+        files = page.evaluate(FOLDER_LS, "Saves")
+        check("saved into the save folder", "05 - saved.zip" in files)
+        check("…not the open folder", not any(k.endswith("05 - saved.zip") for k in page.evaluate(FOLDER_LS)))
+        check("…toast says where", "Saved Saves/05 - saved.zip" in page.inner_text("#recorder-toast"))
+        open_menu()
+        check("…menu head follows the new name and folder", "05 - saved · in Saves" in page.inner_text(".session-menu-head"))
+        page.keyboard.press("Escape")
+        # A subfolder of the save folder, saved again: Save starts there next time.
+        menu("save"); page.wait_for_timeout(800)
+        page.evaluate("async () => { const r = await (await navigator.storage.getDirectory()).getDirectoryHandle('Saves'); await r.getDirectoryHandle('csc258', { create: true }); }")
+        menu_refresh = page.locator(".lib-crumb").first; menu_refresh.click(); page.wait_for_timeout(500)
+        go("csc258"); page.click("[data-save]"); page.wait_for_timeout(2500)
+        files = page.evaluate(FOLDER_LS, "Saves")
+        check("saved into a subfolder", "csc258/05 - saved.zip" in files)
 
-        # 6. Ctrl+S saves again, there, without asking.
-        size0 = files[f"{L}/05 - saved.zip"]
-        page.keyboard.press("ArrowRight"); page.wait_for_timeout(400)
-        page.keyboard.press("Control+s"); page.wait_for_timeout(2500)
-        check("Ctrl+S: no window, saved again", page.locator(".lib").count() == 0 and "05 - saved.zip" in page.inner_text("#recorder-toast"))
-        page.keyboard.press("ArrowLeft"); page.wait_for_timeout(400)
+        # 6. No Ctrl+S shortcut: the browser's own (nothing saved, no window).
+        page.keyboard.press("Control+s"); page.wait_for_timeout(1200)
+        check("Ctrl+S does nothing in Beamer+", page.locator(".lib").count() == 0 and page.evaluate(FOLDER_LS, "Saves") == files)
 
         # 7. Record from the menu.
         if not os.environ.get("SKIPREC"):
@@ -168,11 +180,11 @@ def run():
         page.click("#welcome-last-btn"); page.wait_for_url("**/s/**"); page.wait_for_timeout(4500); shot("s10-resumed")
         check("same session code (still on the server)", sid() == first)
         check("…the ?resume is gone from the address", "resume" not in page.url)
-        st = page.evaluate("() => ({ n: window.beamerState.totalSlides, at: window.beamerState.currentSlide, ink: Object.keys(window.beamerState.annotations), name: document.getElementById('session-btn').innerText.trim(), target: window.beamerState.target })")
+        st = page.evaluate("() => ({ n: window.beamerState.totalSlides, at: window.beamerState.currentSlide, ink: Object.keys(window.beamerState.annotations), btn: document.getElementById('session-btn').innerText.trim(), target: window.beamerState.target })")
         print("   resumed:", st)
         check("…deck back, on slide 3", st["n"] == 6 and st["at"] == 2)
         check("…with the ink on slide 2", "1" in st["ink"])
-        check("…and its place in the folder (Save goes back there)", st["name"] == "05 - saved" and st["target"] and st["target"]["dir"] == L)
+        check("…and its place in the folder (Save goes back there)", st["btn"] == f"Session {first}" and st["target"]["name"] == "05 - saved" and st["target"]["src"] == "save" and st["target"]["dir"] == "csc258")
 
         # 9. The server lost that session: Last Session opens it in a new one.
         page.evaluate(SET_LAST_SESSION, "ZZZZZZ")
@@ -181,10 +193,19 @@ def run():
         check("gone from the server: a new session, deck back", sid() not in (first, "ZZZZZZ")
               and page.evaluate("() => window.beamerState.totalSlides") == 6)
 
-        # 10. New Session starts empty (the kept copy stays for Last Session).
+        # 10. New Session starts empty (the kept copy stays for Last Session);
+        #     both folders are remembered, each where you last were in it.
         page.goto(BASE); page.wait_for_timeout(600)
         page.click("#welcome-new-btn"); page.wait_for_url("**/s/**"); page.wait_for_timeout(2500)
         check("New Session: nothing open", not page.evaluate("() => !!window.beamerState.zipFile"))
+        menu("open"); page.wait_for_timeout(800)
+        check("next session, Open: Courses, where I last opened from",
+              "Courses" in page.inner_text(".lib-folder") and page.inner_text(".lib-crumbs").replace("\n", " ").strip() == "Courses › csc258 › lectures")
+        go("06 - Multiplication.pdf"); page.wait_for_timeout(2500)
+        menu("save"); page.wait_for_timeout(800); shot("s11-save-remembered")
+        check("…Save: Saves, where I last saved",
+              "Saves" in page.inner_text(".lib-folder") and page.inner_text(".lib-crumbs").replace("\n", " ").strip() == "Saves › csc258")
+        page.keyboard.press("Escape")
         page.goto(BASE); page.wait_for_timeout(600)
         check("…Last Session still there", not page.locator("#welcome-last-btn").is_disabled())
 

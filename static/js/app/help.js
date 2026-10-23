@@ -82,7 +82,7 @@ export function showHelpModal() {
 <h4 class="help-h">Moving &amp; resizing</h4>
 <p class="help-p">Drag any overlay to reposition it, or drag its bottom-right corner to resize. The Properties panel shows exact position and size. To change what sits in front, drag the items in the slide's <strong>On this slide</strong> list — the top one is in front.</p>
 <h4 class="help-h">Saving your work</h4>
-<p class="help-p">Open the session menu (top-right) and choose <b>Save presentation…</b> (or press Ctrl+S): pick a folder and a file name (or <b>Or download instead</b>, for your downloads folder), and tick what to save: <b>Presentation</b> is a ZIP with all overlays, widgets, and annotations that reopens at the slide you were on; <b>Notes</b> a single PDF to hand out: every visible slide with your annotations drawn on, each widget as it stands now, videos and 3D models as pictures, and poll results; and any <b>Recordings</b>. After that, Ctrl+S saves the presentation to the same place again.</p>
+<p class="help-p">Open the session menu (top-right) and choose <b>Save presentation…</b>: pick a folder and a file name (or <b>Or download instead</b>, for your downloads folder), and tick what to save: <b>Presentation</b> is a ZIP with all overlays, widgets, and annotations that reopens at the slide you were on; <b>Notes</b> a single PDF to hand out: every visible slide with your annotations drawn on, each widget as it stands now, videos and 3D models as pictures, and poll results; and any <b>Recordings</b>.</p>
 <p class="help-p">Even unsaved, your work isn't lost: Beamer+ keeps a copy of the open presentation in this browser as you go, and <b>Last Session</b> on the start page reopens it where you left off.</p>`,
         },
         {

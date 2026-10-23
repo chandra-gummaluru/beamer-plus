@@ -93,26 +93,30 @@ drawing, editing or clicking (and when the tab is hidden or the session ends);
 moving between slides only updates which slide you're on. It's per browser,
 and only the most recent presentation is kept.
 
-The session button (top-right: the open presentation's name, or **Session**)
+The session button (top-right: **Session ABC123**, the session's code)
 is the session menu: **Open a presentation…**, **Edit presentation**, **Save
-presentation…** (Edit and Save once a presentation is open; Ctrl/⌘+S saves
-too), **Start recording…** / **Stop recording**, and **End session** (back to
+presentation…** (Edit and Save once a presentation is open), **Start recording…** / **Stop recording**, and **End session** (back to
 the start page).
 
-## Opening and saving: a folder on this computer
+## Opening and saving: folders on this computer
 
-Open and Save work like a file manager on a folder you choose once (your
-course folder, say; e.g. `csc258 › f26 › lectures` inside it). Beamer+
-remembers it; after a reload the browser asks once to allow it again. Beamer+
-doesn't impose a layout: you choose where things go. **Change folder…** picks
-another. Underneath, **Or open a single file instead** (Open) is the system
-file picker, and **Or download instead** (Save) saves to your browser's
-downloads folder.
+Open and Save work like a file manager, each on a folder you choose once:
+the folder you open presentations from, and the folder you save them in
+(your course folder for both, say, or two different ones; the first time,
+Save offers **Use <the Open folder>** as a one-click choice). Both are
+remembered across sessions, along with the subfolder you were last in; after
+the browser restarts it asks once to allow each again (Chrome's **Allow on
+every visit** skips that). Beamer+ doesn't impose a layout: you choose where
+things go. **Change folder…** picks another. Underneath, **Or open a single
+file instead** (Open) is the system file picker, and **Or download instead**
+(Save) saves to your browser's downloads folder.
 
 - **Open a presentation** lists the folders and the `.zip` / `.pdf` files in
   the one you're in; click one to open it. **Open a presentation** on the empty
   slide, and dropping a file on the window, open one too.
-- **Save presentation** starts in the folder the presentation came from. Pick a
+- **Save presentation** starts where the presentation was last saved (or the
+  folder it was opened from, when that's inside the save folder), otherwise
+  where you last saved. Pick a
   folder, a file name, and tick what to save (Presentation, Notes,
   Recordings); each goes in that folder:
   - `<name>.zip`: the presentation, which reopens at the slide you were on
@@ -120,8 +124,6 @@ downloads folder.
     folder, or the notes replace it)
   - `<name>-<yyyy-mm-dd>-<hh-mm>[-part<n>].mp4` (or `.webm`): recordings not
     saved yet
-- **Ctrl/⌘+S** saves the presentation again to where it was last saved or
-  opened from, without asking (the first time, it opens Save).
 
 Choosing a folder needs the File System Access API (Chrome, Edge). In other
 browsers Open is the file picker and Save downloads.

@@ -1,12 +1,12 @@
-// Top-right: the session menu, behind the session button (the open
-// presentation's name, or "Session").
+// Top-right: the session menu, behind the session button ("Session ABC123",
+// the session's code).
 //
 //   Session ABC123
 //   <presentation> · in <folder>/<subfolder>
 //   ───
 //   Open a presentation…
 //   Edit presentation            (Done editing while editing)
-//   Save presentation…    Ctrl+S
+//   Save presentation…
 //   ───
 //   Start recording…             (Stop recording while recording)
 //   ───
@@ -33,7 +33,6 @@ const ICON = {
     end: svg('<circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/>'),
     chevron: '<svg class="session-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>',
 };
-const isMac = /Mac|iPhone|iPad/.test(navigator.platform || '');
 
 let appState = null;
 let menu = null;
@@ -56,10 +55,10 @@ const deckName = () => appState?.target?.name || (appState?.zipFile ? appState.d
 function refresh() {
     const btn = document.getElementById('session-btn');
     if (!btn) return;
-    const name = deckName();
+    const id = getSessionId() || '';
     btn.innerHTML = `<span class="session-mark">${ICON.session}</span><span class="session-name"></span>${ICON.chevron}`;
-    btn.querySelector('.session-name').textContent = name || 'Session';
-    btn.title = `Session ${getSessionId() || ''}${name ? ` · ${name}` : ''}`;
+    btn.querySelector('.session-name').textContent = id ? `Session ${id}` : 'Session';
+    btn.title = `Session ${id}: open, edit, save, record, end`;
 }
 
 function openMenu(anchor) {
@@ -75,7 +74,7 @@ function openMenu(anchor) {
     const name = deckName();
     if (name) {
         const t = appState.target;
-        const where = t?.src === 'folder' ? [folderLabel(), t.dir].filter(Boolean).join('/') : '';
+        const where = folderLabel(t) ? [folderLabel(t), t.dir].filter(Boolean).join('/') : '';
         const sub = document.createElement('span');
         sub.className = 'session-menu-sub';
         sub.textContent = where ? `${name} · in ${where}` : name;
@@ -90,7 +89,7 @@ function openMenu(anchor) {
     const items = [
         { key: 'open', label: 'Open a presentation…', run: () => openPresentation() },
         { key: 'edit', label: editing ? 'Done editing' : 'Edit presentation', run: toggleEdit, off: !deck },
-        { key: 'save', label: 'Save presentation…', kbd: isMac ? '⌘S' : 'Ctrl+S', run: () => savePresentation(), off: !deck },
+        { key: 'save', label: 'Save presentation…', run: () => savePresentation(), off: !deck },
         { sep: true },
         recording
             ? { key: 'record', icon: 'stop', label: 'Stop recording', run: () => stopRecording() }

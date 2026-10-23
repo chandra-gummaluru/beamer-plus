@@ -47,22 +47,27 @@ def make_zip(pdf):
 
 # showDirectoryPicker() answers with a folder in the browser's private file
 # system (OPFS) instead of opening a dialog; its handles don't do permissions,
-# so those always say yes. Headless Chromium crashes reading an OPFS handle
-# back from IndexedDB, so the remembered folder is stored as a marker and
-# handed back as the handle. FOLDER_RESET empties the folder.
+# so those always say yes; window.__pick names the folder the next pick
+# returns ('Courses' or 'Saves'). Headless Chromium crashes reading an OPFS
+# handle back from IndexedDB, so a remembered folder is stored as a marker
+# and handed back as the handle. FOLDER_RESET empties the folder.
 FAKE_FOLDER = """
 (() => {
-  const folder = () => navigator.storage.getDirectory().then(r => r.getDirectoryHandle('Courses', { create: true }));
-  folder().then(h => { window.__fakeFolder = h; });
-  window.showDirectoryPicker = folder;
+  // The picker hands back 'Courses', or the folder named in window.__pick.
+  const NAMES = ['Courses', 'Saves'];
+  const get = name => navigator.storage.getDirectory().then(r => r.getDirectoryHandle(name, { create: true }));
+  window.__fakeFolders = {};
+  for (const n of NAMES) get(n).then(h => { window.__fakeFolders[n] = h; });
+  window.showDirectoryPicker = () => get(window.__pick || 'Courses');
   const P = FileSystemHandle.prototype;
   P.queryPermission = async () => 'granted';
   P.requestPermission = async () => 'granted';
   const put = IDBObjectStore.prototype.put;
-  IDBObjectStore.prototype.put = function (v, ...rest) { return put.call(this, v instanceof FileSystemHandle ? '__fake_folder__' : v, ...rest); };
+  IDBObjectStore.prototype.put = function (v, ...rest) { return put.call(this, v instanceof FileSystemHandle ? '__fake_folder__:' + v.name : v, ...rest); };
   const res = Object.getOwnPropertyDescriptor(IDBRequest.prototype, 'result');
   Object.defineProperty(IDBRequest.prototype, 'result', { configurable: true,
-    get() { const r = res.get.call(this); return r === '__fake_folder__' ? window.__fakeFolder : r; } });
+    get() { const r = res.get.call(this);
+      return typeof r === 'string' && r.startsWith('__fake_folder__:') ? window.__fakeFolders[r.slice(16)] : r; } });
 })();
 """
 FOLDER_RESET = """async () => { const r = await navigator.storage.getDirectory(); for await (const [n] of r.entries()) await r.removeEntry(n, { recursive: true }); }"""
@@ -76,11 +81,11 @@ FOLDER_PUT = """async (files) => {
     await w.write(Uint8Array.from(atob(b64), c => c.charCodeAt(0))); await w.close();
   }
 }"""
-# Every file in the folder: { path: size }.
-FOLDER_LS = """async () => {
+# Every file in a folder ('Courses' unless named): { path: size }.
+FOLDER_LS = """async (name) => {
   const out = {};
   const walk = async (d, pre) => { for await (const [n, h] of d.entries()) {
     if (h.kind === 'directory') await walk(h, pre + n + '/'); else out[pre + n] = (await h.getFile()).size; } };
-  await walk(await (await navigator.storage.getDirectory()).getDirectoryHandle('Courses', { create: true }), '');
+  await walk(await (await navigator.storage.getDirectory()).getDirectoryHandle(name || 'Courses', { create: true }), '');
   return out;
 }"""

@@ -22,6 +22,7 @@ import { applySlideReorder, removeSlideReorder } from './reorder.js';
 import { initWidgetSettings } from './widget-settings.js';
 import { initNumberSteppers } from './number-stepper.js';
 import { realSlideCount } from '../slides/structure.js';
+import { initPanelResize } from './panel-resize.js';
 import { PAPER_STYLES, PAPER_SPACING, PAPER_THICKNESS, PAPER_COLORS, normalizePaper } from '../slides/paper.js';
 
 /* ─── init ──────────────────────────────────────────────────── */
@@ -30,6 +31,7 @@ export function initEditor(state) {
     ctx.state = state;
     state.editMode = false;
     state.editorNewFiles = {};
+    initPanelResize();
 
     document.getElementById('edit-mode-btn')?.addEventListener('click', toggleEditMode);
     document.getElementById('edit-add-video-btn')?.addEventListener('click', () => pickMediaFile('video', 'video/*'));
