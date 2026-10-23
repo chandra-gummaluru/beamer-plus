@@ -10,7 +10,7 @@ import { Canvas } from './core/canvas.js';
 import { updateWidgetPositions,
          parkWidgets, discardParkedWidgets, clearAllParked, setWidgetStates } from './core/iframe-widget-renderer.js';
 
-import { initToolbar, initToolbarDrag } from './annotations/toolbar.js';
+import { initToolbar } from './annotations/toolbar.js';
 import { initPenSlots } from './annotations/pen-slots.js';
 import { initShapeTools } from './annotations/shape-tools.js';
 import { initTextAnnotations, wireTextCanvas, commitOpenTextEditor,
@@ -158,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initMedia(state);
     initToolbar(state);
     initPenSlots(state);
-    initToolbarDrag();   // after pen slots, so the first clamp sees the full rail
+    // (the toolbar is fixed: docked right; it used to be draggable)
     initShapeTools(state);
     initTextAnnotations(state);
     initUploader(state);
