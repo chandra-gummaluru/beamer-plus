@@ -1,5 +1,5 @@
 // "Open a presentation" and "Save presentation" (the Open and Save buttons,
-// top-right, and the empty slide). Each browses a folder on this computer, like a file manager: Open
+// top-right). Each browses a folder on this computer, like a file manager: Open
 // the folder you open presentations from, Save the folder you save them in.
 // They're chosen separately (the same folder or not, "Use <the other one>"
 // is one click), and each is remembered across sessions, along with the

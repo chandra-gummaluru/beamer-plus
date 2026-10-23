@@ -1,6 +1,5 @@
 // Upload — loading a presentation from a PDF or a saved Beamer+ ZIP.
-// Ways in: clicking the empty slide or "Open a presentation…" in the session
-// menu (openUpload), or dropping the file anywhere on the window. Opening
+// Ways in: the Open button, top-right (openUpload), or dropping the file anywhere on the window. Opening
 // shows the folder browser (library/ui.js registers it here); both route by
 // file type and hand off through bus events, keeping this decoupled from
 // main.js.

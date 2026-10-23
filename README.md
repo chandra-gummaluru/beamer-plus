@@ -21,8 +21,8 @@ python launch.py            # production launcher: HTTPS with a self-signed cert
 ```
 
 Open the `https://...` URL the launcher prints, then **New Session** on the
-welcome screen (or **Last Session** to pick up where you left off; or go
-directly to `/s/{code}/` if you already have a code). Browsers warn about the
+welcome screen (or **Try Demo**; or go directly to `/s/{code}/` if you
+already have a code). Browsers warn about the
 self-signed certificate — click **Advanced → Proceed**. HTTPS is needed so
 camera/microphone widgets work on LAN addresses.
 
@@ -33,12 +33,12 @@ python app.py               # ad-hoc HTTPS cert (needs `cryptography`)
 python app.py --http        # plain HTTP (camera widget disabled on LAN)
 ```
 
-To try the built-in demo presentation (with a guided tour), click **try the
-demo** on the empty slide.
+To try the built-in demo presentation (with a guided tour), click **Try
+Demo** on the welcome screen.
 
 ## Loading a presentation
 
-Click **Open a presentation** on the empty slide, drag the file onto the window, or use the **Open** button (top-right) to load either:
+Use the **Open** button (top-right), or drag the file onto the window, to load either:
 
 - **A plain PDF** — every page becomes a slide.
 - **A presentation ZIP** — a PDF plus saved configuration, media, widgets and
@@ -79,19 +79,9 @@ your folder instead; see below.)
 
 ## Sessions
 
-The welcome screen offers **New Session** (nothing open) and **Last Session**,
-which reopens the presentation you had open last exactly as you left it —
-annotations, edits, widget states and the slide you were on, saved or not. It
-is greyed out until there is something to reopen; underneath, a line says what
-(`Last: <name> · slide 12 of 40 · today, 10:41`). Last Session goes back to the
-same session code when the server still has it (so audience QR codes keep
-working), otherwise to a new one.
-
-While a presentation is open, Beamer+ keeps a copy of it in the browser
-(IndexedDB, `app/last-session.js`): rebuilt a few seconds after you stop
-drawing, editing or clicking (and when the tab is hidden or the session ends);
-moving between slides only updates which slide you're on. It's per browser,
-and only the most recent presentation is kept.
+The welcome screen offers **New Session** (an empty session: the slide just
+says "Nothing here yet…") and **Try Demo** (the demo presentation with a
+guided tour).
 
 Four buttons top-right run the session: **Open**, **Edit**, **Save** (Edit
 and Save once a presentation is open) and **Close session** (back to the

@@ -66,7 +66,7 @@ def create_survey(client, session_id, **payload):
 def test_welcome_page(client):
     resp = client.get('/')
     assert resp.status_code == 200
-    assert b'New Session' in resp.data and b'Last Session' in resp.data
+    assert b'New Session' in resp.data and b'Try Demo' in resp.data
 
 
 def test_session_create_and_presenter_page(client):
