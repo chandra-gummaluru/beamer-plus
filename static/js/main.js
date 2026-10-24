@@ -1638,7 +1638,10 @@ function _leanLeft(pane, w) {
 function _clearTopRightControls(pane, w, h) {
     pane.style.paddingRight = '';
     pane.style.removeProperty('--stage-shift');
-    const ctrls = document.getElementById('top-right-controls');
+    // Editing with a panel open: Done sits at the panel's edge, over the
+    // stage's top-right corner, in place of the session buttons.
+    const editPanel = document.body.classList.contains('edit-mode') && document.body.classList.contains('editor-panel-open');
+    const ctrls = document.getElementById(editPanel ? 'edit-mode-container' : 'top-right-controls');
     const c = ctrls?.getBoundingClientRect();
     if (!c || !c.width || !c.height) return { w, h };   // hidden (focus mode)
     const r  = pane.getBoundingClientRect();

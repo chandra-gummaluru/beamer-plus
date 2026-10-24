@@ -41,6 +41,10 @@ body.edit-mode #edit-mode-container { display: flex; }
     font-size: var(--fs-sm);
     font-weight: 600;
 }
+/* With a panel open, Done moves to the panel's left edge — never over it. */
+body.edit-mode.editor-panel-open #edit-mode-container {
+    right: calc(var(--editor-panel-width) + var(--sp-3));
+}
 #edit-mode-container .btn.is-done:hover {
     background: var(--accent-strong);
     border-color: var(--accent-strong);
@@ -48,15 +52,16 @@ body.edit-mode #edit-mode-container { display: flex; }
 
 /* ─── Hide other UI when edit mode is active ─────────────────── */
 
-body.edit-mode #top-right-controls      { display: none !important; }
+/* Hidden but still laid out: the slide is fitted around these buttons while
+   presenting (main.js, _clearTopRightControls), and keeping their box keeps
+   the slide where it was. Done sits in their place. */
+body.edit-mode #top-right-controls      { visibility: hidden !important; pointer-events: none; }
 body.edit-mode #floating-annotation-toolbar { display: none !important; }
 body.edit-mode #shape-sidebar               { display: none !important; }
 
-/* Make room on the stage at the right for the edit rail — and for the
-   panel, while one is open. */
-body.edit-mode #main-content {
-    padding-right: 64px;
-}
+/* With nothing selected the stage is laid out exactly as when presenting
+   (the edit rail sits where the annotation toolbar does), so entering edit
+   mode doesn't move the slide. A panel takes its width from the stage. */
 body.edit-mode.editor-panel-open #main-content {
     padding-right: var(--editor-panel-width);
 }
@@ -1252,7 +1257,8 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 /* ─── Mobile ─────────────────────────────────────────────────── */
 
 @media (max-width: 1024px) {
-    #edit-mode-container {
+    #edit-mode-container,
+    body.edit-mode.editor-panel-open #edit-mode-container {
         top: var(--sp-2);
         right: var(--sp-2);
     }
