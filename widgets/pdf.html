@@ -5,6 +5,7 @@
 {
   "label": "PDF",
   "category": "Tools",
+  "liveSettings": true,
   "fields": [
     { "key": "pdf", "label": "PDF file", "type": "file", "accept": ".pdf", "folder": "assets" },
     { "key": "title", "label": "Name",            "type": "text",   "placeholder": "Title bar and downloaded file" },
@@ -502,6 +503,11 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
 
   // ── Config ────────────────────────────────────────────────────────────────────
 
+  // Settings arrive live from the pencil dialog, the whole config re-sent on
+  // every edit — so each part is redone only when its own value changed: an
+  // edited Name must not reload the file or throw the reader back to the
+  // start page.
+  let lastRange = null, lastStart = null, lastSocket = null, lastUrl = null, configured = false;
   function applyConfig(cfg) {
     cfg = cfg || {};
     widgetId = cfg.id || cfg.widgetId || widgetId;
@@ -510,20 +516,43 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
     if (cfg.title) docTitle.textContent = cfg.title;
 
     // Page range: [startPage, endPage] (1-based, inclusive)
-    if (Array.isArray(cfg.range) && cfg.range.length === 2) {
-      rangeStart = Math.max(1, cfg.range[0]);
-      rangeEnd   = Math.max(rangeStart, cfg.range[1]);
-    } else {
-      rangeStart = 1;
-      rangeEnd   = Infinity;
+    const rangeKey = JSON.stringify(Array.isArray(cfg.range) && cfg.range.length === 2 ? cfg.range : null);
+    const rangeChanged = rangeKey !== lastRange;
+    if (rangeChanged) {
+      lastRange = rangeKey;
+      if (Array.isArray(cfg.range) && cfg.range.length === 2) {
+        rangeStart = Math.max(1, cfg.range[0]);
+        rangeEnd   = Math.max(rangeStart, cfg.range[1]);
+      } else {
+        rangeStart = 1;
+        rangeEnd   = Infinity;
+      }
+      if (pdfDoc) {
+        rangeEnd   = Math.min(isFinite(rangeEnd) ? rangeEnd : pdfDoc.numPages, pdfDoc.numPages);
+        rangeStart = Math.max(1, Math.min(rangeStart, rangeEnd));
+      }
     }
 
-    // Starting page (1-based, absolute)
-    currentPage = (typeof cfg.page === 'number' && cfg.page >= 1) ? cfg.page : rangeStart;
+    // Starting page (1-based, absolute). Editing it shows that page now.
+    const start = (typeof cfg.page === 'number' && cfg.page >= 1) ? cfg.page : null;
+    const startChanged = start !== lastStart || !configured;
+    configured = true;
+    if (startChanged) {
+      lastStart   = start;
+      currentPage = start ?? rangeStart;
+    }
 
+    if (pdfDoc && (rangeChanged || startChanged)) {
+      currentPage = clampPage(currentPage);
+      renderPage(currentPage);
+      emitState();
+    }
     updateToolbar();
 
-    if (cfg.socketUrl) initSocket(cfg.socketUrl);
+    if (cfg.socketUrl && cfg.socketUrl !== lastSocket) {
+      lastSocket = cfg.socketUrl;
+      initSocket(cfg.socketUrl);
+    }
 
     // Resolve PDF URL — serve relative paths through /api/zip-asset/ so Flask
     // can extract them from _temp_assets (pre-save) or the loaded ZIP (saved).
@@ -547,7 +576,7 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
     if (!/\.pdf$/i.test(sourceName)) sourceName += '.pdf';
     if (btnDownload) btnDownload.disabled = !url;
 
-    if (url) loadPDF(url);
+    if (url && url !== lastUrl) { lastUrl = url; loadPDF(url); }
   }
 
   // ── Download ──────────────────────────────────────────────────────────────────

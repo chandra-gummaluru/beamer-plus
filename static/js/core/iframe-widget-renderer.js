@@ -588,6 +588,7 @@ export function renderWidgets(slideConfig, container, zipFile, viewerMode = fals
         iframe.dataset.widgetId    = w.id;
         iframe.dataset.widgetSlide = slideKey ?? '';   // which slide owns this iframe
         iframe.dataset.widgetSig   = _configSignature(w);
+        iframe.dataset.widgetRole  = viewerMode ? 'viewer' : 'presenter';
 
         iframe.dataset.widgetX      = w.x;
         iframe.dataset.widgetY      = w.y;
@@ -940,6 +941,33 @@ export function postToWidget(widgetId, message) {
     if (!iframe?.contentWindow) return false;
     try { iframe.contentWindow.postMessage(message, '*'); return true; }
     catch (_) { return false; }
+}
+
+/**
+ * Hand a widget its changed settings while it keeps running (a widget whose
+ * schema declares "liveSettings": true — see editor/widget-settings-dialog.js).
+ * Every live copy gets the same payload it was built with, so the widget sees
+ * one full config, never a patch: a key that's gone means "back to default".
+ * Each copy's signature is brought up to date, so the next render reuses the
+ * iframe instead of rebuilding it for a change it already has.
+ */
+export function pushWidgetConfig(widgetId, item) {
+    const id = String(widgetId);
+    let reached = false;
+    document.querySelectorAll(`.widget-iframe[data-widget-id="${CSS.escape(id)}"]`).forEach(iframe => {
+        const config = _withPendingAssets({
+            ...item,
+            ...(iframe.dataset.widgetFull === 'true' ? _FULL_GEOM : {}),
+            ...widgetSessionConfig(),
+            role: iframe.dataset.widgetRole || 'presenter',
+        });
+        try {
+            iframe.contentWindow?.postMessage({ type: 'widget-config', config, live: true }, '*');
+            reached = true;
+        } catch (_) { /* a copy that's mid-teardown */ }
+        iframe.dataset.widgetSig = _configSignature(item);
+    });
+    return reached;
 }
 
 /**

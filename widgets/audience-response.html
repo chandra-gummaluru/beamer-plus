@@ -5,6 +5,7 @@
 {
   "label": "Audience Response",
   "category": "Audience Response",
+  "liveSettings": true,
   "fields": [
     {"key": "responseType", "label": "Question type", "type": "select", "default": "choice", "options": [{"v": "choice", "l": "Multiple choice"}, {"v": "truefalse", "l": "True / False"}, {"v": "rating", "l": "Rating scale"}, {"v": "numeric", "l": "Numeric estimate"}, {"v": "exact", "l": "Numerical answer"}, {"v": "wordcloud", "l": "Word cloud"}, {"v": "fill", "l": "Fill in the blanks"}, {"v": "open", "l": "Open-ended"}], "section": "Question"},
     {"key": "question", "expand": true, "label": "Question text", "type": "textarea", "rows": 4, "placeholder": "Consider the following code:\n\n```python\nx = 5\nif x > 2:\n    x = -3\n```\n\nWhat is `x`?", "note": "Markdown & $LaTeX$"},
@@ -1071,6 +1072,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
 
   let pollKey    = null;     // identity of the running poll; a change starts a new one
   let startToken = 0;        // bumped to discard a create() that lost a race
+  let restartTimer = null;   // a live settings edit's pending new poll (see applyConfig)
   let pollTimer  = null;
   let inflight   = null;
 
@@ -2177,6 +2179,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
 
   async function startPoll() {
     if (IS_VIEWER || !ready()) return;
+    clearTimeout(restartTimer); restartTimer = null;   // Start pressed during a pending live restart
     const token = ++startToken;
     stopPolling();
     try {
@@ -2477,8 +2480,23 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   }
 
   // ── Config ──────────────────────────────────────────────────────────────────
-  function applyConfig(c) {
+  // Two poll identities that differ only in the question's wording.
+  function sameShapeAs(a, b) {
+    try {
+      const x = JSON.parse(a), y = JSON.parse(b);
+      x[1] = y[1] = '';
+      return JSON.stringify(x) === JSON.stringify(y);
+    } catch (_) { return false; }
+  }
+
+  // `live`: a settings edit arriving while the poll may be running (the host's
+  // settings dialog sends the whole config on every change, a few hundred ms
+  // apart while typing). Everything outside the poll's identity — layout,
+  // timer, correct answer, revealed value, autoStart, AI options — simply
+  // applies in place. An identity change is handled in the block below.
+  function applyConfig(c, live = false) {
     if (!c) return;
+    const prevAuto = cfg.autoStart !== false;
     cfg       = { ...cfg, ...c };
     WIDGET_ID = cfg.id || cfg.widgetId || WIDGET_ID;
     IS_VIEWER = cfg.role === 'viewer' || IS_VIEWER;
@@ -2493,14 +2511,32 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     if (!canReveal) S.revealed = false;
 
     const key = pollIdentity(S.type, S.question, S.options, S.scale, S.unit, S.words, S.template);
-    if (key !== pollKey) {
+    if (key !== pollKey && live && S.total > 0 && sameShapeAs(key, pollKey)) {
+      // Rewording a question that already has answers — a typo fix, mostly.
+      // Keep the answers: they still answer it. Phones that already joined
+      // keep the old wording; anyone joining now gets it too, since the
+      // survey on the server isn't rewritten.
+      pollKey = key;
+      if (S.phase !== 'idle') recompute();
+    } else if (key !== pollKey) {
+      // A different question (type, options, scale…): the old answers don't
+      // fit it, so the old poll closes and a new one — new QR — opens. While
+      // the presenter is still typing, the new poll waits until they pause,
+      // rather than creating a survey per keystroke burst.
       pollKey = key;
       startToken++;
+      clearTimeout(restartTimer); restartTimer = null;
       closeOnServer(S.phase === 'collect' ? S.surveyId : null);
       resetPoll();
-      if (ready() && cfg.autoStart !== false) startPoll();
-    } else if (S.phase !== 'idle') {
-      recompute();   // e.g. the words-per-response setting changes the tallies
+      if (ready() && cfg.autoStart !== false) {
+        if (live) restartTimer = setTimeout(() => { restartTimer = null; startPoll(); }, 700);
+        else startPoll();
+      }
+    } else {
+      if (S.phase !== 'idle') recompute();   // e.g. the words-per-response setting changes the tallies
+      // Auto-start just switched on, with nothing collecting yet: start now,
+      // as the slide would have on open.
+      if (live && !prevAuto && cfg.autoStart !== false && S.phase === 'idle' && ready()) startPoll();
     }
     // Timer edited mid-poll: keep the clock where it is, just change what it
     // does — switching to a countdown already past its length closes at once.
@@ -2513,6 +2549,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
     stopPolling();
     stopTicking();
     startToken++;
+    clearTimeout(restartTimer); restartTimer = null;
     clearTimeout(syncTimer);
     if (socket && socket.disconnect) socket.disconnect();
     socket = null; socketUrlInUse = null;
@@ -2574,7 +2611,7 @@ body.is-presenter .resp:hover { border-color: var(--text-3); }
   // ── Beamer+ message bridge ──────────────────────────────────────────────────
   window.addEventListener('message', e => {
     const d = e.data || {};
-    if (d.type === 'widget-config')  applyConfig(d.config);
+    if (d.type === 'widget-config')  applyConfig(d.config, !!d.live);
     if (d.type === 'widget-cleanup') destroy();
     if (d.type === 'widget-get-state') {
       window.parent.postMessage({ type: 'widget-state', widgetId: WIDGET_ID, state: getState() }, '*');

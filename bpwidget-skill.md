@@ -75,6 +75,13 @@ Name, Text size and layout — every widget is self-contained).
 - `category` — one of: `Tools`, `Mathematics`, `Computer Science`, `Audience Response`.
   Add a new one only if none fits.
 - `fontSize: false` — opt out of the host's font-size control (e.g. `map.html`).
+- `liveSettings: true` — the widget applies setting changes while it runs. The
+  presenter edits settings in a sheet opened from the pencil on the widget; with
+  this flag each change arrives as a fresh `widget-config` message (full config,
+  `live: true`) as they type, and the widget must update in place without losing
+  its runtime state. Without it, the widget is rebuilt when the sheet closes.
+- `"rebuild": true` on a field — that one field can't be applied live (e.g. a
+  different notebook file); changing it rebuilds the widget when the sheet closes.
 - `modes: ["full", "overlay"]` — how the widget can be shown; the first is the
   default when it's added. **Full** is the slide's content: the box is pinned to the
   whole slide and the widget has the shared bar. **Overlay** is a small tool laid over

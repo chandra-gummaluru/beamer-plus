@@ -877,9 +877,13 @@
         var utils = el('div', 'bw-topbar-utils');
 
         if (hasOwnSettings()) {
-            utils.appendChild(makeBtn({
+            // Discreet: it only shows while the pointer is over the widget
+            // (widget-base.css), so the room never sees it mid-talk.
+            var pencil = makeBtn({
                 variant: 'icon', title: 'Widget settings', icon: PENCIL_ICON, onClick: editSettings,
-            }));
+            });
+            pencil.classList.add('bw-edit-btn');
+            utils.appendChild(pencil);
         }
 
         if (!(schema && schema.fontSize === false)) {
@@ -1372,7 +1376,13 @@
             return;
         }
         if (d.type === 'widget-config' && d.config) {
+            // A live settings change carries the config item, not what the
+            // renderer adds at build time — keep the pre-loaded notebook.
+            var prevNb = cfg().notebookContent;
             window.WIDGET_CONFIG = d.config;
+            if (d.live && prevNb !== undefined && d.config.notebookContent === undefined) {
+                window.WIDGET_CONFIG.notebookContent = prevNb;
+            }
             applyScale();
             syncScaleButtons();
             if (titleEl) titleEl.textContent = barTitle();

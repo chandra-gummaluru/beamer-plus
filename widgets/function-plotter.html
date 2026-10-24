@@ -7,6 +7,7 @@
   "category": "Mathematics",
   "modes": ["full", "overlay"],
   "overlaySize": { "width": 0.45, "height": 0.55 },
+  "liveSettings": true,
   "fields": [
     { "key": "mode", "label": "Open in", "type": "select",
       "options": [{ "v": "2d", "l": "2D — curves y = f(x)" },
@@ -1835,15 +1836,24 @@ function applyState(s) {
 // ─────────────────────────────────────────────────────────
 // Beamer+ config / postMessage bridge
 // ─────────────────────────────────────────────────────────
-let appliedFunctions = null, appliedRange = null;
+// Settings arrive live from the pencil dialog, the whole config re-sent on
+// every edit: each one is applied only when its value changed, so editing one
+// setting never undoes what the presenter has done with the others since
+// (typed functions, a toggled mode, a panned view).
+let appliedFunctions = null, appliedRange = null, appliedExprs = null,
+    appliedBox = null, appliedMode = null, appliedSocket = null, configured = false;
 function applyConfig(cfg) {
   if (!cfg) return;
+  const booting = !configured;
+  configured = true;
   if (cfg.viewer || IS_VIEWER) {
     document.body.classList.add('is-viewer');
     canvas.classList.add('viewer');
     resize();
   }
-  if (cfg.expressions?.length) {
+  const exprKey = JSON.stringify([cfg.expressions || null, cfg.colors || null]);
+  if (cfg.expressions?.length && exprKey !== appliedExprs) {
+    appliedExprs = exprKey;
     cfg.expressions.forEach((e, i) => {
       const color = (cfg.colors || [])[i] || null;
       addExpression(e, color);
@@ -1872,12 +1882,23 @@ function applyConfig(cfg) {
     appliedRange = cfg.range;
     xmin = -r; xmax = r; ymin = -r; ymax = r;
   }
-  if (cfg.xmin != null) { xmin = cfg.xmin; xmax = cfg.xmax; ymin = cfg.ymin; ymax = cfg.ymax; }
+  const boxKey = JSON.stringify([cfg.xmin, cfg.xmax, cfg.ymin, cfg.ymax]);
+  if (cfg.xmin != null && boxKey !== appliedBox) {
+    appliedBox = boxKey;
+    xmin = cfg.xmin; xmax = cfg.xmax; ymin = cfg.ymin; ymax = cfg.ymax;
+  }
   if (cfg.showGrid   != null) { showGrid   = cfg.showGrid;   document.getElementById('btn-grid').classList.toggle('is-active', showGrid); }
   if (cfg.showLabels != null) { showLabels = cfg.showLabels; document.getElementById('btn-labels').classList.toggle('is-active', showLabels); }
-  if (cfg.mode === '3d' || cfg.mode === '2d') setMode(cfg.mode, true);
-  if (cfg.socketUrl) initSocket(cfg.socketUrl);
+  if ((cfg.mode === '3d' || cfg.mode === '2d') && cfg.mode !== appliedMode) {
+    appliedMode = cfg.mode;
+    setMode(cfg.mode, true);
+  }
+  if (cfg.socketUrl && cfg.socketUrl !== appliedSocket) {
+    appliedSocket = cfg.socketUrl;
+    initSocket(cfg.socketUrl);
+  }
   plot();
+  if (!booting && !IS_VIEWER) emitState();
 }
 
 window.addEventListener('message', (e) => {

@@ -487,6 +487,16 @@ body.bw-overlay:hover .bw-edit-float,
 body.bw-partial:hover .bw-edit-float,
 .bw-edit-float:focus-visible { opacity: 1; }
 
+/* The pencil in the bar: the same discretion — hidden until the pointer is
+   over the widget, so it never shows to the room while presenting. */
+.bw-edit-btn {
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+body:hover .bw-edit-btn,
+.bw-edit-btn:focus-visible { opacity: 1; }
+@media (hover: none) { .bw-edit-btn { opacity: 1; } }
+
 /* Widgets no longer show a title in the top-left of their bar.
    The title node stays in the DOM (widgets and setTitle() still write to it)
    but is never drawn, and neither is the separator that used to follow it.

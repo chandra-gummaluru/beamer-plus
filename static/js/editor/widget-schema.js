@@ -88,6 +88,8 @@ async function loadSchema(item) {
     return {
         label: typeof schema?.label === 'string' ? schema.label : null,
         customSettings: !!schema?.customSettings,
+        // Takes setting changes while running (widget-settings-dialog.js).
+        liveSettings: schema?.liveSettings === true,
         // Only works as the whole slide (a notebook, a workspace, a circuit
         // canvas): the editor locks its box to fill the slide.
         fullSlide: schema?.fullSlide === true,

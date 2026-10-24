@@ -7,6 +7,7 @@
   "category": "Tools",
   "modes": ["full", "overlay"],
   "overlaySize": { "width": 0.26, "height": 0.2 },
+  "liveSettings": true,
   "fields": [
     { "key": "mode",      "label": "Mode",       "type": "select", "options": [{"v":"countdown","l":"Countdown"},{"v":"stopwatch","l":"Stopwatch"}], "default": "countdown" },
     { "key": "duration",  "label": "Duration",   "type": "duration", "min": 5, "default": 300, "showIf": { "mode": "countdown" } },
@@ -653,27 +654,59 @@ body.bw-overlay.is-presenter #clock.is-editable .unit { cursor: ns-resize; }
 
   // ── Config ──────────────────────────────────────────────────────────────────
   let lastMode = null, lastDur = null;
+  const OWN_KEYS = ['mode', 'duration', 'format', 'progress', 'onLeave', 'autoStart'];
   function applyConfig(c) {
     if (!c) return;
     const prevUrl = cfg.socketUrl;
     cfg = { ...cfg, ...c };
+    // A full config (the host's) is authoritative: a setting put back to its
+    // default is absent from it, and the merge would otherwise keep the old one.
+    if (c.id != null || c.widgetId != null) OWN_KEYS.forEach(k => { if (!(k in c)) delete cfg[k]; });
     WIDGET_ID = cfg.id || cfg.widgetId || WIDGET_ID;
     IS_VIEWER = cfg.role === 'viewer' || IS_VIEWER;
-    // Only a changed setting is adopted, so re-sent config never interrupts
-    // a running clock.
-    if ((cfg.mode === 'countdown' || cfg.mode === 'stopwatch') && cfg.mode !== lastMode) {
-      lastMode = cfg.mode;
-      if (!S.running) { S.mode = cfg.mode; S.elapsed = 0; S.expired = false; }
+    // Settings arrive live from the pencil dialog, and the whole config is
+    // re-sent on every edit — so only a setting that actually changed is
+    // adopted, and re-sent config never interrupts a running clock. The first
+    // pass (lastMode/lastDur still null) is the widget booting, not an edit.
+    const booting = lastMode === null;
+    let changed = false;
+    // Absent = the schema default (a field put back to it may be dropped).
+    const wantMode = cfg.mode === 'stopwatch' ? 'stopwatch' : 'countdown';
+    if (wantMode !== lastMode) {
+      lastMode = wantMode;
+      // Picking the other mode is asking for a different clock: it starts
+      // fresh, even if this one was running.
+      if (S.mode !== wantMode && (!S.running || !booting)) {
+        if (S.running) stop();
+        S.mode = wantMode; S.elapsed = 0; S.expired = false;
+        changed = true;
+      }
     }
-    minutesOnly = cfg.format === 'minutes';
-    ringStyle   = cfg.progress === 'ring';
-    const d = Number(cfg.duration);
+    const fmt = cfg.format === 'minutes', ring = cfg.progress === 'ring';
+    if (fmt !== minutesOnly || ring !== ringStyle) shapeKey = '';
+    minutesOnly = fmt;
+    ringStyle   = ring;
+    const d = Number(cfg.duration ?? 300);
     if (d > 0 && d !== lastDur) {
+      const firstDur = lastDur === null;
       lastDur = d;
-      if (isIdle()) S.duration = Math.max(MIN_MS, Math.min(MAX_MS, d * 1000));
+      const ms = Math.max(MIN_MS, Math.min(MAX_MS, d * 1000));
+      if (isIdle()) { S.duration = ms; changed = true; }
+      else if (!firstDur && S.mode === 'countdown') {
+        // A new duration mid-countdown keeps the time already run and moves
+        // the finish line; one already passed ends the clock now.
+        S.duration = ms;
+        if (S.elapsed >= S.duration) {
+          S.elapsed = S.duration;
+          if (S.running) stop();
+          if (!S.expired) expire();
+        }
+        changed = true;
+      }
     }
     if (cfg.socketUrl && cfg.socketUrl !== prevUrl) initSocket(cfg.socketUrl);
     render();
+    if (changed && !booting && !IS_VIEWER) emitState(true);
   }
 
   function destroy() {

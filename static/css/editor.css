@@ -291,7 +291,6 @@ body.edit-mode #editor-panel { display: flex; }
     color: var(--ink-1);
     cursor: pointer;
 }
-.wf--modal .editor-prop-checkbox-row { min-height: 34px; font-size: var(--fs-base); }
 
 /* Textareas share the input's box, minus its fixed single-line height. */
 .editor-prop-area {
@@ -831,13 +830,6 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
     margin-bottom: 2px;
 }
 #editor-widget .wf-group + .wf-group { padding-top: var(--sp-1); }
-/* Under the list: where the widget's own settings are (its pencil). */
-#editor-widget .wp-own-note {
-    margin: var(--sp-4) 0 0;
-    font-size: var(--fs-sm);
-    color: var(--ink-3);
-    line-height: 1.45;
-}
 
 /* Text boxes keep their size — no drag handle. Long ones grow with their
    text, and a field with "expand" opens in the large editor. */
@@ -1240,7 +1232,6 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
     color: var(--ink-1);
     padding: 0;
 }
-.wf--modal .editor-prop-file-btn { min-height: 34px; font-size: var(--fs-sm); }
 
 /* Blank-slide paper settings: the same rows as the settings above. */
 #slide-paper-settings, #paper-options { display: flex; flex-direction: column; gap: var(--sp-3); }
@@ -1590,43 +1581,221 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 @keyframes wf-cc-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 .wf-list-add[hidden] { display: none; }
 
-/* ─── A widget's own settings dialog (editor/widget-settings-dialog.js) ──
-   Opened from the pencil in the widget's top bar. Two columns of cards: long
-   content (a question, an answer list, a template) on the left, short
-   settings on the right (buildWidgetForm's 'modal' variant); one column when
-   there's only one kind. */
-.custom-modal-content.widget-settings-modal {
-    max-width: min(920px, 94vw);
-    width: 94vw;
-    text-align: left;
-    max-height: 90vh;
+/* ─── A widget's own settings sheet (editor/widget-settings-dialog.js) ───
+   Opened from the pencil on the widget. Docked to the right of the window,
+   over the tool rail, so the slide — and the widget changing as you edit —
+   stays in view. One column: headed groups separated by a hairline, labels
+   as sentences, every control the same height. */
+.wsheet {
+    --wsheet-w: 384px;
+    --wsheet-ctl: 34px;
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    bottom: 12px;
+    z-index: 1100;
+    width: min(var(--wsheet-w), calc(100vw - 24px));
     display: flex;
     flex-direction: column;
-}
-.widget-settings-modal:has(.wf--modal.is-single) { max-width: min(560px, 94vw); }
-.widget-settings-modal .custom-modal-title { text-align: left; }
-.widget-settings-modal .custom-modal-body { overflow-y: auto; min-height: 0; padding-right: 2px; }
-.wf--modal {
-    display: grid;
-    grid-template-columns: minmax(0, 1.75fr) minmax(250px, 1fr);
-    align-items: start;
-    gap: var(--sp-4);
-}
-.wf--modal.is-single { grid-template-columns: minmax(0, 1fr); }
-.wf-col { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
-.wf--modal .wf-group {
-    padding: var(--sp-4);
-    background: var(--surface-cream);
+    background: var(--surface-paper);
     border: var(--line-soft);
-    border-radius: var(--r-md);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-pop);
+    font-family: var(--font-sans);
+    color: var(--ink-1);
+    opacity: 0;
+    transform: translateX(16px);
+    transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-slow) var(--ease-out);
+    pointer-events: none;
 }
-.wf--modal .wf-group[hidden],
-.wf-col[hidden] { display: none; }
-@media (max-width: 820px) {
-    .wf--modal { grid-template-columns: minmax(0, 1fr); }
+.wsheet.is-open { opacity: 1; transform: none; pointer-events: auto; }
+/* The stage makes room for it, as for the editor's panel. The tool rail
+   stays where it is, under the sheet, until the sheet closes. */
+body.wsheet-open #main-content { padding-right: 408px; }
+
+.wsheet-head {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-3);
+    padding: var(--sp-5) var(--sp-5) var(--sp-4);
+    border-bottom: var(--line-soft);
 }
-.wf--modal .editor-prop-input,
-.wf--modal .editor-prop-select { min-height: 34px; font-size: var(--fs-base); }
-.wf--modal .wf-mono,
-.wf--modal .wf-code-mirror,
-.wf--modal .wf-code-input { font-size: 13.5px; }
+.wsheet-titles { flex: 1 1 auto; min-width: 0; }
+.wsheet-title {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: var(--fs-xl);
+    font-weight: 500;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    color: var(--ink-1);
+    overflow-wrap: anywhere;
+}
+.wsheet-kind { margin-top: 2px; font-size: var(--fs-sm); color: var(--ink-3); }
+.wsheet-close {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    margin: -4px -6px 0 0;
+    padding: 0;
+    border: none;
+    border-radius: var(--r-sm);
+    background: none;
+    color: var(--ink-3);
+    cursor: pointer;
+    transition: background var(--dur-fast), color var(--dur-fast);
+}
+.wsheet-close:hover { background: var(--surface-cream-2); color: var(--ink-1); }
+.wsheet-close:focus-visible,
+.wsheet-done:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.wsheet-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: var(--sp-5);
+    scrollbar-width: thin;
+    scrollbar-color: oklch(86% 0.005 260) transparent;
+}
+
+.wsheet-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-5);
+    border-top: var(--line-soft);
+}
+.wsheet-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: var(--fs-xs);
+    color: var(--ink-3);
+}
+.wsheet-live-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: oklch(62% 0.14 150);
+    box-shadow: 0 0 0 3px oklch(62% 0.14 150 / 0.16);
+}
+.wsheet-done {
+    min-height: 32px;
+    padding: 0 var(--sp-4);
+    border: 1px solid var(--ink-1);
+    border-radius: var(--r-sm);
+    background: var(--ink-1);
+    color: var(--ink-on-accent);
+    font-family: var(--font-sans);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--dur-fast), border-color var(--dur-fast);
+}
+.wsheet-done:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
+
+/* The form: groups as sections, not cards. */
+.wsheet .wf { gap: 0; }
+.wsheet .wf-group { gap: var(--sp-3); }
+.wsheet .wf-group:not([hidden]) ~ .wf-group:not([hidden]) {
+    margin-top: var(--sp-5);
+    padding-top: var(--sp-5);
+    border-top: var(--line-soft);
+}
+.wsheet .wf-group-title {
+    padding: 0;
+    border: none;
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+}
+.wsheet .wf-group-body { gap: var(--sp-4); }
+.wsheet .editor-prop-row { gap: 6px; }
+.wsheet .editor-prop-label {
+    font-size: var(--fs-sm);
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--ink-1);
+}
+.wsheet .editor-prop-label-note { font-size: var(--fs-xs); color: var(--ink-3); }
+
+/* Every control: same height, same border, same focus ring. */
+.wsheet .editor-prop-input,
+.wsheet .editor-prop-select {
+    min-height: var(--wsheet-ctl);
+    padding: 6px 10px;
+    font-size: var(--fs-base);
+    border-color: oklch(87% 0.005 260);
+    background: var(--surface-paper);
+}
+.wsheet .editor-prop-input:hover,
+.wsheet .editor-prop-select:hover { border-color: oklch(78% 0.006 260); }
+.wsheet .editor-prop-input:focus,
+.wsheet .editor-prop-select:focus,
+.wsheet .wf-code:focus-within {
+    border-color: var(--ink-2);
+    box-shadow: 0 0 0 3px oklch(45% 0.005 260 / 0.10);
+}
+.wsheet textarea.editor-prop-input { resize: none; line-height: 1.5; }
+.wsheet .editor-prop-select[hidden] { display: none; }
+/* Dropdowns drawn to match the inputs, with a quiet chevron. */
+.wsheet .editor-prop-select {
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 32px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23777' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    cursor: pointer;
+}
+/* Short settings stack under their label, full width; only a switch sits
+   beside its label. */
+.wsheet .editor-prop-row--inline { flex-direction: column; align-items: stretch; }
+.wsheet .editor-prop-row--inline > .editor-prop-select,
+.wsheet .editor-prop-row--inline > .editor-prop-input,
+.wsheet .editor-prop-select { width: 100%; max-width: none; align-self: stretch; }
+.wsheet .editor-prop-checkbox-row {
+    min-height: var(--wsheet-ctl);
+    padding: 0;
+    border: none;
+    background: none;
+    font-size: var(--fs-sm);
+    font-weight: 500;
+    color: var(--ink-1);
+}
+.wsheet .wf-seg { padding: 3px; }
+.wsheet .wf-seg-btn { min-height: 28px; }
+.wsheet .wf-duration-part { flex: 1 1 0; }
+.wsheet .num-stepper { min-height: var(--wsheet-ctl); }
+.wsheet .editor-prop-file-btn { min-height: var(--wsheet-ctl); }
+.wsheet .wf-mono,
+.wsheet .wf-code-mirror,
+.wsheet .wf-code-input { font-size: 13px; }
+
+/* Answer lists: the row inputs at the same height as everything else. */
+.wsheet .wf-list { gap: var(--sp-2); }
+.wsheet .wf-list-input { min-height: var(--wsheet-ctl); }
+
+/* The widget the sheet is editing. */
+.widget-iframe.is-being-configured {
+    outline: 2px solid oklch(45% 0.005 260 / 0.35);
+    outline-offset: 3px;
+    border-radius: 2px;
+}
+
+@media (max-width: 640px) {
+    body.wsheet-open #main-content { padding-right: 0; }
+    .wsheet { top: auto; left: 8px; right: 8px; bottom: 8px; width: auto; max-height: 72vh; transform: translateY(16px); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .wsheet { transition: none; transform: none; }
+}

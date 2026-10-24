@@ -7,6 +7,7 @@
 {
   "label": "Circuit Simulator",
   "fullSlide": true,
+  "liveSettings": true,
   "category": "Engineering",
   "fields": [
     { "key": "circuit", "expand": true, "label": "Starting circuit", "type": "textarea", "mono": true, "rows": 4,
@@ -3926,54 +3927,92 @@ function App() {
      written to the browser's saved-parts registry, so a slide can't quietly
      add clutter to someone's local palette. They're registered *before* the
      board circuit loads, since that circuit may place them. */
-  const configuredRef = useRef(false);
+  // Settings apply live (the schema's liveSettings): the host re-sends the
+  // whole config on every edit and never rebuilds this iframe for one, so
+  // each call compares against what was last applied and touches only the
+  // keys that changed. Re-sending an unchanged config is a no-op — which is
+  // what keeps a saved or hand-built board from being wiped by the starting
+  // circuit every time the presenter nudges some other setting.
+  const appliedRef = useRef(null);      // key → JSON of the value last applied
+  const configKindsRef = useRef([]);    // palette kinds that came from `parts`
   const applyConfig = useCallback((cfg)=>{
-    if (!cfg || configuredRef.current) return;
-    configuredRef.current = true;
+    if (!cfg) return;
     const asObject = (v)=>{
       if (!v) return null;
       if (typeof v === 'object') return v;
       try { return JSON.parse(String(v)); } catch { return null; }
     };
+    const first = appliedRef.current === null;
+    const prev = appliedRef.current || {};
+    const next = {};
+    const changed = (k)=>{
+      let j; try { j = JSON.stringify(cfg[k] ?? null); } catch { j = String(cfg[k]); }
+      next[k] = j;
+      return first || prev[k] !== j;
+    };
+    const KEYS = ['running', 'showParts', 'showTiming', 'hop', 'hopMs', 'parts', 'circuit'];
+    const dirty = Object.fromEntries(KEYS.map(k=>[k, changed(k)]));
+    appliedRef.current = next;
 
-    if (cfg.running === false) setRunning(false);
     const flag = (v)=> v === true || v === 'true' ? true : v === false || v === 'false' ? false : null;
-    if (flag(cfg.showParts)  !== null) setPartsOpen(flag(cfg.showParts));
-    if (flag(cfg.showTiming) !== null) setTimingOpen(flag(cfg.showTiming));
-    const hopSec = typeof cfg.hop === 'string' ? parseFloat(cfg.hop) : cfg.hop;
-    const wanted = typeof cfg.hopMs === 'number' ? cfg.hopMs
-                 : (Number.isFinite(hopSec) ? hopSec*1000 : null);
-    if (wanted) {
-      // Snap to an offered rate so the toolbar's segmented control still
-      // shows which one is active.
-      const best = HOP_CHOICES.reduce((a,b)=>Math.abs(b.ms-wanted)<Math.abs(a.ms-wanted)?b:a);
-      setHopMs(best.ms);
+    // On load only an explicit false halts it (the default is running); a
+    // live edit sets it either way, so ticking the box starts the clock.
+    if (dirty.running) {
+      if (first) { if (flag(cfg.running) === false) setRunning(false); }
+      else if (flag(cfg.running) !== null) setRunning(flag(cfg.running));
     }
-
-    const parts = asObject(cfg.parts) || [];
-    const added = [];
-    for (const p of (Array.isArray(parts) ? parts : [])) {
-      try {
-        let name = p.name, data = asObject(p.data || p.circuit);
-        if (!data && p.equation) {
-          const built = buildEquationCircuit(p.equation);
-          if (built.error) throw new Error(built.error);
-          data = built.data;
-          name = name || built.outputLabel;
-        }
-        if (!data || !name) throw new Error('needs a name plus either data or equation');
-        added.push(gates.registerCustomGate(name, data));
-      } catch (err) {
-        console.warn('[circuit] slide config: skipping part', p && p.name, '—', err.message);
+    if (dirty.showParts  && flag(cfg.showParts)  !== null) setPartsOpen(flag(cfg.showParts));
+    if (dirty.showTiming && flag(cfg.showTiming) !== null) setTimingOpen(flag(cfg.showTiming));
+    if (dirty.hop || dirty.hopMs) {
+      const hopSec = typeof cfg.hop === 'string' ? parseFloat(cfg.hop) : cfg.hop;
+      const wanted = typeof cfg.hopMs === 'number' ? cfg.hopMs
+                   : (Number.isFinite(hopSec) ? hopSec*1000 : null);
+      if (wanted) {
+        // Snap to an offered rate so the toolbar's segmented control still
+        // shows which one is active.
+        const best = HOP_CHOICES.reduce((a,b)=>Math.abs(b.ms-wanted)<Math.abs(a.ms-wanted)?b:a);
+        setHopMs(best.ms);
       }
     }
-    if (added.length) setCustomKinds(prev=>[...new Set([...prev, ...added])]);
 
-    const board = asObject(cfg.circuit);
-    if (board && Array.isArray(board.components)) {
-      circuit.load(board);
-      circuit.resetSim();
-      hist.current = { stack:[JSON.stringify(circuit.serialize())], idx:0 };
+    if (dirty.parts) {
+      const parts = asObject(cfg.parts) || [];
+      const added = [];
+      for (const p of (Array.isArray(parts) ? parts : [])) {
+        try {
+          let name = p.name, data = asObject(p.data || p.circuit);
+          if (!data && p.equation) {
+            const built = buildEquationCircuit(p.equation);
+            if (built.error) throw new Error(built.error);
+            data = built.data;
+            name = name || built.outputLabel;
+          }
+          if (!data || !name) throw new Error('needs a name plus either data or equation');
+          added.push(gates.registerCustomGate(name, data));
+        } catch (err) {
+          console.warn('[circuit] slide config: skipping part', p && p.name, '—', err.message);
+        }
+      }
+      // Swap the config's parts for the new list. A dropped part leaves the
+      // palette, but its gate stays registered, so copies already placed on
+      // the board keep working.
+      const old = configKindsRef.current;
+      configKindsRef.current = added;
+      if (added.length || old.length) {
+        setCustomKinds(prevKinds=>[...new Set([...prevKinds.filter(k=>!old.includes(k)), ...added])]);
+      }
+    }
+
+    // A new starting circuit replaces what's on the board: pasting one is an
+    // explicit "show this instead". Unchanged, it's left alone, so the live
+    // board (and the saved state that overrode it on load) survives.
+    if (dirty.circuit) {
+      const board = asObject(cfg.circuit);
+      if (board && Array.isArray(board.components)) {
+        circuit.load(board);
+        circuit.resetSim();
+        hist.current = { stack:[JSON.stringify(circuit.serialize())], idx:0 };
+      }
     }
     refresh();
   },[circuit, refresh]);

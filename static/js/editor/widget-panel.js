@@ -14,7 +14,7 @@
 // Delete on the slide.)
 import { buildWidgetForm } from './widget-fields.js';
 import { widgetDisplay, setWidgetDisplay } from './widget-schema.js';
-import { GENERAL_KEYS, ownFields } from './widget-settings-dialog.js';
+import { GENERAL_KEYS } from './widget-settings-dialog.js';
 
 const near = (a, b) => Math.abs((a ?? 0) - b) < 0.005;
 const isFullBox = (it) => near(it.x, 0) && near(it.y, 0) && near(it.width ?? 1, 1) && near(it.height ?? 1, 1);
@@ -47,14 +47,6 @@ export function renderWidgetPanel(host, item, schema, { onLayout, onName } = {})
     const layoutBody = layout.node.querySelector('.wf-group-body');
     while (layoutBody.firstChild) body.appendChild(layoutBody.firstChild);
     host.appendChild(form.node);
-
-    // Where its own settings are.
-    if (ownFields(schema).length) {
-        const note = document.createElement('p');
-        note.className = 'wp-own-note';
-        note.textContent = 'Its own settings: the pencil in the widget’s top bar, while presenting.';
-        host.appendChild(note);
-    }
 
     const apply = (e) => {
         if (e.target.closest('[data-k]')) return;   // the layout rows apply themselves

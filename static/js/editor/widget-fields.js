@@ -39,7 +39,8 @@ import { sessionUrl } from '../app/session.js';
 /**
  * @param {{label?:string, fields:object[]}} schema
  * @param {object} item            the widget's config item (read for initial values)
- * @param {'panel'|'modal'} variant
+ * @param {'panel'|'modal'|'sheet'} variant  sheet: the widget's own settings
+ *                                         sheet — one column, headed groups only
  * @returns {{ node: HTMLElement, apply(item): void, syncVisibility(): void, focusFirst(): void }}
  */
 export function buildWidgetForm(schema, item, variant = 'panel') {
@@ -268,7 +269,7 @@ function buildFieldRow(field, item, variant) {
         // In the dialog, a choice of two or three is a row of buttons you can
         // see all of at once, and Text size is a row of A's growing in size.
         // The select stays (hidden) as the value everything else reads.
-        if (variant === 'modal' || variant === 'panel') {
+        if (variant === 'modal' || variant === 'panel' || variant === 'sheet') {
             const seg = field.key === 'scale' ? buildSizePicker(input)
                       : input.options.length >= 2 && input.options.length <= 3
                         && Array.from(input.options).every(o => o.textContent.length <= 14) ? buildSegmented(input)

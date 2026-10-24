@@ -6,6 +6,7 @@
   "label": "Python Workspace",
   "fullSlide": true,
   "category": "Computer Science",
+  "liveSettings": true,
   "fields": [
     { "key": "layout", "label": "Layout", "type": "select", "default": "grid-left",
       "options": [ { "v": "single",      "l": "Single pane" },
@@ -27,7 +28,7 @@
     { "key": "readOnly", "label": "Read-only editor", "type": "checkbox", "default": false },
     { "key": "clearOnRun", "label": "Clear shell before each run", "type": "checkbox", "default": false },
     { "key": "banner", "label": "Show version banner", "type": "checkbox", "default": true },
-    { "key": "startup", "expand": true, "label": "Shell startup lines (run at boot)", "type": "textarea-lines", "rows": 3,
+    { "key": "startup", "expand": true, "label": "Shell startup lines (run at boot and on Restart)", "type": "textarea-lines", "rows": 3,
       "placeholder": "import math" },
     { "key": "packages", "label": "Preload packages (one per line)", "type": "textarea-lines", "rows": 2,
       "placeholder": "numpy" },
@@ -5039,6 +5040,7 @@ print(shopping)
   let completeSeq = 0;
   let bootStartup = null;       // startup lines waiting on a package load
   let lastCfg     = {};         // config values already applied, by key
+  let configApplied = false;    // the boot config has been through applyConfig
   let marks       = null;       // { current, err, locked } from the memory model
   let applying    = false;      // restoring state: don't echo it back out
 
@@ -6658,15 +6660,23 @@ def _debug_file(src, fname, limit):
     // The diagram was tuned at 1.5 for the default text size; keep that ratio.
     mmPaneEl.style.setProperty('--u', String(+(1.5 * ws / 1.4).toFixed(3)));
 
+    // Anything below that moves what the room sees is sent on to the viewers
+    // too: settings are edited live, and the widget is never rebuilt for them.
+    const firstApply = !configApplied;
+    configApplied = true;
+    let synced = false;
+
     const code = Array.isArray(cfg.code) ? cfg.code.join('\n') : cfg.code;
     if (changed('code') && typeof code === 'string' && code.trim()) {
       S.code = code.replace(/\r\n?/g, '\n');
       codeEl.value = S.code;
       PV.syncCode(S.code);
+      synced = true;
     }
     if (changed('filename')) {
       S.filename = String(cfg.filename);
       fileEl.value = S.filename;
+      synced = true;
     }
 
     const lk = changed('layout'), pk = changed('primary'), sk = changed('secondary');
@@ -6679,6 +6689,7 @@ def _debug_file(src, fname, limit):
       L.slots = [first, second, ...PANES.filter(p => p !== first && p !== second)];
       S.layout = L;
       S.max = null;
+      synced = true;
     }
 
     if (changed('theme')) PV.setTheme(cfg.theme === 'dark' ? 'dark' : 'light');
@@ -6694,6 +6705,7 @@ def _debug_file(src, fname, limit):
     renderLayout();
     render();
     PV.render();
+    if (synced && !firstApply) emitState();
   }
 
   function destroy() {

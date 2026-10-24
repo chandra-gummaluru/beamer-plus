@@ -5,9 +5,10 @@
 {
   "label": "Python Notebook",
   "fullSlide": true,
+  "liveSettings": true,
   "category": "Computer Science",
   "fields": [
-    { "key": "notebook", "label": "Notebook file", "type": "file", "accept": ".ipynb", "folder": "assets" },
+    { "key": "notebook", "label": "Notebook file", "type": "file", "accept": ".ipynb", "folder": "assets", "rebuild": true },
     { "key": "packages", "label": "Extra packages (one per line)", "type": "textarea-lines", "rows": 4, "placeholder": "pandas\nsympy\nrequests==2.31.0" },
     { "key": "autoImport", "label": "Auto-load packages from imports", "type": "checkbox", "default": true }
   ]
@@ -725,11 +726,16 @@ function parsePackageList(v) {
   return list.map(s => String(s).trim()).filter(Boolean);
 }
 
-const EXTRA_PACKAGES = parsePackageList(
+// `let`, not const: both are settings that apply live (see the widget-config
+// handler), and initPyodide reads them when it gets there, so an edit made
+// while the kernel is still booting is picked up too. A different notebook
+// file is the one setting that rebuilds the widget instead (`rebuild` in the
+// schema) — it replaces the whole document, which is what a fresh load is.
+let EXTRA_PACKAGES = parsePackageList(
   CFG.packages != null ? CFG.packages : _qs.get('packages')
 );
 // Default on; only an explicit false / ?autoImport=0 turns it off.
-const AUTO_IMPORT = CFG.autoImport != null
+let AUTO_IMPORT = CFG.autoImport != null
   ? CFG.autoImport !== false
   : _qs.get('autoImport') !== '0';
 
@@ -955,7 +961,8 @@ function mergePackageLists(...lists) {
 }
 
 async function installExtraPackages(names) {
-  const seen = new Set(BASE_PACKAGES);
+  // Skip what's already in, so a live settings edit only installs the new names.
+  const seen = new Set([...BASE_PACKAGES, ...loadedPackages].map(packageKey));
   for (const name of names) {
     const key = packageKey(name);
     if (seen.has(key)) continue;
@@ -2183,6 +2190,29 @@ function _nbSetState(s) {
   scrollNotebookToTop();
 }
 
+// Settings edited while the notebook is open. Cells, outputs and the kernel's
+// namespace all stay; a package added to the list is installed into the
+// running kernel (before it is up, initPyodide picks the new list up itself).
+let _liveInstall = Promise.resolve();
+function applyLiveSettings(c) {
+  if (c.autoImport != null) AUTO_IMPORT = c.autoImport !== false;
+  if (c.packages === undefined) return;
+  const next = parsePackageList(c.packages);
+  if (next.join('\n') === EXTRA_PACKAGES.join('\n')) return;
+  EXTRA_PACKAGES = next;
+  if (IS_VIEWER || !bpRunCell) return;
+  // Chained, so two quick edits don't install the same package twice.
+  _liveInstall = _liveInstall.then(async () => {
+    const before = failedPackages.length;
+    await installExtraPackages(EXTRA_PACKAGES);
+    const failed = failedPackages.slice(before);
+    if (failed.length) {
+      document.getElementById('pkg-warning')?.remove();
+      showPackageWarning(failed);
+    }
+  }).catch(err => console.warn('[Beamer+] live package install failed', err));
+}
+
 window.addEventListener('message', function(e) {
   if (!e.data) return;
   if (e.data.type === 'widget-get-state') {
@@ -2190,6 +2220,7 @@ window.addEventListener('message', function(e) {
   } else if (e.data.type === 'widget-set-state' && e.data.state != null) {
     _nbSetState(e.data.state);
   } else if (e.data.type === 'widget-config') {
+    applyLiveSettings(e.data.config || {});
     // The shared top bar rewrites its title from the widget's own name each
     // time the host re-sends the config. Once a file is open, its name is the
     // more useful thing to show, so put it back. The settings kit registered

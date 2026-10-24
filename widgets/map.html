@@ -6,6 +6,7 @@
   "label": "Map",
   "category": "Tools",
   "fontSize": false,
+  "liveSettings": true,
   "fields": [
     { "key": "zoom", "label": "Default zoom (1–18)", "type": "number", "min": 1, "max": 18, "step": 1, "default": 12 }
   ]
@@ -350,6 +351,9 @@
     function updateConfig(newCfg) {
       const prev = cfg;
       cfg = { ...cfg, ...newCfg };
+      // A full config (the host's, sent live from the settings dialog) is
+      // authoritative: a Zoom put back to its default is absent from it.
+      if ((newCfg.id != null || newCfg.widgetId != null) && !('zoom' in newCfg)) delete cfg.zoom;
       cfg.widgetId = cfg.id || cfg.widgetId || 'map-default';
 
       const center   = cfg.center || DEFAULT_CENTER;
@@ -374,8 +378,11 @@
         // Fly to new center/zoom if changed
         const centerChanged = JSON.stringify(cfg.center) !== JSON.stringify(prev.center);
         const zoomChanged   = cfg.zoom !== prev.zoom;
-        if (centerChanged || zoomChanged) {
+        // A new default zoom alone keeps wherever the map has been panned to.
+        if (centerChanged) {
           map.setView(center, zoom, { animate: true });
+        } else if (zoomChanged) {
+          map.setZoom(zoom, { animate: true });
         }
       }
 

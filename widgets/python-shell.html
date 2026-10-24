@@ -7,6 +7,7 @@
   "category": "Computer Science",
   "modes": ["overlay", "full"],
   "overlaySize": { "width": 0.46, "height": 0.42 },
+  "liveSettings": true,
   "fields": [
     { "key": "startup", "expand": true,  "label": "Run at start", "type": "textarea", "rows": 4, "mono": true,
       "placeholder": "import math\nxs = [3, 1, 2]" },
@@ -560,7 +561,7 @@ body.bw-overlay #term { padding: 8px 12px 10px; }
   }
 
   // ── Config ──────────────────────────────────────────────────────────────────
-  let started = false, lastSetup = null;
+  let started = false, lastSetup = null, setupTimer = null;
   function applyConfig(c) {
     if (!c) return;
     const prevUrl = cfg.socketUrl;
@@ -574,12 +575,24 @@ body.bw-overlay #term { padding: 8px 12px 10px; }
     const setup = JSON.stringify([cfg.startup || '', asList(cfg.packages)]);
     if (!IS_VIEWER && !cfg.printMode) {
       if (!started) { started = true; lastSetup = setup; startWorker(); }
-      else if (setup !== lastSetup) { lastSetup = setup; restart('Setup changed'); }
+      else if (setup !== lastSetup) {
+        // Settings are pushed live while the presenter types, so wait for the
+        // edit to settle — one restart for the finished change, not one per
+        // pause. The transcript survives; only the namespace is new.
+        clearTimeout(setupTimer);
+        setupTimer = setTimeout(() => {
+          const now = JSON.stringify([cfg.startup || '', asList(cfg.packages)]);
+          if (now === lastSetup) return;
+          lastSetup = now;
+          restart('Setup changed');
+        }, 1200);
+      }
     }
     renderPrompt();
   }
 
   function destroy() {
+    clearTimeout(setupTimer);
     stopWorker();
     clearTimeout(syncTimer);
     if (socket && socket.disconnect) socket.disconnect();

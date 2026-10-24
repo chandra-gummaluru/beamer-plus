@@ -20,7 +20,7 @@ import { addWidget } from './widget-picker.js';
 import { showViewConfig, hideViewConfig } from './view-config.js';
 import { applySlideReorder, removeSlideReorder } from './reorder.js';
 import { initWidgetSettings } from './widget-settings.js';
-import { initWidgetSettingsDialog } from './widget-settings-dialog.js';
+import { initWidgetSettingsDialog, closeWidgetSettings } from './widget-settings-dialog.js';
 import { initNumberSteppers } from './number-stepper.js';
 import { realSlideCount } from '../slides/structure.js';
 import { PAPER_STYLES, PAPER_SPACING, PAPER_THICKNESS, PAPER_COLORS, normalizePaper } from '../slides/paper.js';
@@ -164,6 +164,7 @@ function toggleEditMode() {
 }
 
 async function enterEditMode() {
+    closeWidgetSettings();   // its widget is about to become a box on the slide
     ctx.state.editMode = true;
     document.body.classList.add('edit-mode');
     setPanelMode('slide');

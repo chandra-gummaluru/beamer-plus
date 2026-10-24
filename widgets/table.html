@@ -5,6 +5,7 @@
 {
   "label": "Table",
   "category": "Tools",
+  "liveSettings": true,
   "fields": [
     { "key": "csv", "label": "Starting data (CSV, or paste from Excel)", "type": "textarea", "rows": 6,
       "placeholder": "Name, Score\nAda, 92\nAlan, 88" },
@@ -1173,10 +1174,15 @@ body.can-edit #grid td.revealed::after {
   // it is changed in the settings, or when nothing has been edited yet, but
   // a re-sent config never wipes edits made on the slide.
   let lastCsv = null;
+  const OWN_KEYS = ['csv', 'showLabels', 'readOnly'];
   function applyConfig(c) {
     if (!c) return;
     const prevUrl = cfg.socketUrl;
     cfg = { ...cfg, ...c };
+    // A full config (the host's, live from the settings dialog) is
+    // authoritative: a setting put back to its default is simply absent from
+    // it, and the merge above would otherwise keep the old value.
+    if (c.id != null || c.widgetId != null) OWN_KEYS.forEach(k => { if (!(k in c)) delete cfg[k]; });
     WIDGET_ID = cfg.id || cfg.widgetId || WIDGET_ID;
     IS_VIEWER = cfg.role === 'viewer' || IS_VIEWER;
     const csv = typeof cfg.csv === 'string' ? cfg.csv : '';

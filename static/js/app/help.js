@@ -95,7 +95,7 @@ export function showHelpModal() {
 <h4 class="help-h">Building a custom widget</h4>
 <p class="help-p">A widget is a single self-contained ${_hic('.html')} file. Beamer+ loads it in an isolated iframe and handles the rest: persistence, resizing, and state saving.</p>
 <h4 class="help-h">1 · Declare your settings</h4>
-<p class="help-p">Put a schema block at the top of ${_hic('&lt;head&gt;')}. Beamer+ builds your widget's settings dialog from it: while presenting, the pencil in your widget's top bar opens it (the editor panel only holds the Name, Text size and position every widget has). Nothing else is needed — the fields are read from this block:</p>
+<p class="help-p">Put a schema block at the top of ${_hic('&lt;head&gt;')}. Beamer+ builds your widget's settings sheet from it: while presenting, the pencil that appears when you hover over your widget opens it (the editor panel only holds the Name, Text size and position every widget has). Add ${_hic('"liveSettings": true')} if your widget can take a changed config while it runs: each edit then arrives as a fresh ${_hic('widget-config')} message instead of a rebuild. Nothing else is needed — the fields are read from this block:</p>
 <code class="help-code">&lt;script id="widget-schema" type="application/json"&gt;
 {
   "label": "My Widget",
@@ -135,7 +135,7 @@ BeamerWidget.topbar.onReset(() =&gt; clearEverything());</code>
   <dt>widget-hidden</dt><dd>Received when the slide is navigated away from. The iframe stays alive, so pause any audio or video here.</dd>
   <dt>widget-shown</dt><dd>Received when the slide is shown again.</dd>
   <dt>widget-cleanup</dt><dd>Received when the widget is removed. Stop timers and release resources.</dd>
-  <dt>widget-settings</dt><dd>Post ${_hic('{ widgetId, patch, remove }')} to save settings into your config item, where they persist with the deck. Use this if your widget changes its own configuration at run time; the presenter's own edits come from the settings dialog the pencil in your top bar opens.</dd>
+  <dt>widget-settings</dt><dd>Post ${_hic('{ widgetId, patch, remove }')} to save settings into your config item, where they persist with the deck. Use this if your widget changes its own configuration at run time; the presenter's own edits come from the settings sheet the pencil on your widget opens.</dd>
 </dl>
 <p class="help-p">Calling a Beamer+ route? Build the URL from ${_hic('BeamerWidget.serverUrl()')}, not from ${_hic('serverOrigin()')}. Every API route lives under this session's ${_hic('/s/&lt;code&gt;')} prefix, which ${_hic('serverUrl()')} includes and ${_hic('serverOrigin()')} does not — the latter is the bare origin, for ${_hic('io()')}. Mixing them up gives a 404 that looks like a missing file:</p>
 <code class="help-code">const res = await fetch(BeamerWidget.serverUrl() + '/api/zip-asset/' + cfg.pdf);

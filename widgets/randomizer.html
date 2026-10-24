@@ -5,6 +5,7 @@
 {
  "label": "Randomizer",
  "category": "Tools",
+ "liveSettings": true,
  "fields": [
   {
    "key": "mode",
@@ -4924,11 +4925,22 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   }
 
   // ── Config ──────────────────────────────────────────────────────────────────
-  let lastSeed = null;
+  let lastSeed = null, shownSig = null;
+
+  // The keys the settings dialog owns. The host sends the whole config on
+  // every change, and a field put back to its default arrives as an absent
+  // key — so one missing from the new config has to be dropped, not kept from
+  // the old one by the merge.
+  const SETTING_KEYS = (() => {
+    try { return JSON.parse(document.getElementById('widget-schema').textContent).fields.map(f => f.key); }
+    catch (_) { return []; }
+  })();
+
   function applyConfig(c) {
     if (!c) return;
     const prevUrl = cfg.socketUrl;
     cfg = { ...cfg, ...c };
+    for (const k of SETTING_KEYS) if (!(k in c)) delete cfg[k];
     WIDGET_ID = cfg.id || cfg.widgetId || WIDGET_ID;
     IS_VIEWER = cfg.role === 'viewer' || IS_VIEWER;
     const nextMode = MODES.includes(cfg.mode) ? cfg.mode : 'dice';
@@ -4942,7 +4954,11 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       lastSeed = seed;
     }
     if (cfg.socketUrl && cfg.socketUrl !== prevUrl) initSocket(cfg.socketUrl);
-    render();
+    // Settings now arrive live, a keystroke at a time. Redraw only when what's
+    // on screen depends on what changed: render() snaps a running roll to its
+    // end, so retyping the seed mid-spin mustn't cut the spin short.
+    const sig = JSON.stringify([S.mode, S.setup, cfg.animate !== false, IS_VIEWER]);
+    if (sig !== shownSig) { shownSig = sig; render(); }
     if (!IS_VIEWER && lastSeed !== null) emitState();
   }
 
