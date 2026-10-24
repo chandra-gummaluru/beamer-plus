@@ -52,17 +52,15 @@ body.edit-mode #top-right-controls      { display: none !important; }
 body.edit-mode #floating-annotation-toolbar { display: none !important; }
 body.edit-mode #shape-sidebar               { display: none !important; }
 
-/* Make room on the stage: below the slide for its caption bar, at the right
-   for the insert rail — or for the panel, while one is open. */
+/* Make room on the stage at the right for the edit rail — and for the
+   panel, while one is open. */
 body.edit-mode #main-content {
     padding-right: 64px;
-    padding-bottom: 60px;
 }
 body.edit-mode.editor-panel-open #main-content {
-    padding-right: calc(var(--editor-panel-width) + 64px);
+    padding-right: var(--editor-panel-width);
 }
-/* A split view being configured has no caption bar under it. */
-body.edit-mode.split-view-active #main-content { padding-bottom: 0; }
+
 
 /* Hide actual media elements — only edit overlay boxes are shown */
 body.edit-mode #pdf-canvas video,
@@ -363,9 +361,10 @@ body.edit-mode.editor-panel-open #editor-panel { display: flex; }
     border-color: oklch(75% 0.08 25);
 }
 
-/* ─── Insert rail ──────────────────────────────────────────────────
+/* ─── Edit rail ────────────────────────────────────────────────────
    Where the annotation toolbar docks while presenting, the same glass
-   surface; it moves in beside the panel while one is open. */
+   surface: the inserts, then this slide's tools. Hidden while a panel is
+   open. */
 
 #editor-add-row {
     position: fixed;
@@ -387,11 +386,8 @@ body.edit-mode.editor-panel-open #editor-panel { display: flex; }
     box-shadow: var(--shadow-3);
 }
 body.edit-mode #editor-add-row { display: flex; }
-body.edit-mode.editor-panel-open #editor-add-row {
-    right: calc(var(--editor-panel-width) + var(--sp-2));
-    border-right: var(--line-hairline);
-    border-radius: var(--r-lg);
-}
+/* While something's settings are open, the panel is the only tool. */
+body.edit-mode.editor-panel-open #editor-add-row { display: none; }
 .editor-rail-sep { width: 24px; height: 1px; background: oklch(88% 0.004 260); margin: 2px 0; }
 
 .editor-icon-btn {
@@ -415,97 +411,44 @@ body.edit-mode.editor-panel-open #editor-add-row {
 .editor-icon-btn:disabled { opacity: 0.35; cursor: default; }
 .editor-icon-btn svg { width: 17px; height: 17px; pointer-events: none; }
 
-/* ─── Under the slide: title, paper, visibility, delete ──────────────
-   Positioned by editor.js to the slide's own left edge and width. */
-#slide-caption-bar {
-    position: fixed;
-    z-index: 180;
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    min-width: 0;
-    font-family: var(--font-sans);
-}
-#slide-caption-bar[hidden] { display: none; }
-.slide-caption-num {
-    min-width: 20px;
-    font-size: var(--fs-xs);
-    font-weight: 600;
-    color: var(--ink-3);
-    font-variant-numeric: tabular-nums;
-}
-#slide-caption-bar .slide-title-input {
-    flex: 0 1 340px;
-    min-width: 120px;
-    height: 34px;
-    padding: 0 10px;
-    box-sizing: border-box;
-    border: 1px solid oklch(86% 0.005 260);
-    border-radius: var(--r-sm);
-    background: var(--surface-paper);
-    outline: none;
-    text-align: left;
-    font-family: var(--font-serif);
-    font-size: 19px;
-    font-weight: 500;
-    color: var(--ink-1);
-    transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
-}
-#slide-caption-bar .slide-title-input::placeholder { color: var(--ink-4); font-style: italic; }
-#slide-caption-bar .slide-title-input:hover { border-color: oklch(78% 0.006 260); }
-#slide-caption-bar .slide-title-input:focus { border-color: var(--ink-2); box-shadow: 0 0 0 3px oklch(45% 0.005 260 / 0.10); }
-#slide-caption-bar.is-hidden-slide .slide-title-input { color: var(--ink-3); }
-.slide-caption-pill {
-    flex: 0 0 auto;
-    padding: 3px 10px;
-    border-radius: var(--r-pill);
-    background: var(--surface-cream-2);
-    font-size: var(--fs-xs);
-    font-weight: 600;
-    color: var(--ink-2);
-    white-space: nowrap;
-}
-.slide-caption-pill[hidden] { display: none; }
-.slide-caption-spacer { flex: 1 1 auto; }
-.slide-caption-btn {
-    flex: 0 0 auto;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    min-width: 34px;
-    height: 34px;
-    padding: 0 8px;
-    border: 1px solid oklch(84% 0.005 260);
-    border-radius: var(--r-md);
-    background: var(--surface-paper);
-    color: var(--ink-2);
-    font-family: var(--font-sans);
-    font-size: var(--fs-sm);
-    font-weight: 600;
-    cursor: pointer;
-    transition: background var(--dur-fast), border-color var(--dur-fast), color var(--dur-fast);
-}
-.slide-caption-btn:hover:not(:disabled) { background: var(--surface-cream-2); color: var(--ink-1); }
-.slide-caption-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.slide-caption-btn:disabled { opacity: 0.4; cursor: default; }
+/* This slide's tools, under the inserts. */
+.editor-rail-group { display: flex; flex-direction: column; align-items: center; gap: var(--sp-1); }
+.editor-rail-slide[hidden] { display: none; }
 #slide-hidden-toggle .i-eye-off { display: none; }
 #slide-hidden-toggle[aria-pressed="true"] { background: var(--ink-1); border-color: var(--ink-1); color: var(--ink-on-accent); }
 #slide-hidden-toggle[aria-pressed="true"] .i-eye { display: none; }
 #slide-hidden-toggle[aria-pressed="true"] .i-eye-off { display: block; }
-.slide-caption-delete-label { display: none; }
-.slide-caption-delete.is-armed { padding: 0 12px; background: var(--danger); border-color: var(--danger); color: #fff; }
-.slide-caption-delete.is-armed:hover:not(:disabled) { background: oklch(52% 0.18 25); color: #fff; }
-.slide-caption-delete.is-armed .slide-caption-delete-label { display: inline; }
+/* Delete, armed: red, with what a second click does spelled out beside it. */
+.editor-rail-delete { position: relative; }
+.editor-rail-delete.is-armed,
+.editor-rail-delete.is-armed:hover:not(:disabled) { background: var(--danger); border-color: var(--danger); color: #fff; }
+.editor-rail-delete-label {
+    display: none;
+    position: absolute;
+    right: calc(100% + 10px);
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 5px 10px;
+    border-radius: var(--r-sm);
+    background: var(--danger);
+    color: #fff;
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    white-space: nowrap;
+    pointer-events: none;
+}
+.editor-rail-delete.is-armed .editor-rail-delete-label { display: block; }
 
-/* Paper (blank slides): a small popover above its button. */
-.slide-caption-paper { position: relative; flex: 0 0 auto; }
-.slide-caption-paper[hidden] { display: none; }
+/* Paper (blank slides): a popover to the left of the rail. */
+.editor-rail-paper { position: relative; }
+.editor-rail-paper[hidden] { display: none; }
 #slide-paper-btn[aria-expanded="true"] { background: var(--surface-cream-2); color: var(--ink-1); }
 .slide-paper-pop {
     position: absolute;
-    right: 0;
-    bottom: calc(100% + 8px);
+    right: calc(100% + 14px);
+    top: 50%;
+    transform: translateY(-50%);
     width: 260px;
     padding: var(--sp-3);
     background: var(--surface-paper);
@@ -1326,16 +1269,7 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
     }
     /* The panel is a bottom sheet here: the stage gives up height for it,
        and the rail stays at the window's edge. */
-    body.edit-mode #main-content,
-    body.edit-mode.editor-panel-open #main-content { padding-right: 64px; }
-    body.edit-mode.editor-panel-open #main-content { height: calc(100dvh - 45dvh - 88px); }
-    body.edit-mode.editor-panel-open #editor-add-row {
-        right: 0;
-        top: var(--sp-8);
-        transform: none;
-        border-right: 0;
-        border-radius: var(--r-lg) 0 0 var(--r-lg);
-    }
+    body.edit-mode.editor-panel-open #main-content { padding-right: 0; height: calc(100dvh - 45dvh - 88px); }
 }
 
 @media (max-width: 480px) {

@@ -240,9 +240,8 @@
             <span id="editor-panel-title">Slide Properties</span>
         </div>
         <div id="editor-panel-body">
-            <!-- The slide's own settings live under the slide while editing
-                 (#slide-caption-bar, editor/slide-caption.js); this panel only
-                 opens for something selected on it. -->
+            <!-- The slide's own tools are on the edit rail (#editor-slide-tools);
+                 this panel only opens for something selected on the slide. -->
             <div id="editor-slide-settings"></div>
             <div id="editor-properties">
                 <div id="editor-properties-body"></div>
@@ -256,9 +255,10 @@
             </div>
         </div>
     </aside>
-    <!-- Insert rail — where the annotation toolbar sits while presenting
-         (it's hidden in edit mode); beside the panel when one is open. -->
-    <div id="editor-add-row" role="toolbar" aria-label="Insert" aria-orientation="vertical">
+    <!-- Edit rail — where the annotation toolbar sits while presenting (it's
+         hidden in edit mode); beside the panel when one is open. Inserts
+         first, then this slide's own tools. -->
+    <div id="editor-add-row" role="toolbar" aria-label="Edit tools" aria-orientation="vertical">
         <button class="btn editor-icon-btn" id="add-view-btn" title="Insert split view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="3" width="8" height="18" rx="1.5"/><rect x="15" y="3" width="8" height="18" rx="1.5"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="9" y1="12" x2="15" y2="12"/></svg></button>
         <button class="btn editor-icon-btn" id="edit-add-video-btn" title="Add video">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
@@ -276,50 +276,47 @@
         <button class="btn editor-icon-btn" id="edit-add-widget-btn" title="Add widget">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
         </button>
-    </div>
-
-    <!-- Under the slide while editing: its title on the left, its visibility
-         and delete on the right (editor/slide-caption.js). -->
-    <div id="slide-caption-bar" hidden>
-        <span class="slide-caption-num" id="slide-caption-num"></span>
-        <input type="text" class="slide-title-input" id="slide-title-input" maxlength="40" autocomplete="off" spellcheck="false" placeholder="Add a title" aria-label="Slide title">
-        <span class="slide-caption-pill" id="slide-hidden-pill" hidden>Hidden · skipped when presenting</span>
-        <span class="slide-caption-spacer"></span>
-        <!-- Blank slides only: lined / grid / dotted paper (slides/paper.js). -->
-        <div class="slide-caption-paper" id="slide-paper-wrap" hidden>
-            <button type="button" class="slide-caption-btn" id="slide-paper-btn" title="Paper" aria-label="Paper" aria-haspopup="true" aria-expanded="false">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>
-            </button>
-            <div id="slide-paper-settings" class="slide-paper-pop" hidden>
-                <label class="slide-setting">
-                    <span class="slide-setting-name">Background</span>
-                    <select class="slide-setting-select" id="paper-style"></select>
-                </label>
-                <div id="paper-options">
+        <!-- This slide: paper (blank slides), hide from the presentation, delete
+             (editor.js). Not shown while a split view is being configured. -->
+        <div class="editor-rail-sep editor-rail-slide" aria-hidden="true"></div>
+        <div class="editor-rail-group editor-rail-slide" id="editor-slide-tools">
+            <!-- Blank slides only: lined / grid / dotted paper (slides/paper.js). -->
+            <div class="editor-rail-paper" id="slide-paper-wrap" hidden>
+                <button type="button" class="btn editor-icon-btn" id="slide-paper-btn" title="Paper" aria-label="Paper" aria-haspopup="true" aria-expanded="false">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>
+                </button>
+                <div id="slide-paper-settings" class="slide-paper-pop" hidden>
                     <label class="slide-setting">
-                        <span class="slide-setting-name">Spacing</span>
-                        <select class="slide-setting-select" id="paper-spacing"></select>
+                        <span class="slide-setting-name">Background</span>
+                        <select class="slide-setting-select" id="paper-style"></select>
                     </label>
-                    <label class="slide-setting">
-                        <span class="slide-setting-name" id="paper-thickness-label">Line weight</span>
-                        <select class="slide-setting-select" id="paper-thickness"></select>
-                    </label>
-                    <label class="slide-setting">
-                        <span class="slide-setting-name">Colour</span>
-                        <select class="slide-setting-select" id="paper-color"></select>
-                    </label>
+                    <div id="paper-options">
+                        <label class="slide-setting">
+                            <span class="slide-setting-name">Spacing</span>
+                            <select class="slide-setting-select" id="paper-spacing"></select>
+                        </label>
+                        <label class="slide-setting">
+                            <span class="slide-setting-name" id="paper-thickness-label">Line weight</span>
+                            <select class="slide-setting-select" id="paper-thickness"></select>
+                        </label>
+                        <label class="slide-setting">
+                            <span class="slide-setting-name">Colour</span>
+                            <select class="slide-setting-select" id="paper-color"></select>
+                        </label>
+                    </div>
                 </div>
             </div>
+            <button type="button" class="btn editor-icon-btn" id="slide-hidden-toggle" aria-pressed="false" title="Shown in presentation — click to hide">
+                <svg class="i-eye" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="i-eye-off" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.7 10.7 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.1"/><path d="M6.6 6.6A17.3 17.3 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>
+            </button>
+            <!-- Two clicks: the first arms it, since there's no undo (editor.js). -->
+            <button type="button" class="btn editor-icon-btn editor-rail-delete" id="slide-delete" title="Delete slide" aria-label="Delete slide">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>
+                <span class="editor-rail-delete-label">Delete slide?</span>
+            </button>
         </div>
-        <button type="button" class="slide-caption-btn" id="slide-hidden-toggle" aria-pressed="false" title="Shown in presentation — click to hide">
-            <svg class="i-eye" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
-            <svg class="i-eye-off" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.7 10.7 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.1"/><path d="M6.6 6.6A17.3 17.3 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>
-        </button>
-        <!-- Two clicks: the first arms it, since there's no undo (editor.js). -->
-        <button type="button" class="slide-caption-btn slide-caption-delete" id="slide-delete" title="Delete slide" aria-label="Delete slide">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>
-            <span class="slide-caption-delete-label">Delete slide?</span>
-        </button>
     </div>
+
 </body>
 </html>

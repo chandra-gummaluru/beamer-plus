@@ -70,9 +70,9 @@ export function showHelpModal() {
             id: 'edit', label: 'Editing',
             html: `
 <h4 class="help-h">Entering edit mode</h4>
-<p class="help-p">Click the edit button ${_hbtn('edit','Edit mode')} in the top-right corner. Under the slide, its title is on the left (click to rename it) and on the right are an eye to hide it from the presentation and a trash can to delete it (click twice). Click anything on the slide to open its settings in a panel on the right; click empty space or press Esc to close it. Click <strong>Done</strong> when you're finished.</p>
+<p class="help-p">Click the edit button ${_hbtn('edit','Edit mode')} in the top-right corner. A toolbar on the right has buttons to add things to the slide and, below them, an eye to hide the slide from the presentation and a trash can to delete it (click twice); a blank slide also gets a button for its paper. Click anything on the slide to open its settings in a panel on the right; click empty space or press Esc to close it. Click <strong>Done</strong> when you're finished.</p>
 <h4 class="help-h">Adding overlays</h4>
-<p class="help-p">The toolbar on the right, where the drawing tools sit while presenting, lets you add content on top of your slides:</p>
+<p class="help-p">The toolbar on the right, where the drawing tools sit while presenting, adds content on top of your slides:</p>
 <ul class="help-ul">
   <li>${_hbtn('video','Add video')} <strong>Video</strong>: overlay a video player.</li>
   <li>${_hbtn('audio','Add audio')} <strong>Audio</strong>: overlay an audio clip.</li>
