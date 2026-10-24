@@ -1,52 +1,46 @@
 // A widget's properties, in the editor's right panel.
 //
-// Selecting a widget on the slide (or Edit in the slide's item list, or
-// adding one) shows them here, in place of the slide's properties — the same
-// way a video or a reveal box shows its own. Only what every widget has, in
-// one list: Name, Text size, Full slide, X / Y / Width / Height and the
-// reveal step it appears on. Where it sits and how big it is can also be
-// changed on the slide itself (drag it, drag its corner).
+// Selecting a widget on the slide (or adding one) opens the panel with
+// everything about it: Name and Text size, its layout (full slide, box,
+// reveal step, layer), then its own settings from its `widget-schema`
+// block, and Remove. Where it sits and how big it is can also be changed on
+// the slide itself (drag it, drag its corner). While presenting, the same
+// own settings are also a pencil away (widget-settings-dialog.js).
 //
-// Everything specific to the widget (a poll's question, a timer's duration…)
-// is edited from the widget itself: the pencil in its top bar opens its
-// settings dialog (widget-settings-dialog.js). Every change here is applied
-// to the config item live. (Removing a widget is the slide's item list, or
-// Delete on the slide.)
+// Every change is applied to the config item as it's made; the widget is
+// rebuilt with them when edit mode closes.
 import { buildWidgetForm } from './widget-fields.js';
 import { widgetDisplay, setWidgetDisplay } from './widget-schema.js';
-import { GENERAL_KEYS } from './widget-settings-dialog.js';
 
 const near = (a, b) => Math.abs((a ?? 0) - b) < 0.005;
 const isFullBox = (it) => near(it.x, 0) && near(it.y, 0) && near(it.width ?? 1, 1) && near(it.height ?? 1, 1);
 
 /**
- * Fill `host` with a widget's properties.
+ * Fill `host` with everything about a widget: General (Name, Text size),
+ * Layout (full slide, box, reveal step, layer), then the widget's own
+ * settings from its schema, and Remove at the bottom.
  * @param {HTMLElement} host
  * @param {object} item     the widget's config item (edited in place)
  * @param {object} schema   from getWidgetSchema(item)
  * @param {object} opts
  * @param {() => void} opts.onLayout  after its box, display or step changed
  * @param {() => void} opts.onName    after its Name changed
+ * @param {(toFront: boolean) => void} opts.onLayer  Bring to front / Send to back
+ * @param {boolean} opts.canLayer     more than one thing on the slide
+ * @param {() => void} opts.onRemove  Remove widget (second click)
  * @returns {{ refresh(): void }}  refresh: the box moved on the slide
  */
-export function renderWidgetPanel(host, item, schema, { onLayout, onName } = {}) {
+export function renderWidgetPanel(host, item, schema, { onLayout, onName, onLayer, canLayer, onRemove } = {}) {
     host.textContent = '';
-    const general = { ...schema, fields: (schema.fields || []).filter(f => GENERAL_KEYS.has(f.key)) };
-    const form = buildWidgetForm(general, item, 'panel');
+    // The 'panel' variant puts Name and Text size first, under "General",
+    // and the widget's own fields after it in their schema sections.
+    const form = buildWidgetForm(schema, item, 'panel');
     const layout = buildLayoutCard(item, schema, () => onLayout?.());
-    // One list, no headings: Name and Text size, then the layout rows.
-    let group = form.commonNode;
-    if (!group) {
-        group = document.createElement('div');
-        group.className = 'wf-group';
-        group.innerHTML = '<div class="wf-group-body"></div>';
-        form.node.insertBefore(group, form.node.firstChild);
-    }
-    group.querySelector(':scope > .wf-group-title')?.remove();
-    const body = group.querySelector('.wf-group-body');
-    const layoutBody = layout.node.querySelector('.wf-group-body');
-    while (layoutBody.firstChild) body.appendChild(layoutBody.firstChild);
+    if (onLayer) layout.node.querySelector('.wf-group-body').appendChild(buildLayerRow(onLayer, canLayer));
+    const general = form.commonNode;
+    form.node.insertBefore(layout.node, general ? general.nextSibling : form.node.firstChild);
     host.appendChild(form.node);
+    if (onRemove) host.appendChild(buildRemoveButton('Remove widget', onRemove));
 
     const apply = (e) => {
         if (e.target.closest('[data-k]')) return;   // the layout rows apply themselves
@@ -57,6 +51,44 @@ export function renderWidgetPanel(host, item, schema, { onLayout, onName } = {})
     form.node.addEventListener('input', apply);
     form.node.addEventListener('change', apply);
     return { refresh: layout.show };
+}
+
+/** Bring to front / Send to back — shared with the media items' panel. */
+export function buildLayerRow(onLayer, enabled = true) {
+    const row = document.createElement('div');
+    row.className = 'editor-prop-row';
+    row.innerHTML = `<span class="editor-prop-label">Layer</span>
+        <div class="editor-layer-btns">
+            <button type="button" class="btn editor-layer-btn" data-layer="front">Bring to front</button>
+            <button type="button" class="btn editor-layer-btn" data-layer="back">Send to back</button>
+        </div>`;
+    row.querySelectorAll('button').forEach(b => {
+        b.disabled = !enabled;
+        b.addEventListener('click', () => onLayer(b.dataset.layer === 'front'));
+    });
+    return row;
+}
+
+/** Remove, two clicks — the first arms it, since there's no undo. */
+export function buildRemoveButton(label, onRemove) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn editor-delete-btn wp-remove';
+    btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg><span></span>';
+    const text = btn.querySelector('span');
+    text.textContent = label;
+    let timer = null;
+    btn.addEventListener('click', () => {
+        if (!btn.classList.contains('is-armed')) {
+            btn.classList.add('is-armed');
+            text.textContent = 'Click again to remove';
+            timer = setTimeout(() => { btn.classList.remove('is-armed'); text.textContent = label; }, 3000);
+            return;
+        }
+        clearTimeout(timer);
+        onRemove();
+    });
+    return btn;
 }
 
 // Layout: a Full slide switch over X / Y / Width / Height. Switching Full

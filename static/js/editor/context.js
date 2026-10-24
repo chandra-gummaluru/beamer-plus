@@ -13,7 +13,8 @@ export function getSlideEl() { return document.getElementById('pdf-canvas'); }
 /* ─── panel mode ────────────────────────────────────────────────
    The editor panel shows one section at a time, and its header names
    which one:
-     'slide' — the current slide's own properties (the default)
+     'slide' — nothing selected: the panel is closed (the slide's own
+               settings are in the bar under it)
      'item'  — the selected overlay's properties
      'widget' — the selected widget's settings (editor/widget-panel.js)
      'view'  — the split-view configuration for a view slide
@@ -31,6 +32,14 @@ export function setPanelMode(mode, title) {
     const panel = document.getElementById('editor-panel');
     if (panel) panel.dataset.mode = mode;
     setPanelTitle(title ?? PANEL_TITLES[mode] ?? 'Edit Presentation');
+    // The panel only opens for something selected (or a split view being
+    // configured): the slide's own settings sit under it (#slide-caption-bar).
+    // Opening or closing it re-fits the stage.
+    const open = mode !== 'slide';
+    if (document.body.classList.contains('editor-panel-open') !== open) {
+        document.body.classList.toggle('editor-panel-open', open);
+        window.dispatchEvent(new Event('resize'));
+    }
 }
 
 export function setPanelTitle(title) {

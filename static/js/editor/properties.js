@@ -13,7 +13,7 @@ import { ctx, getSlideEl, getOrCreateConfig, escAttr, setPanelMode, setPanelTitl
 import { cleanupEditOverlays, renderEditOverlays, positionOverlay, selectOverlayEl, overlayLabel, syncWidgetLock } from './overlays.js';
 import { WIDGET_LABELS } from './widget-picker.js';
 import { getWidgetSchema } from './widget-schema.js';
-import { renderWidgetPanel } from './widget-panel.js';
+import { renderWidgetPanel, buildLayerRow } from './widget-panel.js';
 
 export function updatePropertiesPanel() {
     const panel = document.getElementById('editor-properties');
@@ -39,8 +39,19 @@ export function updatePropertiesPanel() {
     if (!body) return;
     body.innerHTML = buildPropsHTML(arrKey, item);
 
-    // Delete button
-    body.querySelector('#prop-delete')?.addEventListener('click', () => deleteItem(arrKey, index));
+    // Delete button — two clicks, the first arms it.
+    const del = body.querySelector('#prop-delete');
+    del?.addEventListener('click', () => {
+        const label = del.querySelector('span');
+        if (!del.classList.contains('is-armed')) {
+            del.classList.add('is-armed');
+            label.textContent = 'Click again to remove';
+            setTimeout(() => { if (del.isConnected) { del.classList.remove('is-armed'); label.textContent = 'Remove'; } }, 3000);
+            return;
+        }
+        deleteItem(arrKey, index);
+    });
+    del?.before(buildLayerRow((front) => moveLayer(arrKey, index, front), slideItemCount() > 1));
 
     // AR lock: W drives H for video/model
     if (arrKey === 'videos' || arrKey === 'models') {
@@ -162,7 +173,7 @@ function buildPropsHTML(arrKey, item) {
     html += `
         <button class="btn editor-delete-btn" id="prop-delete" title="Remove this item">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-            Remove
+            <span>Remove</span>
         </button>
     `;
 
@@ -294,6 +305,9 @@ async function showWidgetPanel(index) {
             const cr = getSlideEl()?.getBoundingClientRect();
             if (cr) positionOverlay(div, item, cr);
         },
+        onLayer: (front) => moveLayer('widgets', index, front),
+        canLayer: slideItemCount() > 1,
+        onRemove: () => deleteItem('widgets', index),
         onName: () => {
             const name = item.title || widgetTypeLabel(item);
             setPanelTitle(name);
@@ -470,8 +484,39 @@ function wireReorder(list) {
     }
 }
 
+/** How many things are on the current slide (layering needs two). */
+function slideItemCount() {
+    const cfg = getOrCreateConfig();
+    return ['widgets', 'videos', 'audios', 'models', 'reveals']
+        .reduce((n, k) => n + (cfg?.[k]?.length || 0), 0);
+}
+
+/**
+ * Bring one item in front of everything else on the slide, or behind it,
+ * keeping the others' order — the panel's Layer buttons.
+ */
+export function moveLayer(arrKey, index, toFront) {
+    const cfg = getOrCreateConfig();
+    if (!cfg) return;
+    const entries = [];
+    for (const k of ['widgets', 'videos', 'audios', 'models', 'reveals']) {
+        (cfg[k] || []).forEach((item, i) => entries.push({ arrKey: k, item, index: i }));
+    }
+    entries.sort((a, b) => layerOf(b) - layerOf(a));   // front first
+    const at = entries.findIndex(e => e.arrKey === arrKey && e.index === index);
+    if (at < 0) return;
+    const [me] = entries.splice(at, 1);
+    if (toFront) entries.unshift(me); else entries.push(me);
+    renumberLayers(entries);
+}
+
 function applyListOrder(list) {
-    const ordered = Array.from(list.querySelectorAll('.slide-item')).map(r => r._entry);
+    renumberLayers(Array.from(list.querySelectorAll('.slide-item')).map(r => r._entry));
+    refreshSlideItems();
+}
+
+// `ordered` is front to back; the back gets LAYER_BASE, each one forward one more.
+function renumberLayers(ordered) {
     const n = ordered.length;
     ordered.forEach(({ item }, i) => { item.zIndex = LAYER_BASE + (n - 1 - i); });
     // Keep the boxes on the slide stacked the same way, so the one in front
@@ -480,5 +525,4 @@ function applyListOrder(list) {
         const div = document.querySelector(`.edit-overlay[data-arr-key="${arrKey}"][data-item-index="${index}"]`);
         if (div) div.style.zIndex = String(50 + item.zIndex);
     }
-    refreshSlideItems();
 }

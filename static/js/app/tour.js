@@ -81,7 +81,7 @@ const STEPS = [
         sel:   '#session-edit-btn',
         place: 'auto',
         title: 'Edit mode',
-        body:  'Edit presentation opens the editing panel where you can add videos, audio, 3D models, and interactive widgets to any slide. Drag and resize overlays freely.',
+        body:  'Edit presentation lets you add videos, audio, 3D models, and interactive widgets to any slide from the toolbar on the right, and rename, hide or delete the slide from the bar under it. Drag and resize overlays freely; click one to open its settings.',
     },
     {
         sel:   '#record-btn',

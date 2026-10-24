@@ -70,9 +70,9 @@ export function showHelpModal() {
             id: 'edit', label: 'Editing',
             html: `
 <h4 class="help-h">Entering edit mode</h4>
-<p class="help-p">Click the edit button ${_hbtn('edit','Edit mode')} in the top-right corner. A panel opens on the right where you can select, configure, and delete anything on the current slide.</p>
+<p class="help-p">Click the edit button ${_hbtn('edit','Edit mode')} in the top-right corner. Under the slide, its title is on the left (click to rename it) and on the right are an eye to hide it from the presentation and a trash can to delete it (click twice). Click anything on the slide to open its settings in a panel on the right; click empty space or press Esc to close it. Click <strong>Done</strong> when you're finished.</p>
 <h4 class="help-h">Adding overlays</h4>
-<p class="help-p">The buttons at the bottom of the editor panel let you add content on top of your slides:</p>
+<p class="help-p">The toolbar on the right, where the drawing tools sit while presenting, lets you add content on top of your slides:</p>
 <ul class="help-ul">
   <li>${_hbtn('video','Add video')} <strong>Video</strong>: overlay a video player.</li>
   <li>${_hbtn('audio','Add audio')} <strong>Audio</strong>: overlay an audio clip.</li>
@@ -80,7 +80,7 @@ export function showHelpModal() {
   <li>${_hbtn('widget','Add widget')} <strong>Widget</strong>: add an interactive widget (see the Widgets section).</li>
 </ul>
 <h4 class="help-h">Moving &amp; resizing</h4>
-<p class="help-p">Drag any overlay to reposition it, or drag its bottom-right corner to resize. The Properties panel shows exact position and size. To change what sits in front, drag the items in the slide's <strong>On this slide</strong> list — the top one is in front.</p>
+<p class="help-p">Drag any overlay to reposition it, or drag its bottom-right corner to resize. The panel shows its exact position and size, and its <strong>Layer</strong> buttons bring it to the front or send it to the back.</p>
 <h4 class="help-h">Saving your work</h4>
 <p class="help-p">Click the save button (top-right, the disk): pick a folder and a file name (or <b>Or download instead</b>, for your downloads folder), and tick what to save: <b>Presentation</b> is a ZIP with all overlays, widgets, and annotations that reopens at the slide you were on; <b>Notes</b> a single PDF to hand out: every visible slide with your annotations drawn on, each widget as it stands now, videos and 3D models as pictures, and poll results; and any <b>Recordings</b>.</p>`,
         },
