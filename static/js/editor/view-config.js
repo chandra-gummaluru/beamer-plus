@@ -79,6 +79,13 @@ function buildViewConfigHTML(obj, viewIdx) {
                 </button>`).join('')}
             </div>
         </div>
+        <section class="wf-group">
+            <div class="wf-group-title">Edit a Slide</div>
+            <div class="slide-items" role="list">
+                ${paneRow('left', obj.left)}
+                ${paneRow('right', obj.right)}
+            </div>
+        </section>
         <button class="btn editor-delete-btn" id="view-delete">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
             Remove View
@@ -86,8 +93,44 @@ function buildViewConfigHTML(obj, viewIdx) {
     `;
 }
 
+// One row per pane: click it to leave the split view and edit that slide on
+// its own, with everything on it in the panel.
+const PANE_ICON = {
+    left:  '<rect x="3" y="4" width="18" height="16" rx="2"/><rect x="3" y="4" width="8" height="16" rx="2" fill="currentColor" fill-opacity="0.25"/>',
+    right: '<rect x="3" y="4" width="18" height="16" rx="2"/><rect x="13" y="4" width="8" height="16" rx="2" fill="currentColor" fill-opacity="0.25"/>',
+};
+function paneRow(side, idx) {
+    if (idx == null) return '';
+    const label = getSlideLabels(ctx.state.slideStructure)[idx] ?? '';
+    return `
+        <div class="slide-item" role="listitem" tabindex="0" data-pane="${side}" data-index-to="${idx}" title="Edit Slide ${escAttr(label)}">
+            <span class="slide-item-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${PANE_ICON[side]}</svg></span>
+            <span class="slide-item-text">
+                <span class="slide-item-name">Slide ${escHtml(label)}</span>
+                <span class="slide-item-kind">${side === 'left' ? 'Left Pane' : 'Right Pane'}</span>
+            </span>
+            <svg class="slide-item-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+        </div>`;
+}
+
+// Close the split and go to one of its slides, in the editor as usual.
+async function editPaneSlide(idx) {
+    hideViewConfig();
+    if (ctx.state.splitView) {
+        document.getElementById('split-toggle')?.click();
+        await new Promise(r => setTimeout(r, 250));
+    }
+    bus.emit('slide:goto', idx);
+}
+
 function wireViewConfigHandlers(i, obj) {
     const get = id => document.getElementById(id);
+
+    document.querySelectorAll('#editor-view-body .slide-item[data-index-to]').forEach(row => {
+        const go = () => editPaneSlide(parseInt(row.dataset.indexTo, 10));
+        row.addEventListener('click', go);
+        row.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+    });
 
     function saveAndRefresh() {
         const leftVal  = get('view-left')?.value  ?? '';

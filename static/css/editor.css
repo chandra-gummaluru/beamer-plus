@@ -1134,8 +1134,9 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 #editor-view-body {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-3);
+    gap: 18px;
 }
+#editor-view-body .wf-group { gap: 10px; margin-top: 4px; }
 
 .editor-flow-range {
     width: 100%;
