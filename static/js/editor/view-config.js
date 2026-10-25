@@ -44,8 +44,7 @@ function buildViewConfigHTML(obj, viewIdx) {
     const ratio = obj.ratio !== undefined ? obj.ratio : 50;
 
     return `
-        <section class="wf-group">
-            <div class="wf-group-title">Slides</div>
+        <section class="wf-group" aria-label="Slides">
             <div class="slide-items" role="list">
                 ${paneRow('left', obj.left)}
                 ${paneRow('right', obj.right)}
@@ -55,8 +54,7 @@ function buildViewConfigHTML(obj, viewIdx) {
                 <span>Choose Slides</span>
             </button>
         </section>
-        <div class="editor-prop-row">
-            <div class="editor-prop-label">Split</div>
+        <div class="editor-prop-row" aria-label="Split">
             <!-- The two panes, drawn to scale: drag the line between them, or
                  pick a preset below. The divider on the slide itself can be
                  dragged too. -->

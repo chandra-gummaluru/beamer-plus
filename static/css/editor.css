@@ -2232,3 +2232,24 @@ body.picking-panes #slide-nav-slides .slide-nav-item:hover .slide-preview { outl
 #slide-shown-btn.btn_selected .slide-shown-off { display: contents; }
 #slide-shown-btn > span { display: contents; }
 #slide-shown-btn.btn_selected { background: var(--surface-cream-2); color: var(--ink-1); }
+
+/* Blank slide paper: each choice a little page drawn the way it'd look
+   (editor.js initPaperSettings / syncPaperSettings). */
+.paper-tiles { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 8px; }
+.paper-tile {
+    display: flex; flex-direction: column; align-items: stretch; gap: 5px;
+    padding: 5px 5px 4px; margin: 0;
+    border: 1px solid oklch(88% 0.004 260); border-radius: var(--r-md);
+    background: transparent; cursor: pointer;
+    font-family: var(--font-sans); font-size: var(--fs-xs); color: var(--ink-3);
+}
+.paper-tile:hover { background: var(--surface-cream-2); color: var(--ink-2); }
+.paper-tile.is-selected { border-color: var(--ink-1); box-shadow: 0 0 0 1px var(--ink-1); color: var(--ink-1); font-weight: 600; }
+.paper-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.paper-tile-page {
+    display: block; aspect-ratio: 4 / 3; border-radius: 3px;
+    background-color: #fff; border: 1px solid oklch(0% 0 0 / 0.08);
+}
+/* The options only need a strip of the pattern. */
+.paper-tiles:not([data-paper="style"]) .paper-tile-page { aspect-ratio: 2 / 1; }
+.paper-tile-name { text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

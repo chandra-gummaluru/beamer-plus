@@ -58,10 +58,12 @@ const CARD = { pct: 11, line: 1, dot: 1.6, c: 'rgba(26, 26, 24, 0.34)' };
  * strokes, for the navigator's small previews; `card` draws the close-up
  * used on the Add page chooser's style cards.
  */
-export function paperCss(paper, { thumb = false, card = false } = {}) {
+export function paperCss(paper, { thumb = false, card = false, zoom = 1 } = {}) {
     if (!paper || !paper.style || paper.style === 'none') return null;
     const p  = normalizePaper(paper);
-    const sx = card ? CARD.pct : pick(PAPER_SPACING, p.spacing, 'm').pct;
+    // zoom: the editor panel's little pages draw the pattern larger, so
+    // their spacings still tell apart at that size.
+    const sx = card ? CARD.pct : pick(PAPER_SPACING, p.spacing, 'm').pct * zoom;
     const sy = sx / 0.75;
     const th = pick(PAPER_THICKNESS, p.thickness, 'm');
     const c  = card ? CARD.c : pick(PAPER_COLORS, p.color, 'grey').c;

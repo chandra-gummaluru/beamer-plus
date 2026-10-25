@@ -26,7 +26,7 @@ import { initDropdowns } from './dropdown.js';
 import { titleCase } from './title-case.js';
 import { realSlideCount, insertViewAfterCurrent, removeSlideAt } from '../slides/structure.js';
 import { pickPanes, cancelPick } from './pane-picker.js';
-import { PAPER_STYLES, PAPER_SPACING, PAPER_THICKNESS, PAPER_COLORS, normalizePaper } from '../slides/paper.js';
+import { PAPER_STYLES, PAPER_SPACING, PAPER_THICKNESS, PAPER_COLORS, normalizePaper, applyPaper } from '../slides/paper.js';
 
 /* ─── init ──────────────────────────────────────────────────── */
 
@@ -307,6 +307,20 @@ function initPaperSettings() {
         const sel = document.getElementById(`paper-${key}`);
         if (!sel) continue;
         sel.innerHTML = list.map(o => `<option value="${o.v}">${titleCase(o.l)}</option>`).join('');
+        // The choices as little pages (drawn in syncPaperSettings).
+        const tiles = document.querySelector(`.paper-tiles[data-paper="${key}"]`);
+        if (tiles) {
+            tiles.style.setProperty('--n', list.length);
+            tiles.innerHTML = list.map(o => `
+                <button type="button" class="paper-tile" role="radio" data-v="${o.v}" title="${titleCase(o.l)}">
+                    <span class="paper-tile-page"></span><span class="paper-tile-name">${titleCase(o.l)}</span>
+                </button>`).join('');
+            tiles.querySelectorAll('.paper-tile').forEach(t => t.addEventListener('click', () => {
+                if (sel.value === t.dataset.v) return;
+                sel.value = t.dataset.v;
+                sel.dispatchEvent(new Event('change'));
+            }));
+        }
         sel.addEventListener('change', () => {
             const obj = ctx.state?.slideStructure?.[ctx.state?.currentSlide];
             if (obj?.type !== 'blank') return;
@@ -331,10 +345,21 @@ function syncPaperSettings(obj) {
     if (opts) opts.hidden = p.style === 'none';
     const tl = document.getElementById('paper-thickness-label');
     if (tl) tl.textContent = p.style === 'dots' ? 'Dot Size' : 'Line Weight';
+    // Each little page is this paper with that one choice changed. The
+    // backgrounds show the style close up; the rest draw it at 3× so the
+    // spacings, weights and colours tell apart at that size.
+    for (const key of Object.keys(PAPER_FIELDS)) {
+        document.querySelectorAll(`.paper-tiles[data-paper="${key}"] .paper-tile`).forEach(t => {
+            const on = p[key] === t.dataset.v;
+            t.classList.toggle('is-selected', on);
+            t.setAttribute('aria-checked', String(on));
+            const look = { ...p, [key]: t.dataset.v };
+            if (key !== 'style' && look.style === 'none') look.style = 'grid';
+            applyPaper(t.querySelector('.paper-tile-page'), look, key === 'style' ? { card: true } : { zoom: 3 });
+        });
+    }
 }
 
-// Disable the add-media buttons when the current slide is a view slide
-// (view slides have no content layer to attach media to).
 // The slide the toolbar's eye and trash act on: the one on stage, or while
 // a split view is on stage, the split view itself (null for a split you
 // opened yourself, which isn't a slide).

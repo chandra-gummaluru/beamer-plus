@@ -250,34 +250,37 @@
                  (properties.js, refreshSlideItems). Whether it's shown is
                  the insert toolbar's eye. -->
             <div id="editor-slide-settings">
-                <!-- Blank slides only: lined / grid / dotted paper (slides/paper.js). -->
-                <section class="wf-group" id="slide-paper-section" hidden>
-                    <div class="wf-group-title">Paper</div>
-                    <div class="wf-group-body">
-                <div id="slide-paper-settings">
-                    <label class="editor-prop-row">
-                        <span class="editor-prop-label">Background</span>
-                        <select class="editor-prop-select" id="paper-style"></select>
-                    </label>
-                    <div id="paper-options">
-                        <label class="editor-prop-row">
-                            <span class="editor-prop-label">Spacing</span>
-                            <select class="editor-prop-select" id="paper-spacing"></select>
-                        </label>
-                        <label class="editor-prop-row">
-                            <span class="editor-prop-label" id="paper-thickness-label">Line Weight</span>
-                            <select class="editor-prop-select" id="paper-thickness"></select>
-                        </label>
-                        <label class="editor-prop-row">
-                            <span class="editor-prop-label">Colour</span>
-                            <select class="editor-prop-select" id="paper-color"></select>
-                        </label>
-                    </div>
-                </div>
+                <!-- Blank slides only: lined / grid / dotted paper (slides/paper.js).
+                     Each choice is a row of little pages drawn the way it'd
+                     look (editor.js initPaperSettings); the hidden selects
+                     hold the values. -->
+                <section class="wf-group" id="slide-paper-section" aria-label="Paper" hidden>
+                    <div id="slide-paper-settings">
+                        <div class="editor-prop-row">
+                            <span class="editor-prop-label">Background</span>
+                            <select id="paper-style" hidden></select>
+                            <div class="paper-tiles" data-paper="style" role="radiogroup" aria-label="Background"></div>
+                        </div>
+                        <div id="paper-options">
+                            <div class="editor-prop-row">
+                                <span class="editor-prop-label">Spacing</span>
+                                <select id="paper-spacing" hidden></select>
+                                <div class="paper-tiles" data-paper="spacing" role="radiogroup" aria-label="Spacing"></div>
+                            </div>
+                            <div class="editor-prop-row">
+                                <span class="editor-prop-label" id="paper-thickness-label">Line Weight</span>
+                                <select id="paper-thickness" hidden></select>
+                                <div class="paper-tiles" data-paper="thickness" role="radiogroup" aria-label="Line Weight"></div>
+                            </div>
+                            <div class="editor-prop-row">
+                                <span class="editor-prop-label">Colour</span>
+                                <select id="paper-color" hidden></select>
+                                <div class="paper-tiles" data-paper="color" role="radiogroup" aria-label="Colour"></div>
+                            </div>
+                        </div>
                     </div>
                 </section>
-                <section class="wf-group" id="slide-items-section">
-                    <div class="wf-group-title">On This Slide</div>
+                <section class="wf-group" id="slide-items-section" aria-label="On This Slide">
                     <div id="editor-slide-items"></div>
                 </section>
             </div>
