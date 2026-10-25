@@ -48,24 +48,24 @@
     <!-- Slide navigator -->
     <aside id="slide-navigator">
         <div id="slide-nav-top-actions">
-            <button class="btn" id="split-toggle" title="Split view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg></button>
+            <button class="btn" id="split-toggle" title="Split View"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg></button>
         </div>
         <div id="bookmark-pins"></div>
         <div id="slide-nav-slides"></div>
         <div id="slide-nav-bottom-actions">
             <!-- Split button: left half inserts a blank slide, right half
                  duplicates the slide on stage (slides/structure.js). -->
-            <div class="btn-split" id="add-slide-group" role="group" aria-label="Add slide">
-                <button class="btn" id="add-blank-btn" title="Add page…"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg></button>
-                <button class="btn" id="duplicate-slide-btn" title="Duplicate this slide"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M4 16V5a2 2 0 0 1 2-2h11"/></svg></button>
+            <div class="btn-split" id="add-slide-group" role="group" aria-label="Add Slide">
+                <button class="btn" id="add-blank-btn" title="Add Page…"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg></button>
+                <button class="btn" id="duplicate-slide-btn" title="Duplicate This Slide"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M4 16V5a2 2 0 0 1 2-2h11"/></svg></button>
             </div>
-            <button class="btn" id="bookmark-btn" title="Bookmark slide"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+            <button class="btn" id="bookmark-btn" title="Bookmark Slide"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
         </div>
     </aside>
 
     <!-- Drawer hinge — slides the navigator out of view and back
          (slides/drawer.js). Sits on the navigator's right edge. -->
-    <button type="button" id="nav-drawer-hinge" aria-controls="slide-navigator" aria-expanded="true" title="Hide slides">
+    <button type="button" id="nav-drawer-hinge" aria-controls="slide-navigator" aria-expanded="true" title="Hide Slides">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
     </button>
 
@@ -118,7 +118,7 @@
     <!-- Edit mode button — bottom-right, just right of the hide-slide button
          (top-right while editing, where it closes the editor). -->
     <div id="edit-mode-container">
-        <button class="btn" id="edit-mode-btn" title="Edit mode">
+        <button class="btn" id="edit-mode-btn" title="Edit Mode">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
                 <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
@@ -131,42 +131,42 @@
          (library/ui.js); Edit and Save need an open presentation. Dropping a
          file on the window opens it too. -->
     <div id="top-right-controls">
-        <button class="btn" id="session-open-btn" title="Open a presentation" aria-label="Open a presentation"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H9l2 2.5h7.5A2.5 2.5 0 0 1 21 10v7.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/></svg></button>
-        <button class="btn" id="session-edit-btn" title="Edit presentation" aria-label="Edit presentation" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-        <button class="btn" id="session-save-btn" title="Save presentation" aria-label="Save presentation" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></button>
-        <button class="btn" id="session-close-btn" title="Close session" aria-label="Close session"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 17l5-5-5-5M15 12H4"/></svg></button>
+        <button class="btn" id="session-open-btn" title="Open a Presentation" aria-label="Open a Presentation"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H9l2 2.5h7.5A2.5 2.5 0 0 1 21 10v7.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/></svg></button>
+        <button class="btn" id="session-edit-btn" title="Edit Presentation" aria-label="Edit Presentation" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+        <button class="btn" id="session-save-btn" title="Save Presentation" aria-label="Save Presentation" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></button>
+        <button class="btn" id="session-close-btn" title="Close Session" aria-label="Close Session"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 17l5-5-5-5M15 12H4"/></svg></button>
     </div>
 
     <!-- Record + Mute — bottom-right corner. Record opens the recorder
          (app/recorder.js); Mute blanks the stage until pressed again
          (shortcut "."; main.js toggleMute). -->
     <div id="mute-container">
-        <button class="btn" id="record-btn" title="Record this tab"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/></svg></button>
+        <button class="btn" id="record-btn" title="Record This Tab"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/></svg></button>
         <!-- Recording bar — takes the record button's place while a take
              is in progress (app/recorder.js). Stays up in edit and focus mode. -->
         <div id="recorder-bar" role="group" aria-label="Recording" hidden>
             <span class="recorder-dot" aria-hidden="true"></span>
             <span class="recorder-state visually-hidden">Recording</span>
             <span class="recorder-time" aria-live="off">0:00</span>
-            <button class="btn" id="recorder-pause-btn" title="Pause recording" aria-label="Pause recording">
+            <button class="btn" id="recorder-pause-btn" title="Pause Recording" aria-label="Pause Recording">
                 <svg class="recorder-icon-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
                 <svg class="recorder-icon-resume" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="6"/></svg>
             </button>
-            <button class="btn" id="recorder-stop-btn" title="Stop recording" aria-label="Stop recording">
+            <button class="btn" id="recorder-stop-btn" title="Stop Recording" aria-label="Stop Recording">
                 <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
             </button>
         </div>
-        <button class="btn" id="mute-btn" title="Hide slide (.)" aria-pressed="false"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button>
+        <button class="btn" id="mute-btn" title="Hide Slide (.)" aria-pressed="false"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button>
     </div>
 
     <!-- Annotation toolbar -->
     <div id="floating-annotation-toolbar">
         <div id="tool-container">
-            <button class="btn tool-btn" data-tool="hand" id="hand-btn" title="Hand / pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 11V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2"/><path d="M14 10V4a2 2 0 0 0-2-2 2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2v8"/><path d="M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg></button>
+            <button class="btn tool-btn" data-tool="hand" id="hand-btn" title="Hand / Pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 11V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2"/><path d="M14 10V4a2 2 0 0 0-2-2 2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2v8"/><path d="M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg></button>
             <button class="btn tool-btn" data-tool="spotlight" id="spotlight-btn" title="Spotlight"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></button>
-            <button class="btn tool-btn" data-tool="magnify" id="magnify-btn" title="Magnifier (scroll to zoom)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16" y2="16"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
+            <button class="btn tool-btn" data-tool="magnify" id="magnify-btn" title="Magnifier (Scroll to Zoom)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16" y2="16"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
             <div id="pen-slots"></div>
-            <button class="btn tool-btn" data-tool="text" id="text-btn" title="Text box"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg></button>
+            <button class="btn tool-btn" data-tool="text" id="text-btn" title="Text Box"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg></button>
             <button class="btn tool-btn" data-tool="eraser" title="Eraser"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 21h10"/><path d="m5 11 9-9 6 6-9 9H5z"/></svg></button>
         </div>
         <div id="annotation-undo-redo">
@@ -174,7 +174,7 @@
             <button class="btn" id="annotation-redo" title="Redo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></button>
         </div>
         <div id="annotation-clear">
-            <button class="btn" id="annotation-clear-btn" title="Clear all"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
+            <button class="btn" id="annotation-clear-btn" title="Clear All"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
         </div>
     </div>
 
@@ -183,12 +183,12 @@
          toolbar's own box (the toolbar has `transform`, which would otherwise make
          it the containing block for a fixed-position descendant). -->
     <div id="text-size-sidebar">
-        <button class="btn" type="button" data-size="small" title="Small text"><span class="text-size-dot text-size-dot--small"></span></button>
-        <button class="btn" type="button" data-size="regular" title="Regular text"><span class="text-size-dot text-size-dot--regular"></span></button>
-        <button class="btn" type="button" data-size="large" title="Large text"><span class="text-size-dot text-size-dot--large"></span></button>
-        <button class="btn" type="button" data-size="xlarge" title="Extra-large text"><span class="text-size-dot text-size-dot--xlarge"></span></button>
+        <button class="btn" type="button" data-size="small" title="Small Text"><span class="text-size-dot text-size-dot--small"></span></button>
+        <button class="btn" type="button" data-size="regular" title="Regular Text"><span class="text-size-dot text-size-dot--regular"></span></button>
+        <button class="btn" type="button" data-size="large" title="Large Text"><span class="text-size-dot text-size-dot--large"></span></button>
+        <button class="btn" type="button" data-size="xlarge" title="Extra-Large Text"><span class="text-size-dot text-size-dot--xlarge"></span></button>
         <hr class="text-flyout-sep">
-        <div class="text-color-row" role="group" aria-label="Text color">
+        <div class="text-color-row" role="group" aria-label="Text Color">
             <button class="text-color-swatch" type="button" data-color="#242424" title="Black" style="--c:#242424"></button>
             <button class="text-color-swatch" type="button" data-color="#e74c3c" title="Red" style="--c:#e74c3c"></button>
             <button class="text-color-swatch" type="button" data-color="#f1c40f" title="Yellow" style="--c:#f1c40f"></button>
@@ -196,8 +196,8 @@
             <button class="text-color-swatch" type="button" data-color="#3498db" title="Blue" style="--c:#3498db"></button>
             <button class="text-color-swatch" type="button" data-color="#9b59b6" title="Purple" style="--c:#9b59b6"></button>
             <button class="text-color-swatch" type="button" data-color="#eeeeee" title="White" style="--c:#eeeeee"></button>
-            <label class="text-color-swatch text-color-custom" title="Pick any color">
-                <input type="color" id="text-color-custom" value="#242424" aria-label="Pick any color">
+            <label class="text-color-swatch text-color-custom" title="Pick Any Color">
+                <input type="color" id="text-color-custom" value="#242424" aria-label="Pick Any Color">
             </label>
         </div>
     </div>
@@ -234,7 +234,7 @@
     <!-- Editor panel (right sidebar, visible in edit mode) -->
     <aside id="editor-panel" data-mode="slide">
         <div id="editor-panel-header">
-            <button class="editor-props-back" id="editor-props-back" type="button" title="Back to the slide" aria-label="Back to the slide">
+            <button class="editor-props-back" id="editor-props-back" type="button" title="Back to the Slide" aria-label="Back to the Slide">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
             </button>
             <div class="editor-panel-titles">
@@ -243,7 +243,7 @@
                 <input id="editor-panel-title" type="text" value="Slide" readonly tabindex="-1" autocomplete="off" spellcheck="false" aria-label="Name">
             </div>
             <!-- Leaves edit mode (editor.js). -->
-            <button class="btn editor-done-btn" id="editor-done-btn" type="button" title="Finish editing">
+            <button class="btn editor-done-btn" id="editor-done-btn" type="button" title="Finish Editing">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
                 <span>Done</span>
             </button>
@@ -317,22 +317,22 @@
     </aside>
     <!-- Insert toolbar — docked to the top edge of the stage while editing,
          the way the annotation toolbar docks to the right while presenting. -->
-    <div id="editor-add-row" role="toolbar" aria-label="Add to this slide">
-        <button class="btn editor-icon-btn" id="add-view-btn" title="Insert split view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="3" width="8" height="18" rx="1.5"/><rect x="15" y="3" width="8" height="18" rx="1.5"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="9" y1="12" x2="15" y2="12"/></svg></button>
-        <button class="btn editor-icon-btn" id="edit-add-video-btn" title="Add video">
+    <div id="editor-add-row" role="toolbar" aria-label="Add to This Slide">
+        <button class="btn editor-icon-btn" id="add-view-btn" title="Insert Split View"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="3" width="8" height="18" rx="1.5"/><rect x="15" y="3" width="8" height="18" rx="1.5"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="9" y1="12" x2="15" y2="12"/></svg></button>
+        <button class="btn editor-icon-btn" id="edit-add-video-btn" title="Add Video">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
         </button>
-        <button class="btn editor-icon-btn" id="edit-add-audio-btn" title="Add audio">
+        <button class="btn editor-icon-btn" id="edit-add-audio-btn" title="Add Audio">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
         </button>
-        <button class="btn editor-icon-btn" id="edit-add-model-btn" title="Add 3D model (.glb / .gltf)">
+        <button class="btn editor-icon-btn" id="edit-add-model-btn" title="Add 3D Model (.glb / .gltf)">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
         </button>
-        <button class="btn editor-icon-btn" id="edit-add-reveal-btn" title="Add reveal step (hide part of the slide until a key press)">
+        <button class="btn editor-icon-btn" id="edit-add-reveal-btn" title="Add Reveal Step: hides part of the slide until you press a key">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="3 3"/><path d="M8 12h8"/><path d="M13 9l3 3-3 3"/></svg>
         </button>
         <div class="editor-rail-sep" aria-hidden="true"></div>
-        <button class="btn editor-icon-btn" id="edit-add-widget-btn" title="Add widget">
+        <button class="btn editor-icon-btn" id="edit-add-widget-btn" title="Add Widget">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
         </button>
     </div>

@@ -20,6 +20,8 @@ function fixWord(word, first, last) {
     const m = /^([^A-Za-z0-9]*)(.*?)([^A-Za-z0-9]*)$/.exec(word);
     const [, pre, core, post] = m;
     if (!core) return word;
+    // A file extension or path (".glb") is written as it is.
+    if (pre.endsWith('.') || pre.endsWith('/')) return word;
     // Already shaped by its author: an acronym, a mixed-case name, a number.
     if (/[A-Z]/.test(core.slice(1)) || /\d/.test(core) || /^[A-Z]{2,}$/.test(core)) return word;
     if (core.length === 1 && core !== 'a' && core !== 'i') return word;

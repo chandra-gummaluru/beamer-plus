@@ -88,8 +88,8 @@ export function syncWidgetLock(div, item, schema, container = getSlideEl()) {
 // What a box on the slide is called, plus its reveal step if it has one.
 export function overlayLabel(arrKey, item, name) {
     const step = parseInt(item?.step, 10);
-    if (arrKey === 'reveals') return `Reveal · step ${step > 0 ? step : 1}`;
-    return step > 0 ? `${name} · step ${step}` : name;
+    if (arrKey === 'reveals') return `Reveal Step ${step > 0 ? step : 1}`;
+    return step > 0 ? `${name} · Appears on Step ${step}` : name;
 }
 
 /* ─── reveal boxes ──────────────────────────────────────────── */

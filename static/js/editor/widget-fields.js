@@ -878,7 +878,7 @@ async function fillModelOptions(select, current) {
         select.textContent = '';
         const none = document.createElement('option');
         none.value = '';
-        none.textContent = '— no model —';
+        none.textContent = 'No Model';
         select.appendChild(none);
         for (const m of models) {
             const opt = document.createElement('option');
@@ -911,7 +911,7 @@ async function fillModelOptions(select, current) {
         if (ctx.state) ctx.state.availableModels = models;
         render(models);
     } catch (_) {
-        placeholder.textContent = '— unavailable —';
+        placeholder.textContent = 'Unavailable';
     }
 }
 
