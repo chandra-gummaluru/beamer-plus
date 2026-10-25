@@ -277,11 +277,12 @@ function updateSlideSettingsPanel() {
     if (!ctx.selectedOverlay && ctx.selectedViewIdx === null) setPanelMode('slide');
 }
 
+// Armed, the toolbar's trash turns red and says "Click Again to Delete".
 function armSlideDelete(on) {
     const btn = document.getElementById('slide-delete');
     if (!btn) return;
     btn.classList.toggle('is-armed', on);
-    btn.querySelector('span').textContent = on ? 'Click Again to Delete' : 'Delete Slide';
+    btn.title = on ? 'Click Again to Delete' : 'Delete Slide';
 }
 
 /* ─── blank-slide paper ─────────────────────────────────────── */

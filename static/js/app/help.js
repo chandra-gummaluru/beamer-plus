@@ -70,7 +70,7 @@ export function showHelpModal() {
             id: 'edit', label: 'Editing',
             html: `
 <h4 class="help-h">Entering edit mode</h4>
-<p class="help-p">Click the edit button ${_hbtn('edit','Edit mode')} in the top-right corner. A toolbar across the top of the slide adds things to it, and a panel on the right shows the slide itself: <strong>Show During Presentation</strong>, everything on the slide (drag a row to change what's in front, click it to edit), and <strong>Delete Slide</strong> at the bottom (click twice). Click anything on the slide to open its settings in the panel; the back arrow, a click on empty space or Esc returns to the slide. Click <strong>Done</strong> in the panel when you're finished.</p>
+<p class="help-p">Click the edit button ${_hbtn('edit','Edit mode')} in the top-right corner. A toolbar across the top of the slide adds things to it, and a panel on the right shows the slide itself: <strong>Show During Presentation</strong>, everything on the slide (drag a row to change what's in front, click it to edit). The toolbar ends with New Page, Duplicate, Bookmark and <strong>Delete Slide</strong> (the trash; click it twice). Click anything on the slide to open its settings in the panel; the back arrow, a click on empty space or Esc returns to the slide. Click <strong>Done</strong> in the panel when you're finished.</p>
 <h4 class="help-h">Adding overlays</h4>
 <p class="help-p">The toolbar along the top of the slide adds content on top of it:</p>
 <ul class="help-ul">

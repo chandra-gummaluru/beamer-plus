@@ -2140,7 +2140,7 @@ body.wsheet-open #main-content { padding-right: 408px; }
 .slide-item:hover .slide-item-chev { color: var(--ink-2); }
 .slide-items-empty { margin: 0; font-size: var(--fs-sm); line-height: 1.5; color: var(--ink-3); }
 
-/* ── Footer: Delete Slide / Remove … ── */
+/* ── Footer: Remove … (a selected item) ── */
 #editor-panel-footer {
     flex: 0 0 auto;
     display: flex;
@@ -2148,9 +2148,17 @@ body.wsheet-open #main-content { padding-right: 408px; }
     border-top: var(--line-soft);
     background: var(--surface-cream);
 }
-#editor-panel[data-mode="view"] #editor-panel-footer { display: none; }
-#editor-panel[data-mode="slide"] #item-remove,
-#editor-panel:not([data-mode="slide"]) #slide-delete { display: none; }
+#editor-panel[data-mode="view"] #editor-panel-footer,
+#editor-panel[data-mode="slide"] #editor-panel-footer { display: none; }
+
+/* Delete Slide: the trash at the end of the insert toolbar. The first click
+   arms it: red, widening to say "Click Again to Delete" (editor.js). */
+.editor-delete-btn { width: auto; gap: 6px; transition: background var(--dur-fast, 120ms); }
+.editor-delete-btn .editor-delete-label { display: none; font-family: var(--font-sans); font-size: var(--fs-sm); font-weight: 600; white-space: nowrap; }
+.editor-delete-btn:hover:not(:disabled) { color: oklch(45% 0.16 25); background: oklch(96% 0.02 25); }
+.editor-delete-btn.is-armed,
+.editor-delete-btn.is-armed:hover { padding: 0 12px 0 10px; background: var(--danger); color: #fff; }
+.editor-delete-btn.is-armed .editor-delete-label { display: inline; }
 .editor-remove-btn {
     height: var(--ep-ctl);
     min-height: var(--ep-ctl);
