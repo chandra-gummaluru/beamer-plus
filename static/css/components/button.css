@@ -102,7 +102,10 @@
 }
 
 .btn--danger { --_fg: var(--danger-ink); }
-.btn--danger:hover { --_bg: var(--danger-soft); --_bd: transparent; --_fg: var(--danger-ink); }
+/* Outlined (not ghost): the usual outline, in a pale red. */
+.btn--danger:not(.btn--ghost) { --_bd: oklch(from var(--danger) l c h / 0.45); }
+.btn--danger:hover { --_bg: var(--danger-soft); --_fg: var(--danger-ink); }
+.btn--danger:not(.btn--ghost):hover { --_bd: var(--danger); }
 /* An icon alone (a toolbar's trash) keeps the toolbar's ink until hovered. */
 .btn--icon.btn--danger:not(:hover):not(.is-armed) { --_fg: var(--ink-2); }
 .btn--danger.is-armed,

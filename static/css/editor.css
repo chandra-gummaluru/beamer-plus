@@ -1436,7 +1436,7 @@ body.wsheet-open #main-content { padding-right: var(--editor-panel-width); }
     background: var(--surface-cream);
 }
 #editor-panel-footer .editor-prop-checkbox-row[hidden] { display: none; }
-.editor-delete-btn { align-self: flex-start; margin-left: -10px; }
+.editor-delete-btn { align-self: flex-end; }
 
 /* ── Body and sections ── */
 #editor-panel-body { padding: 18px 20px 24px; gap: 18px; }
