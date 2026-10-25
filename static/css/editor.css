@@ -7,61 +7,24 @@
 }
 
 /* ─── Edit-mode button ───────────────────────────────────────────
-   Edit mode is opened from the session menu ("Edit presentation"); this
-   button only shows while editing, top-right, as the editor's close button.
-   (It stays in the page, hidden, so keyboard shortcuts can still click it.) */
+   Edit mode is opened from the session menu ("Edit presentation") and left
+   with Done in the panel's header. This button stays in the page, hidden,
+   so keyboard shortcuts can still click it. */
 
-#edit-mode-container {
-    position: fixed;
-    top: var(--sp-3);
-    right: var(--sp-3);
-    z-index: 231;
-    display: none;
-    align-items: center;
-    justify-content: center;
-}
-body.edit-mode #edit-mode-container { display: flex; }
-
-#edit-mode-container .btn {
-    width: var(--hit-min);
-    min-width: var(--hit-min);
-    min-height: var(--hit-min);
-    padding: 0;
-}
-
-
-/* While editing it reads "Done": the same paper button as the session
-   buttons it stands in for, just with a label. */
-#edit-mode-container .btn.is-done {
-    width: auto;
-    gap: 6px;
-    padding: 0 14px 0 12px;
-    font-family: var(--font-sans);
-    font-size: var(--fs-sm);
-    font-weight: 500;
-}
-#edit-mode-container .btn.is-done svg { flex: 0 0 auto; }
-
-/* With a panel open, Done moves to the panel's left edge — never over it. */
-body.edit-mode.editor-panel-open #edit-mode-container {
-    right: calc(var(--editor-panel-width) + var(--sp-3));
-}
+#edit-mode-container { display: none; }
 
 /* ─── Hide other UI when edit mode is active ─────────────────── */
 
-/* Hidden but still laid out: the slide is fitted around these buttons while
-   presenting (main.js, _clearTopRightControls), and keeping their box keeps
-   the slide where it was. Done sits in their place. */
-body.edit-mode #top-right-controls      { visibility: hidden !important; pointer-events: none; }
+body.edit-mode #top-right-controls      { display: none !important; }
 body.edit-mode #floating-annotation-toolbar { display: none !important; }
 body.edit-mode #shape-sidebar               { display: none !important; }
 
-/* With nothing selected the stage is laid out exactly as when presenting
-   (the edit rail sits where the annotation toolbar does), so entering edit
-   mode doesn't move the slide. A panel takes its width from the stage. */
-body.edit-mode.editor-panel-open #main-content {
+/* The panel takes its width from the stage, and the insert toolbar its
+   height from the top of it. */
+body.edit-mode #main-content {
     padding-right: var(--editor-panel-width);
 }
+body.edit-mode:not(.split-view-active) #pdf-container { padding-top: 64px; }
 
 
 /* Hide actual media elements — only edit overlay boxes are shown */
@@ -90,7 +53,7 @@ body.edit-mode #pdf-canvas .widget-iframe { display: none !important; }
 }
 
 /* Only while something is selected (or a split view is being set up). */
-body.edit-mode.editor-panel-open #editor-panel { display: flex; }
+body.edit-mode #editor-panel { display: flex; }
 
 /* Panel header — height 58px puts the 1px hairline at y=57,
    matching the centre of the nav's 2px border at y=56-58 */
@@ -144,6 +107,7 @@ body.edit-mode.editor-panel-open #editor-panel { display: flex; }
    The panel shows exactly one section at a time: the slide's own
    properties by default, an item's properties while an overlay is
    selected, or the view configuration for a split-view slide. */
+#editor-panel[data-mode="slide"] #editor-slide-settings { display: flex; }
 #editor-panel[data-mode="item"]  #editor-properties     { display: flex; }
 #editor-panel[data-mode="view"]  #editor-view           { display: flex; }
 
@@ -363,34 +327,32 @@ body.edit-mode.editor-panel-open #editor-panel { display: flex; }
     border-color: oklch(75% 0.08 25);
 }
 
-/* ─── Edit rail ────────────────────────────────────────────────────
-   Where the annotation toolbar docks while presenting, the same glass
-   surface: the inserts, then this slide's tools. Hidden while a panel is
-   open. */
+/* ─── Insert toolbar ───────────────────────────────────────────────
+   Docked to the top edge of the stage while editing, the way the annotation
+   toolbar docks to the right edge while presenting: the same glass surface,
+   icons only. Centred over the stage, between the navigator and the panel. */
 
 #editor-add-row {
     position: fixed;
-    top: 50%;
-    right: 0;
-    transform: translateY(-50%);
+    top: 0;
+    left: calc(var(--nav-width) + (100vw - var(--nav-width) - var(--editor-panel-width)) / 2);
+    transform: translateX(-50%);
     z-index: 195;
     display: none;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
-    gap: var(--sp-1);
-    padding: var(--sp-2);
+    gap: 2px;
+    padding: var(--sp-1);
     background: oklch(99% 0.003 80 / 0.86);
     backdrop-filter: blur(12px) saturate(1.4);
     -webkit-backdrop-filter: blur(12px) saturate(1.4);
     border: var(--line-hairline);
-    border-right: 0;
-    border-radius: var(--r-lg) 0 0 var(--r-lg);
+    border-top: 0;
+    border-radius: 0 0 var(--r-lg) var(--r-lg);
     box-shadow: var(--shadow-3);
 }
 body.edit-mode #editor-add-row { display: flex; }
-/* While something's settings are open, the panel is the only tool. */
-body.edit-mode.editor-panel-open #editor-add-row { display: none; }
-.editor-rail-sep { width: 24px; height: 1px; background: oklch(88% 0.004 260); margin: 2px 0; }
+.editor-rail-sep { width: 1px; height: 20px; background: oklch(88% 0.004 260); margin: 0 4px; }
 
 .editor-icon-btn {
     width: var(--hit-min);
@@ -407,66 +369,12 @@ body.edit-mode.editor-panel-open #editor-add-row { display: none; }
 }
 .editor-icon-btn:hover:not(:disabled) {
     background: var(--surface-cream-2);
-    border-color: oklch(82% 0.005 260);
+    border-color: transparent;
     color: var(--ink-1);
 }
 .editor-icon-btn:disabled { opacity: 0.35; cursor: default; }
 .editor-icon-btn svg { width: 17px; height: 17px; pointer-events: none; }
 
-/* This slide's tools, under the inserts. */
-.editor-rail-group { display: flex; flex-direction: column; align-items: center; gap: var(--sp-1); }
-.editor-rail-slide[hidden] { display: none; }
-#slide-hidden-toggle .i-eye-off { display: none; }
-#slide-hidden-toggle[aria-pressed="true"] { background: var(--ink-1); border-color: var(--ink-1); color: var(--ink-on-accent); }
-#slide-hidden-toggle[aria-pressed="true"] .i-eye { display: none; }
-#slide-hidden-toggle[aria-pressed="true"] .i-eye-off { display: block; }
-/* Delete, armed: red, with what a second click does spelled out beside it. */
-.editor-rail-delete { position: relative; }
-.editor-rail-delete.is-armed,
-.editor-rail-delete.is-armed:hover:not(:disabled) { background: var(--danger); border-color: var(--danger); color: #fff; }
-.editor-rail-delete-label {
-    display: none;
-    position: absolute;
-    right: calc(100% + 10px);
-    top: 50%;
-    transform: translateY(-50%);
-    padding: 5px 10px;
-    border-radius: var(--r-sm);
-    background: var(--danger);
-    color: #fff;
-    font-family: var(--font-sans);
-    font-size: var(--fs-xs);
-    font-weight: 600;
-    white-space: nowrap;
-    pointer-events: none;
-}
-.editor-rail-delete.is-armed .editor-rail-delete-label { display: block; }
-
-/* Paper (blank slides): a popover to the left of the rail. */
-.editor-rail-paper { position: relative; }
-.editor-rail-paper[hidden] { display: none; }
-#slide-paper-btn[aria-expanded="true"] { background: var(--surface-cream-2); color: var(--ink-1); }
-.slide-paper-pop {
-    position: absolute;
-    right: calc(100% + 14px);
-    top: 50%;
-    transform: translateY(-50%);
-    width: 260px;
-    padding: var(--sp-3);
-    background: var(--surface-paper);
-    border: var(--line-soft);
-    border-radius: var(--r-lg);
-    box-shadow: var(--shadow-pop);
-    z-index: 5;
-}
-.slide-paper-pop .slide-setting { padding: 8px 10px; }
-
-/* Bring to front / Send to back. */
-.editor-layer-btns { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); }
-.editor-layer-btn { min-height: 32px; justify-content: center; font-size: var(--fs-sm); font-family: var(--font-sans); }
-.editor-layer-btn:disabled { opacity: 0.45; cursor: default; }
-.editor-delete-btn.is-armed { background: var(--danger); border-color: var(--danger); color: #fff; }
-#editor-widget .wp-remove { margin-top: var(--sp-5); }
 
 /* ─── Edit overlays on the slide ─────────────────────────────── */
 
@@ -1254,12 +1162,6 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 /* ─── Mobile ─────────────────────────────────────────────────── */
 
 @media (max-width: 1024px) {
-    #edit-mode-container,
-    body.edit-mode.editor-panel-open #edit-mode-container {
-        top: var(--sp-2);
-        right: var(--sp-2);
-    }
-
     #editor-panel {
         top: auto; right: 0; left: 0; bottom: 0;
         width: 100%;
@@ -1271,8 +1173,9 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
         z-index: 300;
     }
     /* The panel is a bottom sheet here: the stage gives up height for it,
-       and the rail stays at the window's edge. */
-    body.edit-mode.editor-panel-open #main-content { padding-right: 0; height: calc(100dvh - 45dvh - 88px); }
+       and the insert toolbar centres on the whole width. */
+    body.edit-mode #main-content { padding-right: 0; height: calc(100dvh - 45dvh - 88px); }
+    #editor-add-row { left: 50%; }
 }
 
 @media (max-width: 480px) {
@@ -1280,7 +1183,7 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
         height: 50dvh;
         max-height: 60dvh;
     }
-    body.edit-mode.editor-panel-open #main-content {
+    body.edit-mode #main-content {
         height: calc(100dvh - 50dvh - 88px);
     }
     #editor-panel-body {
@@ -1767,19 +1670,22 @@ body.wsheet-open #main-content { padding-right: 408px; }
     box-shadow: 0 0 0 3px oklch(62% 0.14 150 / 0.16);
 }
 .wsheet-done {
-    min-height: 32px;
-    padding: 0 var(--sp-4);
-    border: 1px solid var(--ink-1);
-    border-radius: var(--r-sm);
-    background: var(--ink-1);
-    color: var(--ink-on-accent);
+    height: 32px;
+    padding: 0 12px 0 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid oklch(86% 0.004 260);
+    border-radius: var(--r-md);
+    background: var(--surface-paper);
+    color: var(--ink-1);
     font-family: var(--font-sans);
     font-size: var(--fs-sm);
-    font-weight: 600;
+    font-weight: 500;
     cursor: pointer;
     transition: background var(--dur-fast), border-color var(--dur-fast);
 }
-.wsheet-done:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
+.wsheet-done:hover { background: var(--surface-cream-2); border-color: oklch(78% 0.006 260); }
 
 /* The form: groups as sections, not cards. */
 .wsheet .wf { gap: 0; }
@@ -1881,3 +1787,355 @@ body.wsheet-open #main-content { padding-right: 408px; }
 @media (prefers-reduced-motion: reduce) {
     .wsheet { transition: none; transform: none; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   The editor panel, as designed (Beamer+ Edit Mode Redesign, boards 4–7)
+   Always open while editing. One height (34px), one border, one radius
+   (8px) and one focus ring for every control; small grey capitals with a
+   hairline for each section; Done in the header, Remove in the footer.
+   Later than everything above, so it wins over the older panel rules.
+   ═══════════════════════════════════════════════════════════════════ */
+
+#editor-panel {
+    --ep-ctl: 34px;
+    --ep-line: oklch(87% 0.004 260);
+    --ep-line-hover: oklch(78% 0.006 260);
+    --ep-ring: 0 0 0 3px oklch(45% 0.005 260 / 0.10);
+    box-shadow: none;
+}
+
+/* ── Header: back · kicker over name · Done ── */
+#editor-panel-header {
+    height: 64px;
+    gap: var(--sp-2);
+    padding: 0 14px 0 20px;
+    border-bottom: var(--line-soft);
+}
+#editor-panel:not([data-mode="slide"]) #editor-panel-header { padding-left: 10px; }
+.editor-props-back,
+#editor-panel[data-mode] .editor-props-back {
+    display: none;
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--ink-2);
+}
+#editor-panel[data-mode="item"] .editor-props-back,
+#editor-panel[data-mode="widget"] .editor-props-back { display: flex; }
+.editor-props-back:hover { background: var(--surface-cream-2); color: var(--ink-1); }
+.editor-panel-titles { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+#editor-panel-kicker {
+    font-size: var(--fs-xs);
+    font-weight: 400;
+    color: var(--ink-3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    order: 0;
+}
+#editor-panel-kicker[hidden] { display: none; }
+#editor-panel-title {
+    font-family: var(--font-serif);
+    font-size: 20px;
+    font-weight: 500;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    color: var(--ink-1);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+/* The slide's header reads name first, what it is under it. */
+#editor-panel[data-mode="slide"] #editor-panel-kicker { order: 1; }
+.editor-done-btn {
+    flex: 0 0 auto;
+    height: var(--ep-ctl);
+    min-height: var(--ep-ctl);
+    padding: 0 12px 0 10px;
+    gap: 6px;
+    border-radius: var(--r-md);
+    font-family: var(--font-sans);
+    font-size: var(--fs-sm);
+    font-weight: 500;
+}
+
+/* ── Body and sections ── */
+#editor-panel-body { padding: 18px 20px 24px; gap: 18px; }
+#editor-panel .wf,
+#editor-widget .wf { gap: 22px; }
+#editor-panel .wf-group,
+#editor-widget .wf-group { gap: 14px; padding: 0; background: none; border: 0; border-radius: 0; }
+#editor-panel .wf-group + .wf-group,
+#editor-widget .wf-group + .wf-group { padding-top: 0; }
+#editor-panel .wf-group-title,
+#editor-widget .wf-group-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    font-family: var(--font-sans);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+}
+#editor-panel .wf-group-title::after { content: ''; flex: 1; height: 1px; background: oklch(90% 0.004 260); }
+#editor-panel .wf-group-body,
+#editor-widget .wf-group-body { gap: 14px; }
+#editor-panel .wf-group[hidden] { display: none; }
+#editor-slide-settings { gap: 22px; }
+#editor-properties-body { gap: 0; }
+
+/* ── Labels ── */
+#editor-panel .editor-prop-row { gap: 6px; }
+#editor-panel .editor-prop-label,
+#editor-view .editor-prop-label,
+#editor-properties .editor-prop-label,
+#editor-widget .editor-prop-label {
+    font-size: var(--fs-sm);
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--ink-1);
+}
+#editor-panel .wp-geom .editor-prop-label { font-size: 12px; color: var(--ink-2); }
+
+/* ── Text boxes ── */
+#editor-panel .editor-prop-input {
+    min-height: var(--ep-ctl);
+    padding: 0 12px;
+    border: 1px solid var(--ep-line);
+    border-radius: var(--r-md);
+    background: var(--surface-paper);
+    font-size: var(--fs-base);
+    color: var(--ink-1);
+    transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+#editor-panel textarea.editor-prop-input { padding: 8px 12px; line-height: 1.5; }
+#editor-panel .editor-prop-input:hover { border-color: var(--ep-line-hover); }
+#editor-panel .editor-prop-input:focus {
+    outline: none;
+    border-color: var(--ink-2);
+    box-shadow: var(--ep-ring);
+    background: #fff;
+}
+#editor-panel .editor-prop-input::placeholder { color: var(--ink-4); }
+
+/* ── Dropdowns (editor/dropdown.js) ── */
+.editor-dd-native { display: none !important; }
+.editor-dd {
+    width: 100%;
+    min-height: var(--wsheet-ctl, 34px);
+    height: 34px;
+    padding: 0 10px 0 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border: 1px solid oklch(87% 0.004 260);
+    border-radius: var(--r-md);
+    background: var(--surface-paper);
+    font-family: var(--font-sans);
+    font-size: var(--fs-base);
+    color: var(--ink-1);
+    text-align: left;
+    cursor: pointer;
+    transition: border-color var(--dur-fast), box-shadow var(--dur-fast), background var(--dur-fast);
+}
+.editor-dd[hidden] { display: none; }
+.editor-dd:hover:not(:disabled) { border-color: oklch(78% 0.006 260); background: #fff; }
+.editor-dd:focus-visible,
+.editor-dd.is-open {
+    outline: none;
+    border-color: var(--ink-2);
+    box-shadow: 0 0 0 3px oklch(45% 0.005 260 / 0.10);
+    background: #fff;
+}
+.editor-dd:disabled { cursor: default; background: var(--surface-cream-2); color: var(--ink-4); border-color: oklch(91% 0.003 260); }
+.editor-dd-value { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.editor-dd-chev { flex: 0 0 auto; color: var(--ink-3); transition: transform var(--dur-fast); }
+.editor-dd.is-open .editor-dd-chev { transform: rotate(180deg); color: var(--ink-1); }
+
+.editor-dd-menu {
+    position: fixed;
+    z-index: 1300;          /* over the panel, the settings sheet and the toolbar */
+    box-sizing: border-box;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: #fff;
+    border: 1px solid oklch(90% 0.004 260);
+    border-radius: 10px;
+    box-shadow: 0 12px 32px oklch(20% 0.01 260 / 0.16), 0 2px 6px oklch(20% 0.01 260 / 0.06);
+    font-family: var(--font-sans);
+    animation: editor-dd-in 120ms var(--ease-out);
+    scrollbar-width: thin;
+}
+@keyframes editor-dd-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .editor-dd-menu { animation: none; } }
+.editor-dd-opt {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 10px;
+    border-radius: var(--r-sm);
+    color: var(--ink-1);
+    cursor: pointer;
+}
+.editor-dd-opt.is-active { background: var(--surface-cream-2); }
+.editor-dd-opt[aria-selected="true"]:not(.is-active) { background: var(--surface-stage); }
+.editor-dd-opt[aria-disabled="true"] { color: var(--ink-4); cursor: default; }
+.editor-dd-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.editor-dd-name { font-size: var(--fs-base); line-height: 1.3; }
+.editor-dd-opt[aria-selected="true"] .editor-dd-name { font-weight: 600; }
+.editor-dd-desc { font-size: var(--fs-xs); line-height: 1.35; color: var(--ink-3); }
+.editor-dd-check { flex: 0 0 auto; color: var(--ink-1); }
+
+/* ── Number boxes: the unit inside, small arrows stacked at the right ── */
+#editor-panel .num-stepper,
+.wsheet .num-stepper {
+    display: flex;
+    align-items: stretch;
+    min-height: var(--ep-ctl, 34px);
+    height: 34px;
+    padding: 0;
+    border: 1px solid oklch(87% 0.004 260);
+    border-radius: var(--r-md);
+    background: var(--surface-paper);
+    overflow: hidden;
+}
+#editor-panel .num-stepper:hover { border-color: oklch(78% 0.006 260); }
+#editor-panel .num-stepper:focus-within,
+.wsheet .num-stepper:focus-within { border-color: var(--ink-2); box-shadow: 0 0 0 3px oklch(45% 0.005 260 / 0.10); background: #fff; }
+#editor-panel .num-stepper-field,
+.wsheet .num-stepper-field { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; padding: 0 6px 0 12px; justify-content: flex-start; }
+#editor-panel .num-stepper .editor-prop-input,
+.wsheet .num-stepper .editor-prop-input {
+    min-height: 0; height: 100%; padding: 0; border: 0; background: transparent; box-shadow: none;
+    text-align: left; font-size: var(--fs-base);
+}
+#editor-panel .num-stepper-field:has(.num-stepper-unit) .editor-prop-input { text-align: left; padding-right: 3px; }
+#editor-panel .num-stepper-unit { font-style: normal; font-size: var(--fs-sm); color: var(--ink-3); }
+.num-stepper-arrows {
+    flex: 0 0 22px;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid oklch(91% 0.003 260);
+}
+.num-stepper-arrows .num-stepper-btn {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    height: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0;
+    color: var(--ink-3);
+}
+.num-stepper-arrows .num-stepper-btn + .num-stepper-btn { border-top: 1px solid oklch(91% 0.003 260); }
+.num-stepper-arrows .num-stepper-btn:hover { background: var(--surface-cream-2); color: var(--ink-1); }
+
+/* ── Switch rows ── */
+#editor-panel .editor-prop-checkbox-row {
+    min-height: var(--ep-ctl);
+    padding: 0;
+    gap: 12px;
+    border: 0;
+    background: none;
+    font-size: var(--fs-sm);
+    font-weight: 500;
+    color: var(--ink-1);
+}
+.editor-switch-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.editor-switch-name { font-size: var(--fs-sm); font-weight: 500; color: var(--ink-1); }
+.editor-switch-desc { font-size: var(--fs-xs); font-weight: 400; color: var(--ink-3); line-height: 1.4; }
+
+/* ── Choices of two or three, and Text size ── */
+#editor-panel .wf-seg,
+#editor-panel .wf-sizes { padding: 3px; gap: 2px; background: oklch(93% 0.006 80); border-radius: 9px; }
+#editor-panel .wf-seg-btn { min-height: 28px; border-radius: 6px; font-size: var(--fs-sm); }
+#editor-panel .wf-size-btn { height: 30px; border-radius: 6px; }
+
+/* ── On This Slide ── */
+#slide-items-section { gap: 10px; }
+.slide-items { display: flex; flex-direction: column; gap: 6px; }
+.slide-item {
+    position: relative;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 10px 0 8px;
+    border: 1px solid oklch(90% 0.004 260);
+    border-radius: 10px;
+    background: var(--surface-paper);
+    cursor: pointer;
+    transition: border-color var(--dur-fast), box-shadow var(--dur-fast), background var(--dur-fast);
+}
+.slide-item:hover,
+.slide-item:focus-visible {
+    outline: none;
+    border-color: oklch(78% 0.006 260);
+    background: #fff;
+    box-shadow: 0 1px 3px oklch(20% 0.01 260 / 0.08);
+}
+.slide-item[draggable="true"] { cursor: pointer; }
+.slide-item-grip { flex: 0 0 auto; color: oklch(76% 0.005 260); cursor: grab; }
+.slide-item:hover .slide-item-grip { color: var(--ink-3); }
+.slide-item-icon {
+    flex: 0 0 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--r-md);
+    background: var(--surface-cream-2);
+    color: var(--ink-2);
+}
+.slide-item-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.slide-item-name { font-size: var(--fs-base); font-weight: 500; color: var(--ink-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.slide-item-kind { font-size: var(--fs-xs); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.slide-item-chev { flex: 0 0 auto; color: var(--ink-4); }
+.slide-item:hover .slide-item-chev { color: var(--ink-2); }
+.slide-items-empty { margin: 0; font-size: var(--fs-sm); line-height: 1.5; color: var(--ink-3); }
+
+/* ── Footer: Delete Slide / Remove … ── */
+#editor-panel-footer {
+    flex: 0 0 auto;
+    display: flex;
+    padding: 10px 14px;
+    border-top: var(--line-soft);
+    background: var(--surface-cream);
+}
+#editor-panel[data-mode="view"] #editor-panel-footer { display: none; }
+#editor-panel[data-mode="slide"] #item-remove,
+#editor-panel:not([data-mode="slide"]) #slide-delete { display: none; }
+.editor-remove-btn {
+    height: var(--ep-ctl);
+    min-height: var(--ep-ctl);
+    padding: 0 10px;
+    gap: 6px;
+    border: 1px solid transparent;
+    border-radius: var(--r-md);
+    background: transparent;
+    font-family: var(--font-sans);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: oklch(45% 0.16 25);
+}
+.editor-remove-btn:hover:not(:disabled) { background: oklch(96% 0.02 25); border-color: transparent; }
+.editor-remove-btn.is-armed,
+.editor-remove-btn.is-armed:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
+.editor-remove-btn:disabled { opacity: 0.4; cursor: default; }

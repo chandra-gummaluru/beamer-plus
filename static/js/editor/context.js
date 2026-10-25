@@ -1,6 +1,6 @@
 // Shared editor context — the presenter-state handle, current selections,
 // and small helpers used by every editor module.
-import { configKeyOf } from '../slides/structure.js';
+import { configKeyOf, getSlideLabels } from '../slides/structure.js';
 
 export const ctx = {
     state: null,            // shared presenter state (set by initEditor)
@@ -11,40 +11,58 @@ export const ctx = {
 export function getSlideEl() { return document.getElementById('pdf-canvas'); }
 
 /* ─── panel mode ────────────────────────────────────────────────
-   The editor panel shows one section at a time, and its header names
-   which one:
-     'slide' — nothing selected: the panel is closed (the slide's own
-               tools are on the edit rail)
-     'item'  — the selected overlay's properties
-     'widget' — the selected widget's settings (editor/widget-panel.js)
-     'view'  — the split-view configuration for a view slide
+   The editor panel is open the whole time edit mode is, and shows one
+   section at a time; its header names what that is:
+     'slide'  — nothing selected: the current slide itself (shown or not,
+                its paper, everything on it)
+     'item'   — the selected video, audio, 3D model or reveal box
+     'widget' — the selected widget (editor/widget-panel.js)
+     'view'   — the split-view configuration for a view slide
    CSS keys off #editor-panel[data-mode], so switching modes is a single
    attribute write; nothing sets inline display styles. */
 
 const PANEL_TITLES = {
-    slide: 'Slide Properties',
-    item:  'Properties',        // replaced with the item's own type by properties.js
+    slide:  'Slide',
+    item:   'Properties',       // replaced with the item's own name by properties.js
     widget: 'Widget',           // replaced with the widget's name
-    view:  'View Configuration',
+    view:   'Split View',
 };
 
-export function setPanelMode(mode, title) {
+/**
+ * @param {string} mode
+ * @param {string} [title]   the header's big line
+ * @param {string} [kicker]  the small line above it ("Slide 10 · Video")
+ */
+export function setPanelMode(mode, title, kicker = '') {
     const panel = document.getElementById('editor-panel');
     if (panel) panel.dataset.mode = mode;
-    setPanelTitle(title ?? PANEL_TITLES[mode] ?? 'Edit Presentation');
-    // The panel only opens for something selected (or a split view being
-    // configured); while it's open the edit rail steps aside (editor.css).
-    // Opening or closing it re-fits the stage.
-    const open = mode !== 'slide';
-    if (document.body.classList.contains('editor-panel-open') !== open) {
-        document.body.classList.toggle('editor-panel-open', open);
-        window.dispatchEvent(new Event('resize'));
-    }
+    // The slide names itself: "Slide 10", over what it is.
+    if (mode === 'slide' && title === undefined) { title = slideName(); kicker = slideKind(); }
+    setPanelTitle(title ?? PANEL_TITLES[mode] ?? 'Edit Presentation', kicker);
 }
 
-export function setPanelTitle(title) {
+/** "Slide 10" — the current slide, by its navigator label. */
+export function slideName(i = ctx.state?.currentSlide) {
+    const label = ctx.state?.slideStructure ? getSlideLabels(ctx.state.slideStructure)[i] : null;
+    return label ? `Slide ${label}` : 'Slide';
+}
+
+/** What the current slide is: a PDF page, a copy of one, a blank page. */
+function slideKind(i = ctx.state?.currentSlide) {
+    const obj = ctx.state?.slideStructure?.[i];
+    if (!obj) return '';
+    if (obj.type === 'blank') return 'Blank Slide';
+    if (obj.type === 'view')  return 'Split View';
+    const page = (obj.pdfIndex ?? 0) + 1;
+    return obj.cfgId ? `Copy of PDF Page ${page}` : `PDF Page ${page}`;
+}
+
+export function setPanelTitle(title, kicker) {
     const el = document.getElementById('editor-panel-title');
     if (el) el.textContent = title;
+    if (kicker === undefined) return;
+    const k = document.getElementById('editor-panel-kicker');
+    if (k) { k.textContent = kicker; k.hidden = !kicker; }
 }
 
 // The mode implied by the current selection, used whenever a section

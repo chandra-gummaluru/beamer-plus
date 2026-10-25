@@ -1,7 +1,8 @@
-// Number steppers — every numeric field in the editor panel is shown as
-// [ − ]  value  [ + ] instead of the browser's own number box.
+// Number steppers — every numeric field in the editor panel is a box with
+// the number (and its unit) on the left and small up / down arrows stacked
+// at its right edge, instead of the browser's own number box.
 //
-//   • click − / + to step (hold to repeat; Shift steps ×10)
+//   • click ▲ / ▼ to step (hold to repeat; Shift steps ×10)
 //   • hover and scroll the wheel to step up / down (Shift ×10)
 //   • click the number to type one; arrow keys still work
 //   • a field with a non-numeric placeholder (e.g. "—" for "Appear on
@@ -48,8 +49,8 @@ function enhance(input) {
         wireHold(b, input, dir);
         return b;
     };
-    const minus = '<svg viewBox="0 0 12 12" width="10" height="10"><path d="M2.5 6h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
-    const plus  = '<svg viewBox="0 0 12 12" width="10" height="10"><path d="M2.5 6h7M6 2.5v7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+    const minus = '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+    const plus  = '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>';
 
     // A unit printed after the number (the layout card's "%") moves inside.
     const field = document.createElement('span');
@@ -58,7 +59,10 @@ function enhance(input) {
     const unit = wrap.nextElementSibling?.tagName === 'I' ? wrap.nextElementSibling : null;
     if (unit) { unit.classList.add('num-stepper-unit'); field.appendChild(unit); wrap.parentElement.classList.add('has-stepper'); }
 
-    wrap.append(btn(-1, minus, 'Decrease'), field, btn(+1, plus, 'Increase'));
+    const arrows = document.createElement('span');
+    arrows.className = 'num-stepper-arrows';
+    arrows.append(btn(+1, plus, 'Increase'), btn(-1, minus, 'Decrease'));
+    wrap.append(field, arrows);
 
     const syncState = () => wrap.classList.toggle('is-readonly', input.readOnly || input.disabled);
     syncState();

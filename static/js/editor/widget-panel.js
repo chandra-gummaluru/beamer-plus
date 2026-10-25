@@ -17,30 +17,25 @@ const isFullBox = (it) => near(it.x, 0) && near(it.y, 0) && near(it.width ?? 1, 
 
 /**
  * Fill `host` with everything about a widget: General (Name, Text size),
- * Layout (full slide, box, reveal step, layer), then the widget's own
- * settings from its schema, and Remove at the bottom.
+ * Layout (full slide, box, reveal step), then the widget's own settings
+ * from its schema. Remove is the panel's footer (properties.js).
  * @param {HTMLElement} host
  * @param {object} item     the widget's config item (edited in place)
  * @param {object} schema   from getWidgetSchema(item)
  * @param {object} opts
  * @param {() => void} opts.onLayout  after its box, display or step changed
  * @param {() => void} opts.onName    after its Name changed
- * @param {(toFront: boolean) => void} opts.onLayer  Bring to front / Send to back
- * @param {boolean} opts.canLayer     more than one thing on the slide
- * @param {() => void} opts.onRemove  Remove widget (second click)
  * @returns {{ refresh(): void }}  refresh: the box moved on the slide
  */
-export function renderWidgetPanel(host, item, schema, { onLayout, onName, onLayer, canLayer, onRemove } = {}) {
+export function renderWidgetPanel(host, item, schema, { onLayout, onName } = {}) {
     host.textContent = '';
     // The 'panel' variant puts Name and Text size first, under "General",
     // and the widget's own fields after it in their schema sections.
     const form = buildWidgetForm(schema, item, 'panel');
     const layout = buildLayoutCard(item, schema, () => onLayout?.());
-    if (onLayer) layout.node.querySelector('.wf-group-body').appendChild(buildLayerRow(onLayer, canLayer));
     const general = form.commonNode;
     form.node.insertBefore(layout.node, general ? general.nextSibling : form.node.firstChild);
     host.appendChild(form.node);
-    if (onRemove) host.appendChild(buildRemoveButton('Remove widget', onRemove));
 
     const apply = (e) => {
         if (e.target.closest('[data-k]')) return;   // the layout rows apply themselves
@@ -51,44 +46,6 @@ export function renderWidgetPanel(host, item, schema, { onLayout, onName, onLaye
     form.node.addEventListener('input', apply);
     form.node.addEventListener('change', apply);
     return { refresh: layout.show };
-}
-
-/** Bring to front / Send to back — shared with the media items' panel. */
-export function buildLayerRow(onLayer, enabled = true) {
-    const row = document.createElement('div');
-    row.className = 'editor-prop-row';
-    row.innerHTML = `<span class="editor-prop-label">Layer</span>
-        <div class="editor-layer-btns">
-            <button type="button" class="btn editor-layer-btn" data-layer="front">Bring to front</button>
-            <button type="button" class="btn editor-layer-btn" data-layer="back">Send to back</button>
-        </div>`;
-    row.querySelectorAll('button').forEach(b => {
-        b.disabled = !enabled;
-        b.addEventListener('click', () => onLayer(b.dataset.layer === 'front'));
-    });
-    return row;
-}
-
-/** Remove, two clicks — the first arms it, since there's no undo. */
-export function buildRemoveButton(label, onRemove) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'btn editor-delete-btn wp-remove';
-    btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg><span></span>';
-    const text = btn.querySelector('span');
-    text.textContent = label;
-    let timer = null;
-    btn.addEventListener('click', () => {
-        if (!btn.classList.contains('is-armed')) {
-            btn.classList.add('is-armed');
-            text.textContent = 'Click again to remove';
-            timer = setTimeout(() => { btn.classList.remove('is-armed'); text.textContent = label; }, 3000);
-            return;
-        }
-        clearTimeout(timer);
-        onRemove();
-    });
-    return btn;
 }
 
 // Layout: a Full slide switch over X / Y / Width / Height. Switching Full
@@ -108,7 +65,7 @@ function buildLayoutCard(item, schema, onLayout) {
             ${pinned ? '' : `
             ${canFull ? `
             <label class="editor-prop-checkbox-row">
-                <span>Full slide</span>
+                <span>Fill the Whole Slide</span>
                 <input type="checkbox" class="editor-switch" role="switch" data-k="full">
             </label>` : ''}
             <div class="wp-geom">
@@ -121,8 +78,8 @@ function buildLayoutCard(item, schema, onLayout) {
                 <label class="editor-prop-row"><span class="editor-prop-label">Height</span>
                     <span class="wp-num"><input class="editor-prop-input" type="number" min="5" max="100" step="1" data-k="height"><i>%</i></span></label>
             </div>`}
-            <label class="editor-prop-row editor-prop-row--inline"><span class="editor-prop-label">Appear on step</span>
-                <input class="editor-prop-input" type="number" min="1" max="99" step="1" placeholder="—" data-k="step"></label>
+            <label class="editor-prop-row editor-prop-row--inline"><span class="editor-prop-label">Appear on Step</span>
+                <input class="editor-prop-input" type="number" min="1" max="99" step="1" placeholder="Always" data-k="step"></label>
         </div>`;
 
     // Settle on a display now, so the saved deck says what it is and an old

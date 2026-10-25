@@ -70,9 +70,9 @@ export function showHelpModal() {
             id: 'edit', label: 'Editing',
             html: `
 <h4 class="help-h">Entering edit mode</h4>
-<p class="help-p">Click the edit button ${_hbtn('edit','Edit mode')} in the top-right corner. A toolbar on the right has buttons to add things to the slide and, below them, an eye to hide the slide from the presentation and a trash can to delete it (click twice); a blank slide also gets a button for its paper. Click anything on the slide to open its settings in a panel on the right; click empty space or press Esc to close it. Click <strong>Done</strong> when you're finished.</p>
+<p class="help-p">Click the edit button ${_hbtn('edit','Edit mode')} in the top-right corner. A toolbar across the top of the slide adds things to it, and a panel on the right shows the slide itself: <strong>Show During Presentation</strong>, everything on the slide (drag a row to change what's in front, click it to edit), and <strong>Delete Slide</strong> at the bottom (click twice). Click anything on the slide to open its settings in the panel; the back arrow, a click on empty space or Esc returns to the slide. Click <strong>Done</strong> in the panel when you're finished.</p>
 <h4 class="help-h">Adding overlays</h4>
-<p class="help-p">The toolbar on the right, where the drawing tools sit while presenting, adds content on top of your slides:</p>
+<p class="help-p">The toolbar along the top of the slide adds content on top of it:</p>
 <ul class="help-ul">
   <li>${_hbtn('video','Add video')} <strong>Video</strong>: overlay a video player.</li>
   <li>${_hbtn('audio','Add audio')} <strong>Audio</strong>: overlay an audio clip.</li>
@@ -80,7 +80,7 @@ export function showHelpModal() {
   <li>${_hbtn('widget','Add widget')} <strong>Widget</strong>: add an interactive widget (see the Widgets section).</li>
 </ul>
 <h4 class="help-h">Moving &amp; resizing</h4>
-<p class="help-p">Drag any overlay to reposition it, or drag its bottom-right corner to resize. The panel shows its exact position and size, and its <strong>Layer</strong> buttons bring it to the front or send it to the back.</p>
+<p class="help-p">Drag any overlay to reposition it, or drag its bottom-right corner to resize. The panel shows its exact position and size. To change what sits in front, drag the rows in the slide's <strong>On This Slide</strong> list; the top one is in front.</p>
 <h4 class="help-h">Saving your work</h4>
 <p class="help-p">Click the save button (top-right, the disk): pick a folder and a file name (or <b>Or download instead</b>, for your downloads folder), and tick what to save: <b>Presentation</b> is a ZIP with all overlays, widgets, and annotations that reopens at the slide you were on; <b>Notes</b> a single PDF to hand out: every visible slide with your annotations drawn on, each widget as it stands now, videos and 3D models as pictures, and poll results; and any <b>Recordings</b>.</p>`,
         },

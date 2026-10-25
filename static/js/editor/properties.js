@@ -9,11 +9,11 @@
 // `widget-schema` block — see widget-schema.js): selected by clicking it on
 // the slide, by Edit in the slide's item list, and straight after adding it.
 import { ctx, getSlideEl, getOrCreateConfig, escAttr, setPanelMode, setPanelTitle,
-         resolvePanelMode } from './context.js';
+         resolvePanelMode, slideName } from './context.js';
 import { cleanupEditOverlays, renderEditOverlays, positionOverlay, selectOverlayEl, overlayLabel, syncWidgetLock } from './overlays.js';
 import { WIDGET_LABELS } from './widget-picker.js';
 import { getWidgetSchema } from './widget-schema.js';
-import { renderWidgetPanel, buildLayerRow } from './widget-panel.js';
+import { renderWidgetPanel } from './widget-panel.js';
 
 export function updatePropertiesPanel() {
     const panel = document.getElementById('editor-properties');
@@ -25,33 +25,18 @@ export function updatePropertiesPanel() {
     }
     if (ctx.selectedOverlay.arrKey === 'widgets') { showWidgetPanel(ctx.selectedOverlay.index); return; }
     _widgetShown = null;
-    setPanelMode('item');
 
     const { arrKey, index } = ctx.selectedOverlay;
     const cfg  = getOrCreateConfig();
     const item = cfg?.[arrKey]?.[index];
     if (!item) return;
 
-    const typeLabels = { videos: 'Video', audios: 'Audio', models: '3D Model', reveals: 'Reveal' };
-    setPanelTitle(`${typeLabels[arrKey] || arrKey} Properties`);
+    setPanelMode('item', itemName(arrKey, item, index), `${slideName()} · ${KIND_LABELS[arrKey]}`);
+    setRemoveLabel(`Remove ${KIND_LABELS[arrKey]}`);
 
     const body = document.getElementById('editor-properties-body');
     if (!body) return;
     body.innerHTML = buildPropsHTML(arrKey, item);
-
-    // Delete button — two clicks, the first arms it.
-    const del = body.querySelector('#prop-delete');
-    del?.addEventListener('click', () => {
-        const label = del.querySelector('span');
-        if (!del.classList.contains('is-armed')) {
-            del.classList.add('is-armed');
-            label.textContent = 'Click again to remove';
-            setTimeout(() => { if (del.isConnected) { del.classList.remove('is-armed'); label.textContent = 'Remove'; } }, 3000);
-            return;
-        }
-        deleteItem(arrKey, index);
-    });
-    del?.before(buildLayerRow((front) => moveLayer(arrKey, index, front), slideItemCount() > 1));
 
     // AR lock: W drives H for video/model
     if (arrKey === 'videos' || arrKey === 'models') {
@@ -72,112 +57,75 @@ export function updatePropertiesPanel() {
 
 function buildPropsHTML(arrKey, item) {
     const lockAR = arrKey === 'videos' || arrKey === 'models';
+    const pct = (v) => Math.round(v * 100);
+    const sel = (cur, v) => (cur === v ? 'selected' : '');
+    const num = (id, label, value, extra = '') => `
+        <label class="editor-prop-row"><span class="editor-prop-label">${label}</span>
+            <span class="wp-num"><input class="editor-prop-input" type="number" step="1" id="${id}" value="${value}" ${extra}><i>%</i></span></label>`;
+    const section = (title, body) => `
+        <section class="wf-group"><div class="wf-group-title">${title}</div><div class="wf-group-body">${body}</div></section>`;
 
-    let html = `
-        <div class="editor-prop-row">
-            <div class="editor-prop-label">Position</div>
-            <div class="editor-prop-row-2col">
-                <div><div class="editor-prop-label">X (%)</div>
-                <input class="editor-prop-input" type="number" min="0" max="100" step="1" id="prop-x" value="${Math.round((item.x ?? 0) * 100)}"></div>
-                <div><div class="editor-prop-label">Y (%)</div>
-                <input class="editor-prop-input" type="number" min="0" max="100" step="1" id="prop-y" value="${Math.round((item.y ?? 0) * 100)}"></div>
-            </div>
-        </div>
-        <div class="editor-prop-row">
-            <div class="editor-prop-label">Size</div>
-            <div class="editor-prop-row-2col">
-                <div><div class="editor-prop-label">W (%)</div>
-                <input class="editor-prop-input" type="number" min="1" max="100" step="1" id="prop-w" value="${Math.round((item.width  ?? 0.4) * 100)}"></div>
-                <div><div class="editor-prop-label">H (%)</div>
-                <input class="editor-prop-input" type="number" min="1" max="100" step="1" id="prop-h" value="${Math.round((item.height ?? 0.3) * 100)}"${lockAR ? ' readonly' : ''}></div>
-            </div>
-        </div>
-    `;
-
+    let layout = `
+        <div class="wp-geom">
+            ${num('prop-x', 'X', pct(item.x ?? 0), 'min="0" max="100"')}
+            ${num('prop-y', 'Y', pct(item.y ?? 0), 'min="0" max="100"')}
+            ${num('prop-w', 'Width', pct(item.width ?? 0.4), 'min="1" max="100"')}
+            ${num('prop-h', 'Height', pct(item.height ?? 0.3), `min="1" max="100"${lockAR ? ' readonly title="Follows the width, keeping its shape"' : ''}`)}
+        </div>`;
     if (arrKey === 'reveals') {
-        html += `
-            <div class="editor-prop-row">
-                <div class="editor-prop-label">Reveal on step</div>
-                <input class="editor-prop-input" type="number" min="1" max="99" step="1" id="prop-step" value="${parseInt(item.step, 10) || 1}">
-            </div>
-            <div class="editor-prop-row">
-                <div class="editor-prop-label">Look while hidden</div>
+        layout += `
+            <label class="editor-prop-row"><span class="editor-prop-label">Reveal on Step</span>
+                <input class="editor-prop-input" type="number" min="1" max="99" step="1" id="prop-step" value="${parseInt(item.step, 10) || 1}"></label>
+            <label class="editor-prop-row"><span class="editor-prop-label">Look While Hidden</span>
                 <select class="editor-prop-select" id="prop-revealStyle">
-                    <option value="blend"   ${(item.style ?? 'blend') === 'blend' ? 'selected' : ''}>Blend into slide</option>
-                    <option value="frosted" ${item.style === 'frosted' ? 'selected' : ''}>Frosted panel</option>
-                </select>
-            </div>
-        `;
+                    <option value="blend" ${sel(item.style ?? 'blend', 'blend')} data-desc="Matches the slide behind it">Blend Into Slide</option>
+                    <option value="frosted" ${sel(item.style, 'frosted')} data-desc="A visible panel over the hidden part">Frosted Panel</option>
+                </select></label>`;
     } else {
-        html += `
-            <div class="editor-prop-row">
-                <div class="editor-prop-label">Appear on step</div>
-                <input class="editor-prop-input" type="number" min="1" max="99" step="1" id="prop-step" placeholder="—" value="${parseInt(item.step, 10) > 0 ? parseInt(item.step, 10) : ''}">
-            </div>
-        `;
+        layout += `
+            <label class="editor-prop-row"><span class="editor-prop-label">Appear on Step</span>
+                <input class="editor-prop-input" type="number" min="1" max="99" step="1" id="prop-step" placeholder="Always" value="${parseInt(item.step, 10) > 0 ? parseInt(item.step, 10) : ''}"></label>`;
     }
+    let html = section('Layout', layout);
 
     if (arrKey === 'videos') {
-        html += `
-            <div class="editor-prop-row">
-                <div class="editor-prop-label">Play Mode</div>
+        const pm = item.playMode ?? 'click';
+        html += section('Playback', `
+            <label class="editor-prop-row"><span class="editor-prop-label">Play Mode</span>
                 <select class="editor-prop-select" id="prop-playMode">
-                    <option value="click"  ${(item.playMode ?? 'click') === 'click'  ? 'selected' : ''}>Click to play</option>
-                    <option value="auto"   ${item.playMode === 'auto'   ? 'selected' : ''}>Auto (once, muted)</option>
-                    <option value="loop"   ${item.playMode === 'loop'   ? 'selected' : ''}>Loop (muted)</option>
-                    <option value="manual" ${item.playMode === 'manual' ? 'selected' : ''}>Manual controls</option>
-                    <option value="once"   ${item.playMode === 'once'   ? 'selected' : ''}>Once</option>
-                </select>
-            </div>
-            <div class="editor-prop-row">
-                <div class="editor-prop-label">Volume (0–1)</div>
-                <input class="editor-prop-input" type="number" min="0" max="1" step="0.05" id="prop-volume" value="${item.volume ?? 1}">
-            </div>
-            <div class="editor-prop-row">
-                <div class="editor-prop-label">Grow to full slide while playing</div>
-                <select class="editor-prop-select" id="prop-expandDelay">${expandDelayOptions(item.expandDelay)}</select>
-            </div>
-        `;
+                    <option value="click" ${sel(pm, 'click')} data-desc="Starts when you click it">Click to Play</option>
+                    <option value="auto" ${sel(pm, 'auto')} data-desc="Plays once, muted, when the slide opens">Auto</option>
+                    <option value="loop" ${sel(pm, 'loop')} data-desc="Plays over and over, muted">Loop</option>
+                    <option value="manual" ${sel(pm, 'manual')} data-desc="Shows the player's own controls">Manual Controls</option>
+                    <option value="once" ${sel(pm, 'once')} data-desc="Plays once with sound">Once</option>
+                </select></label>
+            <label class="editor-prop-row"><span class="editor-prop-label">Volume</span>
+                <input class="editor-prop-input" type="number" min="0" max="1" step="0.05" id="prop-volume" value="${item.volume ?? 1}"></label>
+            <label class="editor-prop-row"><span class="editor-prop-label">Grow to Full Slide While Playing</span>
+                <select class="editor-prop-select" id="prop-expandDelay">${expandDelayOptions(item.expandDelay)}</select></label>`);
     } else if (arrKey === 'audios') {
-        html += `
-            <div class="editor-prop-row">
-                <div class="editor-prop-label">Play Mode</div>
+        const pm = item.playMode ?? 'click';
+        html += section('Playback', `
+            <label class="editor-prop-row"><span class="editor-prop-label">Play Mode</span>
                 <select class="editor-prop-select" id="prop-playMode">
-                    <option value="click" ${(item.playMode ?? 'click') === 'click' ? 'selected' : ''}>Click to play</option>
-                    <option value="auto"  ${item.playMode === 'auto'  ? 'selected' : ''}>Auto</option>
-                    <option value="loop"  ${item.playMode === 'loop'  ? 'selected' : ''}>Loop</option>
-                </select>
-            </div>
-        `;
+                    <option value="click" ${sel(pm, 'click')}>Click to Play</option>
+                    <option value="auto" ${sel(pm, 'auto')}>Auto</option>
+                    <option value="loop" ${sel(pm, 'loop')}>Loop</option>
+                </select></label>`);
     } else if (arrKey === 'models') {
-        html += `
-            <div class="editor-prop-row">
-                <label class="editor-prop-checkbox-row">
-                    <span>Auto-rotate</span>
-                    <input type="checkbox" class="editor-switch" role="switch" id="prop-autoRotate" ${item.autoRotate ? 'checked' : ''}>
-                </label>
-            </div>
-            <div class="editor-prop-row">
-                <label class="editor-prop-checkbox-row">
-                    <span>Play animation</span>
-                    <input type="checkbox" class="editor-switch" role="switch" id="prop-animate" ${item.animate !== false ? 'checked' : ''}>
-                </label>
-            </div>
-            <div class="editor-prop-row">
-                <div class="editor-prop-label">Animation name (optional)</div>
-                <input class="editor-prop-input" type="text" id="prop-animName" value="${escAttr(item.animationName ?? '')}">
-            </div>
-        `;
+        html += section('Model', `
+            <label class="editor-prop-checkbox-row">
+                <span>Auto-Rotate</span>
+                <input type="checkbox" class="editor-switch" role="switch" id="prop-autoRotate" ${item.autoRotate ? 'checked' : ''}>
+            </label>
+            <label class="editor-prop-checkbox-row">
+                <span>Play Animation</span>
+                <input type="checkbox" class="editor-switch" role="switch" id="prop-animate" ${item.animate !== false ? 'checked' : ''}>
+            </label>
+            <label class="editor-prop-row"><span class="editor-prop-label">Animation Name</span>
+                <input class="editor-prop-input" type="text" id="prop-animName" placeholder="The model's first" value="${escAttr(item.animationName ?? '')}"></label>`);
     }
-
-    html += `
-        <button class="btn editor-delete-btn" id="prop-delete" title="Remove this item">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-            <span>Remove</span>
-        </button>
-    `;
-
-    return html;
+    return `<div class="wf wf--panel">${html}</div>`;
 }
 
 // Expand-on-play delays offered for a video (seconds; '' = never). A delay
@@ -187,7 +135,7 @@ const EXPAND_DELAYS = [0, 2, 3, 5, 10];
 function expandDelayOptions(current) {
     const cur = current == null || current === '' ? '' : Number(current);
     const vals = EXPAND_DELAYS.includes(cur) || cur === '' ? EXPAND_DELAYS : [...EXPAND_DELAYS, cur].sort((x, y) => x - y);
-    const label = (v) => v === 0 ? 'As soon as it plays' : `After ${v} s of playing`;
+    const label = (v) => v === 0 ? 'As Soon as It Plays' : `After ${v} s of Playing`;
     return [`<option value="" ${cur === '' ? 'selected' : ''}>Never</option>`,
             ...vals.map(v => `<option value="${v}" ${cur === v ? 'selected' : ''}>${label(v)}</option>`)].join('');
 }
@@ -286,7 +234,8 @@ export function openWidgetSettingsFor(index) {
 async function showWidgetPanel(index) {
     const item = getOrCreateConfig()?.widgets?.[index];
     if (!item) return;
-    setPanelMode('widget', item.title || widgetTypeLabel(item));
+    setPanelMode('widget', item.title || widgetTypeLabel(item), `${slideName()} · ${widgetTypeLabel(item)}`);
+    setRemoveLabel('Remove Widget');
     // Pressing on the same widget again (to drag it) keeps what's typed.
     if (_widgetShown?.item === item) return;
     const token = ++_widgetToken;
@@ -305,9 +254,6 @@ async function showWidgetPanel(index) {
             const cr = getSlideEl()?.getBoundingClientRect();
             if (cr) positionOverlay(div, item, cr);
         },
-        onLayer: (front) => moveLayer('widgets', index, front),
-        canLayer: slideItemCount() > 1,
-        onRemove: () => deleteItem('widgets', index),
         onName: () => {
             const name = item.title || widgetTypeLabel(item);
             setPanelTitle(name);
@@ -317,110 +263,117 @@ async function showWidgetPanel(index) {
     });
 }
 
-/* ─── the slide properties' item list ─────────────────────────────── */
+/* ─── the footer's Remove ─────────────────────────────────────────── */
+// Remove whatever is selected: two clicks, the first arms it, since there's
+// no undo. The label names what goes ("Remove Video"); the panel sets it.
+
+let _removeLabel = 'Remove';
+
+function setRemoveLabel(label) {
+    _removeLabel = label;
+    armRemove(false);
+}
+
+function armRemove(on) {
+    const btn = document.getElementById('item-remove');
+    if (!btn) return;
+    clearTimeout(armRemove.timer);
+    btn.classList.toggle('is-armed', on);
+    btn.querySelector('span').textContent = on ? 'Click Again to Remove' : _removeLabel;
+    if (on) armRemove.timer = setTimeout(() => armRemove(false), 3000);
+}
+
+export function initItemRemove() {
+    const btn = document.getElementById('item-remove');
+    btn?.addEventListener('click', () => {
+        const sel = ctx.selectedOverlay;
+        if (!sel) return;
+        if (!btn.classList.contains('is-armed')) { armRemove(true); return; }
+        armRemove(false);
+        deleteItem(sel.arrKey, sel.index);
+    });
+}
+
+/* ─── the slide's list of what's on it ────────────────────────────── */
 
 const ITEM_ICONS = {
-    widgets: '<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/>',
-    videos:  '<polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/>',
+    widgets: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>',
+    videos:  '<rect x="2" y="6" width="14" height="12" rx="2"/><path d="M16 10l6-3v10l-6-3"/>',
     audios:  '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
-    reveals: '<rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="3 3"/><path d="M8 12h8"/><path d="M13 9l3 3-3 3"/>',
-    models:  '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>',
+    reveals: '<rect x="3" y="4" width="18" height="16" rx="2" stroke-dasharray="3 3"/><path d="M9 12h6M13 9l3 3-3 3"/>',
+    models:  '<path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M3 7l9 5 9-5"/><path d="M12 12v10"/>',
 };
-const KIND_LABELS = { widgets: 'Widget', videos: 'Video', audios: 'Audio', models: '3D model', reveals: 'Reveal box' };
-const ICON_EDIT  = '<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>';
-const ICON_TRASH = '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>';
+const KIND_LABELS = { widgets: 'Widget', videos: 'Video', audios: 'Audio', models: '3D Model', reveals: 'Reveal Box' };
+const GRIP = '<svg class="slide-item-grip" width="10" height="16" viewBox="0 0 10 16" fill="currentColor" aria-hidden="true"><circle cx="2.5" cy="3" r="1.4"/><circle cx="7.5" cy="3" r="1.4"/><circle cx="2.5" cy="8" r="1.4"/><circle cx="7.5" cy="8" r="1.4"/><circle cx="2.5" cy="13" r="1.4"/><circle cx="7.5" cy="13" r="1.4"/></svg>';
+const CHEVRON = '<svg class="slide-item-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
 
-function iconButton(cls, title, paths) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = `slide-item-btn ${cls}`;
-    b.title = title;
-    b.setAttribute('aria-label', title);
-    b.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
-    return b;
+/** What a thing on the slide is called in the list and the panel header. */
+function itemName(arrKey, item, index) {
+    if (arrKey === 'widgets') return item.title || widgetTypeLabel(item);
+    if (arrKey === 'reveals') return `Reveal Step ${parseInt(item.step, 10) > 0 ? parseInt(item.step, 10) : 1}`;
+    return item.path ? item.path.split('/').pop() : `${KIND_LABELS[arrKey]} ${index + 1}`;
 }
 
 /**
- * Rebuild the list of everything on the current slide, in the slide
- * properties section. Each row has Edit — a widget's settings dialog, or a
- * media item's properties — and Delete.
+ * Rebuild the list of everything on the current slide, front to back, in
+ * the slide's panel. Click a row to open its settings; drag it to change
+ * what sits in front.
  */
 export function refreshSlideItems() {
     const host = document.getElementById('editor-slide-items');
     if (!host) return;
     host.textContent = '';
-
     const cfg = getOrCreateConfig();
     const entries = [];
     for (const arrKey of ['widgets', 'videos', 'audios', 'models', 'reveals']) {
         (cfg?.[arrKey] || []).forEach((item, index) => entries.push({ arrKey, item, index }));
     }
-    if (!entries.length) return;
+    if (!entries.length) {
+        const empty = document.createElement('p');
+        empty.className = 'slide-items-empty';
+        empty.textContent = 'Nothing here yet. Add a video, a widget or a reveal step from the toolbar above the slide.';
+        host.appendChild(empty);
+        return;
+    }
     // Front to back: the list's order is the slide's stacking order.
     entries.sort((a, b) => layerOf(b) - layerOf(a));
 
-    const head = document.createElement('div');
-    head.className = 'slide-items-head';
-    head.innerHTML = `<span>On this slide</span>${entries.length > 1 ? '<span class="slide-items-hint">Front to back · drag to reorder</span>' : ''}`;
-    host.appendChild(head);
-
     const list = document.createElement('div');
     list.className = 'slide-items';
+    list.setAttribute('role', 'list');
     for (const { arrKey, item, index } of entries) {
         const isWidget = arrKey === 'widgets';
-        const step = parseInt(item.step, 10) > 0 ? parseInt(item.step, 10) : (arrKey === 'reveals' ? 1 : 0);
-        const name = isWidget
-            ? (item.title || widgetTypeLabel(item))
-            : arrKey === 'reveals' ? `Reveal step ${step}`
-            : (item.path ? item.path.split('/').pop() : `${KIND_LABELS[arrKey]} ${index + 1}`);
-        const kind = (isWidget && item.title ? widgetTypeLabel(item) : KIND_LABELS[arrKey])
-            + (step && arrKey !== 'reveals' ? ` · step ${step}` : '');
-
+        const step = parseInt(item.step, 10) > 0 ? parseInt(item.step, 10) : 0;
+        const name = itemName(arrKey, item, index);
+        const kind = (isWidget ? widgetTypeLabel(item) : KIND_LABELS[arrKey])
+            + (step && arrKey !== 'reveals' ? ` · Appears on Step ${step}` : '');
         const row = document.createElement('div');
         row.className = 'slide-item';
+        row.setAttribute('role', 'listitem');
+        row.tabIndex = 0;
+        row.title = `Edit ${name}`;
         row.innerHTML = `
-            ${entries.length > 1 ? `<span class="slide-item-grip" aria-hidden="true"><svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor"><circle cx="2.5" cy="2.5" r="1.3"/><circle cx="7.5" cy="2.5" r="1.3"/><circle cx="2.5" cy="7" r="1.3"/><circle cx="7.5" cy="7" r="1.3"/><circle cx="2.5" cy="11.5" r="1.3"/><circle cx="7.5" cy="11.5" r="1.3"/></svg></span>` : ''}
-            <svg class="slide-item-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ITEM_ICONS[arrKey]}</svg>
+            ${entries.length > 1 ? GRIP : ''}
+            <span class="slide-item-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ITEM_ICONS[arrKey]}</svg></span>
             <span class="slide-item-text">
                 <span class="slide-item-name"></span>
                 <span class="slide-item-kind"></span>
-            </span>`;
+            </span>
+            ${CHEVRON}`;
         row.querySelector('.slide-item-name').textContent = name;
         row.querySelector('.slide-item-kind').textContent = kind;
-
-        const edit = iconButton('slide-item-edit', isWidget ? `Edit ${name}` : `Edit ${name}'s properties`, ICON_EDIT);
-        const del  = iconButton('slide-item-delete', `Delete ${name}`, ICON_TRASH);
-        row.appendChild(edit);
-        row.appendChild(del);
-
         // Point out which box on the slide this row is.
         const box = () => document.querySelector(`.edit-overlay[data-arr-key="${arrKey}"][data-item-index="${index}"]`);
         row.addEventListener('mouseenter', () => box()?.classList.add('is-hinted'));
         row.addEventListener('mouseleave', () => box()?.classList.remove('is-hinted'));
-
-        edit.addEventListener('click', () => {
+        const open = () => {
             box()?.classList.remove('is-hinted');
             if (isWidget) { openWidgetSettingsFor(index); return; }
             const b = box();
             if (b) selectOverlayEl(b, arrKey, index);
-        });
-        // Two clicks: the first arms it, since there's no undo.
-        del.addEventListener('click', () => {
-            if (!del.classList.contains('is-armed')) {
-                del.classList.add('is-armed');
-                del.title = 'Click again to delete';
-                row.classList.add('is-deleting');
-                setTimeout(() => {
-                    if (!del.isConnected) return;
-                    del.classList.remove('is-armed');
-                    del.title = `Delete ${name}`;
-                    row.classList.remove('is-deleting');
-                }, 3000);
-                return;
-            }
-            box()?.classList.remove('is-hinted');
-            deleteItem(arrKey, index);
-        });
+        };
+        row.addEventListener('click', open);
+        row.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
         row._entry = { arrKey, item, index };
         list.appendChild(row);
     }
@@ -482,32 +435,6 @@ function wireReorder(list) {
             applyListOrder(list);
         });
     }
-}
-
-/** How many things are on the current slide (layering needs two). */
-function slideItemCount() {
-    const cfg = getOrCreateConfig();
-    return ['widgets', 'videos', 'audios', 'models', 'reveals']
-        .reduce((n, k) => n + (cfg?.[k]?.length || 0), 0);
-}
-
-/**
- * Bring one item in front of everything else on the slide, or behind it,
- * keeping the others' order — the panel's Layer buttons.
- */
-export function moveLayer(arrKey, index, toFront) {
-    const cfg = getOrCreateConfig();
-    if (!cfg) return;
-    const entries = [];
-    for (const k of ['widgets', 'videos', 'audios', 'models', 'reveals']) {
-        (cfg[k] || []).forEach((item, i) => entries.push({ arrKey: k, item, index: i }));
-    }
-    entries.sort((a, b) => layerOf(b) - layerOf(a));   // front first
-    const at = entries.findIndex(e => e.arrKey === arrKey && e.index === index);
-    if (at < 0) return;
-    const [me] = entries.splice(at, 1);
-    if (toFront) entries.unshift(me); else entries.push(me);
-    renumberLayers(entries);
 }
 
 function applyListOrder(list) {

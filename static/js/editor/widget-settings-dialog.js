@@ -23,6 +23,7 @@ import { bus } from '../core/events.js';
 import { widgetIdForWindow, pushWidgetConfig } from '../core/iframe-widget-renderer.js';
 import { getWidgetSchema } from './widget-schema.js';
 import { buildWidgetForm } from './widget-fields.js';
+import { enhanceSelects } from './dropdown.js';
 import { findWidgetItem } from './widget-settings.js';
 
 // What the editor panel edits instead (widget-panel.js).
@@ -88,6 +89,7 @@ export async function openWidgetSettings(widgetId) {
 
     const form = buildWidgetForm({ ...schema, fields }, item, 'sheet');
     const node = buildSheet(name, schema?.label, live, form.node);
+    enhanceSelects(form.node);
 
     const state = { id, item, node, form, live, timer: null, pushedSig: before };
 
@@ -200,7 +202,7 @@ function buildSheet(name, kind, live, body) {
     const done = document.createElement('button');
     done.type = 'button';
     done.className = 'wsheet-done';
-    done.textContent = 'Done';
+    done.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg><span>Done</span>';
     foot.append(hint, done);
 
     node.append(head, scroll, foot);

@@ -34,6 +34,7 @@
 // `input` events, so whoever hosts the form applies them with one listener.
 import { ctx, WIDGET_RESERVED } from './context.js';
 import { saveWidgetAsset } from './widget-settings.js';
+import { titleCase } from './title-case.js';
 import { sessionUrl } from '../app/session.js';
 
 /**
@@ -163,7 +164,7 @@ function makeGroup(title, variant) {
     if (title || variant === 'modal' || variant === 'panel') {
         const h = document.createElement('div');
         h.className = 'wf-group-title';
-        h.textContent = title || 'Settings';
+        h.textContent = titleCase(title || 'Settings');
         node.appendChild(h);
     }
     const body = document.createElement('div');
@@ -192,7 +193,7 @@ function fieldValue(item, field) {
 function fieldLabel(field) {
     const lab = document.createElement('div');
     lab.className = 'editor-prop-label';
-    lab.textContent = field.label || field.key;
+    lab.textContent = titleCase(field.label || field.key);
     // A schema field's `note` is no longer shown: the editor keeps labels
     // to the label alone, without grey asides.
     return lab;
@@ -224,7 +225,7 @@ function buildFieldRow(field, item, variant) {
         const lab = document.createElement('label');
         lab.className = 'editor-prop-checkbox-row';
         const text = document.createElement('span');
-        text.textContent = field.label || field.key;
+        text.textContent = titleCase(field.label || field.key);
         input = document.createElement('input');
         input.type = 'checkbox';
         input.className = 'editor-switch';
@@ -244,7 +245,9 @@ function buildFieldRow(field, item, variant) {
             const label = isObj ? (o.l !== undefined ? o.l : o.v) : o;
             const opt = document.createElement('option');
             opt.value = value;
-            opt.textContent = label;
+            opt.textContent = titleCase(String(label));
+            // A short line under the option in the dropdown's menu (dropdown.js).
+            if (isObj && o.d) opt.dataset.desc = o.d;
             // Compared as strings: a deck may hold 1.4 where the schema
             // declares "1.4", and a strict compare would lose the selection.
             if (String(eff) === String(value)) opt.selected = true;

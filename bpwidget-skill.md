@@ -74,6 +74,7 @@ Name, Text size and layout — every widget is self-contained).
 - `label` — human name shown in the widget picker.
 - `category` — one of: `Tools`, `Mathematics`, `Computer Science`, `Audience Response`.
   Add a new one only if none fits.
+- Labels are written in sentence case ("Question type"); the editor shows them in Title Case.
 - `fontSize: false` — opt out of the host's font-size control (e.g. `map.html`).
 - `liveSettings: true` — the widget applies setting changes while it runs. The
   presenter edits settings in a sheet opened from the pencil on the widget; with
@@ -115,7 +116,7 @@ Name, Text size and layout — every widget is self-contained).
 | `number-nullable` | `min`, `step`                     | number or null |
 | `duration`        | `min` (seconds, default 1), `default` (seconds) | number of whole seconds — the presenter types minutes and seconds |
 | `checkbox`        | `default`                         | boolean |
-| `select`          | `options`, `default`              | `["1","1.4"]` or `[{ "v": 500, "l": "Normal" }]` |
+| `select`          | `options`, `default`              | `["1","1.4"]` or `[{ "v": 500, "l": "Normal", "d": "One short line shown under it in the menu" }]` |
 | `file`            | `accept`, `folder` (`"assets"`)   | relative path — resolve via `/api/zip-asset/` |
 | `password`        | `placeholder`                     | string |
 | `ai-model`        | —                                 | model id string |

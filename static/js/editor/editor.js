@@ -15,13 +15,15 @@
 import { bus } from '../core/events.js';
 import { ctx, setPanelMode } from './context.js';
 import { renderEditOverlays, cleanupEditOverlays, deselectOverlay, pickMediaFile, onMediaFileSelected, addReveal, repositionEditOverlays } from './overlays.js';
-import { updatePropertiesPanel, refreshSlideItems } from './properties.js';
+import { updatePropertiesPanel, refreshSlideItems, initItemRemove } from './properties.js';
 import { addWidget } from './widget-picker.js';
 import { showViewConfig, hideViewConfig } from './view-config.js';
 import { applySlideReorder, removeSlideReorder } from './reorder.js';
 import { initWidgetSettings } from './widget-settings.js';
 import { initWidgetSettingsDialog, closeWidgetSettings } from './widget-settings-dialog.js';
 import { initNumberSteppers } from './number-stepper.js';
+import { initDropdowns } from './dropdown.js';
+import { titleCase } from './title-case.js';
 import { realSlideCount } from '../slides/structure.js';
 import { PAPER_STYLES, PAPER_SPACING, PAPER_THICKNESS, PAPER_COLORS, normalizePaper } from '../slides/paper.js';
 
@@ -41,16 +43,17 @@ export function initEditor(state) {
 
     initPaperSettings();
 
-    document.getElementById('slide-hidden-toggle')?.addEventListener('click', () => {
+    document.getElementById('editor-done-btn')?.addEventListener('click', () => { if (ctx.state.editMode) exitEditMode(); });
+
+    document.getElementById('slide-shown-toggle')?.addEventListener('change', e => {
         const obj = ctx.state?.slideStructure?.[ctx.state?.currentSlide];
         if (!obj) return;
-        if (obj.hidden) delete obj.hidden;
+        if (e.target.checked) delete obj.hidden;
         else obj.hidden = true;
-        syncSlideTools();
         bus.emit('nav:refresh');
     });
 
-    // Remove slide: two clicks — the first arms it — since there's no undo.
+    // Delete the slide: two clicks — the first arms it — since there's no undo.
     const delBtn = document.getElementById('slide-delete');
     delBtn?.addEventListener('click', () => {
         const i = ctx.state?.currentSlide;
@@ -65,14 +68,20 @@ export function initEditor(state) {
         bus.emit('slide:delete', i);
     });
 
-    initSlideTools();
+    // The stage re-fits on resize (main.js); the edit boxes follow it.
+    window.addEventListener('resize', () => {
+        if (!ctx.state?.editMode) return;
+        requestAnimationFrame(() => repositionEditOverlays());
+    });
 
     const fileInput = document.getElementById('edit-media-input');
     fileInput?.addEventListener('change', () => onMediaFileSelected(fileInput));
 
+    initItemRemove();
     initWidgetSettings();
     initWidgetSettingsDialog();
     initNumberSteppers();
+    initDropdowns();
     wireDeselect();
     // The split's divider moved (the view panel's picker, or a drag on
     // stage): the slide under the edit boxes changed size — redraw them.
@@ -119,7 +128,6 @@ export function initEditor(state) {
                 // Stay in split view config mode: don't render overlays or show
                 // the regular slide settings — the view config panel is the only UI.
                 _updateAddMediaButtons();
-                syncSlideTools();
                 return;
             }
             // Navigated away from the view panes — tear down.
@@ -130,7 +138,6 @@ export function initEditor(state) {
         }
 
         // Regular slide — show its overlays and settings normally.
-        closePaperPop();
         renderEditOverlays();
         updatePropertiesPanel();
         updateSlideSettingsPanel();
@@ -145,7 +152,6 @@ export function initEditor(state) {
         cleanupEditOverlays();
         updatePropertiesPanel();  // hides (no overlay)
         showViewConfig(i);
-        syncSlideTools();
     });
 }
 
@@ -160,13 +166,8 @@ async function enterEditMode() {
     ctx.state.editMode = true;
     document.body.classList.add('edit-mode');
     setPanelMode('slide');
-    const btn = document.getElementById('edit-mode-btn');
-    if (btn) {
-        btn.classList.add('is-done');
-        btn.title = 'Finish editing';
-        btn.dataset.originalHtml = btn.innerHTML;
-        btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg><span>Done</span>';
-    }
+    // The panel and the insert toolbar take room from the stage: re-fit it.
+    window.dispatchEvent(new Event('resize'));
     if (ctx.state.annCvs?.canvas) ctx.state.annCvs.canvas.style.pointerEvents = 'none';
 
     // If we entered edit mode while a split view was active, keep it visible
@@ -189,7 +190,6 @@ async function enterEditMode() {
     }
 
     applySlideReorder();
-    syncSlideTools();
     setTimeout(() => { renderEditOverlays(); updateSlideSettingsPanel(); _updateAddMediaButtons(); }, 60);
 }
 
@@ -201,20 +201,13 @@ async function exitEditMode() {
     }
     ctx.state.editMode = false;
     document.body.classList.remove('edit-mode');
-    const btn = document.getElementById('edit-mode-btn');
-    if (btn) {
-        btn.classList.remove('is-done');
-        btn.title = 'Edit mode';
-        if (btn.dataset.originalHtml) btn.innerHTML = btn.dataset.originalHtml;
-    }
     if (ctx.state.annCvs?.canvas) ctx.state.annCvs.canvas.style.pointerEvents = '';
     cleanupEditOverlays();
     removeSlideReorder();
     ctx.selectedOverlay = null;
     hideViewConfig();
     updatePropertiesPanel();
-    closePaperPop();
-    syncSlideTools();
+    window.dispatchEvent(new Event('resize'));
     bus.emit('editor:exited');
 }
 
@@ -254,73 +247,17 @@ function updateSlideSettingsPanel() {
     armSlideDelete(false);
     const del = document.getElementById('slide-delete');
     if (del) del.disabled = !obj || (ctx.state?.slideStructure?.length || 0) <= 1;
-    syncSlideTools();
+    const shown = document.getElementById('slide-shown-toggle');
+    if (shown) shown.checked = !obj?.hidden;
+    // The header names the slide; a selection elsewhere names itself.
+    if (!ctx.selectedOverlay && ctx.selectedViewIdx === null) setPanelMode('slide');
 }
 
 function armSlideDelete(on) {
     const btn = document.getElementById('slide-delete');
     if (!btn) return;
     btn.classList.toggle('is-armed', on);
-    btn.title = on ? 'Click again to delete this slide' : 'Delete slide';
-}
-
-/* ─── this slide's tools, on the edit rail ──────────────────── */
-// Paper for a blank slide, hide from the presentation, delete — under the
-// inserts on the rail. Not for a split view being configured: its panes
-// aren't "the slide", and it has its own panel.
-
-function initSlideTools() {
-    window.addEventListener('resize', () => {
-        if (!ctx.state?.editMode) return;
-        // After main.js has re-fitted the slide for the new size.
-        requestAnimationFrame(() => repositionEditOverlays());
-    });
-
-    const pbtn = document.getElementById('slide-paper-btn');
-    pbtn?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const pop = document.getElementById('slide-paper-settings');
-        if (pop?.hidden) openPaperPop(); else closePaperPop();
-    });
-    document.addEventListener('pointerdown', (e) => {
-        if (!e.target.closest?.('#slide-paper-wrap')) closePaperPop();
-    });
-    bus.on('ui:escape', closePaperPop);
-}
-
-function openPaperPop() {
-    const pop = document.getElementById('slide-paper-settings');
-    if (!pop) return;
-    pop.hidden = false;
-    document.getElementById('slide-paper-btn')?.setAttribute('aria-expanded', 'true');
-}
-function closePaperPop() {
-    const pop = document.getElementById('slide-paper-settings');
-    if (pop) pop.hidden = true;
-    document.getElementById('slide-paper-btn')?.setAttribute('aria-expanded', 'false');
-}
-
-function slideToolsWanted() {
-    const s = ctx.state;
-    if (!s?.editMode || ctx.selectedViewIdx !== null) return false;
-    const obj = s.slideStructure?.[s.currentSlide];
-    return !!obj && obj.type !== 'view';
-}
-
-function syncSlideTools() {
-    const show = slideToolsWanted();
-    document.querySelectorAll('.editor-rail-slide').forEach(el => { el.hidden = !show; });
-    if (!show) return;
-    const obj = ctx.state.slideStructure[ctx.state.currentSlide];
-    const hidden = !!obj.hidden;
-    const eye = document.getElementById('slide-hidden-toggle');
-    if (eye) {
-        eye.setAttribute('aria-pressed', String(hidden));
-        eye.title = hidden ? 'Hidden in presentation — click to show' : 'Shown in presentation — click to hide';
-        eye.setAttribute('aria-label', eye.title);
-    }
-    const paper = document.getElementById('slide-paper-wrap');
-    if (paper) paper.hidden = obj.type !== 'blank';
+    btn.querySelector('span').textContent = on ? 'Click Again to Delete' : 'Delete Slide';
 }
 
 /* ─── blank-slide paper ─────────────────────────────────────── */
@@ -330,7 +267,7 @@ function initPaperSettings() {
     for (const [key, list] of Object.entries(PAPER_FIELDS)) {
         const sel = document.getElementById(`paper-${key}`);
         if (!sel) continue;
-        sel.innerHTML = list.map(o => `<option value="${o.v}">${o.l}</option>`).join('');
+        sel.innerHTML = list.map(o => `<option value="${o.v}">${titleCase(o.l)}</option>`).join('');
         sel.addEventListener('change', () => {
             const obj = ctx.state?.slideStructure?.[ctx.state?.currentSlide];
             if (obj?.type !== 'blank') return;
@@ -343,8 +280,8 @@ function initPaperSettings() {
 }
 
 function syncPaperSettings(obj) {
-    // The popover's own open/closed state is its `hidden`; the paper button
-    // is shown for blank slides only (syncSlideTools).
+    const section = document.getElementById('slide-paper-section');
+    if (section) section.hidden = obj?.type !== 'blank';
     if (obj?.type !== 'blank') return;
     const p = normalizePaper(obj.paper);
     for (const key of Object.keys(PAPER_FIELDS)) {
@@ -354,7 +291,7 @@ function syncPaperSettings(obj) {
     const opts = document.getElementById('paper-options');
     if (opts) opts.hidden = p.style === 'none';
     const tl = document.getElementById('paper-thickness-label');
-    if (tl) tl.textContent = p.style === 'dots' ? 'Dot size' : 'Line weight';
+    if (tl) tl.textContent = p.style === 'dots' ? 'Dot Size' : 'Line Weight';
 }
 
 // Disable the add-media buttons when the current slide is a view slide

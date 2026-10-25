@@ -7,7 +7,7 @@
   "category": "Audience Response",
   "liveSettings": true,
   "fields": [
-    {"key": "responseType", "label": "Question type", "type": "select", "default": "choice", "options": [{"v": "choice", "l": "Multiple choice"}, {"v": "truefalse", "l": "True / False"}, {"v": "rating", "l": "Rating scale"}, {"v": "numeric", "l": "Numeric estimate"}, {"v": "exact", "l": "Numerical answer"}, {"v": "wordcloud", "l": "Word cloud"}, {"v": "fill", "l": "Fill in the blanks"}, {"v": "open", "l": "Open-ended"}], "section": "Question"},
+    {"key": "responseType", "label": "Question type", "type": "select", "default": "choice", "options": [{"v": "choice", "l": "Multiple choice", "d": "Pick one of a list of answers"}, {"v": "truefalse", "l": "True / False", "d": "Two buttons: true or false"}, {"v": "rating", "l": "Rating scale", "d": "A scale, e.g. 1 to 5"}, {"v": "numeric", "l": "Numeric estimate", "d": "Any number; see how the guesses spread"}, {"v": "exact", "l": "Numerical answer", "d": "A number checked against the right answer"}, {"v": "wordcloud", "l": "Word cloud", "d": "A word or two, shown as a cloud"}, {"v": "fill", "l": "Fill in the blanks", "d": "Complete a sentence with gaps"}, {"v": "open", "l": "Open-ended", "d": "Short written answers"}], "section": "Question"},
     {"key": "question", "expand": true, "label": "Question text", "type": "textarea", "rows": 4, "placeholder": "Consider the following code:\n\n```python\nx = 5\nif x > 2:\n    x = -3\n```\n\nWhat is `x`?", "note": "Markdown & $LaTeX$"},
     {"key": "template", "label": "Template", "type": "textarea", "rows": 6, "placeholder": ">>> f(BLANK, BLANK)\nTrue\n>>> f(BLANK, BLANK)\nFalse", "showIf": {"responseType": "fill"}, "note": "each blank is one answer", "mono": true, "blanks": {"pattern": "\\bBLANK\\b|_{3,}", "insert": "BLANK"}},
     {"key": "options", "label": "Options", "type": "textarea-lines", "rows": 4, "placeholder": "Option A\nOption B\nOption C", "showIf": {"responseType": "choice"}, "section": "Answers", "editor": "list", "itemLabel": "option", "itemPlaceholder": "Option", "correct": {"key": "correctAnswer", "base": 1}},
@@ -22,14 +22,14 @@
     {"key": "numericUnit", "label": "Unit", "type": "text", "placeholder": "ms", "showIf": {"responseType": ["numeric", "exact"]}, "note": "optional"},
     {"key": "wordsPerResponse", "label": "Each response counts as", "type": "select", "default": "1", "options": [{"v": "1", "l": "One word"}, {"v": "2", "l": "Up to two words"}, {"v": "3", "l": "Up to three words"}], "showIf": {"responseType": "wordcloud"}},
     {"key": "autoStart", "label": "Start collecting when the slide opens", "type": "checkbox", "default": true, "section": "Collecting"},
-    {"key": "timerMode", "label": "Timer", "type": "select", "default": "none", "options": [{"v": "none", "l": "None"}, {"v": "down", "l": "Count down, then close the poll"}, {"v": "up", "l": "Count up"}]},
+    {"key": "timerMode", "label": "Timer", "type": "select", "default": "none", "options": [{"v": "none", "l": "None", "d": "Close the poll yourself"}, {"v": "down", "l": "Count down, then close the poll", "d": "Closes the poll at zero"}, {"v": "up", "l": "Count up", "d": "Show how long it's been open"}]},
     {"key": "timerSeconds", "label": "Countdown length (seconds)", "type": "number", "min": 5, "step": 5, "default": 60, "showIf": {"timerMode": "down"}},
     {"key": "minResponses", "label": "Responses needed to close", "type": "number", "min": 1, "step": 1, "default": 1, "showIf": {"responseType": "open"}},
     {"key": "model", "label": "Model", "type": "ai-model", "showIf": {"responseType": "open"}, "section": "AI summaries"},
     {"key": "numSummaries", "label": "Number of summaries", "type": "number", "min": 1, "step": 1, "default": 3, "showIf": {"responseType": "open"}},
     {"key": "apiKey", "label": "API key", "type": "password", "placeholder": "Paste API key…", "showIf": {"responseType": "open"}},
     {"key": "scale", "label": "Text size", "type": "select", "options": [{"v": "1", "l": "Small"}, {"v": "1.4", "l": "Medium"}, {"v": "1.8", "l": "Large"}, {"v": "2.2", "l": "Extra large"}], "default": "1.4", "section": "Display"},
-    {"key": "layout", "label": "Layout while collecting", "section": "Display", "type": "select", "default": "side", "options": [{"v": "side", "l": "Side by side (QR on the right)"}, {"v": "stacked", "l": "Stacked (QR below the question)"}]}
+    {"key": "layout", "label": "Layout while collecting", "section": "Display", "type": "select", "default": "side", "options": [{"v": "side", "l": "Side by side", "d": "QR code on the right of the question"}, {"v": "stacked", "l": "Stacked", "d": "QR code below the question"}]}
   ]
 }
 </script>

@@ -49,13 +49,13 @@ function buildViewConfigHTML(obj, viewIdx) {
 
     return `
         <div class="editor-prop-row">
-            <div class="editor-prop-label">Left pane slide</div>
+            <div class="editor-prop-label">Left Pane Slide</div>
             <select class="editor-prop-select" id="view-left" style="margin-top:var(--sp-1)">
                 ${buildSlideOptions(leftVal, 'Select a slide...', leftExclude)}
             </select>
         </div>
         <div class="editor-prop-row">
-            <div class="editor-prop-label">Right pane slide</div>
+            <div class="editor-prop-label">Right Pane Slide</div>
             <select class="editor-prop-select" id="view-right" style="margin-top:var(--sp-1)">
                 ${buildSlideOptions(rightVal, 'Select a slide...', rightExclude)}
             </select>
@@ -81,7 +81,7 @@ function buildViewConfigHTML(obj, viewIdx) {
         </div>
         <button class="btn editor-delete-btn" id="view-delete">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-            Remove view
+            Remove View
         </button>
     `;
 }
