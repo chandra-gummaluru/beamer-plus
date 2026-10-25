@@ -215,7 +215,7 @@ function buildFieldRow(field, item, variant) {
     } else if (field.type === 'select') {
         row.appendChild(fieldLabel(field));
         input = document.createElement('select');
-        input.className = 'editor-prop-select';
+        input.className = 'field';
         for (const o of field.options || []) {
             const isObj = o && typeof o === 'object';
             const value = isObj ? o.v : o;
@@ -265,7 +265,7 @@ function buildFieldRow(field, item, variant) {
     } else if (field.type === 'ai-model') {
         row.appendChild(fieldLabel(field));
         input = document.createElement('select');
-        input.className = 'editor-prop-select';
+        input.className = 'field';
         fillModelOptions(input, eff);
         row.appendChild(input);
 
@@ -273,7 +273,7 @@ function buildFieldRow(field, item, variant) {
         const lab = fieldLabel(field);
         row.appendChild(lab);
         input = document.createElement('textarea');
-        input.className = 'editor-prop-input editor-prop-area' + (field.mono ? ' wf-mono' : '');
+        input.className = 'field editor-prop-area' + (field.mono ? ' wf-mono' : '');
         input.rows = field.rows || (field.type === 'textarea-lines' ? 4 : 3);
         input.spellcheck = false;
         if (field.placeholder) input.placeholder = field.placeholder;
@@ -297,7 +297,7 @@ function buildFieldRow(field, item, variant) {
         const fileRow = document.createElement('div');
         fileRow.className = 'editor-prop-file';
         input = document.createElement('input');
-        input.className = 'editor-prop-input';
+        input.className = 'field';
         input.type = 'text';
         input.readOnly = true;
         input.placeholder = 'No file selected';
@@ -322,7 +322,7 @@ function buildFieldRow(field, item, variant) {
             const lab = document.createElement('label');
             lab.className = 'wf-duration-part';
             const i = document.createElement('input');
-            i.className = 'editor-prop-input';
+            i.className = 'field';
             i.type = 'number';
             i.min = '0';
             i.step = '1';
@@ -359,7 +359,7 @@ function buildFieldRow(field, item, variant) {
     } else {
         row.appendChild(fieldLabel(field));
         input = document.createElement('input');
-        input.className = 'editor-prop-input';
+        input.className = 'field';
         input.type = field.type === 'password' ? 'password'
                    : (field.type === 'number' || field.type === 'number-nullable') ? 'number'
                    : 'text';
@@ -628,7 +628,7 @@ function buildListRow(field, item) {
         num.className = 'wf-list-num';
         const inp = document.createElement('input');
         inp.type = 'text';
-        inp.className = 'editor-prop-input wf-list-input';
+        inp.className = 'field wf-list-input';
         inp.value = value;
         inp.spellcheck = false;
         r.appendChild(num);
@@ -1128,7 +1128,7 @@ function buildSelectListRow(field, item) {
             num.className = 'wf-list-num';
             num.textContent = String(i + 1);
             const sel = document.createElement('select');
-            sel.className = 'editor-prop-select wf-list-input';
+            sel.className = 'field wf-list-input';
             sel.setAttribute('aria-label', `${field.itemLabel || 'Item'} ${i + 1}`);
             for (const o of opts) {
                 const op = document.createElement('option');

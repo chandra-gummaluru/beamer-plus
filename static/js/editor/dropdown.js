@@ -13,7 +13,7 @@
 // .selectedIndex from code updates the box too, and a MutationObserver
 // upgrades any select that lands in the panel later (panels rebuild freely).
 
-const SEL = 'select.editor-prop-select';
+const SEL = 'select.field';
 
 const CHEVRON = '<svg class="editor-dd-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg>';
 const CHECK   = '<svg class="editor-dd-check" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>';

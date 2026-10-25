@@ -61,7 +61,7 @@ function buildPropsHTML(arrKey, item) {
     const sel = (cur, v) => (cur === v ? 'selected' : '');
     const num = (id, label, value, extra = '') => `
         <label class="editor-prop-row"><span class="editor-prop-label">${label}</span>
-            <span class="wp-num"><input class="editor-prop-input" type="number" step="1" id="${id}" value="${value}" ${extra}><i>%</i></span></label>`;
+            <span class="wp-num"><input class="field" type="number" step="1" id="${id}" value="${value}" ${extra}><i>%</i></span></label>`;
     const section = (title, body) => `
         <section class="wf-group"><div class="wf-group-title">${title}</div><div class="wf-group-body">${body}</div></section>`;
 
@@ -75,16 +75,16 @@ function buildPropsHTML(arrKey, item) {
     if (arrKey === 'reveals') {
         layout += `
             <label class="editor-prop-row"><span class="editor-prop-label">Reveal on Step</span>
-                <input class="editor-prop-input" type="number" min="1" max="99" step="1" id="prop-step" value="${parseInt(item.step, 10) || 1}"></label>
+                <input class="field" type="number" min="1" max="99" step="1" id="prop-step" value="${parseInt(item.step, 10) || 1}"></label>
             <label class="editor-prop-row"><span class="editor-prop-label">Look While Hidden</span>
-                <select class="editor-prop-select" id="prop-revealStyle">
+                <select class="field" id="prop-revealStyle">
                     <option value="blend" ${sel(item.style ?? 'blend', 'blend')} data-desc="Matches the slide behind it">Blend Into Slide</option>
                     <option value="frosted" ${sel(item.style, 'frosted')} data-desc="A visible panel over the hidden part">Frosted Panel</option>
                 </select></label>`;
     } else {
         layout += `
             <label class="editor-prop-row"><span class="editor-prop-label">Appear on Step</span>
-                <input class="editor-prop-input" type="number" min="1" max="99" step="1" id="prop-step" placeholder="Always" value="${parseInt(item.step, 10) > 0 ? parseInt(item.step, 10) : ''}"></label>`;
+                <input class="field" type="number" min="1" max="99" step="1" id="prop-step" placeholder="Always" value="${parseInt(item.step, 10) > 0 ? parseInt(item.step, 10) : ''}"></label>`;
     }
     let html = section('Layout', layout);
 
@@ -92,7 +92,7 @@ function buildPropsHTML(arrKey, item) {
         const pm = item.playMode ?? 'click';
         html += section('Playback', `
             <label class="editor-prop-row"><span class="editor-prop-label">Play Mode</span>
-                <select class="editor-prop-select" id="prop-playMode">
+                <select class="field" id="prop-playMode">
                     <option value="click" ${sel(pm, 'click')} data-desc="Starts when you click it">Click to Play</option>
                     <option value="auto" ${sel(pm, 'auto')} data-desc="Plays once, muted, when the slide opens">Auto</option>
                     <option value="loop" ${sel(pm, 'loop')} data-desc="Plays over and over, muted">Loop</option>
@@ -100,14 +100,14 @@ function buildPropsHTML(arrKey, item) {
                     <option value="once" ${sel(pm, 'once')} data-desc="Plays once with sound">Once</option>
                 </select></label>
             <label class="editor-prop-row"><span class="editor-prop-label">Volume</span>
-                <input class="editor-prop-input" type="number" min="0" max="1" step="0.05" id="prop-volume" value="${item.volume ?? 1}"></label>
+                <input class="field" type="number" min="0" max="1" step="0.05" id="prop-volume" value="${item.volume ?? 1}"></label>
             <label class="editor-prop-row"><span class="editor-prop-label">Grow to Full Slide While Playing</span>
-                <select class="editor-prop-select" id="prop-expandDelay">${expandDelayOptions(item.expandDelay)}</select></label>`);
+                <select class="field" id="prop-expandDelay">${expandDelayOptions(item.expandDelay)}</select></label>`);
     } else if (arrKey === 'audios') {
         const pm = item.playMode ?? 'click';
         html += section('Playback', `
             <label class="editor-prop-row"><span class="editor-prop-label">Play Mode</span>
-                <select class="editor-prop-select" id="prop-playMode">
+                <select class="field" id="prop-playMode">
                     <option value="click" ${sel(pm, 'click')}>Click to Play</option>
                     <option value="auto" ${sel(pm, 'auto')}>Auto</option>
                     <option value="loop" ${sel(pm, 'loop')}>Loop</option>
@@ -123,7 +123,7 @@ function buildPropsHTML(arrKey, item) {
                 <input type="checkbox" class="editor-switch" role="switch" id="prop-animate" ${item.animate !== false ? 'checked' : ''}>
             </label>
             <label class="editor-prop-row"><span class="editor-prop-label">Animation Name</span>
-                <input class="editor-prop-input" type="text" id="prop-animName" placeholder="The model's first" value="${escAttr(item.animationName ?? '')}"></label>`);
+                <input class="field" type="text" id="prop-animName" placeholder="The model's first" value="${escAttr(item.animationName ?? '')}"></label>`);
     }
     return `<div class="wf wf--panel">${html}</div>`;
 }

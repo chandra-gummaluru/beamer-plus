@@ -382,7 +382,7 @@ async function drawSaveForm(w, src, path, dirs, decks) {
     const zips = decks.filter(d => /\.zip$/i.test(d.name));
     w.body.innerHTML = `${src.kind === 'computer' ? '' : listHTML(path, dirs, zips, { filesQuiet: true })}
         <label class="lib-field"><span>File name</span>
-            <input data-name value="${esc(w.name)}" spellcheck="false" autocomplete="off"></label>
+            <input class="field" data-name value="${esc(w.name)}" spellcheck="false" autocomplete="off"></label>
         <div class="lib-field"><span>Save</span>
             <div class="lib-chips" role="group" aria-label="What to save">
                 <label class="lib-chip" title="The presentation: reopens at the slide you're on"><input type="checkbox" data-deck checked><span>${ICON.deck}Presentation${ICON.tick}</span></label>

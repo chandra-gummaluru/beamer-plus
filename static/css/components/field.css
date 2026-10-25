@@ -1,0 +1,51 @@
+/* ============================================================
+   Fields — the one text box, text area and dropdown in Beamer+.
+   --ctl-h tall, hairline border (darker on hover), the focus ring.
+   A <select class="field"> is drawn with a quiet chevron; in the
+   editor, editor/dropdown.js swaps it for its own menu (.editor-dd),
+   drawn the same.
+   ============================================================ */
+
+.field {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: var(--ctl-h);
+    padding: 0 var(--sp-3);
+
+    font-family: var(--font-sans);
+    font-size: var(--fs-base);
+    color: var(--ink-1);
+
+    background: var(--surface-paper);
+    border: 1px solid var(--line-2);
+    border-radius: var(--r-md);
+    transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+.field::placeholder { color: var(--ink-4); }
+.field:hover { border-color: var(--line-3); }
+.field:focus {
+    outline: none;
+    border-color: var(--ink-2);
+    box-shadow: var(--ring);
+}
+.field[readonly],
+.field:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+textarea.field {
+    padding: var(--sp-2) var(--sp-3);
+    line-height: 1.5;
+}
+
+select.field {
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 32px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23777' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    cursor: pointer;
+}
+select.field[hidden] { display: none; }

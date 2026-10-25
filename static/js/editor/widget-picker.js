@@ -114,7 +114,7 @@ function _showWidgetModal(widgets) {
                 ${visibleCats.map(c => `<button class="widget-cat-btn" data-cat="${escHtml(c)}">${escHtml(c)}</button>`).join('')}
             </div>
             <div class="widget-modal-search-row">
-                <input class="editor-prop-input widget-modal-search" type="search"
+                <input class="field widget-modal-search" type="search"
                        id="widget-modal-search" placeholder="Search widgets…" autocomplete="off">
             </div>
             <div class="widget-modal-grid" id="widget-modal-grid"></div>

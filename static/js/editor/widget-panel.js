@@ -69,16 +69,16 @@ function buildLayoutCard(item, schema, onLayout) {
             </label>` : ''}
             <div class="wp-geom">
                 <label class="editor-prop-row"><span class="editor-prop-label">X</span>
-                    <span class="wp-num"><input class="editor-prop-input" type="number" min="0" max="100" step="1" data-k="x"><i>%</i></span></label>
+                    <span class="wp-num"><input class="field" type="number" min="0" max="100" step="1" data-k="x"><i>%</i></span></label>
                 <label class="editor-prop-row"><span class="editor-prop-label">Y</span>
-                    <span class="wp-num"><input class="editor-prop-input" type="number" min="0" max="100" step="1" data-k="y"><i>%</i></span></label>
+                    <span class="wp-num"><input class="field" type="number" min="0" max="100" step="1" data-k="y"><i>%</i></span></label>
                 <label class="editor-prop-row"><span class="editor-prop-label">Width</span>
-                    <span class="wp-num"><input class="editor-prop-input" type="number" min="5" max="100" step="1" data-k="width"><i>%</i></span></label>
+                    <span class="wp-num"><input class="field" type="number" min="5" max="100" step="1" data-k="width"><i>%</i></span></label>
                 <label class="editor-prop-row"><span class="editor-prop-label">Height</span>
-                    <span class="wp-num"><input class="editor-prop-input" type="number" min="5" max="100" step="1" data-k="height"><i>%</i></span></label>
+                    <span class="wp-num"><input class="field" type="number" min="5" max="100" step="1" data-k="height"><i>%</i></span></label>
             </div>`}
             <label class="editor-prop-row editor-prop-row--inline"><span class="editor-prop-label">Appear on Step</span>
-                <input class="editor-prop-input" type="number" min="1" max="99" step="1" placeholder="Always" data-k="step"></label>
+                <input class="field" type="number" min="1" max="99" step="1" placeholder="Always" data-k="step"></label>
         </div>`;
 
     // Settle on a display now, so the saved deck says what it is and an old

@@ -15,7 +15,7 @@
 // Panels rebuild their fields freely, so a MutationObserver upgrades any
 // new number input that lands in the panel.
 
-const SEL = 'input[type="number"].editor-prop-input';
+const SEL = 'input[type="number"].field';
 const HOLD_DELAY = 380, HOLD_EVERY = 70;
 
 export function initNumberSteppers(root = document.getElementById('editor-panel')) {

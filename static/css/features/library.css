@@ -36,12 +36,7 @@
 .lib-row--end { justify-content: flex-end; }
 
 .lib-field { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); color: var(--ink-2); font-weight: 600; }
-.lib-field select, .lib-field input {
-    font: inherit; font-weight: 400; font-size: var(--fs-base); color: var(--ink-1);
-    min-height: 38px; padding: 0 var(--sp-3);
-    border: var(--line-hairline); border-radius: var(--r-md); background: var(--surface-paper);
-}
-.lib-field select:focus, .lib-field input:focus { outline: 2px solid var(--ink-1); outline-offset: 1px; }
+.lib-field .field { font-weight: 400; }
 
 .lib .btn small { font-weight: 400; opacity: 0.85; }
 

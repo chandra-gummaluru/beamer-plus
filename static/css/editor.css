@@ -157,30 +157,7 @@ body.edit-mode #editor-panel { display: flex; }
     gap: var(--sp-1);
 }
 
-.editor-prop-input,
-.editor-prop-select {
-    width: 100%;
-    padding: var(--sp-1) var(--sp-2);
-    font-size: var(--fs-sm);
-    font-family: var(--font-sans);
-    border: 1px solid var(--line-2);
-    border-radius: var(--r-sm);
-    background: var(--surface-paper);
-    color: var(--ink-1);
-    box-sizing: border-box;
-    transition: border-color var(--dur-fast);
-    min-height: 30px;
-}
-.editor-prop-input:focus,
-.editor-prop-select:focus {
-    outline: none;
-    border-color: var(--accent);
-    box-shadow: 0 0 0 2px oklch(from var(--accent) l c h / 0.12);
-}
-.editor-prop-input[readonly] {
-    opacity: 0.5;
-    cursor: default;
-}
+/* Text boxes, text areas and dropdowns are .field (components/field.css). */
 
 /* An on/off setting: a row shaped like the inputs around it, label on the
    left and the editor's switch on the right (as "Hide in presentation"). */
@@ -189,13 +166,9 @@ body.edit-mode #editor-panel { display: flex; }
     align-items: center;
     justify-content: space-between;
     gap: var(--sp-3);
-    min-height: 30px;
-    padding: 4px 6px 4px var(--sp-2);
-    box-sizing: border-box;
-    border: 1px solid var(--line-2);
-    border-radius: var(--r-sm);
-    background: var(--surface-paper);
+    min-height: var(--ctl-h);
     font-size: var(--fs-sm);
+    font-weight: 500;
     font-family: var(--font-sans);
     color: var(--ink-1);
     cursor: pointer;
@@ -213,7 +186,7 @@ body.edit-mode #editor-panel { display: flex; }
     align-items: center;
     gap: var(--sp-2);
 }
-.editor-prop-file .editor-prop-input {
+.editor-prop-file .field {
     flex: 1 1 auto;
     min-width: 0;
 }
@@ -231,7 +204,7 @@ body.edit-mode #editor-panel { display: flex; }
     align-items: center;
     gap: 6px;
 }
-.wf-duration-part .editor-prop-input {
+.wf-duration-part .field {
     flex: 1 1 auto;
     min-width: 0;
 }
@@ -682,26 +655,13 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 }
 #editor-widget .wf-group-body { gap: var(--sp-3); }
 #editor-widget .editor-prop-row { gap: 6px; }
-#editor-widget .editor-prop-select[hidden] { display: none; }
-#editor-widget .editor-prop-input,
-#editor-widget .editor-prop-select { min-height: 32px; }
 
 /* Every control sits under its label, full width — dropdowns and numbers
    included. Only an on/off switch sits beside its label. */
 #editor-widget .editor-prop-row--inline { flex-direction: column; align-items: stretch; }
-#editor-widget .editor-prop-row--inline > .editor-prop-select,
-#editor-widget .editor-prop-row--inline > .editor-prop-input { width: 100%; }
-#editor-widget .editor-prop-select { width: 100%; max-width: none; align-self: stretch; }
-/* Dropdowns drawn to match the inputs, with a quiet chevron. */
-#editor-panel .editor-prop-select {
-    appearance: none;
-    -webkit-appearance: none;
-    padding-right: 30px;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23777' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 10px center;
-    cursor: pointer;
-}
+#editor-widget .editor-prop-row--inline > select.field,
+#editor-widget .editor-prop-row--inline > .field { width: 100%; }
+#editor-widget select.field { max-width: none; align-self: stretch; }
 
 /* Two or three choices: a segmented control, every option in view. */
 .wf-seg {
@@ -773,21 +733,11 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 /* Minutes and seconds share the line evenly. */
 #editor-widget .wf-duration-part { flex: 1 1 0; }
 
-/* On/off: the same line as every other short setting, no box around it. */
-#editor-widget .editor-prop-checkbox-row {
-    min-height: 32px;
-    padding: 0;
-    border: none;
-    background: none;
-    font-size: var(--fs-sm);
-    font-weight: 500;
-    color: var(--ink-2);
-}
 
 /* ── Layout card ── a Full slide switch over X / Y / Width / Height. */
 .wp-geom { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
 .wp-num { position: relative; display: block; }
-.wp-num .editor-prop-input { padding-right: 24px; }
+.wp-num .field { padding-right: 24px; }
 .wp-num i {
     position: absolute;
     right: 9px;
@@ -813,9 +763,9 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 
 .widget-modal {
     background: var(--surface-paper);
-    border: 1px solid var(--line-2);
+    border: var(--line-soft);
     border-radius: var(--r-lg);
-    box-shadow: var(--shadow-2), 0 20px 60px oklch(from var(--ink-1) l c h / 0.18);
+    box-shadow: var(--shadow-pop);
     width: min(620px, 92vw);
     max-height: 80vh;
     display: flex;
@@ -833,7 +783,7 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 
 .widget-modal-title {
     font-family: var(--font-serif);
-    font-size: var(--fs-lg);
+    font-size: var(--fs-xl);
     font-weight: 500;
     color: var(--ink-1);
     margin: 0;
@@ -1227,8 +1177,8 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
     justify-content: center;
     cursor: text;
 }
-.num-stepper .editor-prop-input,
-.wp-num .num-stepper .editor-prop-input {
+.num-stepper .field,
+.wp-num .num-stepper .field {
     border: none;
     background: transparent;
     box-shadow: none;
@@ -1241,14 +1191,14 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
     -moz-appearance: textfield;
     appearance: textfield;
 }
-.num-stepper .editor-prop-input:focus { box-shadow: none; }
-.num-stepper .editor-prop-input::-webkit-outer-spin-button,
-.num-stepper .editor-prop-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.num-stepper .editor-prop-input::placeholder { color: var(--ink-4); }
+.num-stepper .field:focus { box-shadow: none; }
+.num-stepper .field::-webkit-outer-spin-button,
+.num-stepper .field::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.num-stepper .field::placeholder { color: var(--ink-4); }
 /* With a unit, the number and its unit centre together. */
-.num-stepper-field:has(.num-stepper-unit) .editor-prop-input { width: auto; field-sizing: content; min-width: 2ch; text-align: right; padding-right: 1px; }
+.num-stepper-field:has(.num-stepper-unit) .field { width: auto; field-sizing: content; min-width: 2ch; text-align: right; padding-right: 1px; }
 @supports not (field-sizing: content) {
-    .num-stepper-field:has(.num-stepper-unit) .editor-prop-input { width: 4ch; }
+    .num-stepper-field:has(.num-stepper-unit) .field { width: 4ch; }
 }
 .wp-num.has-stepper i.num-stepper-unit,
 .num-stepper-unit {
@@ -1457,50 +1407,18 @@ body.wsheet-open #main-content { padding-right: 408px; }
     color: var(--ink-1);
 }
 
-/* Every control: same height, same border, same focus ring. */
-.wsheet .editor-prop-input,
-.wsheet .editor-prop-select {
-    min-height: var(--ctl-h);
-    padding: 6px 10px;
-    font-size: var(--fs-base);
-    border-color: var(--line-2);
-    background: var(--surface-paper);
-}
-.wsheet .editor-prop-input:hover,
-.wsheet .editor-prop-select:hover { border-color: var(--line-3); }
-.wsheet .editor-prop-input:focus,
-.wsheet .editor-prop-select:focus,
+/* Fields are the standard .field; a code box takes the same focus ring. */
 .wsheet .wf-code:focus-within {
     border-color: var(--ink-2);
     box-shadow: var(--ring);
 }
-.wsheet textarea.editor-prop-input { resize: none; line-height: 1.5; }
-.wsheet .editor-prop-select[hidden] { display: none; }
-/* Dropdowns drawn to match the inputs, with a quiet chevron. */
-.wsheet .editor-prop-select {
-    appearance: none;
-    -webkit-appearance: none;
-    padding-right: 32px;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23777' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 10px center;
-    cursor: pointer;
-}
+.wsheet textarea.field { resize: none; }
 /* Short settings stack under their label, full width; only a switch sits
    beside its label. */
 .wsheet .editor-prop-row--inline { flex-direction: column; align-items: stretch; }
-.wsheet .editor-prop-row--inline > .editor-prop-select,
-.wsheet .editor-prop-row--inline > .editor-prop-input,
-.wsheet .editor-prop-select { width: 100%; max-width: none; align-self: stretch; }
-.wsheet .editor-prop-checkbox-row {
-    min-height: var(--ctl-h);
-    padding: 0;
-    border: none;
-    background: none;
-    font-size: var(--fs-sm);
-    font-weight: 500;
-    color: var(--ink-1);
-}
+.wsheet .editor-prop-row--inline > select.field,
+.wsheet .editor-prop-row--inline > .field,
+.wsheet select.field { max-width: none; align-self: stretch; }
 .wsheet .wf-seg { padding: 3px; }
 .wsheet .wf-seg-btn { min-height: 28px; }
 .wsheet .wf-duration-part { flex: 1 1 0; }
@@ -1651,27 +1569,6 @@ body.wsheet-open #main-content { padding-right: 408px; }
 }
 #editor-panel .wp-geom .editor-prop-label { font-size: var(--fs-sm); color: var(--ink-2); }
 
-/* ── Text boxes ── */
-#editor-panel .editor-prop-input {
-    min-height: var(--ctl-h);
-    padding: 0 12px;
-    border: 1px solid var(--line-2);
-    border-radius: var(--r-md);
-    background: var(--surface-paper);
-    font-size: var(--fs-base);
-    color: var(--ink-1);
-    transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
-}
-#editor-panel textarea.editor-prop-input { padding: 8px 12px; line-height: 1.5; }
-#editor-panel .editor-prop-input:hover { border-color: var(--line-3); }
-#editor-panel .editor-prop-input:focus {
-    outline: none;
-    border-color: var(--ink-2);
-    box-shadow: var(--ring);
-    background: var(--surface-paper);
-}
-#editor-panel .editor-prop-input::placeholder { color: var(--ink-4); }
-
 /* ── Dropdowns (editor/dropdown.js) ── */
 .editor-dd-native { display: none !important; }
 .editor-dd {
@@ -1718,9 +1615,9 @@ body.wsheet-open #main-content { padding-right: 408px; }
     overflow-y: auto;
     overscroll-behavior: contain;
     background: var(--surface-paper);
-    border: 1px solid var(--line-1);
+    border: var(--line-hairline);
     border-radius: var(--r-lg);
-    box-shadow: 0 12px 32px oklch(from var(--ink-1) l c h / 0.16), 0 2px 6px oklch(from var(--ink-1) l c h / 0.06);
+    box-shadow: var(--shadow-3);
     font-family: var(--font-sans);
     animation: editor-dd-in 120ms var(--ease-out);
     scrollbar-width: thin;
@@ -1763,12 +1660,12 @@ body.wsheet-open #main-content { padding-right: 408px; }
 .wsheet .num-stepper:focus-within { border-color: var(--ink-2); box-shadow: var(--ring); background: var(--surface-paper); }
 #editor-panel .num-stepper-field,
 .wsheet .num-stepper-field { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; padding: 0 6px 0 12px; justify-content: flex-start; }
-#editor-panel .num-stepper .editor-prop-input,
-.wsheet .num-stepper .editor-prop-input {
+#editor-panel .num-stepper .field,
+.wsheet .num-stepper .field {
     min-height: 0; height: 100%; padding: 0; border: 0; background: transparent; box-shadow: none;
     text-align: left; font-size: var(--fs-base);
 }
-#editor-panel .num-stepper-field:has(.num-stepper-unit) .editor-prop-input { text-align: left; padding-right: 3px; }
+#editor-panel .num-stepper-field:has(.num-stepper-unit) .field { text-align: left; padding-right: 3px; }
 #editor-panel .num-stepper-unit { font-style: normal; font-size: var(--fs-sm); color: var(--ink-3); }
 .num-stepper-arrows {
     flex: 0 0 22px;
@@ -1791,16 +1688,6 @@ body.wsheet-open #main-content { padding-right: 408px; }
 .num-stepper-arrows .num-stepper-btn:hover { background: var(--surface-cream-2); color: var(--ink-1); }
 
 /* ── Switch rows ── */
-#editor-panel .editor-prop-checkbox-row {
-    min-height: var(--ctl-h);
-    padding: 0;
-    gap: 12px;
-    border: 0;
-    background: none;
-    font-size: var(--fs-sm);
-    font-weight: 500;
-    color: var(--ink-1);
-}
 
 /* ── Choices of two or three, and Text size ── */
 #editor-panel .wf-seg,
