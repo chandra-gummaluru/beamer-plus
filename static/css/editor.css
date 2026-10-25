@@ -30,24 +30,21 @@ body.edit-mode #edit-mode-container { display: flex; }
 }
 
 
-/* While editing it reads "Done": the one way out, a primary button. */
+/* While editing it reads "Done": the same paper button as the session
+   buttons it stands in for, just with a label. */
 #edit-mode-container .btn.is-done {
     width: auto;
-    padding: 0 var(--sp-4);
-    background: var(--ink-1);
-    border-color: var(--ink-1);
-    color: var(--ink-on-accent);
+    gap: 6px;
+    padding: 0 14px 0 12px;
     font-family: var(--font-sans);
     font-size: var(--fs-sm);
-    font-weight: 600;
+    font-weight: 500;
 }
+#edit-mode-container .btn.is-done svg { flex: 0 0 auto; }
+
 /* With a panel open, Done moves to the panel's left edge — never over it. */
 body.edit-mode.editor-panel-open #edit-mode-container {
     right: calc(var(--editor-panel-width) + var(--sp-3));
-}
-#edit-mode-container .btn.is-done:hover {
-    background: var(--accent-strong);
-    border-color: var(--accent-strong);
 }
 
 /* ─── Hide other UI when edit mode is active ─────────────────── */
