@@ -12,7 +12,6 @@ import argparse
 
 # Colors for terminal output
 class Colors:
-    HEADER = '\033[95m'
     BLUE = '\033[94m'
     CYAN = '\033[96m'
     GREEN = '\033[92m'
@@ -232,18 +231,12 @@ def main():
     if port != args.port:
         print_warning(f"Port {args.port} is in use. Using port {port} instead.")
     
-    # Skip app.py check when running as bundled executable
-    # PyInstaller bundles everything, so this check is unnecessary
-    if not getattr(sys, 'frozen', False):
-        # Only check for app.py when running as a script
-        if not os.path.exists("app.py"):
-            print_error("app.py not found in current directory")
-            print("Please run this script from the beamer-plus directory")
-            sys.exit(1)
-    
-    # Check dependencies (skip when frozen/bundled)
-    if not getattr(sys, 'frozen', False):
-        check_dependencies()
+    if not os.path.exists("app.py"):
+        print_error("app.py not found in current directory")
+        print("Please run this script from the beamer-plus directory")
+        sys.exit(1)
+
+    check_dependencies()
     
     # Get network information (before cert generation so the LAN IP can be
     # baked into the certificate's SAN list)

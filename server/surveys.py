@@ -49,10 +49,9 @@ def create_survey(session_id):
     if options is not None:
         if not isinstance(options, list) or not all(isinstance(o, str) for o in options):
             return jsonify({'error': 'options must be a list of strings'}), 400
-    is_wordcloud = bool(data.get('is_wordcloud', False))
     kind = data.get('kind')
     if kind not in SURVEY_KINDS:
-        kind = 'choice' if options else ('wordcloud' if is_wordcloud else 'open')
+        kind = 'choice' if options else 'open'
     sess.surveys[survey_id] = {
         'question': str(data.get('question', 'What do you think?')),
         'created_at': time.time(),

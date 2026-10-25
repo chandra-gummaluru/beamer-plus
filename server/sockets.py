@@ -13,7 +13,6 @@ def join_presenter(data=None):
         return
     join_room(session_room(session_id))
     join_room(f'presenter_{session_id}')
-    emit('joined', {'room': f'presenter_{session_id}'})
 
 
 @socketio.on('join_survey')
@@ -26,7 +25,6 @@ def join_survey(data):
         return
     join_room(session_room(session_id))
     join_room(f'survey_{session_id}_{survey_id}')
-    emit('joined', {'room': f'survey_{session_id}_{survey_id}'})
 
 
 @socketio.on('widget_state')

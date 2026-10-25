@@ -1,20 +1,11 @@
 """Filesystem locations for the Beamer+ server.
 
-Everything is resolved relative to BASE_PATH, which is the repository root
-when running from source and the PyInstaller bundle root when frozen.
+Everything is resolved relative to BASE_PATH, the repository root.
 """
 import os
-import sys
 
-
-def get_base_path():
-    if getattr(sys, 'frozen', False):
-        return sys._MEIPASS
-    # This file lives in server/, so the repo root is one level up.
-    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-
-BASE_PATH = get_base_path()
+# This file lives in server/, so the repo root is one level up.
+BASE_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 UPLOAD_FOLDER = os.path.join(BASE_PATH, 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)

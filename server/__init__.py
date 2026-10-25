@@ -2,7 +2,7 @@
 
 Module map:
 - core.py          Flask app + Socket.IO instances
-- paths.py         BASE_PATH and derived folders (works frozen and from source)
+- paths.py         BASE_PATH and derived folders
 - state.py         shared limits (MAX_RESPONSES_PER_SURVEY, …)
 - sessions.py      per-presenter session registry + create API
 - ai_models.py     survey-summarization model loading (built-ins + ZIP models)

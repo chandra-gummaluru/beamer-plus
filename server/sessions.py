@@ -10,7 +10,7 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 
-from flask import Blueprint, abort, jsonify, request
+from flask import Blueprint, abort, jsonify
 
 from . import ai_models
 from .paths import UPLOAD_FOLDER
@@ -96,16 +96,4 @@ def api_create_session():
     return jsonify({
         'session_id': session_id,
         'url': f'/s/{session_id}/',
-    })
-
-
-@sessions_bp.route('/api/session/<session_id>')
-def api_get_session(session_id):
-    sess = get_session(session_id)
-    if not sess:
-        return jsonify({'error': 'Session not found'}), 404
-    return jsonify({
-        'session_id': session_id,
-        'url': f'/s/{session_id}/',
-        'created_at': sess.created_at,
     })

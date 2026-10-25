@@ -24,7 +24,6 @@ def _save_and_load(sess, session_id, file):
 
 
 @presentation_bp.route('/s/<session_id>/upload', methods=['POST'])
-@presentation_bp.route('/s/<session_id>/api/presentation/upload', methods=['POST'])
 def upload(session_id):
     sess = get_session_or_404(session_id)
     if 'file' not in request.files:
@@ -35,14 +34,6 @@ def upload(session_id):
         'models': available_models,
         'models_found': len(available_models),
     })
-
-
-@presentation_bp.route('/s/<session_id>/api/presentation/current')
-def get_current_presentation(session_id):
-    sess = get_session_or_404(session_id)
-    if sess.current_presentation['file'] and os.path.exists(sess.current_presentation['file']):
-        return send_file(sess.current_presentation['file'], as_attachment=True, download_name='presentation.zip')
-    return jsonify({'error': 'No presentation loaded'}), 404
 
 
 @presentation_bp.route('/api/demo-zip')
@@ -60,20 +51,6 @@ def serve_demo_zip():
                 zf.write(fpath, arcname)
     buf.seek(0)
     return send_file(buf, mimetype='application/zip', download_name='demo.zip')
-
-
-@presentation_bp.route('/api/demo/<path:filename>')
-def serve_demo_file(filename):
-    from .paths import BASE_PATH
-    demo_dir = os.path.realpath(os.path.join(BASE_PATH, 'demo'))
-    requested = os.path.realpath(os.path.join(demo_dir, filename))
-    if not requested.startswith(demo_dir + os.sep):
-        return jsonify({'error': 'Forbidden'}), 403
-    if not os.path.isfile(requested):
-        return jsonify({'error': 'Not found'}), 404
-    resp = send_file(requested)
-    resp.headers['Access-Control-Allow-Origin'] = '*'
-    return resp
 
 
 @presentation_bp.route('/s/<session_id>/api/zip-asset/<path:filepath>')

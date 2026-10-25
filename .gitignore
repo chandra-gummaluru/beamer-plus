@@ -6,7 +6,6 @@ __pycache__/
 uploads/
 
 # Secrets — never commit these
-api_keys.json
 .env
 *.pem
 
