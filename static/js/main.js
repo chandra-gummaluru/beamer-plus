@@ -448,7 +448,7 @@ function wireKeyboardNav() {
         if (e.key === sc.clearAnnotations) document.getElementById('annotation-clear-btn')?.click();
         if (e.key === sc.splitView)        document.getElementById('split-toggle')?.click();
         if (e.key === sc.focusMode)        toggleFocusMode();
-        [sc.pen1, sc.pen2, sc.pen3, sc.pen4, sc.pen5].forEach((key, i) => {
+        [sc.pen1, sc.pen2].forEach((key, i) => {
             if (key && e.key === key) document.querySelectorAll('#pen-slots .pen-slot-btn')[i]?.click();
         });
     });

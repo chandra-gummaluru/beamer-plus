@@ -4,12 +4,11 @@
 // puts the flyout away. Changes apply straight away and are remembered.
 import { bus } from '../core/events.js';
 
+// Two slots: a pen and a highlighter (each can be switched and recoloured
+// from its flyout).
 const DEFAULT_PROFILES = [
     { mode: 'draw',      color: '#333333', size: 2, label: 'P1' },
-    { mode: 'draw',      color: '#e74c3c', size: 2, label: 'P2' },
     { mode: 'highlight', color: '#f1c40f', size: 5, label: 'H1' },
-    { mode: 'highlight', color: '#2ecc71', size: 5, label: 'H2' },
-    { mode: 'draw',      color: '#3498db', size: 2, label: 'P3' },
 ];
 
 const PEN_SWATCHES = ['#eeeeee','#e74c3c','#f1c40f','#2ecc71','#3498db','#9b59b6','#333333'];
@@ -21,7 +20,14 @@ function _savePenProfiles(profiles) {
 function _loadPenProfiles() {
     try {
         const saved = JSON.parse(localStorage.getItem('beamer-pen-profiles') || 'null');
-        if (Array.isArray(saved) && saved.length > 0) return saved;
+        if (!Array.isArray(saved) || !saved.length) return null;
+        if (saved.length === DEFAULT_PROFILES.length) return saved;
+        // Saved from the old five slots: keep the first pen and the first
+        // highlighter they had.
+        const pick = (mode, i) => ({ ...(saved.find(p => p?.mode === mode) ?? DEFAULT_PROFILES[i]) });
+        const two = [pick('draw', 0), pick('highlight', 1)];
+        _savePenProfiles(two);
+        return two;
     } catch {}
     return null;
 }

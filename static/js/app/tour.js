@@ -33,7 +33,7 @@ const STEPS = [
         sel:   '#annotation-slide-actions',
         place: 'left',
         title: 'Add or duplicate slides',
-        body:  'At the bottom of the toolbar: the first button adds a page after the current one; the second duplicates the current slide (its widgets, media and ink included) so you can build a variation without touching the original.',
+        body:  'At the bottom of the toolbar, after Split View: the first button adds a page after the current one; the second duplicates the current slide (its widgets, media and ink included) so you can build a variation without touching the original.',
     },
     {
         sel:   '#nav-drawer-hinge',
@@ -43,7 +43,7 @@ const STEPS = [
     },
     {
         sel:   '#split-toggle',
-        place: 'right',
+        place: 'left',
         title: 'Split view',
         body:  'Split the stage into two independent panes. Show your notes on one side while the audience slide stays in place on the other, or jump ahead while the current slide stays visible.',
     },

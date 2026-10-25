@@ -24,9 +24,6 @@ export const DEFAULT_SHORTCUTS = {
     focusMode:        'f',
     pen1:             '1',
     pen2:             '2',
-    pen3:             '3',
-    pen4:             '4',
-    pen5:             '5',
 };
 
 const SHORTCUT_LABELS = {
@@ -38,11 +35,8 @@ const SHORTCUT_LABELS = {
     clearAnnotations: 'Clear annotations',
     splitView:        'Split view',
     focusMode:        'Focus mode',
-    pen1:             'Pen slot 1',
-    pen2:             'Pen slot 2',
-    pen3:             'Pen slot 3',
-    pen4:             'Pen slot 4',
-    pen5:             'Pen slot 5',
+    pen1:             'Pen',
+    pen2:             'Highlighter',
 };
 
 export function loadShortcuts() {

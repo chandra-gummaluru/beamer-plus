@@ -47,9 +47,6 @@
 
     <!-- Slide navigator -->
     <aside id="slide-navigator">
-        <div id="slide-nav-top-actions">
-            <button class="btn" id="split-toggle" title="Split View"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg></button>
-        </div>
         <div id="bookmark-pins"></div>
         <div id="slide-nav-slides"></div>
     </aside>
@@ -167,9 +164,11 @@
         <div id="annotation-clear">
             <button class="btn" id="annotation-clear-btn" title="Clear All"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
         </div>
-        <!-- New page and duplicate (slides/structure.js). While editing they
-             sit in the insert toolbar instead, beside Bookmark. -->
+        <!-- Split view (main.js), then new page and duplicate
+             (slides/structure.js). While editing, the last two sit in the
+             insert toolbar instead, beside Bookmark. -->
         <div id="annotation-slide-actions">
+            <button class="btn" id="split-toggle" title="Split View"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg></button>
             <button class="btn" id="add-blank-btn" title="Add Page…"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg></button>
             <button class="btn" id="duplicate-slide-btn" title="Duplicate This Slide"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M4 16V5a2 2 0 0 1 2-2h11"/></svg></button>
         </div>

@@ -53,7 +53,7 @@ export function showHelpModal() {
 <li>Bookmark a slide in edit mode with the ${_hbtn('bookmark','Bookmark')} button in the toolbar along the top. Bookmarked slides get a pin so you can jump to them instantly.</li>
 </ul>
 <h4 class="help-h">Split view</h4>
-<p class="help-p">Click ${_hbtn('split','Split view')} at the top of the navigator to display two slides side by side, handy for comparing pages or keeping a reference slide visible while you present another.</p>
+<p class="help-p">Click ${_hbtn('split','Split view')} in the annotation toolbar to display two slides side by side, handy for comparing pages or keeping a reference slide visible while you present another.</p>
 <h4 class="help-h">Focus mode</h4>
 <p class="help-p">Click ${_hbtn('focus','Focus mode')} in the top-right to hide all UI and show only the slide. Press ${_hic('Esc')} to exit.</p>
 <h4 class="help-h">Annotation tools</h4>
