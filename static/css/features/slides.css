@@ -1174,36 +1174,6 @@ body.slide-muted #ann-canvas, body.slide-muted #ann-canvas-2 { z-index: 2 !impor
    Add page chooser (slides/structure.js openAddPageModal)
    ============================================================ */
 .add-page { display: flex; flex-direction: column; gap: var(--sp-4); text-align: left; }
-.add-page-styles {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: var(--sp-3);
-}
-.add-page-card {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 6px;
-    padding: 6px;
-    border: 1px solid oklch(86% 0.005 260);
-    border-radius: var(--r-md);
-    background: var(--surface-paper);
-    cursor: pointer;
-    font-family: var(--font-sans);
-    transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
-}
-.add-page-card:hover { border-color: var(--ink-4); }
-.add-page-card.is-active { border-color: var(--ink-1); box-shadow: 0 0 0 1px var(--ink-1); }
-.add-page-sheet {
-    display: block;
-    aspect-ratio: 4 / 3;
-    background-color: #fff;
-    border: 1px solid oklch(90% 0.005 260);
-    border-radius: 4px;
-}
-.add-page-name { font-size: var(--fs-sm); font-weight: 600; color: var(--ink-1); text-align: center; }
-.add-page-card.is-active .add-page-sheet { border-color: oklch(80% 0.005 260); }
-
 /* The large preview: what will actually be added, at slide proportions,
    beside the settings that shape it (or, for a plain page, a short note). */
 .add-page-detail {
@@ -1220,28 +1190,16 @@ body.slide-muted #ann-canvas, body.slide-muted #ann-canvas-2 { z-index: 2 !impor
     border-radius: var(--r-sm);
     box-shadow: 0 1px 2px oklch(20% 0.01 260 / 0.06);
 }
-.add-page-opts { display: flex; flex-direction: column; gap: var(--sp-3); }
-.add-page-opts[hidden] { display: none; }
 .add-page-note {
     margin: 0;
-    padding-top: 22px;   /* level with the first setting's label */
     font-family: var(--font-sans);
     font-size: var(--fs-sm);
     line-height: 1.45;
     color: var(--ink-3);
 }
 .add-page-note[hidden] { display: none; }
-.add-page-field { display: flex; flex-direction: column; gap: 4px; }
-.add-page-label {
-    font-family: var(--font-sans);
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--ink-3);
-}
 @media (max-width: 520px) {
-    .add-page-styles { grid-template-columns: repeat(2, 1fr); }
+    .add-page .paper-tiles { grid-template-columns: repeat(2, 1fr); }
     .add-page-detail { grid-template-columns: minmax(0, 1fr); }
 }
 
@@ -1331,3 +1289,71 @@ body.slide-muted #ann-canvas, body.slide-muted #ann-canvas-2 { z-index: 2 !impor
 @media (prefers-reduced-motion: reduce) {
     .pane-undefined-q { animation: none; stroke-dashoffset: 0; }
 }
+
+/* ============================================================
+   Paper chooser (slides/paper-picker.js) — the editor panel's, for the
+   blank slide on stage, and the Add Page window's. Backgrounds as little
+   pages; spacing and line weight as sliders with a stop per choice, like
+   the split view's divider; colour as three dots.
+   ============================================================ */
+.paper-row { display: flex; flex-direction: column; gap: 6px; }
+.paper-label { font-family: var(--font-sans); font-size: var(--fs-sm); font-weight: 600; color: var(--ink-1); }
+.paper-options { display: flex; flex-direction: column; gap: var(--sp-4); }
+.paper-options[hidden] { display: none; }
+
+.paper-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.paper-tile {
+    display: flex; flex-direction: column; align-items: stretch; gap: 5px;
+    margin: 0; padding: 5px 5px 4px;
+    border: 1px solid oklch(88% 0.004 260); border-radius: var(--r-md);
+    background: transparent; cursor: pointer;
+    font-family: var(--font-sans); font-size: var(--fs-xs); color: var(--ink-3);
+}
+.paper-tile:hover { background: var(--surface-cream-2); color: var(--ink-2); }
+.paper-tile.is-selected { border-color: var(--ink-1); box-shadow: 0 0 0 1px var(--ink-1); color: var(--ink-1); font-weight: 600; }
+.paper-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.paper-tile-page {
+    display: block; aspect-ratio: 4 / 3; border-radius: 3px;
+    background-color: #fff; border: 1px solid oklch(0% 0 0 / 0.08);
+}
+.paper-tile-name { text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.paper-slider { padding: 0 10px; }
+.paper-slider-rail {
+    --pos: 50%;
+    position: relative; height: 28px; cursor: pointer; outline: none; touch-action: none;
+}
+.paper-slider-line {
+    position: absolute; left: 0; right: 0; top: 50%; height: 2px; margin-top: -1px;
+    border-radius: 1px; background: oklch(84% 0.005 260);
+}
+.paper-slider-tick {
+    position: absolute; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px;
+    border-radius: 50%; background: oklch(84% 0.005 260);
+}
+/* The handle: the split view divider's pill. */
+.paper-slider-handle {
+    position: absolute; top: 50%; left: var(--pos);
+    width: 10px; height: 22px; transform: translate(-50%, -50%);
+    background: var(--surface-paper); border: 2px solid var(--ink-1); border-radius: 4px;
+    transition: left var(--dur-fast, 120ms) var(--ease-out, ease-out);
+}
+.paper-slider-rail.is-dragging .paper-slider-handle { transition: none; }
+.paper-slider-rail:focus-visible .paper-slider-handle { box-shadow: 0 0 0 3px oklch(45% 0.005 260 / 0.25); }
+.paper-slider-names { display: flex; justify-content: space-between; margin: 2px -10px 0; }
+.paper-slider-names button {
+    flex: 0 0 auto; padding: 0; border: 0; background: none; cursor: pointer;
+    font-family: var(--font-sans); font-size: var(--fs-xs); color: var(--ink-3);
+}
+.paper-slider-names button:hover { color: var(--ink-1); }
+.paper-slider-names button.is-selected { color: var(--ink-1); font-weight: 600; }
+
+.paper-dots { display: flex; gap: 12px; padding: 2px 0; }
+.paper-dot {
+    width: 24px; height: 24px; padding: 0; border-radius: 50%; cursor: pointer;
+    background: var(--c); border: 1px solid oklch(0% 0 0 / 0.12);
+    transition: transform var(--dur-fast, 120ms);
+}
+.paper-dot:hover { transform: scale(1.1); }
+.paper-dot.is-selected { box-shadow: 0 0 0 2px var(--surface-paper), 0 0 0 4px var(--ink-1); }
+.paper-dot:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }

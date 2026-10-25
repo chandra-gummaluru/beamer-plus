@@ -6,7 +6,8 @@
 // remapSlideIndices, which moves all of it in one place.
 import { bus } from '../core/events.js';
 import { discardParkedWidgets, requestWidgetStates, seedWidgetStates } from '../core/iframe-widget-renderer.js';
-import { PAPER_STYLES, PAPER_SPACING, PAPER_THICKNESS, PAPER_COLORS, normalizePaper, applyPaper } from './paper.js';
+import { normalizePaper, applyPaper } from './paper.js';
+import { createPaperPicker } from './paper-picker.js';
 
 let _state = null;
 
@@ -173,12 +174,18 @@ function openAddPageModal() {
     const root = document.createElement('div');
     root.className = 'add-page';
 
-    const grid = document.createElement('div');
-    grid.className = 'add-page-styles';
-    root.appendChild(grid);
+    // The same chooser as the editor panel's (paper-picker.js): the
+    // backgrounds across the top; below, a large preview of exactly what
+    // will be added (real spacing, weight and colour, at slide proportions)
+    // beside the rest of the settings. Double-click a background to add it.
+    const picker = createPaperPicker({
+        get: () => choice,
+        set: (key, v) => { choice[key] = v; },
+        onChange: () => showPreview(),
+        onStyleDblClick: () => { add(); window.BeamerModal?.close(); },
+    });
+    root.appendChild(picker.styles);
 
-    // Below the cards: a large preview of exactly what will be added (real
-    // spacing, weight and colour, at slide proportions) beside the settings.
     const detail = document.createElement('div');
     detail.className = 'add-page-detail';
     root.appendChild(detail);
@@ -187,10 +194,7 @@ function openAddPageModal() {
     preview.className = 'add-page-preview';
     preview.setAttribute('aria-hidden', 'true');
     detail.appendChild(preview);
-
-    const opts = document.createElement('div');
-    opts.className = 'add-page-opts';
-    detail.appendChild(opts);
+    detail.appendChild(picker.options);
 
     // Plain has nothing to set; say so in the same spot, so switching styles
     // doesn't reflow the dialog.
@@ -199,61 +203,25 @@ function openAddPageModal() {
     plainNote.textContent = 'A blank white page. Choose Lined, Grid or Dots for a pattern you can set the spacing, weight and colour of.';
     detail.appendChild(plainNote);
 
-    const cards = PAPER_STYLES.map(st => {
-        const card = document.createElement('button');
-        card.type = 'button';
-        card.className = 'add-page-card';
-        card.innerHTML = '<span class="add-page-sheet"></span><span class="add-page-name"></span>';
-        card.querySelector('.add-page-name').textContent = st.l;
-        card.addEventListener('click', () => { choice.style = st.v; sync(); });
-        card.addEventListener('dblclick', () => { choice.style = st.v; add(); window.BeamerModal?.close(); });
-        grid.appendChild(card);
-        return { st, card, sheet: card.querySelector('.add-page-sheet') };
-    });
-
-    const selects = {};
-    const field = (key, list, label) => {
-        const wrap = document.createElement('label');
-        wrap.className = 'add-page-field';
-        wrap.innerHTML = '<span class="add-page-label"></span>';
-        wrap.querySelector('.add-page-label').textContent = label;
-        const sel = document.createElement('select');
-        sel.className = 'editor-prop-select';
-        sel.innerHTML = list.map(o => `<option value="${o.v}">${o.l}</option>`).join('');
-        sel.addEventListener('change', () => { choice[key] = sel.value; sync(); });
-        wrap.appendChild(sel);
-        opts.appendChild(wrap);
-        selects[key] = { sel, wrap };
-    };
-    field('spacing', PAPER_SPACING, 'Spacing');
-    field('thickness', PAPER_THICKNESS, 'Line weight');
-    field('color', PAPER_COLORS, 'Colour');
-
-    function sync() {
-        for (const { st, card, sheet } of cards) {
-            card.classList.toggle('is-active', st.v === choice.style);
-            applyPaper(sheet, { ...choice, style: st.v }, { card: true });
-        }
+    function showPreview() {
         applyPaper(preview, choice);
-        for (const [k, { sel }] of Object.entries(selects)) sel.value = choice[k];
-        opts.hidden = choice.style === 'none';
         plainNote.hidden = choice.style !== 'none';
-        selects.thickness.wrap.querySelector('.add-page-label').textContent =
-            choice.style === 'dots' ? 'Dot size' : 'Line weight';
     }
+
     function add() {
         _lastPaper = { ...choice };
         insertBlankAfterCurrent(choice.style === 'none' ? null : { ...choice });
     }
-    sync();
+    picker.sync();
+    showPreview();
 
     window.BeamerModal?.show({
         kind: 'info',
-        title: 'Add page',
+        title: 'Add Page',
         body: root,
         buttons: [
             { label: 'Cancel', kind: 'cancel' },
-            { label: 'Add page', kind: 'ok', onClick: add },
+            { label: 'Add Page', kind: 'ok', onClick: add },
         ],
     });
 }

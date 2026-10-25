@@ -23,10 +23,10 @@ import { initWidgetSettings } from './widget-settings.js';
 import { initWidgetSettingsDialog, closeWidgetSettings } from './widget-settings-dialog.js';
 import { initNumberSteppers } from './number-stepper.js';
 import { initDropdowns } from './dropdown.js';
-import { titleCase } from './title-case.js';
 import { realSlideCount, insertViewAfterCurrent, removeSlideAt } from '../slides/structure.js';
 import { pickPanes, cancelPick } from './pane-picker.js';
-import { PAPER_STYLES, PAPER_SPACING, PAPER_THICKNESS, PAPER_COLORS, normalizePaper, applyPaper } from '../slides/paper.js';
+import { normalizePaper } from '../slides/paper.js';
+import { createPaperPicker } from '../slides/paper-picker.js';
 
 /* ─── init ──────────────────────────────────────────────────── */
 
@@ -300,64 +300,34 @@ function armSlideDelete(on) {
 }
 
 /* ─── blank-slide paper ─────────────────────────────────────── */
-const PAPER_FIELDS = { style: PAPER_STYLES, spacing: PAPER_SPACING, thickness: PAPER_THICKNESS, color: PAPER_COLORS };
+// The same chooser as the Add Page window (slides/paper-picker.js), on the
+// blank slide on stage.
+let paperPicker = null;
+const blankOnStage = () => {
+    const obj = ctx.state?.slideStructure?.[ctx.state?.currentSlide];
+    return obj?.type === 'blank' ? obj : null;
+};
 
 function initPaperSettings() {
-    for (const [key, list] of Object.entries(PAPER_FIELDS)) {
-        const sel = document.getElementById(`paper-${key}`);
-        if (!sel) continue;
-        sel.innerHTML = list.map(o => `<option value="${o.v}">${titleCase(o.l)}</option>`).join('');
-        // The choices as little pages (drawn in syncPaperSettings).
-        const tiles = document.querySelector(`.paper-tiles[data-paper="${key}"]`);
-        if (tiles) {
-            tiles.style.setProperty('--n', list.length);
-            tiles.innerHTML = list.map(o => `
-                <button type="button" class="paper-tile" role="radio" data-v="${o.v}" title="${titleCase(o.l)}">
-                    <span class="paper-tile-page"></span><span class="paper-tile-name">${titleCase(o.l)}</span>
-                </button>`).join('');
-            tiles.querySelectorAll('.paper-tile').forEach(t => t.addEventListener('click', () => {
-                if (sel.value === t.dataset.v) return;
-                sel.value = t.dataset.v;
-                sel.dispatchEvent(new Event('change'));
-            }));
-        }
-        sel.addEventListener('change', () => {
-            const obj = ctx.state?.slideStructure?.[ctx.state?.currentSlide];
-            if (obj?.type !== 'blank') return;
-            const paper = { ...normalizePaper(obj.paper), [key]: sel.value };
+    const host = document.getElementById('slide-paper-settings');
+    if (!host) return;
+    paperPicker = createPaperPicker({
+        get: () => normalizePaper(blankOnStage()?.paper),
+        set: (key, v) => {
+            const obj = blankOnStage();
+            if (!obj) return;
+            const paper = { ...normalizePaper(obj.paper), [key]: v };
             if (paper.style === 'none') delete obj.paper; else obj.paper = paper;
-            syncPaperSettings(obj);
             bus.emit('paper:changed');
-        });
-    }
+        },
+    });
+    host.append(paperPicker.styles, paperPicker.options);
 }
 
 function syncPaperSettings(obj) {
     const section = document.getElementById('slide-paper-section');
     if (section) section.hidden = obj?.type !== 'blank';
-    if (obj?.type !== 'blank') return;
-    const p = normalizePaper(obj.paper);
-    for (const key of Object.keys(PAPER_FIELDS)) {
-        const sel = document.getElementById(`paper-${key}`);
-        if (sel) sel.value = p[key];
-    }
-    const opts = document.getElementById('paper-options');
-    if (opts) opts.hidden = p.style === 'none';
-    const tl = document.getElementById('paper-thickness-label');
-    if (tl) tl.textContent = p.style === 'dots' ? 'Dot Size' : 'Line Weight';
-    // Each little page is this paper with that one choice changed. The
-    // backgrounds show the style close up; the rest draw it at 3× so the
-    // spacings, weights and colours tell apart at that size.
-    for (const key of Object.keys(PAPER_FIELDS)) {
-        document.querySelectorAll(`.paper-tiles[data-paper="${key}"] .paper-tile`).forEach(t => {
-            const on = p[key] === t.dataset.v;
-            t.classList.toggle('is-selected', on);
-            t.setAttribute('aria-checked', String(on));
-            const look = { ...p, [key]: t.dataset.v };
-            if (key !== 'style' && look.style === 'none') look.style = 'grid';
-            applyPaper(t.querySelector('.paper-tile-page'), look, key === 'style' ? { card: true } : { zoom: 3 });
-        });
-    }
+    if (obj?.type === 'blank') paperPicker?.sync();
 }
 
 // The slide the toolbar's eye and trash act on: the one on stage, or while
