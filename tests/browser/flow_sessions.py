@@ -80,7 +80,6 @@ def run():
         page.keyboard.press("Escape"); page.mouse.click(5, 5); page.wait_for_timeout(900)
         check("…and stays (no ×, Escape and clicking outside don't close it)",
               page.locator(".lib[data-mode=open]").count() == 1 and not page.locator(".custom-modal-x-btn").is_visible())
-        check("…with a way back to the start page", page.locator(".lib [data-leave]").count() == 1)
         print("   buttons:", shown())
         check("top-right, nothing open: Close session only", shown() == ["session-close-btn"])
         check("record button in the corner", page.locator("#record-btn").is_visible())

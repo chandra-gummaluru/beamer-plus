@@ -116,6 +116,7 @@ export function initLibrary(state) {
     bus.on('library:require', requirePresentation);
     bus.on('deck:loaded', () => {
         required = false;
+        document.body.classList.remove('lib-required');
         // The Open window may have come back while the deck was loading.
         if (window.BeamerModal?.open?.querySelector('.lib-modal--required')) window.BeamerModal.close();
         updateTitle();
@@ -143,8 +144,8 @@ export function openPresentation() {
 }
 
 /* A session with nothing open: the Open window, which can't be closed until
-   a presentation has opened. Its other ways out: a file from anywhere else
-   (or dropped on the window), and back to the start page. If anything puts
+   a presentation has opened. Its other ways in: a file from anywhere else,
+   or one dropped on the window. (Close session, top-right, still leaves.) If anything puts
    it away first (the file picker, a file that wouldn't open), it comes back. */
 let required = false;
 let watching = false;
@@ -183,6 +184,8 @@ function openWindow(mode) {
     const card = window.BeamerModal?.open?.querySelector('.custom-modal-content');
     card?.classList.add('lib-modal');
     card?.classList.toggle('lib-modal--required', locked);
+    // Close session (top-right) stays reachable above it: the way out.
+    document.body.classList.toggle('lib-required', locked);
     const w = {
         mode, root, cwd: null,
         srcBox: root.querySelector('.lib-src'),
@@ -223,23 +226,20 @@ function drawPickFile(w) {
     w.body.querySelector('[data-pick]').onclick = () => { appState.pendingTarget = null; chooseLocalFile(); };
 }
 
-// Underneath: the other way (one file from anywhere, or a download), and
-// for a session that has to open something first, the way back out.
+// Underneath: the other way (one file from anywhere, or a download).
 function drawFoot(w) {
-    const leave = w.locked ? `<button type="button" class="lib-link lib-link--quiet" data-leave>Back to the Start Page</button>` : '';
     if (w.local || (w.mode === 'open' && !Folder.supported())) {
-        w.foot.innerHTML = leave;
+        w.foot.innerHTML = '';
     } else {
-        w.foot.innerHTML = (w.mode === 'open'
+        w.foot.innerHTML = w.mode === 'open'
             ? `<button type="button" class="lib-link" data-local>Or upload from somewhere else instead</button>`
-            : `<button type="button" class="lib-link" data-local>Or download instead</button>`) + leave;
+            : `<button type="button" class="lib-link" data-local>Or download instead</button>`;
         w.foot.querySelector('[data-local]').onclick = () => {
             // While it has to stay up, the window stays under the file picker.
             if (w.mode === 'open') { if (!w.locked) window.BeamerModal?.close(); appState.pendingTarget = null; chooseLocalFile(); return; }
             w.local = true; w.cwd = null; refreshWindow(w);
         };
     }
-    w.foot.querySelector('[data-leave]')?.addEventListener('click', () => { window.location.href = '/'; });
 }
 
 // Downloading: where it goes, and the way back to the folder.

@@ -1,8 +1,9 @@
 // View-slide configuration panel — the split view's two slides (click one
 // to edit it; Choose Slides picks both again by clicking them in the slide
-// list, pane-picker.js), the divider ratio, and Remove View.
+// list, pane-picker.js) and the divider ratio. Deleting it and whether it's
+// shown are the insert toolbar's trash and eye (editor.js).
 import { bus } from '../core/events.js';
-import { getSlideLabels, removeSlideAt } from '../slides/structure.js';
+import { getSlideLabels } from '../slides/structure.js';
 import { ctx, escAttr, escHtml, setPanelMode, resolvePanelMode } from './context.js';
 import { pickPanes } from './pane-picker.js';
 
@@ -73,10 +74,6 @@ function buildViewConfigHTML(obj, viewIdx) {
                 </button>`).join('')}
             </div>
         </div>
-        <button class="btn editor-delete-btn" id="view-delete">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-            Remove View
-        </button>
     `;
 }
 
@@ -154,18 +151,6 @@ function wireViewConfigHandlers(i, obj) {
         }
     });
 
-    get('view-delete')?.addEventListener('click', () => {
-        if (ctx.selectedViewIdx === null) return;
-        const delIdx = ctx.selectedViewIdx;
-        // Close the panel first, so it isn't still pointing at the view while
-        // the remap runs. removeSlideAt shifts everything position-keyed —
-        // including the right pane and text boxes, which the old hand-rolled
-        // shift here missed.
-        hideViewConfig();
-        removeSlideAt(delIdx);
-        if (ctx.state.splitView) document.getElementById('split-toggle')?.click();
-        bus.emit('nav:refresh');
-    });
 }
 
 // The split picker: two panes drawn to scale with a draggable line between

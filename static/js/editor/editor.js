@@ -24,7 +24,7 @@ import { initWidgetSettingsDialog, closeWidgetSettings } from './widget-settings
 import { initNumberSteppers } from './number-stepper.js';
 import { initDropdowns } from './dropdown.js';
 import { titleCase } from './title-case.js';
-import { realSlideCount, insertViewAfterCurrent } from '../slides/structure.js';
+import { realSlideCount, insertViewAfterCurrent, removeSlideAt } from '../slides/structure.js';
 import { pickPanes, cancelPick } from './pane-picker.js';
 import { PAPER_STYLES, PAPER_SPACING, PAPER_THICKNESS, PAPER_COLORS, normalizePaper } from '../slides/paper.js';
 
@@ -59,19 +59,23 @@ export function initEditor(state) {
         if (!titleEl.readOnly && !titleEl.value.trim()) titleEl.value = '';
     });
 
-    document.getElementById('slide-shown-toggle')?.addEventListener('change', e => {
-        const obj = ctx.state?.slideStructure?.[ctx.state?.currentSlide];
+    // The toolbar's eye: shown or skipped while presenting.
+    document.getElementById('slide-shown-btn')?.addEventListener('click', () => {
+        const obj = ctx.state?.slideStructure?.[toolbarSlideIndex()];
         if (!obj) return;
-        if (e.target.checked) delete obj.hidden;
+        if (obj.hidden) delete obj.hidden;
         else obj.hidden = true;
         bus.emit('nav:refresh');
+        _updateAddMediaButtons();
     });
 
-    // Delete the slide: two clicks — the first arms it — since there's no undo.
+    // The toolbar's trash: two clicks — the first arms it — since there's no
+    // undo. On a split view it deletes the split view (not its slides).
     const delBtn = document.getElementById('slide-delete');
     delBtn?.addEventListener('click', () => {
-        const i = ctx.state?.currentSlide;
-        if (i == null || !ctx.state?.slideStructure?.[i]) return;
+        const i = toolbarSlideIndex();
+        const obj = i == null ? null : ctx.state?.slideStructure?.[i];
+        if (!obj) return;
         if (!delBtn.classList.contains('is-armed')) {
             armSlideDelete(true);
             clearTimeout(armSlideDelete.timer);
@@ -79,6 +83,17 @@ export function initEditor(state) {
             return;
         }
         armSlideDelete(false);
+        if (obj.type === 'view') {
+            // Close the panel first, so it isn't still pointing at the view
+            // while removeSlideAt remaps everything position-keyed.
+            hideViewConfig();
+            removeSlideAt(i);
+            if (ctx.state.splitView) document.getElementById('split-toggle')?.click();
+            bus.emit('nav:refresh');
+            // Once the split has closed, the toolbar is a slide's again.
+            setTimeout(() => { if (!ctx.state.splitView) updateSlideSettingsPanel(); }, 400);
+            return;
+        }
         bus.emit('slide:delete', i);
     });
 
@@ -172,6 +187,7 @@ export function initEditor(state) {
         cleanupEditOverlays();
         updatePropertiesPanel();  // hides (no overlay)
         showViewConfig(i);
+        _updateAddMediaButtons();
     });
 }
 
@@ -269,10 +285,7 @@ function updateSlideSettingsPanel() {
     syncPaperSettings(obj);
     refreshSlideItems();
     armSlideDelete(false);
-    const del = document.getElementById('slide-delete');
-    if (del) del.disabled = !obj || (ctx.state?.slideStructure?.length || 0) <= 1;
-    const shown = document.getElementById('slide-shown-toggle');
-    if (shown) shown.checked = !obj?.hidden;
+    _updateAddMediaButtons();
     // The header names the slide; a selection elsewhere names itself.
     if (!ctx.selectedOverlay && ctx.selectedViewIdx === null) setPanelMode('slide');
 }
@@ -282,7 +295,8 @@ function armSlideDelete(on) {
     const btn = document.getElementById('slide-delete');
     if (!btn) return;
     btn.classList.toggle('is-armed', on);
-    btn.title = on ? 'Click Again to Delete' : 'Delete Slide';
+    const view = ctx.state?.slideStructure?.[toolbarSlideIndex()]?.type === 'view';
+    btn.title = on ? 'Click Again to Delete' : view ? 'Delete Split View' : 'Delete Slide';
 }
 
 /* ─── blank-slide paper ─────────────────────────────────────── */
@@ -321,13 +335,41 @@ function syncPaperSettings(obj) {
 
 // Disable the add-media buttons when the current slide is a view slide
 // (view slides have no content layer to attach media to).
+// The slide the toolbar's eye and trash act on: the one on stage, or while
+// a split view is on stage, the split view itself (null for a split you
+// opened yourself, which isn't a slide).
+function toolbarSlideIndex() {
+    const s = ctx.state;
+    if (!s) return null;
+    if (s.splitView) return ctx.selectedViewIdx ?? s.currentViewIndex ?? null;
+    return s.currentSlide;
+}
+
+// What the insert toolbar can do here. On a split view only the eye and the
+// trash are live: everything else adds to a slide, and a split view has
+// none of its own.
 function _updateAddMediaButtons() {
-    const isView = ctx.state?.slideStructure?.[ctx.state?.currentSlide]?.type === 'view';
-    for (const id of ['edit-add-video-btn', 'edit-add-audio-btn', 'edit-add-model-btn', 'edit-add-widget-btn', 'edit-add-reveal-btn']) {
-        const btn = document.getElementById(id);
-        if (btn) btn.disabled = isView;
-    }
+    const s = ctx.state;
+    const split = !!s?.splitView;
+    const set = (id, off) => { const b = document.getElementById(id); if (b) b.disabled = off; };
+    for (const id of ['edit-add-video-btn', 'edit-add-audio-btn', 'edit-add-model-btn', 'edit-add-widget-btn',
+                      'edit-add-reveal-btn', 'edit-add-page-btn', 'edit-duplicate-btn', 'bookmark-btn']) set(id, split);
     // A split view pairs two real slides — none to pair until there are two.
-    const viewBtn = document.getElementById('add-view-btn');
-    if (viewBtn) viewBtn.disabled = realSlideCount(ctx.state?.slideStructure) < 2;
+    set('add-view-btn', split || realSlideCount(s?.slideStructure) < 2);
+
+    const i = toolbarSlideIndex();
+    const obj = i == null ? null : s?.slideStructure?.[i];
+    // The last real slide stays (a split view can always go).
+    set('slide-delete', !obj || (obj.type !== 'view' && (s?.slideStructure?.length || 0) <= 1));
+    const del = document.getElementById('slide-delete');
+    if (del && !del.classList.contains('is-armed')) del.title = obj?.type === 'view' ? 'Delete Split View' : 'Delete Slide';
+
+    const eye = document.getElementById('slide-shown-btn');
+    if (eye) {
+        eye.disabled = !obj;
+        const hidden = !!obj?.hidden;
+        eye.classList.toggle('btn_selected', hidden);
+        eye.setAttribute('aria-pressed', String(hidden));
+        eye.title = hidden ? 'Skipped During Presentation: Click to Show' : 'Hide During Presentation';
+    }
 }

@@ -245,17 +245,11 @@
             </button>
         </div>
         <div id="editor-panel-body">
-            <!-- Nothing selected: the slide itself (editor.js) — whether it's
-                 shown, its paper if it's blank, and everything on it, front to
-                 back (properties.js, refreshSlideItems). -->
+            <!-- Nothing selected: the slide itself (editor.js) — its paper if
+                 it's blank, and everything on it, front to back
+                 (properties.js, refreshSlideItems). Whether it's shown is
+                 the insert toolbar's eye. -->
             <div id="editor-slide-settings">
-                <label class="editor-prop-checkbox-row editor-switch-row">
-                    <span class="editor-switch-text">
-                        <span class="editor-switch-name">Show During Presentation</span>
-                        <span class="editor-switch-desc">When turned off, the slide will be skipped.</span>
-                    </span>
-                    <input type="checkbox" class="editor-switch" role="switch" id="slide-shown-toggle">
-                </label>
                 <!-- Blank slides only: lined / grid / dotted paper (slides/paper.js). -->
                 <section class="wf-group" id="slide-paper-section" hidden>
                     <div class="wf-group-title">Paper</div>
@@ -332,8 +326,10 @@
         <button class="btn editor-icon-btn" id="edit-duplicate-btn" title="Duplicate This Slide"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M4 16V5a2 2 0 0 1 2-2h11"/></svg></button>
         <button class="btn editor-icon-btn" id="bookmark-btn" title="Bookmark This Slide" aria-pressed="false"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
         <div class="editor-rail-sep" aria-hidden="true"></div>
+        <!-- Shown or skipped while presenting (editor.js). -->
+        <button class="btn editor-icon-btn" id="slide-shown-btn" type="button" title="Hide During Presentation" aria-pressed="false"><span class="slide-shown-on"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span><span class="slide-shown-off"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></span></button>
         <!-- Two clicks: the first arms it (editor.js); there is no undo. -->
-        <button class="btn editor-icon-btn editor-delete-btn" id="slide-delete" type="button" title="Delete Slide" aria-label="Delete Slide"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg><span class="editor-delete-label">Click Again to Delete</span></button>
+        <button class="btn editor-icon-btn editor-trash-btn" id="slide-delete" type="button" title="Delete Slide" aria-label="Delete Slide"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg><span class="editor-delete-label">Click Again to Delete</span></button>
     </div>
 
 </body>

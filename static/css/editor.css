@@ -26,8 +26,8 @@ body.edit-mode #main-content {
 }
 body.edit-mode:not(.split-view-active) #pdf-container { padding-top: 64px; }
 /* A split view has nothing to add to: no insert toolbar while one is open. */
-#editor-panel[data-mode="view"] ~ #editor-add-row,
-body.edit-mode.split-view-active #editor-add-row { display: none; }
+/* A split view keeps the toolbar, with only its eye and trash live: they
+   act on the split view itself (editor.js _updateAddMediaButtons). */
 
 
 /* Hide actual media elements — only edit overlay boxes are shown */
@@ -314,21 +314,6 @@ body.edit-mode #editor-panel { display: flex; }
     color: var(--text-3);
 }
 
-.editor-delete-btn {
-    margin-top: var(--sp-2);
-    width: 100%;
-    justify-content: center;
-    gap: var(--sp-2);
-    font-size: var(--fs-sm);
-    font-family: var(--font-sans);
-    color: oklch(40% 0.15 25);
-    border-color: oklch(85% 0.04 25);
-    background: oklch(97% 0.01 25);
-}
-.editor-delete-btn:hover {
-    background: oklch(93% 0.04 25);
-    border-color: oklch(75% 0.08 25);
-}
 
 /* ─── Insert toolbar ───────────────────────────────────────────────
    Docked to the top edge of the stage while editing, the way the annotation
@@ -1180,12 +1165,6 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
        and the insert toolbar centres on the whole width. */
     body.edit-mode #main-content { padding-right: 0; height: calc(100dvh - 45dvh - 88px); }
     #editor-add-row { left: 50%; }
-    /* The navigator's bar sits on top of the sheet, under the stage, rather
-       than hidden behind it (it's how you pick a split view's slides). */
-    body.edit-mode.split-view-active #slide-navigator { right: 0; bottom: 45dvh; }
-}
-@media (max-width: 1024px) and (orientation: portrait) {
-    body.edit-mode #slide-navigator { right: 0; bottom: 45dvh; }
 }
 
 @media (max-width: 480px) {
@@ -1196,8 +1175,6 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
     body.edit-mode #main-content {
         height: calc(100dvh - 50dvh - 88px);
     }
-    body.edit-mode.split-view-active #slide-navigator,
-    body.edit-mode #slide-navigator { bottom: 50dvh; }
     #editor-panel-body {
         padding: var(--sp-3);
     }
@@ -2153,12 +2130,12 @@ body.wsheet-open #main-content { padding-right: 408px; }
 
 /* Delete Slide: the trash at the end of the insert toolbar. The first click
    arms it: red, widening to say "Click Again to Delete" (editor.js). */
-.editor-delete-btn { width: auto; gap: 6px; transition: background var(--dur-fast, 120ms); }
-.editor-delete-btn .editor-delete-label { display: none; font-family: var(--font-sans); font-size: var(--fs-sm); font-weight: 600; white-space: nowrap; }
-.editor-delete-btn:hover:not(:disabled) { color: oklch(45% 0.16 25); background: oklch(96% 0.02 25); }
-.editor-delete-btn.is-armed,
-.editor-delete-btn.is-armed:hover { padding: 0 12px 0 10px; background: var(--danger); color: #fff; }
-.editor-delete-btn.is-armed .editor-delete-label { display: inline; }
+.editor-trash-btn { width: auto; gap: 6px; transition: background var(--dur-fast, 120ms); }
+.editor-trash-btn .editor-delete-label { display: none; font-family: var(--font-sans); font-size: var(--fs-sm); font-weight: 600; white-space: nowrap; }
+.editor-trash-btn:hover:not(:disabled) { color: oklch(45% 0.16 25); background: oklch(96% 0.02 25); }
+.editor-trash-btn.is-armed,
+.editor-trash-btn.is-armed:hover { padding: 0 12px 0 10px; background: var(--danger); color: #fff; }
+.editor-trash-btn.is-armed .editor-delete-label { display: inline; }
 .editor-remove-btn {
     height: var(--ep-ctl);
     min-height: var(--ep-ctl);
@@ -2247,3 +2224,11 @@ body.picking-panes #slide-nav-slides .slide-nav-item:hover .slide-preview { outl
 }
 .slide-item.is-empty { cursor: default; border-style: dashed; background: transparent; }
 .slide-item.is-empty .slide-item-name { color: var(--ink-3); }
+
+/* Show During Presentation: an eye, crossed out (and pressed) while the
+   slide is skipped. */
+#slide-shown-btn .slide-shown-off { display: none; }
+#slide-shown-btn.btn_selected .slide-shown-on { display: none; }
+#slide-shown-btn.btn_selected .slide-shown-off { display: contents; }
+#slide-shown-btn > span { display: contents; }
+#slide-shown-btn.btn_selected { background: var(--surface-cream-2); color: var(--ink-1); }
