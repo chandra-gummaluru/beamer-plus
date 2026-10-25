@@ -238,7 +238,7 @@
                 <input id="editor-panel-title" type="text" value="Slide" readonly tabindex="-1" autocomplete="off" spellcheck="false" aria-label="Name">
             </div>
             <!-- Leaves edit mode (editor.js). -->
-            <button class="btn editor-done-btn" id="editor-done-btn" type="button" title="Finish Editing">
+            <button class="btn btn--sm editor-done-btn" id="editor-done-btn" type="button" title="Finish Editing">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
                 <span>Done</span>
             </button>
@@ -274,7 +274,7 @@
         <!-- Delete the slide, or remove what's selected: two clicks, the first
              arms it, since there's no undo (editor.js, properties.js). -->
         <div id="editor-panel-footer">
-            <button class="btn editor-remove-btn" id="item-remove" type="button">
+            <button class="btn btn--sm btn--ghost btn--danger editor-remove-btn" id="item-remove" type="button">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>
                 <span>Remove</span>
             </button>
@@ -283,32 +283,32 @@
     <!-- Insert toolbar — docked to the top edge of the stage while editing,
          the way the annotation toolbar docks to the right while presenting. -->
     <div id="editor-add-row" role="toolbar" aria-label="Add to This Slide">
-        <button class="btn editor-icon-btn" id="add-view-btn" title="Insert Split View"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="3" width="8" height="18" rx="1.5"/><rect x="15" y="3" width="8" height="18" rx="1.5"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="9" y1="12" x2="15" y2="12"/></svg></button>
-        <button class="btn editor-icon-btn" id="edit-add-video-btn" title="Add Video">
+        <button class="btn btn--ghost btn--icon editor-icon-btn" id="add-view-btn" title="Insert Split View"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="3" width="8" height="18" rx="1.5"/><rect x="15" y="3" width="8" height="18" rx="1.5"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="9" y1="12" x2="15" y2="12"/></svg></button>
+        <button class="btn btn--ghost btn--icon editor-icon-btn" id="edit-add-video-btn" title="Add Video">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
         </button>
-        <button class="btn editor-icon-btn" id="edit-add-audio-btn" title="Add Audio">
+        <button class="btn btn--ghost btn--icon editor-icon-btn" id="edit-add-audio-btn" title="Add Audio">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
         </button>
-        <button class="btn editor-icon-btn" id="edit-add-model-btn" title="Add 3D Model (.glb / .gltf)">
+        <button class="btn btn--ghost btn--icon editor-icon-btn" id="edit-add-model-btn" title="Add 3D Model (.glb / .gltf)">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
         </button>
-        <button class="btn editor-icon-btn" id="edit-add-reveal-btn" title="Add Reveal Step: hides part of the slide until you press a key">
+        <button class="btn btn--ghost btn--icon editor-icon-btn" id="edit-add-reveal-btn" title="Add Reveal Step: hides part of the slide until you press a key">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="3 3"/><path d="M8 12h8"/><path d="M13 9l3 3-3 3"/></svg>
         </button>
         <div class="editor-rail-sep" aria-hidden="true"></div>
-        <button class="btn editor-icon-btn" id="edit-add-widget-btn" title="Add Widget">
+        <button class="btn btn--ghost btn--icon editor-icon-btn" id="edit-add-widget-btn" title="Add Widget">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
         </button>
         <div class="editor-rail-sep" aria-hidden="true"></div>
-        <button class="btn editor-icon-btn" id="edit-add-page-btn" title="Add Page…"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg></button>
-        <button class="btn editor-icon-btn" id="edit-duplicate-btn" title="Duplicate This Slide"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M4 16V5a2 2 0 0 1 2-2h11"/></svg></button>
-        <button class="btn editor-icon-btn" id="bookmark-btn" title="Bookmark This Slide" aria-pressed="false"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+        <button class="btn btn--ghost btn--icon editor-icon-btn" id="edit-add-page-btn" title="Add Page…"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg></button>
+        <button class="btn btn--ghost btn--icon editor-icon-btn" id="edit-duplicate-btn" title="Duplicate This Slide"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M4 16V5a2 2 0 0 1 2-2h11"/></svg></button>
+        <button class="btn btn--ghost btn--icon editor-icon-btn" id="bookmark-btn" title="Bookmark This Slide" aria-pressed="false"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
         <div class="editor-rail-sep" aria-hidden="true"></div>
         <!-- Shown or skipped while presenting (editor.js). -->
-        <button class="btn editor-icon-btn" id="slide-shown-btn" type="button" title="Hide During Presentation" aria-pressed="false"><span class="slide-shown-on"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span><span class="slide-shown-off"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></span></button>
+        <button class="btn btn--ghost btn--icon editor-icon-btn" id="slide-shown-btn" type="button" title="Hide During Presentation" aria-pressed="false"><span class="slide-shown-on"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span><span class="slide-shown-off"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></span></button>
         <!-- Two clicks: the first arms it (editor.js); there is no undo. -->
-        <button class="btn editor-icon-btn editor-trash-btn" id="slide-delete" type="button" title="Delete Slide" aria-label="Delete Slide"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg><span class="editor-delete-label">Click Again to Delete</span></button>
+        <button class="btn btn--ghost btn--icon btn--danger editor-icon-btn editor-trash-btn" id="slide-delete" type="button" title="Delete Slide" aria-label="Delete Slide"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg><span class="editor-delete-label">Click Again to Delete</span></button>
     </div>
 
 </body>

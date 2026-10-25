@@ -5,7 +5,6 @@
 
 /* ── Modals ─────────────────────────────────────────────────── */
 .custom-modal-content.lib-modal { max-width: 560px; text-align: left; }
-.lib-modal .custom-modal-title { text-align: left; }
 .lib-modal .custom-modal-buttons:empty { display: none; }
 
 .lib {
@@ -44,26 +43,7 @@
 }
 .lib-field select:focus, .lib-field input:focus { outline: 2px solid var(--ink-1); outline-offset: 1px; }
 
-.lib-btn {
-    display: inline-flex; align-items: center; gap: 6px;
-    min-height: 36px; padding: 0 var(--sp-3);
-    font: inherit; font-weight: 600; font-size: var(--fs-sm); color: var(--ink-1);
-    background: var(--surface-paper); border: 1px solid var(--line-2); border-radius: var(--r-md);
-    cursor: pointer; text-decoration: none; white-space: nowrap;
-}
-.lib-btn:hover { background: var(--surface-cream-2); border-color: var(--ink-4); }
-.lib-btn:disabled { opacity: 0.5; cursor: default; }
-.lib-btn--primary { background: var(--accent); color: var(--ink-on-accent); border-color: var(--accent-strong); }
-.lib-btn--primary:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
-
-.lib-btn small { font-weight: 400; opacity: 0.85; }
-.lib-link {
-    display: inline-flex; align-items: center; gap: 4px;
-    background: none; border: 0; padding: 0; cursor: pointer;
-    font: inherit; font-size: var(--fs-sm); color: var(--ink-2);
-    text-decoration: underline; text-underline-offset: 2px;
-}
-.lib-link:hover { color: var(--ink-1); }
+.lib .btn small { font-weight: 400; opacity: 0.85; }
 
 .lib-foot {
     display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2);

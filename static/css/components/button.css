@@ -1,9 +1,17 @@
 /* ============================================================
-   Buttons — refined ink/paper aesthetic
-   - Default: paper surface, hairline border, ink text
-   - Hover: tonal lift (cream), no jarring color flip
-   - Selected: accent ink blue background, paper text
-   - Press: subtle 1px depth
+   Buttons — the one button in Beamer+.
+
+   .btn                 paper, hairline border, ink label
+   .btn--primary        the one main action of a page or dialog
+   .btn--ghost          no fill or border until hovered: toolbars, ×, quiet links
+   .btn--danger         destructive; filled once armed (.is-armed)
+   .btn--sm             --ctl-h tall: the editor panel and settings sheet
+   .btn--icon           square, for an icon alone
+   .btn_selected        a toggle that is on (tools, split view, bookmark)
+   .link                a quiet text action inside prose ("Or download instead")
+
+   Feature CSS may place a button (margins, width, position) but never
+   restyles it.
    ============================================================ */
 
 .btn {
@@ -18,12 +26,13 @@
 
     min-width: var(--hit-min);
     min-height: var(--hit-min);
-    padding: 0 0.75em;
+    padding: 0 var(--sp-3);
 
     font-family: var(--font-sans);
     font-size: var(--fs-base);
     font-weight: 500;
     line-height: 1;
+    white-space: nowrap;
 
     color: var(--_fg);
     background: var(--_bg);
@@ -44,12 +53,11 @@
         box-shadow var(--dur-fast) var(--ease);
 }
 
-.btn i { font-size: var(--fs-base); line-height: 1; }
-.btn svg { width: 18px; height: 18px; }
+.btn svg { width: 18px; height: 18px; flex: none; }
 
 .btn:hover {
     --_bg: var(--surface-cream-2);
-    --_bd: var(--ink-4);
+    --_bd: var(--line-3);
 }
 
 .btn:active {
@@ -65,42 +73,74 @@
     filter: saturate(0);
 }
 
-/* Selected state — accent ink */
+/* ---------- Variants ---------- */
+
+.btn--primary,
 .btn_selected,
 .btn.btn_selected {
     --_bg: var(--accent);
     --_fg: var(--ink-on-accent);
     --_bd: var(--accent-strong);
-    color: var(--_fg);
-    box-shadow: 0 1px 2px oklch(from var(--ink-1) l c h / 0.10),
-                inset 0 0 0 1px oklch(100% 0 0 / 0.08);
 }
-
+.btn--primary:hover,
 .btn_selected:hover {
     --_bg: var(--accent-strong);
+    --_bd: var(--accent-strong);
 }
+.btn--primary:active,
+.btn_selected:active { background: var(--accent-strong); }
 
-/* Icon-only square variant (toolbar) */
-.btn--icon {
-    width: var(--hit-min);
-    min-width: var(--hit-min);
-    padding: 0;
-}
-
-/* Ghost / secondary */
 .btn--ghost {
     --_bg: transparent;
     --_bd: transparent;
+    --_fg: var(--ink-2);
 }
 .btn--ghost:hover {
     --_bg: var(--surface-cream-2);
-    --_bd: var(--line-2);
+    --_bd: transparent;
+    --_fg: var(--ink-1);
 }
 
-/* Danger */
-.btn--danger.btn_selected,
-.btn--danger:where(.is-active) {
+.btn--danger { --_fg: var(--danger-ink); }
+.btn--danger:hover { --_bg: var(--danger-soft); --_bd: transparent; --_fg: var(--danger-ink); }
+/* An icon alone (a toolbar's trash) keeps the toolbar's ink until hovered. */
+.btn--icon.btn--danger:not(:hover):not(.is-armed) { --_fg: var(--ink-2); }
+.btn--danger.is-armed,
+.btn--danger.is-armed:hover {
     --_bg: var(--danger);
     --_bd: var(--danger);
     --_fg: var(--ink-on-accent);
 }
+
+/* ---------- Sizes ---------- */
+
+.btn--sm {
+    min-width: var(--ctl-h);
+    min-height: var(--ctl-h);
+    font-size: var(--fs-sm);
+}
+.btn--sm svg { width: 15px; height: 15px; }
+
+.btn--icon {
+    width: var(--hit-min);
+    padding: 0;
+}
+.btn--sm.btn--icon { width: var(--ctl-h); }
+
+/* ---------- Text link ---------- */
+
+.link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    padding: 0;
+    background: none;
+    border: 0;
+    cursor: pointer;
+    font: inherit;
+    font-size: var(--fs-sm);
+    color: var(--ink-2);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+.link:hover { color: var(--ink-1); }

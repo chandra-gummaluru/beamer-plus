@@ -140,13 +140,13 @@ function _mount() {
     popover.innerHTML = `
         <div class="tour-pop-header">
             <span class="tour-count"></span>
-            <button class="tour-skip-btn" aria-label="Skip tour">Skip</button>
+            <button class="link tour-skip-btn" aria-label="Skip Tour">Skip</button>
         </div>
         <h3 class="tour-title"></h3>
         <p  class="tour-body"></p>
         <div class="tour-nav-row">
-            <button class="btn tour-back-btn">Back</button>
-            <button class="btn tour-next-btn">Next</button>
+            <button class="btn btn--sm tour-back-btn">Back</button>
+            <button class="btn btn--sm btn--primary tour-next-btn">Next</button>
         </div>
     `;
 
@@ -200,7 +200,6 @@ function _goto(i) {
     n.body.textContent  = step.body;
     n.prev.style.visibility = _step === 0 ? 'hidden' : '';
     n.next.textContent = last ? 'Finish' : 'Next';
-    n.next.classList.toggle('tour-next-finish', last);
 
     // Resolve target element
     let target = step.sel ? document.querySelector(step.sel) : null;

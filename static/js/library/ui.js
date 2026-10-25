@@ -208,7 +208,7 @@ async function refreshWindow(w) {
         await browse(w, src, w.cwd);
     } catch (e) {
         if (e?.name === 'NotFoundError' && w.cwd) { w.cwd = ''; return refreshWindow(w); }   // that folder is gone
-        w.body.innerHTML = `<p class="lib-err">${esc(e?.message || e)}</p><p><button type="button" class="lib-btn" data-retry>Try again</button></p>`;
+        w.body.innerHTML = `<p class="lib-err">${esc(e?.message || e)}</p><p><button type="button" class="btn" data-retry>Try again</button></p>`;
         w.body.querySelector('[data-retry]').onclick = () => refreshWindow(w);
     }
 }
@@ -217,7 +217,7 @@ async function refreshWindow(w) {
 function drawPickFile(w) {
     w.body.innerHTML = `<p>Choose your presentation: a PDF, or a Beamer+ presentation you saved (a ZIP).
         You can also drop it anywhere on the window.</p>
-        <p class="lib-row"><button type="button" class="lib-btn lib-btn--primary" data-pick>${ICON.pdf}Choose a File…</button></p>`;
+        <p class="lib-row"><button type="button" class="btn btn--primary" data-pick>${ICON.pdf}Choose a File…</button></p>`;
     w.body.querySelector('[data-pick]').onclick = () => { appState.pendingTarget = null; chooseLocalFile(); };
 }
 
@@ -227,8 +227,8 @@ function drawFoot(w) {
         w.foot.innerHTML = '';
     } else {
         w.foot.innerHTML = w.mode === 'open'
-            ? `<button type="button" class="lib-link" data-local>Or upload from somewhere else instead</button>`
-            : `<button type="button" class="lib-link" data-local>Or download instead</button>`;
+            ? `<button type="button" class="link" data-local>Or upload from somewhere else instead</button>`
+            : `<button type="button" class="link" data-local>Or download instead</button>`;
         w.foot.querySelector('[data-local]').onclick = () => {
             // While it has to stay up, the window stays under the file picker.
             if (w.mode === 'open') { if (!w.locked) window.BeamerModal?.close(); appState.pendingTarget = null; chooseLocalFile(); return; }
@@ -240,7 +240,7 @@ function drawFoot(w) {
 // Downloading: where it goes, and the way back to the folder.
 function drawComputerRow(w) {
     w.srcBox.innerHTML = `<p class="lib-muted lib-small lib-local-note">${ICON.down}Saves to your browser’s downloads folder.
-        ${Folder.supported() ? '<button type="button" class="lib-link" data-folder-back>Save in a folder instead</button>' : ''}</p>`;
+        ${Folder.supported() ? '<button type="button" class="link" data-folder-back>Save in a folder instead</button>' : ''}</p>`;
     w.srcBox.querySelector('[data-folder-back]')?.addEventListener('click', () => { w.local = false; w.cwd = null; refreshWindow(w); });
 }
 
@@ -267,15 +267,15 @@ async function drawFolderRow(w) {
     const what = role === 'save' ? 'Save to' : 'Open from';
     if (perm === 'granted') {
         w.srcBox.innerHTML = `<div class="lib-folder"><span class="lib-folder-what">${what}</span>${ICON.folder}<span class="lib-folder-name"></span>
-            <button type="button" class="lib-link" data-change>Change folder…</button></div>`;
+            <button type="button" class="link" data-change>Change folder…</button></div>`;
         w.srcBox.querySelector('.lib-folder-name').textContent = Folder.rootName(role);
         w.srcBox.querySelector('[data-change]').onclick = choose;
         return true;
     }
     if (had) {
         w.body.innerHTML = `<p>Beamer+ needs your OK to ${role === 'save' ? 'save in' : 'open from'} <b></b> again.</p>
-            <p class="lib-row"><button type="button" class="lib-btn lib-btn--primary" data-allow>${ICON.folder}Allow access</button>
-            <button type="button" class="lib-btn" data-choose>Choose another folder…</button></p>`;
+            <p class="lib-row"><button type="button" class="btn btn--primary" data-allow>${ICON.folder}Allow access</button>
+            <button type="button" class="btn" data-choose>Choose another folder…</button></p>`;
         w.body.querySelector('b').textContent = Folder.rootName(role);
         w.body.querySelector('[data-allow]').onclick = async () => { if (await Folder.reconnect(role)) refreshWindow(w); };
         w.body.querySelector('[data-choose]').onclick = choose;
@@ -288,8 +288,8 @@ async function drawFolderRow(w) {
             (it can be a different folder from the one you open them from).</p>`
         : `<p>Choose the folder your presentations are in (your course folder, say).
             Beamer+ remembers it for next time.</p>`;
-    w.body.insertAdjacentHTML('beforeend', `<p class="lib-row"><button type="button" class="lib-btn lib-btn--primary" data-choose>${ICON.folder}Choose a folder…</button>
-        ${otherName ? `<button type="button" class="lib-btn" data-adopt></button>` : ''}</p>`);
+    w.body.insertAdjacentHTML('beforeend', `<p class="lib-row"><button type="button" class="btn btn--primary" data-choose>${ICON.folder}Choose a folder…</button>
+        ${otherName ? `<button type="button" class="btn" data-adopt></button>` : ''}</p>`);
     w.body.querySelector('[data-choose]').onclick = choose;
     const adopt = w.body.querySelector('[data-adopt]');
     if (adopt) {
@@ -390,10 +390,10 @@ async function drawSaveForm(w, src, path, dirs, decks) {
                 <label class="lib-chip" title="${takes.length ? `${takes.length} recording${takes.length > 1 ? 's' : ''} not saved yet` : 'No recordings to save'}"><input type="checkbox" data-recs${takes.length ? ' checked' : ' disabled'}><span>${ICON.rec}Recordings${takes.length ? ` <small>${takes.length}</small>` : ''}${ICON.tick}</span></label>
             </div></div>
         ${tooBig.length ? `<p class="lib-muted lib-small lib-toobig">${tooBig.length === 1 ? '1 recording is' : `${tooBig.length} recordings are`} too big to save here.
-            <button type="button" class="lib-link" data-toobig>Download ${tooBig.length === 1 ? 'it' : 'them'} instead</button></p>` : ''}
+            <button type="button" class="link" data-toobig>Download ${tooBig.length === 1 ? 'it' : 'them'} instead</button></p>` : ''}
         <p class="lib-err" data-save-err></p>
-        <p class="lib-row lib-row--end"><button type="button" class="lib-btn" data-cancel>Cancel</button>
-            <button type="button" class="lib-btn lib-btn--primary" data-save>Save</button></p>`;
+        <p class="lib-row lib-row--end"><button type="button" class="btn" data-cancel>Cancel</button>
+            <button type="button" class="btn btn--primary" data-save>Save</button></p>`;
     const nameIn = w.body.querySelector('[data-name]');
     nameIn.addEventListener('input', () => { w.name = nameIn.value; });
     w.body.querySelectorAll('[data-dir]').forEach(b => { b.onclick = () => browse(w, src, b.dataset.dir); });

@@ -49,7 +49,7 @@ function buildViewConfigHTML(obj, viewIdx) {
                 ${paneRow('left', obj.left)}
                 ${paneRow('right', obj.right)}
             </div>
-            <button type="button" class="btn editor-secondary-btn" id="view-pick">
+            <button type="button" class="btn btn--sm editor-secondary-btn" id="view-pick">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="7" height="14" rx="1"/><rect x="14" y="5" width="7" height="14" rx="1"/></svg>
                 <span>Choose Slides</span>
             </button>

@@ -250,69 +250,11 @@ body.welcome-page {
     align-items: center;
 }
 
-.welcome-btn {
-    font-family: var(--font-sans);
-    font-size: var(--fs-base);
-    font-weight: 600;
-    min-height: 44px;
-    width: auto;
-    padding: 0 var(--sp-5);
-    border-radius: var(--r-md);
-    white-space: nowrap;
-    border: var(--line-hairline);
-    cursor: pointer;
-    transition: background var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
-}
+/* New Session / Try Demo / ? are ordinary buttons (button.css). */
+.welcome-help svg { width: 22px; height: 22px; }
 
-.welcome-btn--help {
-    flex: 0 0 auto;
-    width: 44px;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    border-color: transparent;
-    color: var(--ink-3);
-    text-decoration: none;
-}
-
-.welcome-btn--help:hover {
-    color: var(--ink-1);
-    transform: none;
-}
-
-/* Greyed out while a session is starting. */
-.welcome-btn:disabled {
-    opacity: 0.45;
-    cursor: default;
-}
-body.is-busy .welcome-btn:disabled {
-    opacity: 0.6;
-    cursor: wait;
-}
-
-.welcome-btn--primary {
-    background: var(--accent);
-    color: var(--ink-on-accent);
-    border-color: var(--accent-strong);
-}
-
-.welcome-btn--primary:hover:not(:disabled) {
-    background: var(--accent-strong);
-}
-
-/* "Try Demo" — beside "New Session", quieter than it. */
-.welcome-btn--secondary {
-    flex: 0 0 auto;
-    background: var(--surface-paper);
-    color: var(--ink-1);
-    border-color: var(--ink-4);
-}
-
-.welcome-btn--secondary:hover:not(:disabled) {
-    background: var(--surface-cream-2);
-}
+/* Busy while a session is starting. */
+body.is-busy .welcome-actions .btn:disabled { cursor: wait; }
 
 .welcome-hint {
     font-size: var(--fs-sm);
@@ -360,14 +302,10 @@ body.is-busy .welcome-btn:disabled {
 
     /* Pull the help "?" out of the button row and pin it to the top-right so the
        New Session button spans the full width and reads as centered. */
-    .welcome-btn--help {
+    .welcome-help {
         position: fixed;
         top: var(--sp-4);
         right: var(--sp-4);
-        width: var(--hit-min);
-        height: var(--hit-min);
-        min-height: 0;
-        border-radius: var(--r-pill);
         z-index: 10;
     }
 

@@ -1,5 +1,7 @@
 /* ============================================================
-   Modal — refined paper card with backdrop blur
+   Dialog (BeamerModal, core/modal.js) — the one dialog shell.
+   Title and message left-aligned; footer buttons right-aligned,
+   the main action last. The loading dialog is centred.
    ============================================================ */
 
 .custom-modal-overlay {
@@ -41,8 +43,7 @@
 }
 
 .custom-modal-icon {
-    font-size: 1.75rem;
-    text-align: center;
+    font-size: var(--fs-2xl);
     color: var(--ink-2);
     margin-bottom: var(--sp-3);
 }
@@ -53,8 +54,7 @@
 
 .custom-modal-title {
     font-family: var(--font-serif);
-    margin: 0 0 var(--sp-3) 0;
-    text-align: center;
+    margin: 0 var(--sp-6) var(--sp-3) 0;   /* clear of the × */
     font-size: var(--fs-xl);
     font-weight: 500;
     color: var(--ink-1);
@@ -62,7 +62,6 @@
 }
 
 .custom-modal-message {
-    text-align: center;
     color: var(--ink-2);
     line-height: 1.5;
     margin: 0 0 var(--sp-5) 0;
@@ -72,63 +71,16 @@
 
 .custom-modal-buttons {
     display: flex;
-    justify-content: center;
+    justify-content: flex-end;
     gap: var(--sp-2);
     margin-top: var(--sp-5);
 }
 
-.custom-modal-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--sp-2);
-    min-height: var(--hit-min);
-    padding: 0 1em;
-    font-family: var(--font-sans);
-    font-size: var(--fs-base);
-    color: var(--ink-1);
-    background: var(--surface-paper);
-    border: 1px solid var(--line-2);
-    border-radius: var(--r-md);
-    cursor: pointer;
-    transition: background-color var(--dur-fast), border-color var(--dur-fast);
-}
-
-.custom-modal-btn:hover { background: var(--surface-cream-2); border-color: var(--ink-4); }
-
-.custom-modal-btn-ok {
-    background: var(--accent);
-    color: var(--ink-on-accent);
-    border-color: var(--accent-strong);
-    font-weight: 500;
-}
-.custom-modal-btn-ok:hover { background: var(--accent-strong); }
-
-.custom-modal-btn-cancel { color: var(--ink-2); }
-
-/* ---------- Top-right X close button ---------- */
+/* The × (a ghost icon button), in the corner. */
 .custom-modal-x-btn {
     position: absolute;
     top: var(--sp-3);
     right: var(--sp-3);
-    width: 30px;
-    height: 30px;
-    padding: 0;
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: var(--r-md);
-    color: var(--ink-3);
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: var(--fs-base);
-    transition: background var(--dur-fast), border-color var(--dur-fast), color var(--dur-fast);
-}
-.custom-modal-x-btn:hover {
-    background: var(--surface-cream-2);
-    border-color: var(--line-2);
-    color: var(--ink-1);
 }
 
 .custom-modal-pen-swatch {
@@ -163,26 +115,13 @@
 }
 
 .modal-loading { pointer-events: auto; }
+.modal-loading .custom-modal-content { text-align: center; }
 .modal-loading .custom-modal-content { pointer-events: auto; }
 
 @media (max-width: 768px) {
     .custom-modal-content { max-width: 92%; padding: var(--sp-5); }
     .custom-modal-buttons { flex-direction: column-reverse; }
-    .custom-modal-btn { width: 100%; }
+    .custom-modal-buttons .btn { width: 100%; }
 }
 
-/* ============================================================
-   Help modal — wider, tabbed layout
-   ============================================================ */
-
-.custom-modal-content.help-modal-content {
-    max-width: 600px;
-    width: 94vw;
-    padding: var(--sp-5) var(--sp-6);
-}
-
-@media (max-width: 600px) {
-    .custom-modal-content.help-modal-content { padding: var(--sp-4); }
-
-}
 

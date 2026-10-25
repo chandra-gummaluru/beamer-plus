@@ -136,7 +136,7 @@ def run():
         # 7. Record with the record button.
         if not os.environ.get("SKIPREC"):
             menu("record"); page.wait_for_timeout(400)
-            page.locator(".custom-modal-btn", has_text="Start recording").click(); page.wait_for_timeout(2500)
+            page.locator(".custom-modal-buttons .btn", has_text="Start recording").click(); page.wait_for_timeout(2500)
             check("recording: the bar shows", page.locator("#recorder-bar").is_visible())
             shot("s07-recording")
             check("…in the record button's place", page.locator("#record-btn").is_hidden())
@@ -145,13 +145,13 @@ def run():
 
         # 8. Close session: asks whether to save first (a deck is open).
         menu("end"); page.wait_for_timeout(300); shot("s08-close")
-        btns = [x.inner_text().strip() for x in page.locator(".custom-modal-btn").all()]
+        btns = [x.inner_text().strip() for x in page.locator(".custom-modal-buttons .btn").all()]
         check(f"close session asks to save first ({btns})", "haven’t saved" in page.inner_text(".custom-modal-overlay")
               and btns == ["Cancel", "Don’t Save", "Save…"])
-        page.locator(".custom-modal-btn", has_text="Cancel").click(); page.wait_for_timeout(300)
+        page.locator(".custom-modal-buttons .btn", has_text="Cancel").click(); page.wait_for_timeout(300)
         check("…Cancel stays", "/s/" in page.url)
         menu("end"); page.wait_for_timeout(300)
-        page.locator(".custom-modal-btn", has_text="Save…").click(); page.wait_for_timeout(800)
+        page.locator(".custom-modal-buttons .btn", has_text="Save…").click(); page.wait_for_timeout(800)
         check("…Save… opens the Save window", page.locator(".lib [data-save]").count() == 1)
         page.fill("[data-name]", "05 - closing"); page.click("[data-save]")
         page.wait_for_url(BASE, timeout=15000); page.wait_for_timeout(800)

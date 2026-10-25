@@ -305,7 +305,7 @@ function buildFieldRow(field, item, variant) {
         input.title = input.value;
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'btn editor-prop-file-btn';
+        btn.className = 'btn btn--sm editor-prop-file-btn';
         btn.textContent = 'Upload';
         btn.addEventListener('click', () => pickWidgetAsset(field, item, input, btn));
         fileRow.appendChild(input);

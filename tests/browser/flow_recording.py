@@ -150,7 +150,7 @@ def run():
 
         # 2. A long take is split into parts, each a complete file.
         menu("record"); page.wait_for_timeout(300)
-        page.locator(".custom-modal-btn", has_text="Start recording").click()
+        page.locator(".custom-modal-buttons .btn", has_text="Start recording").click()
         page.wait_for_timeout(12000)
         page.click("#recorder-stop-btn"); page.wait_for_timeout(2500); shot("r02-stopped")
         metas = page.evaluate(METAS)
@@ -173,12 +173,12 @@ def run():
         before = set(folder())
         page.evaluate("() => { window.__failWrites = true; }")
         page.click("[data-save]"); page.wait_for_timeout(4000); shot("r04-failed")
-        btns = [x.inner_text().strip() for x in page.locator(".custom-modal-btn").all()]
+        btns = [x.inner_text().strip() for x in page.locator(".custom-modal-buttons .btn").all()]
         check(f"failed save: Close / Try again / Download instead ({btns})", btns == ["Close", "Try again", "Download instead"])
-        check("…and says the recordings are still safe", "still in Beamer+" in page.inner_text(".custom-modal-overlay"))
+        check("…and says the recordings are still safe", "stay in Beamer+" in page.inner_text(".custom-modal-overlay"))
         got = []
         page.on("download", lambda d: got.append(d.suggested_filename))
-        page.locator(".custom-modal-btn", has_text="Download instead").click()
+        page.locator(".custom-modal-buttons .btn", has_text="Download instead").click()
         page.wait_for_timeout(1500 + 500 * len(metas))
         print("   downloaded:", got)
         check("download instead gets everything that was built",
@@ -187,10 +187,10 @@ def run():
         menu("save"); page.wait_for_timeout(1500)
         check("the parts are still offered for the folder", " ".join(page.locator(".lib-chip", has_text="Recordings").inner_text().split()) == f"Recordings {len(metas)}")
         page.click("[data-save]"); page.wait_for_timeout(3000)
-        page.locator(".custom-modal-btn", has_text="Try again").click()
+        page.locator(".custom-modal-buttons .btn", has_text="Try again").click()
         page.wait_for_timeout(1000)
         page.evaluate("() => { window.__failWrites = false; }")
-        page.locator(".custom-modal-btn", has_text="Try again").click()
+        page.locator(".custom-modal-buttons .btn", has_text="Try again").click()
         page.wait_for_timeout(4000); shot("r05-saved")
         parts = sorted(k for k in folder() if re.match(rf"{re.escape(L)}/05 - Binary Arithmetic-\d{{4}}(-\d\d){{4}}-part\d+\.(webm|mp4)$", k))
         print("   in the folder:", parts)
