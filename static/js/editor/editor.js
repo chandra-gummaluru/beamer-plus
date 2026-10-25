@@ -24,7 +24,8 @@ import { initWidgetSettingsDialog, closeWidgetSettings } from './widget-settings
 import { initNumberSteppers } from './number-stepper.js';
 import { initDropdowns } from './dropdown.js';
 import { titleCase } from './title-case.js';
-import { realSlideCount } from '../slides/structure.js';
+import { realSlideCount, insertViewAfterCurrent } from '../slides/structure.js';
+import { pickPanes, cancelPick } from './pane-picker.js';
 import { PAPER_STYLES, PAPER_SPACING, PAPER_THICKNESS, PAPER_COLORS, normalizePaper } from '../slides/paper.js';
 
 /* ─── init ──────────────────────────────────────────────────── */
@@ -157,6 +158,12 @@ export function initEditor(state) {
         _updateAddMediaButtons();
     });
 
+    // A new split view: click its two slides, then it's made and shown.
+    bus.on('view:insert-pick', () => {
+        if (!ctx.state?.editMode) return;
+        pickPanes({ onDone: (left, right) => insertViewAfterCurrent({ left, right }) });
+    });
+
     bus.on('view:select', (i) => {
         if (!ctx.state?.editMode) return;
         const obj = ctx.state.slideStructure?.[i];
@@ -212,6 +219,7 @@ async function exitEditMode() {
         document.getElementById('split-toggle')?.click();
         await new Promise(r => setTimeout(r, 200));
     }
+    cancelPick();
     ctx.state.editMode = false;
     document.body.classList.remove('edit-mode');
     if (ctx.state.annCvs?.canvas) ctx.state.annCvs.canvas.style.pointerEvents = '';

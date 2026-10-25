@@ -2162,3 +2162,74 @@ body.wsheet-open #main-content { padding-right: 408px; }
 .editor-remove-btn.is-armed,
 .editor-remove-btn.is-armed:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
 .editor-remove-btn:disabled { opacity: 0.4; cursor: default; }
+
+/* ─── Picking a split view's slides (editor/pane-picker.js) ─────────
+   A bar docked to the top of the stage says which pane comes next; the
+   slide list lights up, and a picked slide is labelled Left / Right. */
+#pane-picker {
+    position: fixed;
+    top: 0;
+    left: calc(var(--nav-width) + (100vw - var(--nav-width) - var(--editor-panel-width)) / 2);
+    transform: translateX(-50%);
+    z-index: 260;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 8px 8px 16px;
+    background: oklch(99% 0.003 80 / 0.94);
+    backdrop-filter: blur(12px) saturate(1.4);
+    -webkit-backdrop-filter: blur(12px) saturate(1.4);
+    border: var(--line-hairline);
+    border-top: 0;
+    border-radius: 0 0 var(--r-lg) var(--r-lg);
+    box-shadow: var(--shadow-3);
+    font-family: var(--font-sans);
+    white-space: nowrap;
+}
+body.split-view-active #pane-picker { left: calc((100vw - var(--editor-panel-width)) / 2); }
+.pane-picker-steps { display: flex; gap: 4px; }
+.pane-picker-steps i { width: 8px; height: 8px; border-radius: 50%; background: oklch(86% 0.004 260); }
+.pane-picker-steps i.is-done { background: var(--ink-1); }
+.pane-picker-text { display: flex; align-items: baseline; gap: 8px; font-size: var(--fs-sm); color: var(--ink-2); }
+.pane-picker-text strong { font-size: var(--fs-base); font-weight: 600; color: var(--ink-1); }
+.pane-picker-cancel { min-height: 32px; height: 32px; padding: 0 12px; border-radius: var(--r-md); font-family: var(--font-sans); font-size: var(--fs-sm); font-weight: 500; }
+body.picking-panes #editor-add-row { display: none; }
+
+body.picking-panes #slide-nav-slides .slide-nav-item { cursor: pointer; }
+body.picking-panes #slide-nav-slides .slide-nav-item:hover .slide-preview { outline: 2px solid var(--ink-2); outline-offset: 2px; }
+.slide-nav-item.is-pane-pick { position: relative; }
+.slide-nav-item.is-pane-pick .slide-preview { outline: 2px solid var(--ink-1) !important; outline-offset: 2px; }
+.slide-nav-item.is-pane-pick::before {
+    content: attr(data-pane);
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    z-index: 3;
+    padding: 1px 8px;
+    border-radius: var(--r-pill);
+    background: var(--ink-1);
+    color: var(--ink-on-accent);
+    font-family: var(--font-sans);
+    font-size: 11px;
+    font-weight: 600;
+}
+.slide-nav-item.is-pane-refused { animation: pane-refused 300ms ease; }
+@keyframes pane-refused {
+    20%, 60% { transform: translateX(-3px); }
+    40%, 80% { transform: translateX(3px); }
+}
+@media (prefers-reduced-motion: reduce) { .slide-nav-item.is-pane-refused { animation: none; } }
+
+/* The split view's panel: its two slides, and Choose Slides under them. */
+.editor-secondary-btn {
+    width: 100%;
+    min-height: 34px;
+    justify-content: center;
+    gap: 8px;
+    border-radius: var(--r-md);
+    font-family: var(--font-sans);
+    font-size: var(--fs-sm);
+    font-weight: 500;
+}
+.slide-item.is-empty { cursor: default; border-style: dashed; background: transparent; }
+.slide-item.is-empty .slide-item-name { color: var(--ink-3); }

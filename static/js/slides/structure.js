@@ -14,7 +14,10 @@ export function initSlideStructure(state) {
     _state = state;
     document.getElementById('add-blank-btn')?.addEventListener('click', () => openAddPageModal());
     document.getElementById('duplicate-slide-btn')?.addEventListener('click', () => duplicateCurrentSlide());
-    document.getElementById('add-view-btn')?.addEventListener('click',  () => insertViewAfterCurrent());
+    // In the editor the two slides are picked by clicking them (editor.js).
+    document.getElementById('add-view-btn')?.addEventListener('click',  () => {
+        if (_state.editMode) bus.emit('view:insert-pick'); else insertViewAfterCurrent();
+    });
     document.getElementById('delete-blank-btn')?.addEventListener('click', () => deleteCurrentBlank());
     bus.on('slide:delete', (i) => deleteSlideAt(i));
 }
@@ -284,9 +287,14 @@ export function defaultViewPanes(structure, current) {
     return after != null ? { left: right, right: after } : null;
 }
 
-function insertViewAfterCurrent() {
+/**
+ * Put a split view right after the current slide. `chosen` ({ left, right },
+ * positions as they are now) picks its two slides; without it, sensible
+ * neighbours are used.
+ */
+export function insertViewAfterCurrent(chosen = null) {
     if (realSlideCount(_state.slideStructure) < 2) return;   // nothing to pair
-    const panes = defaultViewPanes(_state.slideStructure, _state.currentSlide);
+    const panes = chosen || defaultViewPanes(_state.slideStructure, _state.currentSlide);
     if (!panes) return;
     const ins    = _state.currentSlide + 1;
     const viewId = `v${Date.now()}`;
@@ -303,6 +311,8 @@ function insertViewAfterCurrent() {
 
     bus.emit('nav:refresh');
     if (_state.editMode) bus.emit('view:select', ins);
+    // And open it, so the new pair is on stage straight away.
+    bus.emit('slide:goto', ins);
 }
 
 // Slides the navigator's delete button may remove: blanks, and duplicated

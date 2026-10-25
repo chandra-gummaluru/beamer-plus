@@ -1,8 +1,10 @@
-// View-slide configuration panel — pick the two pane slides and the divider
-// ratio for a saved split view, or delete the view slide.
+// View-slide configuration panel — the split view's two slides (click one
+// to edit it; Choose Slides picks both again by clicking them in the slide
+// list, pane-picker.js), the divider ratio, and Remove View.
 import { bus } from '../core/events.js';
 import { getSlideLabels, removeSlideAt } from '../slides/structure.js';
 import { ctx, escAttr, escHtml, setPanelMode, resolvePanelMode } from './context.js';
+import { pickPanes } from './pane-picker.js';
 
 export function showViewConfig(i) {
     const obj = ctx.state?.slideStructure?.[i];
@@ -38,28 +40,20 @@ const RATIO_PRESETS = [
 ];
 
 function buildViewConfigHTML(obj, viewIdx) {
-    // null: the pane's slide was deleted — shown as unselected.
-    const leftVal  = obj.left  ?? '';
-    const rightVal = obj.right ?? '';
-    const ratio    = obj.ratio !== undefined ? obj.ratio : 50;
-
-    // Each dropdown excludes the view slide itself and the OTHER pane's choice.
-    const leftExclude  = [viewIdx, ...(rightVal !== '' ? [Number(rightVal)] : [])];
-    const rightExclude = [viewIdx, ...(leftVal  !== '' ? [Number(leftVal)]  : [])];
+    const ratio = obj.ratio !== undefined ? obj.ratio : 50;
 
     return `
-        <div class="editor-prop-row">
-            <div class="editor-prop-label">Left Pane Slide</div>
-            <select class="editor-prop-select" id="view-left" style="margin-top:var(--sp-1)">
-                ${buildSlideOptions(leftVal, 'Select a slide...', leftExclude)}
-            </select>
-        </div>
-        <div class="editor-prop-row">
-            <div class="editor-prop-label">Right Pane Slide</div>
-            <select class="editor-prop-select" id="view-right" style="margin-top:var(--sp-1)">
-                ${buildSlideOptions(rightVal, 'Select a slide...', rightExclude)}
-            </select>
-        </div>
+        <section class="wf-group">
+            <div class="wf-group-title">Slides</div>
+            <div class="slide-items" role="list">
+                ${paneRow('left', obj.left)}
+                ${paneRow('right', obj.right)}
+            </div>
+            <button type="button" class="btn editor-secondary-btn" id="view-pick">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="7" height="14" rx="1"/><rect x="14" y="5" width="7" height="14" rx="1"/></svg>
+                <span>Choose Slides</span>
+            </button>
+        </section>
         <div class="editor-prop-row">
             <div class="editor-prop-label">Split</div>
             <!-- The two panes, drawn to scale: drag the line between them, or
@@ -79,13 +73,6 @@ function buildViewConfigHTML(obj, viewIdx) {
                 </button>`).join('')}
             </div>
         </div>
-        <section class="wf-group">
-            <div class="wf-group-title">Edit a Slide</div>
-            <div class="slide-items" role="list">
-                ${paneRow('left', obj.left)}
-                ${paneRow('right', obj.right)}
-            </div>
-        </section>
         <button class="btn editor-delete-btn" id="view-delete">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
             Remove View
@@ -100,7 +87,14 @@ const PANE_ICON = {
     right: '<rect x="3" y="4" width="18" height="16" rx="2"/><rect x="13" y="4" width="8" height="16" rx="2" fill="currentColor" fill-opacity="0.25"/>',
 };
 function paneRow(side, idx) {
-    if (idx == null) return '';
+    if (idx == null) return `
+        <div class="slide-item is-empty" role="listitem">
+            <span class="slide-item-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${PANE_ICON[side]}</svg></span>
+            <span class="slide-item-text">
+                <span class="slide-item-name">No Slide</span>
+                <span class="slide-item-kind">${side === 'left' ? 'Left Pane' : 'Right Pane'}</span>
+            </span>
+        </div>`;
     const label = getSlideLabels(ctx.state.slideStructure)[idx] ?? '';
     return `
         <div class="slide-item" role="listitem" tabindex="0" data-pane="${side}" data-index-to="${idx}" title="Edit Slide ${escAttr(label)}">
@@ -133,19 +127,24 @@ function wireViewConfigHandlers(i, obj) {
     });
 
     function saveAndRefresh() {
-        const leftVal  = get('view-left')?.value  ?? '';
-        const rightVal = get('view-right')?.value ?? '';
         const ratioVal = get('view-split')?.dataset.ratio ?? '50';
-        if (leftVal  !== '') obj.left  = parseInt(leftVal,  10); else delete obj.left;
-        if (rightVal !== '') obj.right = parseInt(rightVal, 10); else delete obj.right;
         obj.ratio = parseInt(ratioVal, 10);
         bus.emit('nav:refresh');
     }
 
     // When either pane changes, re-render the panel so exclusions update.
     // ...and show the new pair on stage (it may fill an Undefined pane).
-    get('view-left')?.addEventListener('change',  () => { saveAndRefresh(); showViewConfig(i); bus.emit('slide:goto', i); });
-    get('view-right')?.addEventListener('change', () => { saveAndRefresh(); showViewConfig(i); bus.emit('slide:goto', i); });
+    // Choose Slides: click the two in the slide list, then show the new pair.
+    get('view-pick')?.addEventListener('click', () => {
+        pickPanes({ onDone: (left, right) => {
+            if (ctx.state.slideStructure[i] !== obj) return;   // the view moved or went
+            obj.left = left;
+            obj.right = right;
+            bus.emit('nav:refresh');
+            showViewConfig(i);
+            bus.emit('slide:goto', i);
+        } });
+    });
 
     wireSplitPicker(get('view-split'), obj, () => {
         saveAndRefresh();
@@ -227,20 +226,3 @@ function wireSplitPicker(box, obj, commit) {
     presets.forEach(p => p.addEventListener('click', () => set(Number(p.dataset.ratio))));
 }
 
-// Build <option> list from all slides (all types), using structure index as the value.
-// excludeIdx may be a single number or an array of numbers to skip. Labels match the navigator.
-function buildSlideOptions(selectedVal, emptyLabel, excludeIdx) {
-    let html = `<option value="">${escHtml(emptyLabel)}</option>`;
-    if (!ctx.state?.slideStructure) return html;
-    const excluded = excludeIdx === undefined || excludeIdx === null ? new Set()
-                   : Array.isArray(excludeIdx) ? new Set(excludeIdx)
-                   : new Set([excludeIdx]);
-    const labels = getSlideLabels(ctx.state.slideStructure);
-    ctx.state.slideStructure.forEach((s, idx) => {
-        if (excluded.has(idx)) return;
-        const sel = (selectedVal !== '' && selectedVal !== undefined && selectedVal !== null &&
-                     String(idx) === String(selectedVal)) ? 'selected' : '';
-        html += `<option value="${escAttr(String(idx))}" ${sel}>${escHtml(labels[idx])}</option>`;
-    });
-    return html;
-}
