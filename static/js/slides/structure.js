@@ -12,8 +12,12 @@ let _state = null;
 
 export function initSlideStructure(state) {
     _state = state;
-    document.getElementById('add-blank-btn')?.addEventListener('click', () => openAddPageModal());
-    document.getElementById('duplicate-slide-btn')?.addEventListener('click', () => duplicateCurrentSlide());
+    // New page and duplicate: in the annotation toolbar while presenting,
+    // in the insert toolbar while editing.
+    for (const id of ['add-blank-btn', 'edit-add-page-btn'])
+        document.getElementById(id)?.addEventListener('click', () => openAddPageModal());
+    for (const id of ['duplicate-slide-btn', 'edit-duplicate-btn'])
+        document.getElementById(id)?.addEventListener('click', () => duplicateCurrentSlide());
     // In the editor the two slides are picked by clicking them (editor.js).
     document.getElementById('add-view-btn')?.addEventListener('click',  () => {
         if (_state.editMode) bus.emit('view:insert-pick'); else insertViewAfterCurrent();

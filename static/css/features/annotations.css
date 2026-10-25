@@ -47,7 +47,8 @@
 
 #tool-container,
 #annotation-undo-redo,
-#annotation-clear {
+#annotation-clear,
+#annotation-slide-actions {
     display: flex;
     flex-direction: column;
     align-items: stretch;
@@ -63,7 +64,8 @@
 }
 
 /* Section divider between tool group and undo/redo (normal/vertical view) */
-#annotation-undo-redo {
+#annotation-undo-redo,
+#annotation-slide-actions {
     border-top: var(--line-hairline);
     padding-top: var(--sp-2);
     margin-top: var(--sp-1);
@@ -90,7 +92,8 @@ body.split-view-active #floating-annotation-toolbar {
 
 body.split-view-active #tool-container,
 body.split-view-active #annotation-undo-redo,
-body.split-view-active #annotation-clear {
+body.split-view-active #annotation-clear,
+body.split-view-active #annotation-slide-actions {
     flex-direction: row;
     align-items: center;
 }
@@ -100,7 +103,8 @@ body.split-view-active #pen-slots {
     align-items: center;
 }
 
-body.split-view-active #annotation-undo-redo {
+body.split-view-active #annotation-undo-redo,
+body.split-view-active #annotation-slide-actions {
     border-top: none;
     border-left: var(--line-hairline);
     padding-top: 0;
@@ -545,11 +549,13 @@ body.magnify-lens-on #main-content { cursor: none; }
     #floating-annotation-toolbar #tool-container,
     #floating-annotation-toolbar #pen-slots,
     #floating-annotation-toolbar #annotation-clear,
-    #floating-annotation-toolbar #annotation-undo-redo {
+    #floating-annotation-toolbar #annotation-undo-redo,
+    #floating-annotation-toolbar #annotation-slide-actions {
         flex-direction: row;
         align-items: center;
     }
-    #floating-annotation-toolbar #annotation-undo-redo {
+    #floating-annotation-toolbar #annotation-undo-redo,
+    #floating-annotation-toolbar #annotation-slide-actions {
         border-top: none;
         border-left: var(--line-hairline);
         padding-top: 0;

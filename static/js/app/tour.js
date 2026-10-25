@@ -30,22 +30,16 @@ const STEPS = [
         body:  'Thumbnail strip of all your slides. Click any thumbnail to jump directly to it. In edit mode you can drag thumbnails to reorder slides.',
     },
     {
-        sel:   '#add-slide-group',
-        place: 'right',
+        sel:   '#annotation-slide-actions',
+        place: 'left',
         title: 'Add or duplicate slides',
-        body:  'The left half inserts a blank slide after the current one; the right half duplicates the current slide — its widgets, media and ink included — so you can build a variation without touching the original.',
+        body:  'At the bottom of the toolbar: the first button adds a page after the current one; the second duplicates the current slide (its widgets, media and ink included) so you can build a variation without touching the original.',
     },
     {
         sel:   '#nav-drawer-hinge',
         place: 'right',
         title: 'Hide the navigator',
         body:  'Click this hinge to slide the navigator away and give the slide more room. Click it again to bring the navigator back.',
-    },
-    {
-        sel:   '#bookmark-btn',
-        place: 'right',
-        title: 'Bookmarks',
-        body:  'Bookmark the current slide for quick access during a presentation. Bookmarked slides appear as pins at the top of the navigator.',
     },
     {
         sel:   '#split-toggle',

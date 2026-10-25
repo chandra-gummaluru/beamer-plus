@@ -551,6 +551,16 @@ function maybeStartTourFromUrl() {
 }
 
 /* ─── bookmark button ─────────────────────────────────────────── */
+// In the editor's insert toolbar; pressed while the slide on stage is bookmarked.
+function syncBookmarkButton() {
+    const btn = document.getElementById('bookmark-btn');
+    if (!btn) return;
+    const on = !!state.bookmarks[state.currentSlide];
+    btn.classList.toggle('btn_selected', on);
+    btn.setAttribute('aria-pressed', String(on));
+    btn.title = on ? 'Remove Bookmark' : 'Bookmark This Slide';
+}
+
 function wireBookmarkButton() {
     document.getElementById('bookmark-btn')?.addEventListener('click', () => {
         toggleBookmark(state.currentSlide);
@@ -562,6 +572,7 @@ function toggleBookmark(i) {
     else state.bookmarks[i] = true;
     bus.emit('bookmarks:changed', state.bookmarks);
     populateBookmarkPins();
+    syncBookmarkButton();
 }
 
 /* ─── focus mode ─────────────────────────────────────────────── */
@@ -1111,6 +1122,7 @@ async function setSplitActive(active, rightIndex = null, splitRatio = null) {
 }
 
 function updateSlideNavigator() {
+    syncBookmarkButton();
     // Scoped to #slide-nav-slides: bookmark pins in #bookmark-pins share the
     // `.slide-nav-item` class (for styling) but aren't part of the slide
     // structure. Querying unscoped would shift every idx below by the pin
@@ -1410,8 +1422,10 @@ const STAGE_CONTROL_SELECTOR = [
     '#split-toggle',
     '#mute-btn',
     '#duplicate-slide-btn',
+    '#edit-duplicate-btn',
     '#bookmark-btn',
-    '#floating-annotation-toolbar button',
+    // New page lives in the annotation toolbar but stays live: it's a way out.
+    '#floating-annotation-toolbar button:not(#add-blank-btn)',
 ].join(', ');
 
 function setStageControlsEnabled(enabled) {

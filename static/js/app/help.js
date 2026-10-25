@@ -50,7 +50,7 @@ export function showHelpModal() {
 <h4 class="help-h">Navigating slides</h4>
 <ul class="help-ul">
   <li>Press ${_hic('←')} ${_hic('→')} or click any slide in the left navigator.</li>
-<li>Bookmark a slide with the ${_hbtn('bookmark','Bookmark')} button at the bottom of the navigator. Bookmarked slides get a pin so you can jump to them instantly.</li>
+<li>Bookmark a slide in edit mode with the ${_hbtn('bookmark','Bookmark')} button in the toolbar along the top. Bookmarked slides get a pin so you can jump to them instantly.</li>
 </ul>
 <h4 class="help-h">Split view</h4>
 <p class="help-p">Click ${_hbtn('split','Split view')} at the top of the navigator to display two slides side by side, handy for comparing pages or keeping a reference slide visible while you present another.</p>
