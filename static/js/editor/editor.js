@@ -14,7 +14,7 @@
 import { bus } from '../core/events.js';
 import { ctx, setPanelMode } from './context.js';
 import { renderEditOverlays, cleanupEditOverlays, deselectOverlay, pickMediaFile, onMediaFileSelected, addReveal, repositionEditOverlays } from './overlays.js';
-import { updatePropertiesPanel, refreshSlideItems, selectedItemKind, deleteSelectedItem } from './properties.js';
+import { updatePropertiesPanel, refreshSlideItems } from './properties.js';
 import { addWidget } from './widget-picker.js';
 import { showViewConfig, hideViewConfig } from './view-config.js';
 import { applySlideReorder, removeSlideReorder } from './reorder.js';
@@ -69,25 +69,18 @@ export function initEditor(state) {
     });
 
     // The toolbar's trash: two clicks — the first arms it — since there's no
-    // undo. It deletes what's selected (a widget, a video…) when something
-    // is, else the slide; on a split view, the split view (not its slides).
+    // undo. On a split view it deletes the split view (not its slides).
     const delBtn = document.getElementById('slide-delete');
     delBtn?.addEventListener('click', () => {
-        const arm = () => {
-            armSlideDelete(true);
-            clearTimeout(armSlideDelete.timer);
-            armSlideDelete.timer = setTimeout(() => armSlideDelete(false), 3000);
-        };
-        if (selectedItemKind()) {
-            if (!delBtn.classList.contains('is-armed')) { arm(); return; }
-            armSlideDelete(false);
-            deleteSelectedItem();
-            return;
-        }
         const i = toolbarSlideIndex();
         const obj = i == null ? null : ctx.state?.slideStructure?.[i];
         if (!obj) return;
-        if (!delBtn.classList.contains('is-armed')) { arm(); return; }
+        if (!delBtn.classList.contains('is-armed')) {
+            armSlideDelete(true);
+            clearTimeout(armSlideDelete.timer);
+            armSlideDelete.timer = setTimeout(() => armSlideDelete(false), 3000);
+            return;
+        }
         armSlideDelete(false);
         if (obj.type === 'view') {
             // Close the panel first, so it isn't still pointing at the view
@@ -102,9 +95,6 @@ export function initEditor(state) {
         }
         bus.emit('slide:delete', i);
     });
-
-    // Selecting something (or nothing) changes what the trash deletes.
-    bus.on('editor:panel-mode', () => { armSlideDelete(false); _updateAddMediaButtons(); });
 
     // The stage re-fits on resize (main.js); the edit boxes follow it.
     window.addEventListener('resize', () => {
@@ -302,17 +292,9 @@ function updateSlideSettingsPanel() {
 function armSlideDelete(on) {
     const btn = document.getElementById('slide-delete');
     if (!btn) return;
-    if (!on) clearTimeout(armSlideDelete.timer);
     btn.classList.toggle('is-armed', on);
-    btn.title = on ? 'Click Again to Delete' : trashTitle();
-    btn.setAttribute('aria-label', btn.title);
-}
-
-// What the trash deletes: the selected item, else the slide (or split view).
-function trashTitle() {
-    const kind = selectedItemKind();
-    if (kind) return `Delete ${kind}`;
-    return ctx.state?.slideStructure?.[toolbarSlideIndex()]?.type === 'view' ? 'Delete Split View' : 'Delete Slide';
+    const view = ctx.state?.slideStructure?.[toolbarSlideIndex()]?.type === 'view';
+    btn.title = on ? 'Click Again to Delete' : view ? 'Delete Split View' : 'Delete Slide';
 }
 
 /* ─── blank-slide paper ─────────────────────────────────────── */
@@ -371,10 +353,9 @@ function _updateAddMediaButtons() {
     const i = toolbarSlideIndex();
     const obj = i == null ? null : s?.slideStructure?.[i];
     // The last real slide stays (a split view can always go).
-    // A selected item can always go.
-    set('slide-delete', !selectedItemKind() && (!obj || (obj.type !== 'view' && (s?.slideStructure?.length || 0) <= 1)));
+    set('slide-delete', !obj || (obj.type !== 'view' && (s?.slideStructure?.length || 0) <= 1));
     const del = document.getElementById('slide-delete');
-    if (del && !del.classList.contains('is-armed')) { del.title = trashTitle(); del.setAttribute('aria-label', del.title); }
+    if (del && !del.classList.contains('is-armed')) del.title = obj?.type === 'view' ? 'Delete Split View' : 'Delete Slide';
 
     const eye = document.getElementById('slide-shown-btn');
     if (eye) {

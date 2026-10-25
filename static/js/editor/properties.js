@@ -273,22 +273,6 @@ async function showWidgetPanel(index) {
     });
 }
 
-/* ─── deleting what's selected ─────────────────────────────────────── */
-// The insert toolbar's trash deletes the selected item, when there is one
-// (editor.js); otherwise the slide.
-
-/** What kind of thing is selected ("Widget", "Video"…), or null. */
-export function selectedItemKind() {
-    const sel = ctx.selectedOverlay;
-    return sel ? KIND_LABELS[sel.arrKey] || 'Item' : null;
-}
-
-/** Delete the selected item (no-op without one). */
-export function deleteSelectedItem() {
-    const sel = ctx.selectedOverlay;
-    if (sel) deleteItem(sel.arrKey, sel.index);
-}
-
 /* ─── the slide's list of what's on it ────────────────────────────── */
 
 const ITEM_ICONS = {
@@ -300,6 +284,7 @@ const ITEM_ICONS = {
 };
 const KIND_LABELS = { widgets: 'Widget', videos: 'Video', audios: 'Audio', models: '3D Model', reveals: 'Reveal Box' };
 const GRIP = '<svg class="slide-item-grip" width="10" height="16" viewBox="0 0 10 16" fill="currentColor" aria-hidden="true"><circle cx="2.5" cy="3" r="1.4"/><circle cx="7.5" cy="3" r="1.4"/><circle cx="2.5" cy="8" r="1.4"/><circle cx="7.5" cy="8" r="1.4"/><circle cx="2.5" cy="13" r="1.4"/><circle cx="7.5" cy="13" r="1.4"/></svg>';
+const TRASH = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>';
 const CHEVRON = '<svg class="slide-item-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
 
 /** What a thing on the slide is called in the list and the panel header. */
@@ -354,6 +339,7 @@ export function refreshSlideItems() {
                 <span class="slide-item-name"></span>
                 <span class="slide-item-kind"></span>
             </span>
+            <button type="button" class="btn btn--ghost btn--icon btn--sm btn--danger slide-item-delete">${TRASH}</button>
             ${CHEVRON}`;
         row.querySelector('.slide-item-name').textContent = name;
         row.querySelector('.slide-item-kind').textContent = kind;
@@ -368,12 +354,35 @@ export function refreshSlideItems() {
             if (b) selectOverlayEl(b, arrKey, index);
         };
         row.addEventListener('click', open);
+        wireItemDelete(row.querySelector('.slide-item-delete'), arrKey, index, KIND_LABELS[arrKey]);
         row.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
         row._entry = { arrKey, item, index };
         list.appendChild(row);
     }
     host.appendChild(list);
     if (entries.length > 1) wireReorder(list);
+}
+
+// A row's trash: two clicks, the first arms it (red), since there's no undo.
+function wireItemDelete(btn, arrKey, index, kind) {
+    const label = `Delete ${kind}`;
+    const arm = (on) => {
+        clearTimeout(btn._timer);
+        btn.classList.toggle('is-armed', on);
+        btn.title = on ? 'Click Again to Delete' : label;
+        btn.setAttribute('aria-label', btn.title);
+        if (on) btn._timer = setTimeout(() => arm(false), 3000);
+    };
+    arm(false);
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();                 // not the row's "open"
+        if (!btn.classList.contains('is-armed')) { arm(true); return; }
+        arm(false);
+        deleteItem(arrKey, index);
+    });
+    btn.addEventListener('keydown', (e) => e.stopPropagation());
+    btn.addEventListener('mouseenter', () => btn.closest('.slide-item')?.classList.add('is-deleting'));
+    btn.addEventListener('mouseleave', () => btn.closest('.slide-item')?.classList.remove('is-deleting'));
 }
 
 /* ─── layering by list order ──────────────────────────────────────── */
@@ -400,6 +409,7 @@ function wireReorder(list) {
     for (const row of rows()) {
         row.draggable = true;
         row.addEventListener('dragstart', (e) => {
+            if (e.target.closest?.('.slide-item-delete')) { e.preventDefault(); return; }
             dragged = row;
             row.classList.add('is-dragging');
             e.dataTransfer.effectAllowed = 'move';

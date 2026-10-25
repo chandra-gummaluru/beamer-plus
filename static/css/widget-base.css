@@ -467,20 +467,29 @@ body.bw-partial .bw-topbar-utils {
 }
 
 /* The pencil for a widget's own settings when there's no bar to hold it
-   (an overlay, or an inset without the utilities): top-right corner, always
-   shown. In full view it lives in the bar. */
+   (an overlay, or an inset without the utilities): top-right corner, faint,
+   and only while the pointer is over the widget, so a box on a content slide
+   stays clean. In full view it lives in the bar, always shown. */
 .bw-edit-float {
   position: fixed;
   top: 6px;
   right: 6px;
   z-index: 50;
   display: none;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  opacity: 0;
+  transition: opacity 0.15s;
 }
 body.bw-overlay .bw-edit-float,
 body.bw-partial .bw-edit-float { display: inline-flex; }
+body.bw-overlay:hover .bw-edit-float,
+body.bw-partial:hover .bw-edit-float { opacity: 0.45; }
+.bw-edit-float:hover,
+.bw-edit-float:focus-visible { opacity: 1; }
+.bw-edit-float.bw-btn:hover:not(:disabled) { background: transparent; border-color: transparent; }
+@media (hover: none) { .bw-edit-float { opacity: 0.45; } }
 
 /* Widgets no longer show a title in the top-left of their bar.
    The title node stays in the DOM (widgets and setTitle() still write to it)

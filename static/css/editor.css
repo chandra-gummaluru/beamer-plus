@@ -358,7 +358,7 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 }
 
 /* ─── Widget settings form (editor/widget-fields.js) ──────────── */
-/* Shared by the sidebar and the expanded dialog. */
+/* Shared by the editor panel and the settings sheet. */
 
 /* Slide settings: a toggle per setting, as a labelled row. */
 .slide-setting {
@@ -639,7 +639,7 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 #editor-widget .wf-group + .wf-group { padding-top: var(--sp-1); }
 
 /* Text boxes keep their size — no drag handle. Long ones grow with their
-   text, and a field with "expand" opens in the large editor. */
+   text. */
 #editor-widget textarea { resize: none; }
 /* Labels read as sentences (here and in the view slide's panel). */
 #editor-view .editor-prop-label,
@@ -977,86 +977,6 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 .wp-num input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .wp-num input { -moz-appearance: textfield; appearance: textfield; }
 
-/* ─── Expand: a long text field in a large editor (widget-fields.js) ── */
-.wf-expand-wrap { position: relative; }
-.wf-expand-wrap > textarea { padding-right: 34px; }
-.wf-expand-btn {
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    padding: 0;
-    background: var(--surface-paper);
-    border: 1px solid transparent;
-    border-radius: var(--r-sm);
-    color: var(--ink-3);
-    cursor: pointer;
-    transition: color var(--dur-fast), border-color var(--dur-fast), background var(--dur-fast);
-}
-.wf-expand-btn:hover { color: var(--ink-1); border-color: var(--line-2); background: var(--surface-cream-2); }
-
-.wf-xe-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 1200;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--sp-6);
-    background: oklch(from var(--ink-1) l c h / 0.28);
-    opacity: 0;
-    transition: opacity 140ms var(--ease);
-}
-.wf-xe-overlay.is-open { opacity: 1; }
-.wf-xe {
-    width: min(960px, 100%);
-    height: min(720px, 100%);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    background: var(--surface-cream);
-    border-radius: var(--r-lg);
-    box-shadow: var(--shadow-pop);
-    font-family: var(--font-sans);
-}
-.wf-xe-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-3);
-    padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-5);
-    border-bottom: var(--line-hairline);
-}
-.wf-xe-title { font-family: var(--font-serif); font-size: var(--fs-lg); font-weight: 500; color: var(--ink-1); }
-.wf-xe-done {
-    min-height: 32px;
-    padding: 0 var(--sp-5);
-    background: var(--ink-1);
-    border-color: var(--ink-1);
-    color: var(--ink-on-accent);
-}
-.wf-xe-done:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
-.wf-xe-input {
-    flex: 1 1 auto;
-    width: 100%;
-    margin: 0;
-    padding: var(--sp-4) var(--sp-5);
-    border: none;
-    outline: none;
-    resize: none;
-    background: var(--surface-paper);
-    color: var(--ink-1);
-    font-family: var(--font-sans);
-    font-size: var(--fs-base);
-    line-height: 1.55;
-    tab-size: 4;
-}
-.wf-xe-input.is-mono { font-family: var(--font-mono); font-size: var(--fs-base); }
-@media (prefers-reduced-motion: reduce) { .wf-xe-overlay { transition: none; } }
 
 /* ─── View slide: the split picker (editor/view-config.js) ──────── */
 /* The two panes drawn to scale; drag anywhere on it to move the line. */
@@ -1356,26 +1276,11 @@ body.wsheet-open #main-content { padding-right: var(--editor-panel-width); }
 .wsheet-foot {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     gap: var(--sp-3);
     padding: var(--sp-3) var(--sp-5);
     border-top: var(--line-soft);
 }
-.wsheet-hint {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    font-size: var(--fs-xs);
-    color: var(--ink-3);
-}
-.wsheet-live-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--success);
-    box-shadow: 0 0 0 3px oklch(from var(--success) l c h / 0.16);
-}
-
 /* The form: groups as sections, not cards. */
 .wsheet .wf { gap: 0; }
 .wsheet .wf-group { gap: var(--sp-3); }
@@ -1428,12 +1333,6 @@ body.wsheet-open #main-content { padding-right: var(--editor-panel-width); }
 .wsheet .wf-list { gap: var(--sp-2); }
 .wsheet .wf-list-input { min-height: var(--ctl-h); }
 
-/* The widget the sheet is editing. */
-.widget-iframe.is-being-configured {
-    outline: 2px solid oklch(from var(--accent) l c h / 0.35);
-    outline-offset: 3px;
-    border-radius: var(--r-xs);
-}
 
 @media (max-width: 640px) {
     body.wsheet-open #main-content { padding-right: 0; }
@@ -1732,6 +1631,10 @@ body.wsheet-open #main-content { padding-right: var(--editor-panel-width); }
 .slide-item-name { font-size: var(--fs-base); font-weight: 500; color: var(--ink-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .slide-item-kind { font-size: var(--fs-xs); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .slide-item-chev { flex: 0 0 auto; color: var(--ink-4); }
+/* Each row's trash, before its chevron (properties.js). Hovering it marks
+   the row, so it's clear what goes. */
+.slide-item-delete { flex: 0 0 auto; margin-right: -4px; }
+.slide-item.is-deleting { border-color: var(--danger); }
 .slide-item:hover .slide-item-chev { color: var(--ink-2); }
 .slide-items-empty { margin: 0; font-size: var(--fs-sm); line-height: 1.5; color: var(--ink-3); }
 

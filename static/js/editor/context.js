@@ -1,7 +1,6 @@
 // Shared editor context — the presenter-state handle, current selections,
 // and small helpers used by every editor module.
 import { configKeyOf, getSlideLabels } from '../slides/structure.js';
-import { bus } from '../core/events.js';
 
 export const ctx = {
     state: null,            // shared presenter state (set by initEditor)
@@ -43,8 +42,6 @@ export function setPanelMode(mode, title, kicker = '') {
     // The slide names itself: "Slide 10", over what it is.
     if (mode === 'slide' && title === undefined) { title = slideName(); kicker = slideKind(); }
     setPanelTitle(title ?? PANEL_TITLES[mode] ?? 'Edit Presentation', kicker);
-    // The toolbar's trash follows what the panel shows (editor.js).
-    bus.emit('editor:panel-mode', mode);
 }
 
 /**

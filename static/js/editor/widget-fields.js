@@ -15,8 +15,6 @@
 //                             group above them. Groups whose fields are all
 //                             hidden (showIf) hide too.
 //   mono: true                Monospace textarea, for code.
-//   expand: true              On a textarea: an Expand button that opens it
-//                             in a large editor (code, a long question).
 //   editor: "list"            On a textarea-lines field: one input per line,
 //                             with add / remove, Enter for a new row, and
 //                             multi-line paste split into rows.
@@ -281,16 +279,6 @@ function buildFieldRow(field, item, variant) {
         row.appendChild(input);
         autoGrow(input);
         wide = true;
-        // A field the widget marks "expand": true — code, a long question —
-        // gets a small icon in its top-right corner that opens it in a roomy
-        // editor over the page.
-        if (field.expand) {
-            const wrap = document.createElement('div');
-            wrap.className = 'wf-expand-wrap';
-            input.replaceWith(wrap);
-            wrap.appendChild(input);
-            wrap.appendChild(expandButton(field, input));
-        }
 
     } else if (field.type === 'file') {
         row.appendChild(fieldLabel(field));
@@ -400,83 +388,6 @@ function buildFieldRow(field, item, variant) {
             return input.value === '' ? { remove: true } : { value: input.value };
         },
     };
-}
-
-/* ─── expand: a long text field in a roomy editor ───────────────────── */
-// The panel is narrow, and some fields are a page of code. A field that
-// declares "expand": true gets an Expand button by its label; the editor it
-// opens is a second view of the same textarea — every keystroke is written
-// back to it (and fires its input event), so the widget updates as you
-// type and closing loses nothing.
-
-const ICON_EXPAND = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
-
-function expandButton(field, source) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'wf-expand-btn';
-    b.title = 'Expand';
-    b.setAttribute('aria-label', `Expand ${field.label || field.key}`);
-    b.innerHTML = ICON_EXPAND;
-    b.addEventListener('click', (e) => {
-        e.preventDefault();
-        openTextEditor(field, source);
-    });
-    return b;
-}
-
-function openTextEditor(field, source) {
-    const overlay = document.createElement('div');
-    overlay.className = 'wf-xe-overlay';
-    overlay.innerHTML = `
-        <div class="wf-xe" role="dialog" aria-modal="true">
-            <header class="wf-xe-head">
-                <span class="wf-xe-title"></span>
-                <button type="button" class="btn wf-xe-done">Done</button>
-            </header>
-            <textarea class="wf-xe-input${field.mono ? ' is-mono' : ''}" spellcheck="false"></textarea>
-        </div>`;
-    overlay.querySelector('.wf-xe-title').textContent = field.label || field.key;
-    const ta = overlay.querySelector('.wf-xe-input');
-    ta.value = source.value;
-    ta.placeholder = source.placeholder || '';
-
-    const sync = () => {
-        source.value = ta.value;
-        source.dispatchEvent(new Event('input', { bubbles: true }));
-    };
-    ta.addEventListener('input', sync);
-
-    const close = () => {
-        window.removeEventListener('keydown', onKey, true);
-        overlay.remove();
-        source.dispatchEvent(new Event('change', { bubbles: true }));
-        try { source.focus({ preventScroll: true }); } catch (_) {}
-    };
-    // Capture phase: Escape closes this editor and nothing else (the editor
-    // would otherwise deselect the widget), and no key typed here reaches
-    // the slide's shortcuts. Tab indents, as in any code editor.
-    const onKey = (e) => {
-        if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); close(); return; }
-        if (e.target === ta && e.key === 'Tab' && !e.shiftKey) {
-            e.preventDefault();
-            ta.setRangeText('    ', ta.selectionStart, ta.selectionEnd, 'end');
-            sync();
-        }
-        if (overlay.contains(e.target)) e.stopPropagation();
-    };
-    window.addEventListener('keydown', onKey, true);
-    overlay.querySelector('.wf-xe-done').addEventListener('click', close);
-    let downOnBackdrop = false;
-    overlay.addEventListener('pointerdown', (e) => { downOnBackdrop = e.target === overlay; });
-    overlay.addEventListener('click', (e) => { if (downOnBackdrop && e.target === overlay) close(); });
-
-    document.body.appendChild(overlay);
-    requestAnimationFrame(() => {
-        overlay.classList.add('is-open');
-        ta.focus();
-        ta.setSelectionRange(ta.value.length, ta.value.length);
-    });
 }
 
 /* ─── visual pickers over a <select> ─────────────────────────────────── */

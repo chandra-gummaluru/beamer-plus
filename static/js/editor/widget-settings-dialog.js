@@ -88,7 +88,7 @@ async function openWidgetSettings(widgetId) {
     const rebuildBefore = pick(rebuildKeys);
 
     const form = buildWidgetForm({ ...schema, fields }, item, 'sheet');
-    const node = buildSheet(name, schema?.label, live, form.node);
+    const node = buildSheet(name, schema?.label, form.node);
     enhanceSelects(form.node);
 
     const state = { id, item, node, form, live, timer: null, pushedSig: before };
@@ -124,8 +124,7 @@ async function openWidgetSettings(widgetId) {
 
     state.onKey = (e) => {
         if (e.key !== 'Escape' || e.defaultPrevented) return;
-        // Let an open expanded editor or dropdown take its own Escape first.
-        if (document.querySelector('.wf-xe-overlay.is-open')) return;
+        // Let an open dropdown take its own Escape first.
         e.preventDefault();
         closeWidgetSettings();
     };
@@ -135,7 +134,6 @@ async function openWidgetSettings(widgetId) {
 
     _open = state;
     document.body.appendChild(node);
-    markWidget(id, true);
     makeRoom(true);
     // Next frame, so the slide-in transition has a starting point.
     requestAnimationFrame(() => node.classList.add('is-open'));
@@ -148,7 +146,6 @@ export function closeWidgetSettings() {
     _open = null;
     document.removeEventListener('keydown', s.onKey);
     try { s.close(); } finally {
-        markWidget(s.id, false);
         s.node.classList.remove('is-open');
         makeRoom(false);
         const gone = () => s.node.remove();
@@ -159,7 +156,7 @@ export function closeWidgetSettings() {
 
 /* ─── the sheet ─────────────────────────────────────────────────── */
 
-function buildSheet(name, kind, live, body) {
+function buildSheet(name, kind, body) {
     const node = document.createElement('aside');
     node.className = 'wsheet';
     node.setAttribute('role', 'dialog');
@@ -194,16 +191,11 @@ function buildSheet(name, kind, live, body) {
 
     const foot = document.createElement('footer');
     foot.className = 'wsheet-foot';
-    const hint = document.createElement('span');
-    hint.className = 'wsheet-hint';
-    hint.innerHTML = live
-        ? '<span class="wsheet-live-dot" aria-hidden="true"></span>Changes apply as you edit'
-        : 'Changes apply when you close this';
     const done = document.createElement('button');
     done.type = 'button';
     done.className = 'btn btn--sm wsheet-done';
     done.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg><span>Done</span>';
-    foot.append(hint, done);
+    foot.append(done);
 
     node.append(head, scroll, foot);
     return node;
@@ -215,11 +207,4 @@ function buildSheet(name, kind, live, body) {
 function makeRoom(on) {
     document.body.classList.toggle('wsheet-open', on);
     window.dispatchEvent(new Event('resize'));
-}
-
-// Outline the widget being edited, so it's clear which one the sheet is for
-// (a slide may hold several).
-function markWidget(id, on) {
-    document.querySelectorAll(`.widget-iframe[data-widget-id="${CSS.escape(id)}"]`)
-        .forEach(f => f.classList.toggle('is-being-configured', on));
 }
