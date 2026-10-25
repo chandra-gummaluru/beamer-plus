@@ -2,7 +2,9 @@
    Beamer+ Design Tokens
    Single source of truth for color, type, spacing, motion.
    Refined academic aesthetic — warm paper, ink graphite,
-   one accent (ink blue), generous whitespace.
+   one accent (graphite), generous whitespace.
+   Feature CSS uses these; it never types a colour, size or
+   radius of its own.
    ============================================================ */
 
 :root {
@@ -12,6 +14,7 @@
     --surface-cream-2:  oklch(94% 0.007 80);   /* nested surfaces */
     --surface-cream-3:  oklch(90% 0.008 80);   /* hover */
     --surface-stage:    oklch(96% 0.004 80);   /* slide stage backdrop */
+    --surface-slide:    #fff;                  /* the slide itself, and its thumbnails */
 
     /* ---------- Ink (text + UI) ---------- */
     --ink-1:            oklch(22% 0.012 260);  /* primary text / strokes */
@@ -29,13 +32,24 @@
     --bookmark:         oklch(78% 0.13 85);
     --bookmark-soft:    oklch(94% 0.06 85);
     --bookmark-ink:     oklch(32% 0.08 70);
-    --danger:           oklch(58% 0.18 25);
+    --danger:           oklch(58% 0.18 25);    /* fills: armed delete, errors */
+    --danger-ink:       oklch(45% 0.16 25);    /* danger text on paper */
+    --danger-soft:      oklch(96% 0.02 25);    /* danger hover wash */
     --recording:        oklch(58% 0.20 25);
+    --success:          oklch(55% 0.13 150);
+    --warning:          oklch(60% 0.14 60);
+    --edit-tint:        oklch(50% 0.11 200);   /* edit mode only: hidden slides */
+    --edit-tint-soft:   oklch(95% 0.04 200);
+    --edit-tint-ink:    oklch(38% 0.08 200);
+    --guide:            oklch(62% 0.21 350);   /* snap guides while dragging */
 
-    /* ---------- Hairlines ---------- */
-    --line-hairline:    1px solid oklch(85% 0.005 260);
-    --line-soft:        1px solid oklch(90% 0.005 260);
-    --line-strong:      1px solid oklch(70% 0.008 260);
+    /* ---------- Lines (borders, dividers, tracks) ---------- */
+    --line-1:           oklch(90% 0.005 260);  /* dividers, card edges */
+    --line-2:           oklch(85% 0.005 260);  /* control borders */
+    --line-3:           oklch(78% 0.006 260);  /* control borders on hover */
+    --line-soft:        1px solid var(--line-1);
+    --line-hairline:    1px solid var(--line-2);
+    --line-strong:      1px solid var(--line-3);
 
     /* ---------- Type ---------- */
     /* Same stacks as Lectern (static/css/shell.css there), so the two apps match. */
@@ -46,7 +60,6 @@
     --fs-xs:   11px;
     --fs-sm:   13px;
     --fs-base: 14px;
-    --fs-md:   15px;
     --fs-lg:   18px;
     --fs-xl:   22px;
     --fs-2xl:  28px;
@@ -61,6 +74,7 @@
     --sp-8: 32px;
 
     /* ---------- Radii ---------- */
+    --r-xs: 3px;    /* tiny marks: keys, mini thumbnails, bars */
     --r-sm: 6px;
     --r-md: 8px;
     --r-lg: 12px;
@@ -76,6 +90,10 @@
     --shadow-pop: 0 12px 40px oklch(20% 0.01 260 / 0.18),
                   0 4px 12px oklch(20% 0.01 260 / 0.08);
 
+    /* ---------- Overlays and focus ---------- */
+    --scrim:      oklch(20% 0.01 260 / 0.45);
+    --ring:       0 0 0 3px oklch(from var(--accent) l c h / 0.12);
+
     /* ---------- Motion ---------- */
     --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -88,8 +106,9 @@
     --toolbar-w: 52px;
     --topbar-h: 48px;
 
-    /* ---------- Touch targets ---------- */
-    --hit-min: 40px;
+    /* ---------- Controls ---------- */
+    --hit-min: 40px;    /* buttons: toolbars, dialog footers */
+    --ctl-h:   34px;    /* fields and small buttons: editor panel, sheets */
 
     /* ---------- Glass surface ---------- */
     --glass-bg: oklch(99% 0.003 80 / 0.86);

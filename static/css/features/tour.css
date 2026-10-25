@@ -20,8 +20,8 @@
 
     /* Inner ring highlights the element; outer shadow dims everything else */
     box-shadow:
-        0 0 0 2px oklch(95% 0.004 80 / 0.8),
-        0 0 0 9999px oklch(5% 0.01 260 / 0.65);
+        0 0 0 2px oklch(from var(--surface-stage) l c h / 0.8),
+        0 0 0 9999px var(--scrim);
 
     transition:
         left    280ms var(--ease-out),
@@ -128,7 +128,7 @@
 
 .tour-title {
     font-family: var(--font-serif);
-    font-size: var(--fs-md);
+    font-size: var(--fs-base);
     font-weight: 600;
     color: var(--ink-1);
     margin: 0 0 var(--sp-2) 0;

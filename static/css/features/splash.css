@@ -44,7 +44,7 @@
 
 .splash-subtitle {
     font-family: var(--font-sans);
-    font-size: var(--fs-md);
+    font-size: var(--fs-base);
     color: var(--ink-2);
     margin-top: var(--sp-1);
     line-height: 1.5;
@@ -156,7 +156,7 @@ body.welcome-page {
 
 .welcome-institution {
     font-family: var(--font-sans);
-    font-size: clamp(var(--fs-md), 1.5vw, var(--fs-lg));
+    font-size: clamp(var(--fs-base), 1.5vw, var(--fs-lg));
     font-style: normal;
     font-weight: 500;
     color: var(--ink-2);
@@ -165,7 +165,7 @@ body.welcome-page {
 }
 
 .welcome-lede {
-    font-size: clamp(var(--fs-base), 1.5vw, var(--fs-md));
+    font-size: clamp(var(--fs-base), 1.5vw, var(--fs-base));
     color: var(--ink-2);
     line-height: 1.6;
     max-width: 30em;
@@ -183,7 +183,7 @@ body.welcome-page {
     height: auto;
     display: block;
     border-radius: var(--r-lg);
-    filter: drop-shadow(0 24px 48px oklch(20% 0.01 260 / 0.16));
+    filter: drop-shadow(0 24px 48px oklch(from var(--ink-1) l c h / 0.16));
 }
 
 /* Abstract "process" loop inside the preview figure: the active slide steps
@@ -252,7 +252,7 @@ body.welcome-page {
 
 .welcome-btn {
     font-family: var(--font-sans);
-    font-size: var(--fs-md);
+    font-size: var(--fs-base);
     font-weight: 600;
     min-height: 44px;
     width: auto;

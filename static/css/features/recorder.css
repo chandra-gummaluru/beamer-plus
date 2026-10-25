@@ -38,7 +38,7 @@ body.is-recording #record-btn { display: none; }
     50%      { opacity: 0.35; }
 }
 #recorder-bar.is-paused,
-#recorder-bar.is-stopping { border-color: oklch(82% 0.005 260); }
+#recorder-bar.is-stopping { border-color: var(--line-2); }
 #recorder-bar.is-paused .recorder-dot,
 #recorder-bar.is-stopping .recorder-dot {
     animation: none;

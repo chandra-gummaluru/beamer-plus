@@ -9,7 +9,7 @@
        under a modal cost 70-110 ms (opening, hovering, typing), more when a
        widget or video behind it was still drawing. A slightly deeper scrim
        reads the same. */
-    background: oklch(20% 0.01 260 / 0.42);
+    background: var(--scrim);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -48,8 +48,8 @@
 }
 
 .custom-modal-overlay.modal-error .custom-modal-icon { color: var(--danger); }
-.custom-modal-overlay.modal-success .custom-modal-icon { color: oklch(52% 0.13 150); }
-.custom-modal-overlay.modal-warning .custom-modal-icon { color: oklch(60% 0.14 60); }
+.custom-modal-overlay.modal-success .custom-modal-icon { color: var(--success); }
+.custom-modal-overlay.modal-warning .custom-modal-icon { color: var(--warning); }
 
 .custom-modal-title {
     font-family: var(--font-serif);
@@ -67,7 +67,7 @@
     line-height: 1.5;
     margin: 0 0 var(--sp-5) 0;
     user-select: text;
-    font-size: var(--fs-md);
+    font-size: var(--fs-base);
 }
 
 .custom-modal-buttons {
@@ -85,10 +85,10 @@
     min-height: var(--hit-min);
     padding: 0 1em;
     font-family: var(--font-sans);
-    font-size: var(--fs-md);
+    font-size: var(--fs-base);
     color: var(--ink-1);
     background: var(--surface-paper);
-    border: 1px solid oklch(82% 0.005 260);
+    border: 1px solid var(--line-2);
     border-radius: var(--r-md);
     cursor: pointer;
     transition: background-color var(--dur-fast), border-color var(--dur-fast);
@@ -122,12 +122,12 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 14px;
+    font-size: var(--fs-base);
     transition: background var(--dur-fast), border-color var(--dur-fast), color var(--dur-fast);
 }
 .custom-modal-x-btn:hover {
     background: var(--surface-cream-2);
-    border-color: oklch(82% 0.005 260);
+    border-color: var(--line-2);
     color: var(--ink-1);
 }
 
@@ -135,7 +135,7 @@
     width: 32px;
     height: 32px;
     border-radius: 50%;
-    border: 1px solid oklch(82% 0.005 260);
+    border: 1px solid var(--line-2);
     cursor: pointer;
     padding: 0;
     transition: transform var(--dur-fast), box-shadow var(--dur-fast);

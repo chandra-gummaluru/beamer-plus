@@ -13,7 +13,7 @@
     bottom: auto;
     transform: translateY(-50%);
     width: auto;
-    background: oklch(99% 0.003 80 / 0.86);
+    background: var(--glass-bg);
     backdrop-filter: blur(12px) saturate(1.4);
     -webkit-backdrop-filter: blur(12px) saturate(1.4);
     border: var(--line-hairline);
@@ -41,7 +41,7 @@
 }
 #floating-annotation-toolbar::-webkit-scrollbar { width: 4px; }
 #floating-annotation-toolbar::-webkit-scrollbar-thumb {
-    background: oklch(70% 0.005 260 / 0.4);
+    background: oklch(from var(--ink-4) l c h / 0.4);
     border-radius: var(--r-pill);
 }
 
@@ -138,7 +138,7 @@ body.split-view-active #annotation-stage-actions {
 
 #floating-annotation-toolbar .btn:hover {
     background: var(--surface-cream-2);
-    border-color: oklch(82% 0.005 260);
+    border-color: var(--line-2);
 }
 
 #floating-annotation-toolbar .btn.btn_selected {
@@ -167,7 +167,7 @@ body.split-view-active #annotation-stage-actions {
     flex-direction: column;
     gap: var(--sp-1);
     padding: var(--sp-2);
-    background: oklch(99% 0.003 80 / 0.86);
+    background: var(--glass-bg);
     backdrop-filter: blur(12px) saturate(1.4);
     -webkit-backdrop-filter: blur(12px) saturate(1.4);
     border: var(--line-hairline);
@@ -197,7 +197,7 @@ body.split-view-active #annotation-stage-actions {
 
 #text-size-sidebar .btn:hover {
     background: var(--surface-cream-2);
-    border-color: oklch(82% 0.005 260);
+    border-color: var(--line-2);
 }
 
 #text-size-sidebar .btn.btn_selected {
@@ -271,7 +271,7 @@ body.split-view-active #text-size-sidebar {
     flex-direction: column;
     gap: var(--sp-1);
     padding: var(--sp-2);
-    background: oklch(99% 0.003 80 / 0.86);
+    background: var(--glass-bg);
     backdrop-filter: blur(12px) saturate(1.4);
     -webkit-backdrop-filter: blur(12px) saturate(1.4);
     border: var(--line-hairline);
@@ -297,7 +297,7 @@ body.split-view-active #text-size-sidebar {
     color: var(--ink-1);
 }
 #pen-flyout .btn svg { width: 16px; height: 16px; }
-#pen-flyout .btn:hover { background: var(--surface-cream-2); border-color: oklch(82% 0.005 260); }
+#pen-flyout .btn:hover { background: var(--surface-cream-2); border-color: var(--line-2); }
 #pen-flyout .btn.btn_selected { background: var(--accent); border-color: var(--accent-strong); color: var(--ink-on-accent); }
 .pen-size-dot { display: block; border-radius: 50%; background: var(--ink-1); }
 #pen-flyout .btn.btn_selected .pen-size-dot { background: var(--ink-on-accent); }
@@ -386,9 +386,9 @@ body.text-tool-active #ann-canvas-2 {
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid oklch(62% 0.01 260 / 0.45);
+    border: 1px solid oklch(from var(--ink-3) l c h / 0.45);
     border-bottom: none;
-    border-radius: 7px 7px 0 0;
+    border-radius: var(--r-md) var(--r-md) 0 0;
     background: oklch(100% 0 0 / 0.95);
     color: var(--ink-3);
     cursor: grab;
@@ -409,10 +409,10 @@ body.text-tool-active #ann-canvas-2 {
     box-sizing: content-box;
     resize: none;
     overflow: hidden;
-    border: 1px solid oklch(62% 0.01 260 / 0.45);
-    border-radius: 8px;
+    border: 1px solid oklch(from var(--ink-3) l c h / 0.45);
+    border-radius: var(--r-md);
     background: oklch(100% 0 0 / 0.9);
-    box-shadow: 0 0 0 3px oklch(45% 0.005 260 / 0.08), 0 6px 20px oklch(20% 0.01 260 / 0.10);
+    box-shadow: 0 0 0 3px oklch(from var(--accent) l c h / 0.08), 0 6px 20px oklch(from var(--ink-1) l c h / 0.10);
     caret-color: var(--accent-strong);
     color: var(--ink-1);
     font-family: Arial, Helvetica, sans-serif;
@@ -437,8 +437,8 @@ body.text-tool-active #ann-canvas-2 {
             circle 110px at var(--spotlight-x, 50%) var(--spotlight-y, 50%),
             oklch(100% 0 0 / 0) 0 68px,
             oklch(100% 0 0 / 0.1) 88px,
-            oklch(18% 0.01 260 / 0.34) 132px,
-            oklch(18% 0.01 260 / 0.58) 999px
+            oklch(from var(--ink-1) l c h / 0.34) 132px,
+            oklch(from var(--ink-1) l c h / 0.58) 999px
         );
 }
 
@@ -464,7 +464,7 @@ body.text-tool-active #ann-canvas-2 {
     border: 2px solid oklch(100% 0 0 / 0.95);
     box-shadow:
         0 0 0 1px oklch(30% 0.01 260 / 0.35),
-        0 10px 32px oklch(20% 0.01 260 / 0.28);
+        0 10px 32px oklch(from var(--ink-1) l c h / 0.28);
 }
 .magnifier-lens.visible { opacity: 1; }
 .magnifier-lens canvas { display: block; }
@@ -475,10 +475,10 @@ body.text-tool-active #ann-canvas-2 {
     bottom: 14px;
     transform: translateX(-50%);
     padding: 2px 8px;
-    border-radius: 999px;
-    background: oklch(20% 0.01 260 / 0.72);
-    color: #fff;
-    font: 600 11px/1.4 ui-monospace, Menlo, Consolas, monospace;
+    border-radius: var(--r-pill);
+    background: oklch(from var(--ink-1) l c h / 0.72);
+    color: var(--ink-on-accent);
+    font: 600 var(--fs-xs)/1.4 var(--font-mono);
     opacity: 0;
     transition: opacity 150ms ease;
 }

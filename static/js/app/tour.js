@@ -210,7 +210,7 @@ function _goto(i) {
 
     if (!target || step.place === 'center') {
         // Welcome / no-target: full-screen dim, centered popover
-        n.backdrop.style.background = 'oklch(5% 0.01 260 / 0.65)';
+        n.backdrop.style.background = 'var(--scrim)';
         n.spotlight.style.opacity   = '0';
         n.popover.dataset.placement = 'center';
         _centerPopover();

@@ -9,7 +9,7 @@
 .btn {
     --_bg: var(--surface-paper);
     --_fg: var(--ink-1);
-    --_bd: oklch(82% 0.005 260);
+    --_bd: var(--line-2);
 
     display: inline-flex;
     align-items: center;
@@ -21,7 +21,7 @@
     padding: 0 0.75em;
 
     font-family: var(--font-sans);
-    font-size: var(--fs-md);
+    font-size: var(--fs-base);
     font-weight: 500;
     line-height: 1;
 
@@ -44,7 +44,7 @@
         box-shadow var(--dur-fast) var(--ease);
 }
 
-.btn i { font-size: 15px; line-height: 1; }
+.btn i { font-size: var(--fs-base); line-height: 1; }
 .btn svg { width: 18px; height: 18px; }
 
 .btn:hover {
@@ -72,7 +72,7 @@
     --_fg: var(--ink-on-accent);
     --_bd: var(--accent-strong);
     color: var(--_fg);
-    box-shadow: 0 1px 2px oklch(20% 0.01 260 / 0.10),
+    box-shadow: 0 1px 2px oklch(from var(--ink-1) l c h / 0.10),
                 inset 0 0 0 1px oklch(100% 0 0 / 0.08);
 }
 
@@ -94,7 +94,7 @@
 }
 .btn--ghost:hover {
     --_bg: var(--surface-cream-2);
-    --_bd: oklch(82% 0.005 260);
+    --_bd: var(--line-2);
 }
 
 /* Danger */
