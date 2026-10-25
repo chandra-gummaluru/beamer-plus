@@ -51,8 +51,7 @@ body.focus-mode #main-content {
     }
 }
 
-/* ── Mobile portrait — Save grouped at the top-left ──
-   (the combined menu button moves to the top-right; see shortcuts.css) */
+/* ── Mobile portrait — the session buttons move to the top-left ── */
 @media (max-width: 1024px) and (orientation: portrait) {
     #top-right-controls {
         left: var(--sp-2);

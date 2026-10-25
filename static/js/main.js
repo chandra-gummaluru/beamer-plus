@@ -292,7 +292,7 @@ function wireHandButton() {
         commitOpenTextEditor(state);
         state.annotationTool = 'hand';
         forEachAnnCvs(c => c.setPointerMode('hand'));
-            setTextToolActive(false);
+        setTextToolActive(false);
         clearToolSelection();
         btn.classList.add('btn_selected');
     });
@@ -313,7 +313,7 @@ function wireEraserButton() {
         commitOpenTextEditor(state);
         state.annotationTool = 'erase';
         forEachAnnCvs(c => { c.setPointerMode('erase'); c.setStrokeWidth(state.eraserSize ?? 2); });
-            setTextToolActive(false);
+        setTextToolActive(false);
         clearToolSelection();
         btn.classList.add('btn_selected');
     });
@@ -1946,7 +1946,7 @@ async function loadPdfPresentation(file) {
         await renderLogicalSlide(0);
         await generateThumbnails();
         populateSlideNavigator();
-            modal?.close();
+        modal?.close();
         bus.emit('deck:loaded', { kind: 'pdf' });
     } catch (err) {
         console.error('PDF load error:', err);

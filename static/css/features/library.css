@@ -128,7 +128,6 @@ body.lib-required #top-right-controls { z-index: 10001; }
 .lib-chip:has(input:disabled) { cursor: default; }
 .lib-local-note { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0; }
 .lib-local-note svg { width: 14px; height: 14px; }
-.lib-foot .lib-link { font-size: var(--fs-sm); }
 
 /* Save window: takes too big to save there, offered as a download instead */
 .lib-toobig { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: var(--sp-2) 0 0; }
