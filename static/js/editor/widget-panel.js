@@ -1,11 +1,11 @@
 // A widget's properties, in the editor's right panel.
 //
-// Selecting a widget on the slide (or adding one) opens the panel with
-// everything about it: Name and Text size, its layout (full slide, box,
-// reveal step, layer), then its own settings from its `widget-schema`
-// block, and Remove. Where it sits and how big it is can also be changed on
-// the slide itself (drag it, drag its corner). While presenting, the same
-// own settings are also a pencil away (widget-settings-dialog.js).
+// Selecting a widget on the slide (or adding one) opens the panel with what
+// every widget has: Name (in the panel header), Text size and its layout
+// (full slide, box, reveal step), and Remove. Where it sits and how big it
+// is can also be changed on the slide itself (drag it, drag its corner).
+// The widget's own settings are not here: they are edited from the widget,
+// through its pencil (widget-settings-dialog.js).
 //
 // Every change is applied to the config item as it's made; the widget is
 // rebuilt with them when edit mode closes.
@@ -16,9 +16,8 @@ const near = (a, b) => Math.abs((a ?? 0) - b) < 0.005;
 const isFullBox = (it) => near(it.x, 0) && near(it.y, 0) && near(it.width ?? 1, 1) && near(it.height ?? 1, 1);
 
 /**
- * Fill `host` with everything about a widget: General (Name, Text size),
- * Layout (full slide, box, reveal step), then the widget's own settings
- * from its schema. Remove is the panel's footer (properties.js).
+ * Fill `host` with General (Text size) and Layout (full slide, box, reveal
+ * step). Remove is the panel's footer (properties.js).
  * @param {HTMLElement} host
  * @param {object} item     the widget's config item (edited in place)
  * @param {object} schema   from getWidgetSchema(item)
@@ -29,10 +28,9 @@ const isFullBox = (it) => near(it.x, 0) && near(it.y, 0) && near(it.width ?? 1, 
  */
 export function renderWidgetPanel(host, item, schema, { onLayout, onName } = {}) {
     host.textContent = '';
-    // The 'panel' variant puts Name and Text size first, under "General",
-    // and the widget's own fields after it in their schema sections.
-    // Its name is edited in the panel's header, so not here as well.
-    const form = buildWidgetForm({ ...schema, fields: (schema.fields || []).filter(f => f.key !== 'title') }, item, 'panel');
+    // Only Text size: the name is edited in the panel's header, and the
+    // widget's own fields from the widget.
+    const form = buildWidgetForm({ ...schema, fields: (schema.fields || []).filter(f => f.key === 'scale') }, item, 'panel');
     const layout = buildLayoutCard(item, schema, () => onLayout?.());
     const general = form.commonNode;
     form.node.insertBefore(layout.node, general ? general.nextSibling : form.node.firstChild);
