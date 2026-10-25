@@ -302,10 +302,14 @@ body.split-view-active #text-size-sidebar {
     flex-direction: row;
 }
 /* ============================================================
-   Pen flyout (pen / highlighter, size, colour) — the same flyout as the
-   text tool's, beside the toolbar, while a pen's options are open
-   (annotations/pen-slots.js).
+   Pen flyout — the pen's or highlighter's size and colour, or the eraser's
+   size: the same flyout as the text tool's, beside the toolbar, out while
+   that tool is chosen (annotations/pen-slots.js).
    ============================================================ */
+#pen-flyout [hidden] { display: none; }
+/* The eraser's sizes are rings: it takes ink away rather than adding it. */
+#pen-flyout.is-eraser .pen-size-dot { background: transparent; border: 1.5px solid var(--ink-1); }
+#pen-flyout.is-eraser .btn.btn_selected .pen-size-dot { background: transparent; border-color: var(--ink-on-accent); }
 #pen-flyout {
     display: none;
     flex-direction: column;

@@ -62,8 +62,8 @@ export function showHelpModal() {
   <li>${_hbtn('hand','Hand')} <strong>Hand</strong>: default mode, no drawing.</li>
   <li>${_hbtn('spotlight','Spotlight')} <strong>Spotlight</strong>: dims the slide and highlights your cursor position.</li>
   <li>${_hbtn('magnify','Magnifier')} <strong>Magnifier</strong>: a lens that enlarges the part of the slide under your cursor. Scroll to zoom in or out; click to put it away.</li>
-  <li>${_hbtn('pen','Pen')} <strong>Pen</strong>: freehand drawing. Clicking a pen opens its options beside the toolbar — pen or highlighter, size and colour (they're remembered); click it again, or start drawing, to put them away.</li>
-  <li>${_hbtn('eraser','Eraser')} <strong>Eraser</strong>: erase individual strokes.</li>
+  <li>${_hbtn('pen','Pen')} <strong>Pen</strong> and <strong>Highlighter</strong>: freehand drawing. Choosing one brings up its size and colour beside the toolbar (eight colours; they're remembered), and they stay there until you pick another tool.</li>
+  <li>${_hbtn('eraser','Eraser')} <strong>Eraser</strong>: rub out ink, at the size you pick beside the toolbar. Hold the button to clear the slide.</li>
 </ul>`,
         },
         {

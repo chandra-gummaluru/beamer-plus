@@ -320,7 +320,7 @@ function wireEraserButton() {
         if (held) { held = false; return; }
         commitOpenTextEditor(state);
         state.annotationTool = 'erase';
-        forEachAnnCvs(c => c.setPointerMode('erase'));
+        forEachAnnCvs(c => { c.setPointerMode('erase'); c.setStrokeWidth(state.eraserSize ?? 2); });
         setShapeSidebarVisible(false);
         setTextToolActive(false);
         clearToolSelection();
@@ -331,6 +331,11 @@ function wireEraserButton() {
 function clearToolSelection() {
     document.querySelectorAll('#tool-container .btn').forEach(b => b.classList.remove('btn_selected'));
 }
+
+// The eraser's size, from its flyout (pen-slots.js).
+bus.on('eraser:size', (n) => {
+    if (state.annotationTool === 'erase' || state.annotationTool === 'eraser') forEachAnnCvs(c => c.setStrokeWidth(n));
+});
 
 /* bus: pen:select from pen-slots module */
 bus.on('pen:select', (pen) => {
