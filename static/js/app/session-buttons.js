@@ -1,52 +1,83 @@
-// Top-right: the session's buttons — Open, Edit, Save, Close session.
+// Top-right: the session's buttons.
 //
-//   Open    browse the folder you open presentations from (library/ui.js)
-//   Edit    the editor (edit mode's own button closes it, top-right)
-//   Save    the Save window: folder, file name, what to save
-//   Close   back to the start page
+//   nothing open   Open, Close session
+//   a deck open    Edit, Close session
 //
-// Edit and Save need an open presentation. Opening is also a
-// file dropped on the window.
+//   Open    browse the folder you open presentations from (library/ui.js);
+//           dropping a file on the window opens one too
+//   Edit    the editor (its own Done button closes it)
+//   Close   back to the start page; with a deck open it asks whether to
+//           save first (the Save window, then the start page once saved)
 
 import { bus } from '../core/events.js';
 import { openPresentation, savePresentation } from '../library/ui.js';
 import { isRecording, stopRecording } from './recorder.js';
 
 let appState = null;
+// Set while Close session's "Save…" is under way: a finished save then
+// leaves for the start page. Cleared by the other answers.
+let leaveAfterSave = false;
 
 export function initSessionButtons(state) {
     appState = state;
     const $ = id => document.getElementById(id);
     $('session-open-btn')?.addEventListener('click', () => openPresentation());
     $('session-edit-btn')?.addEventListener('click', () => $('edit-mode-btn')?.click());
-    $('session-save-btn')?.addEventListener('click', () => savePresentation());
     $('session-close-btn')?.addEventListener('click', closeSession);
     bus.on('deck:loaded', refresh);
+    bus.on('library:saved', () => {
+        if (!leaveAfterSave) return;
+        leaveAfterSave = false;
+        setTimeout(leave, 700);   // long enough to see the "Saved …" toast
+    });
     refresh();
 }
 
 function refresh() {
     const deck = !!appState?.zipFile;
-    for (const id of ['session-edit-btn', 'session-save-btn']) {
-        const b = document.getElementById(id);
-        if (b) b.disabled = !deck;
-    }
+    const open = document.getElementById('session-open-btn');
+    const edit = document.getElementById('session-edit-btn');
+    if (open) open.hidden = deck;
+    if (edit) { edit.hidden = !deck; edit.disabled = !deck; }
 }
 
-// Back to the start page (asks first when a presentation is open: anything
-// not saved is lost).
+async function leave() {
+    if (isRecording()) await stopRecording();
+    bus.emit('session:ending');
+    window.location.href = '/';
+}
+
+// Back to the start page. With nothing open (and no recording) it just goes;
+// otherwise it asks whether to save first.
 function closeSession() {
-    const go = async () => {
-        if (isRecording()) await stopRecording();
-        bus.emit('session:ending');
-        window.location.href = '/';
-    };
-    if (!appState.zipFile && !isRecording()) { go(); return; }
+    leaveAfterSave = false;
+    if (!appState.zipFile && !isRecording()) { leave(); return; }
+    const rec = isRecording();
+    if (!appState.zipFile) {
+        window.BeamerModal?.show({
+            kind: 'warning',
+            title: 'Close This Session?',
+            message: 'You’ll go back to the start page. The recording stops and is kept.',
+            buttons: [{ label: 'Cancel', kind: 'cancel' }, { label: 'Close Session', kind: 'ok', onClick: leave }],
+        });
+        return;
+    }
     window.BeamerModal?.show({
         kind: 'warning',
-        title: 'Close this session?',
-        message: `You’ll go back to the start page${isRecording() ? ' (the recording stops and is kept)' : ''}. `
+        title: 'Save Before Closing?',
+        message: `You’ll go back to the start page${rec ? ' (the recording stops and is kept)' : ''}. `
             + 'Anything you haven’t saved will be lost.',
-        buttons: [{ label: 'Cancel', kind: 'cancel' }, { label: 'Close session', kind: 'ok', onClick: go }],
+        buttons: [
+            { label: 'Cancel', kind: 'cancel' },
+            { label: 'Don’t Save', kind: 'cancel', onClick: leave },
+            { label: 'Save…', kind: 'ok', onClick: () => {
+                leaveAfterSave = true;
+                // A take in progress is stopped first, so it can be saved too.
+                setTimeout(async () => {
+                    if (isRecording()) await stopRecording();
+                    savePresentation();
+                }, 0);
+            } },
+        ],
     });
 }

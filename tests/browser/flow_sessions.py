@@ -49,9 +49,12 @@ def run():
         page.on("crash", lambda: print("PAGE CRASHED"))
         shot = lambda n: page.screenshot(path=f"{OUT}/{n}.png")
         go = lambda name: (page.locator(".lib-files .lib-item", has_text=name).first.click(), page.wait_for_timeout(400))
-        BTN = {"open": "#session-open-btn", "edit": "#session-edit-btn", "save": "#session-save-btn",
+        BTN = {"open": "#session-open-btn", "edit": "#session-edit-btn",
                "end": "#session-close-btn", "record": "#record-btn"}
-        menu = lambda key: page.click(BTN[key])
+        # No Save button: saving is part of Close session. The steps that
+        # save mid-session open the same Save window directly.
+        menu = lambda key: page.evaluate("() => import('/static/js/library/ui.js').then(m => m.savePresentation())") if key == "save" else page.click(BTN[key])
+        shown = lambda: [b for b in page.eval_on_selector_all("#top-right-controls button", "els => els.filter(e => !e.hidden).map(e => e.id)")]
         sid = lambda: re.search(r"/s/([^/]+)/", page.url).group(1)
 
         # 1. The start page: New Session and Try Demo.
@@ -65,14 +68,12 @@ def run():
               and page.inner_text("#welcome-demo-btn").strip() == "Try Demo")
         check("…no Last Session, no GitHub", page.locator("#welcome-last-btn").count() == 0 and "GitHub" not in page.content())
 
-        # 2. New Session: Open, Edit, Save, Close; nothing open yet.
+        # 2. New Session: Open and Close; nothing open yet.
         page.click("#welcome-new-btn"); page.wait_for_url("**/s/**"); page.wait_for_timeout(2200)
         first = sid()
         shot("s02-buttons-empty")
-        btns = page.eval_on_selector_all("#top-right-controls button", "els => els.map(e => [e.id, e.disabled])")
-        print("   buttons:", btns)
-        check("top-right: open, edit, save, close", [k for k, _ in btns] == ["session-open-btn", "session-edit-btn", "session-save-btn", "session-close-btn"])
-        check("…edit and save need a presentation", dict(btns)["session-edit-btn"] and dict(btns)["session-save-btn"] and not dict(btns)["session-open-btn"])
+        print("   buttons:", shown())
+        check("top-right, nothing open: Open and Close session", shown() == ["session-open-btn", "session-close-btn"])
         check("record button in the corner", page.locator("#record-btn").is_visible())
         check("empty slide: 'Nothing here yet…' and how to start", page.inner_text("#stage-empty .stage-empty-title").strip() == "Nothing here yet…"
               and "opening a presentation" in page.inner_text("#stage-empty .stage-empty-hint")
@@ -89,7 +90,7 @@ def run():
         check(f"…the lecture folder ({items})", items == ["..", f"{DECK}.zip", "06 - Multiplication.pdf"])
         go(f"{DECK}.zip"); page.wait_for_timeout(2500); shot("s05-opened")
         check("deck opened (6 slides)", page.evaluate("() => window.beamerState.totalSlides") == 6)
-        check("…edit and save now on", not page.locator("#session-edit-btn").is_disabled() and not page.locator("#session-save-btn").is_disabled())
+        check("…top-right now: Edit and Close session", shown() == ["session-edit-btn", "session-close-btn"])
         check("tab title", page.title() == f"{DECK} · Beamer+")
 
         # 4. Go to slide 3 (Save keeps the slide you're on).
@@ -134,12 +135,20 @@ def run():
             page.click("#recorder-stop-btn"); page.wait_for_timeout(2000)
             check("…stopped", page.locator("#recorder-bar").is_hidden())
 
-        # 8. Close session: asks first (a deck is open), then the start page.
+        # 8. Close session: asks whether to save first (a deck is open).
         menu("end"); page.wait_for_timeout(300); shot("s08-close")
-        check("close session warns about unsaved work", "haven’t saved" in page.inner_text(".custom-modal-overlay"))
-        page.locator(".custom-modal-btn", has_text="Close session").click()
-        page.wait_for_url(BASE); page.wait_for_timeout(800)
-        check("…back on the start page", page.locator("#welcome-new-btn").is_visible())
+        btns = [x.inner_text().strip() for x in page.locator(".custom-modal-btn").all()]
+        check(f"close session asks to save first ({btns})", "haven’t saved" in page.inner_text(".custom-modal-overlay")
+              and btns == ["Cancel", "Don’t Save", "Save…"])
+        page.locator(".custom-modal-btn", has_text="Cancel").click(); page.wait_for_timeout(300)
+        check("…Cancel stays", "/s/" in page.url)
+        menu("end"); page.wait_for_timeout(300)
+        page.locator(".custom-modal-btn", has_text="Save…").click(); page.wait_for_timeout(800)
+        check("…Save… opens the Save window", page.locator(".lib [data-save]").count() == 1)
+        page.fill("[data-name]", "05 - closing"); page.click("[data-save]")
+        page.wait_for_url(BASE, timeout=15000); page.wait_for_timeout(800)
+        check("…saves, then back on the start page", page.locator("#welcome-new-btn").is_visible()
+              and any(k.endswith("05 - closing.zip") for k in page.evaluate(FOLDER_LS, "Saves")))
 
         # 9. New Session starts empty; both folders are remembered, each where
         #    you last were in it; the saved deck reopens at the slide it was saved on.

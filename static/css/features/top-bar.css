@@ -22,9 +22,6 @@
     padding: 0;
 }
 #top-right-controls .btn:disabled { opacity: 0.4; cursor: default; }
-/* Saving: the Save button pulses. */
-body.lib-saving #session-save-btn svg { animation: session-saving 0.8s ease-in-out infinite alternate; }
-@keyframes session-saving { to { opacity: 0.35; } }
 
 /* Top-controls panel (legacy hidden) */
 #top-controls-panel { display: none; }

@@ -90,10 +90,10 @@ const STEPS = [
         body:  'Blank the stage for a moment (or press .), handy for a question or a pause. You can keep moving through slides while it is hidden.',
     },
     {
-        sel:   '#session-save-btn',
+        sel:   '#session-close-btn',
         place: 'auto',
-        title: 'Save your work',
-        body:  'Save presentation picks the folder and file name, and what to save: the deck (it reopens where you left off), the notes PDF (annotations, widgets, media and poll results drawn in) and any recordings.',
+        title: 'Save and close',
+        body:  'When you are done, Close session asks whether to save first: pick the folder and file name, and what to save: the deck (it reopens where you left off), the notes PDF (annotations, widgets, media and poll results drawn in) and any recordings.',
     },
     {
         sel:   null,

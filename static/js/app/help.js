@@ -41,7 +41,7 @@ export function showHelpModal() {
 <p class="help-p">Click the open button (top-right, the folder), or drag the file anywhere onto the window. It browses the folder you chose for your presentations (the first time, it asks you to choose one; Beamer+ remembers it), with <b>Or upload from somewhere else instead</b> underneath. In browsers that can't use a folder (Firefox, Safari), it's the usual file picker. You can load two types of file:</p>
 <ul class="help-ul">
   <li>Your bare slide deck (as a PDF). Once loaded you can annotate it and place interactive widgets on any slide.</li>
-  <li>A saved Beamer+ presentation (as a ZIP) that bundles the PDF together with all your widgets, overlays, and annotations. To create one, start from a bare slide deck, edit it in Beamer+, then choose <b>Save presentation…</b> with the save button (top-right). Beamer+ packages everything into a ZIP you can reload later.</li>
+  <li>A saved Beamer+ presentation (as a ZIP) that bundles the PDF together with all your widgets, overlays, and annotations. To create one, start from a bare slide deck, edit it in Beamer+, then save it when you close the session (top-right). Beamer+ packages everything into a ZIP you can reload later.</li>
 </ul>`,
         },
         {
@@ -82,7 +82,7 @@ export function showHelpModal() {
 <h4 class="help-h">Moving &amp; resizing</h4>
 <p class="help-p">Drag any overlay to reposition it, or drag its bottom-right corner to resize. The panel shows its exact position and size. To change what sits in front, drag the rows in the slide's <strong>On This Slide</strong> list; the top one is in front.</p>
 <h4 class="help-h">Saving your work</h4>
-<p class="help-p">Click the save button (top-right, the disk): pick a folder and a file name (or <b>Or download instead</b>, for your downloads folder), and tick what to save: <b>Presentation</b> is a ZIP with all overlays, widgets, and annotations that reopens at the slide you were on; <b>Notes</b> a single PDF to hand out: every visible slide with your annotations drawn on, each widget as it stands now, videos and 3D models as pictures, and poll results; and any <b>Recordings</b>.</p>`,
+<p class="help-p">Click Close session (top-right) and choose <b>Save…</b>: pick a folder and a file name (or <b>Or download instead</b>, for your downloads folder), and tick what to save: <b>Presentation</b> is a ZIP with all overlays, widgets, and annotations that reopens at the slide you were on; <b>Notes</b> a single PDF to hand out: every visible slide with your annotations drawn on, each widget as it stands now, videos and 3D models as pictures, and poll results; and any <b>Recordings</b>.</p>`,
         },
         {
             id: 'widgets', label: 'Widgets',
