@@ -2,7 +2,7 @@
 
 Beamer+ is a local, browser-based presentation tool for interactive lectures.
 It renders PDF slide decks (e.g. LaTeX Beamer output) and layers live features
-on top: pen and shape annotations, embedded video / audio / 3D models,
+on top: pen and highlighter annotations (draw and hold to snap a shape), embedded video / audio / 3D models,
 interactive widgets (calculators, plotters, Python REPLs, maps, …), and
 real-time audience surveys with AI-powered response summarization.
 
@@ -38,7 +38,8 @@ Demo** on the welcome screen.
 
 ## Loading a presentation
 
-Use the **Open** button (top-right), or drag the file onto the window, to load either:
+A new session starts with the **Open** window (see below); you can also drag
+a file onto the window. Either way, load:
 
 - **A plain PDF** — every page becomes a slide.
 - **A presentation ZIP** — a PDF plus saved configuration, media, widgets and
@@ -60,11 +61,9 @@ presentation.zip
     └── <model>.py              # optional survey-summarization models (see below)
 ```
 
-## Downloading
+## What Save writes
 
-**Download instead** (in the Save window) offers two files, plus any screen
-recordings (see Recording below). (Normally **Save presentation…** saves them in
-your folder instead; see below.)
+Save (see below) can write two files, plus any screen recordings:
 
 - **Presentation (ZIP)** — everything above, to reopen and keep presenting.
 - **Notes (PDF)** — one flat PDF to hand out. Every visible slide (hidden and
@@ -79,13 +78,13 @@ your folder instead; see below.)
 
 ## Sessions
 
-The welcome screen offers **New Session** (an empty session: the slide just
-says "Nothing here yet…") and **Try Demo** (the demo presentation with a
-guided tour).
+The welcome screen offers **New Session** (the Open window comes up, and
+stays until a presentation is open) and **Try Demo** (the demo presentation
+with a guided tour).
 
-Four buttons top-right run the session: **Open**, **Edit**, **Save** (Edit
-and Save once a presentation is open) and **Close session** (back to the
-start page).
+Two buttons top-right run the session: **Edit** (once a presentation is open)
+and **Close Session**, which asks whether to save first, then goes back to
+the start page.
 
 ## Opening and saving: folders on this computer
 
@@ -96,14 +95,13 @@ Save offers **Use <the Open folder>** as a one-click choice). Both are
 remembered across sessions, along with the subfolder you were last in; after
 the browser restarts it asks once to allow each again (Chrome's **Allow on
 every visit** skips that). Beamer+ doesn't impose a layout: you choose where
-things go. **Change folder…** picks another. Underneath, **Or open a single
-file instead** (Open) is the system file picker, and **Or download instead**
+things go. **Change folder…** picks another. Underneath, **Or upload from somewhere else
+instead** (Open) is the system file picker, and **Or download instead**
 (Save) saves to your browser's downloads folder.
 
-- **Open a presentation** lists the folders and the `.zip` / `.pdf` files in
-  the one you're in; click one to open it. **Open a presentation** on the empty
-  slide, and dropping a file on the window, open one too.
-- **Save presentation** starts where the presentation was last saved (or the
+- **Open** lists the folders and the `.zip` / `.pdf` files in the one you're
+  in; click one to open it. Dropping a file on the window opens one too.
+- **Save** (from Close Session) starts where the presentation was last saved (or the
   folder it was opened from, when that's inside the save folder), otherwise
   where you last saved. Pick a
   folder, a file name, and tick what to save (Presentation, Notes,
@@ -121,15 +119,15 @@ browsers Open is the file picker and Save downloads.
 
 ## Recording
 
-The record button (bottom-right, next to the hide-slide button) records this
+The record button (bottom-right) records this
 tab — slides, ink and widgets — as a video, with your microphone and/or the
 tab's sound (videos, audio, widgets). While recording, the button turns into a
 small bar with the time, pause / resume and stop. Stop and start again as often
-as you like — every take is kept and offered when you **Save**, where
-each can be downloaded (MP4 in Chrome/Edge, WebM elsewhere) or deleted.
+as you like — every take is kept and offered when you **Save** (MP4 in
+Chrome/Edge, WebM elsewhere); one too big for the folder is downloaded instead.
 
 Takes are saved to the browser's storage (IndexedDB) a second at a time, so a
-reload or crash doesn't lose them; they stay until you delete them. Recording
+reload or crash doesn't lose them. Recording
 needs a secure context (the `https://` address, or `localhost`).
 
 ## Surveys
@@ -158,19 +156,22 @@ def summarize(responses: list[str], n: int, api_key: str | None = None):
 ## Widgets
 
 Widgets are standalone HTML files in `widgets/`, rendered in iframes on
-slides. Built-ins include a browser, calculator, camera, circuit sandbox,
-function plotter, Jupyter-notebook runner, map, an audience-response panel (multiple choice, true/false, rating, numeric estimate, word cloud, open-ended),
-PDF textbook viewer, Python workspace, Python shell, terminal, timer, and YouTube player.
+slides. Built-ins include a calculator, camera, circuit sandbox, function
+plotter, Jupyter-notebook runner, map, an audience-response panel (multiple
+choice, true/false, rating, numeric estimate, word cloud, open-ended), PDF
+textbook viewer, Python workspace, Python shell, randomizer, table, terminal,
+timer, and YouTube player.
 A widget is shown either full (the whole slide) or, if it supports it, as an
 overlay — a small box over part of a content slide, with no bar (the timer,
 calculator and Python shell do).
 
 To add your own, drop an `.html` file in `widgets/`. A `<script
 id="widget-schema" type="application/json">` block in the file describes the
-editable fields the editor shows for it, and widgets can sync state across
-instances by emitting `widget_state` over Socket.IO. A widget can also say how it appears in
-the notes PDF by registering a print handler (`BeamerWidget.print.register`; see
-`bpwidget-skill.md`).
+fields edited from the pencil on the widget while presenting (the editor
+panel only holds its name, text size and position). The settings kit
+(`static/js/widget-settings-kit.js`) is injected into every widget and gives
+it the `BeamerWidget` API; a widget can say how it appears in the notes PDF by
+registering a print handler (`BeamerWidget.print.register`).
 
 ## Security model
 
@@ -195,43 +196,64 @@ beamer-plus/
 ├── server/                 # backend (Flask) — one module per concern
 │   ├── core.py             #   Flask app + Socket.IO instances
 │   ├── paths.py            #   BASE_PATH and derived folders
-│   ├── state.py            #   in-memory shared state (surveys, presentation)
+│   ├── env.py              #   .env loading
+│   ├── sessions.py         #   presenter sessions and their state
+│   ├── state.py            #   survey limits (re-exported for the tests)
 │   ├── ai_models.py        #   survey-summarization model loading
-│   ├── pages.py            #   HTML pages + PWA files
+│   ├── pages.py            #   HTML pages, manifest, service-worker tombstone
 │   ├── presentation.py     #   upload, ZIP assets, demo packaging
-│   ├── widgets.py          #   widget serving, embeddability probe
+│   ├── widgets.py          #   widget serving and catalog
 │   ├── surveys.py          #   survey REST API
 │   └── sockets.py          #   Socket.IO handlers
 ├── ai/                     # built-in survey-summarization models (plugin dir)
 ├── templates/              # audience-facing pages + presenter shell
 ├── static/
-│   ├── css/                # tokens → base → components/ → features/
+│   ├── css/                # tokens → base → components/ → features/ (see Design below)
 │   ├── js/
 │   │   ├── main.js         #   orchestrator: state, navigation, rendering
 │   │   ├── core/           #   event bus, canvas, modal, widget iframes
 │   │   ├── slides/         #   navigator, thumbnails, structure, media, spotlight
-│   │   ├── annotations/    #   toolbar, pen slots, shape tools
-│   │   ├── app/            #   settings, help, tour, uploader
+│   │   ├── annotations/    #   toolbar, pen slots, text boxes
+│   │   ├── app/            #   session buttons, recorder, tour, uploader
+│   │   ├── library/        #   Open and Save: folders on this computer
 │   │   └── editor/         #   edit mode (overlays, properties, picker, save)
 │   └── vendor/             # vendored third-party libraries (no CDN)
 ├── widgets/                # built-in widget HTML files (one file per widget)
 ├── demo/                   # bundled demo presentation (used by the tour)
-├── tests/                  # pytest suite for the Flask API
-├── manifest.json           # PWA manifest (served from /manifest.json)
-└── service-worker.js       # PWA service worker (served from /)
+├── tests/                  # pytest suite (API) + browser walkthroughs (tests/browser)
+├── manifest.json           # web app manifest (served from /manifest.json)
+└── service-worker.js       # tombstone: unregisters an old caching worker
 ```
+
+## Design
+
+Every colour, type size, spacing, radius and shadow comes from
+`static/css/tokens.css`; feature CSS lays things out but never types a value
+of its own. Controls are one of a few shared components:
+
+- **Buttons** (`components/button.css`): `.btn`, with `--primary` (the one
+  main action), `--ghost` (toolbars, ×), `--danger`, `--sm` (editor panel and
+  sheets) and `--icon`; `.btn_selected` for a toggle that is on; `.link` for
+  a quiet text action.
+- **Fields** (`components/field.css`): `.field` for text boxes, text areas and
+  selects; in the editor, selects become the custom dropdown
+  (`editor/dropdown.js`).
+- **Dialogs** (`components/modal.css`, `core/modal.js`): one shell; title and
+  message left-aligned, buttons right-aligned with the main action last.
+- **Copy**: Title Case for buttons, titles, tooltips and field labels;
+  sentence case for messages and hints.
 
 ## Development
 
 ```bash
 pip install -r requirements-dev.txt
 pytest
+python tests/browser/flow_sessions.py   # with the app running on :5001 (--http)
 ```
 
 Third-party frontend libraries are vendored in `static/vendor/` so the app
-has no CDN dependency and works offline (some widgets still pull large
-optional libraries, e.g. Pyodide, from CDNs). The app is an installable PWA;
-bump the cache version in `service-worker.js` when changing static assets.
+works offline (some widgets still pull large optional libraries, e.g.
+Pyodide, from CDNs).
 
 ## License
 

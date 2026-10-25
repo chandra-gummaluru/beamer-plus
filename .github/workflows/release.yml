@@ -43,7 +43,7 @@ jobs:
             5. Run the launcher: `python launch.py`
             6. Open the `https://...` URL it prints (accept the self-signed
                certificate warning via "Advanced" → "Proceed")
-            7. Upload and present!
+            7. Click New Session, open your PDF or saved ZIP, and present
 
             ### Features
             - Interactive presentations with PDF slides
