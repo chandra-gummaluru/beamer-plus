@@ -85,6 +85,8 @@ body.edit-mode.is-recording #mute-container {
     right: calc(var(--editor-panel-width) + var(--sp-3));
 }
 body.focus-mode.is-recording #mute-container { display: flex !important; }
+/* …at the top-left in split view (top-bar.css), in edit mode too. */
+body.split-view-active.is-recording #mute-container { right: auto; }
 body.edit-mode #mute-btn,
 body.focus-mode #mute-btn { display: none; }
 body.focus-mode #recorder-bar { opacity: 0.3; }
@@ -112,7 +114,7 @@ body.focus-mode #recorder-bar:focus-within { opacity: 1; }
     transition: opacity var(--dur-base), transform var(--dur-base) var(--ease-out);
 }
 #recorder-toast.is-visible { opacity: 1; transform: none; }
-body.split-view-active #recorder-toast { bottom: calc(88px + var(--sp-3)); }
+body.split-view-active #recorder-toast { top: calc(var(--sp-2) + var(--hit-min) + var(--sp-2)); bottom: auto; left: var(--sp-3); right: auto; }
 @media (max-width: 1024px) {
     #recorder-toast { right: var(--sp-2); bottom: calc(100px + var(--sp-3) + var(--hit-min) + var(--sp-2)); }
 }

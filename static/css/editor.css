@@ -1848,7 +1848,7 @@ body.wsheet-open #main-content { padding-right: 408px; }
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    order: 0;
+    order: 1;   /* under the name: the name first, what it is under it */
 }
 #editor-panel-kicker[hidden] { display: none; }
 #editor-panel-title {
@@ -1881,8 +1881,6 @@ body.wsheet-open #main-content { padding-right: 408px; }
 }
 #editor-panel-title::placeholder { color: var(--ink-1); opacity: 1; }
 #editor-panel-title.is-editable:focus::placeholder { color: var(--ink-4); }
-/* The slide's header reads name first, what it is under it. */
-#editor-panel[data-mode="slide"] #editor-panel-kicker { order: 1; }
 .editor-done-btn {
     flex: 0 0 auto;
     height: var(--ep-ctl);

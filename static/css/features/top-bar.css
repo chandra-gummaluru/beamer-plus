@@ -87,13 +87,10 @@ body.focus-mode #main-content {
     padding: 0;
 }
 body.edit-mode #mute-container { display: none; }
-/* Split view puts the navigator along the bottom, and the right pane's slide
-   reaches the corner: sit in the navigator's bar instead, at its right end
-   (the navigator leaves room: --corner-w is this box's width, main.js). */
-body.split-view-active #mute-container { bottom: calc((88px - var(--hit-min)) / 2); right: var(--sp-3); }
-body.split-view-active:not(.edit-mode):not(.focus-mode) #slide-navigator {
-    padding-right: calc(var(--corner-w, 96px) + 2 * var(--sp-3));
-}
+/* Split view: the right pane's slide reaches the bottom-right corner, so
+   these move to the top-left, in the strip above the slides, level with
+   the session buttons on the right. */
+body.split-view-active #mute-container { top: var(--sp-2); bottom: auto; left: var(--sp-3); right: auto; }
 @media (max-width: 1024px) {
     #mute-container { bottom: calc(100px + var(--sp-3)); right: var(--sp-2); }
 }

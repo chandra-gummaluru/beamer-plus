@@ -1727,16 +1727,6 @@ function _clearTopRightControls(pane, box, { pl, cw, pt, ch, anchor }) {
 }
 
 function wireResizeAndFullscreen() {
-    // In split view the record / hide-slide buttons sit in the navigator's
-    // bar, which keeps their width free (--corner-w): it grows while a
-    // recording's timer and controls are showing.
-    const corner = document.getElementById('mute-container');
-    if (corner && 'ResizeObserver' in window) {
-        new ResizeObserver(() => {
-            const w = Math.ceil(corner.getBoundingClientRect().width);
-            if (w) document.body.style.setProperty('--corner-w', `${w}px`);
-        }).observe(corner);
-    }
     // The session button changes width (the presentation's name, edit mode):
     // re-fit the slide when it does.
     const ctrls = document.getElementById('top-right-controls');
