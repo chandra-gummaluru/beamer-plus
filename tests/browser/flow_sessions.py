@@ -136,7 +136,7 @@ def run():
         # 7. Record with the record button.
         if not os.environ.get("SKIPREC"):
             menu("record"); page.wait_for_timeout(400)
-            page.locator(".custom-modal-buttons .btn", has_text="Start recording").click(); page.wait_for_timeout(2500)
+            page.locator(".custom-modal-buttons .btn", has_text="Start Recording").click(); page.wait_for_timeout(2500)
             check("recording: the bar shows", page.locator("#recorder-bar").is_visible())
             shot("s07-recording")
             check("…in the record button's place", page.locator("#record-btn").is_hidden())

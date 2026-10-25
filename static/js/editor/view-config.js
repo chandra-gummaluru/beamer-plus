@@ -50,7 +50,7 @@ function buildViewConfigHTML(obj, viewIdx) {
                 ${paneRow('right', obj.right)}
             </div>
             <button type="button" class="btn btn--sm editor-secondary-btn" id="view-pick">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="7" height="14" rx="1"/><rect x="14" y="5" width="7" height="14" rx="1"/></svg>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="7" height="14" rx="1"/><rect x="14" y="5" width="7" height="14" rx="1"/></svg>
                 <span>Choose Slides</span>
             </button>
         </section>
@@ -84,7 +84,7 @@ const PANE_ICON = {
 function paneRow(side, idx) {
     if (idx == null) return `
         <div class="slide-item is-empty" role="listitem">
-            <span class="slide-item-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${PANE_ICON[side]}</svg></span>
+            <span class="slide-item-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${PANE_ICON[side]}</svg></span>
             <span class="slide-item-text">
                 <span class="slide-item-name">No Slide</span>
                 <span class="slide-item-kind">${side === 'left' ? 'Left Pane' : 'Right Pane'}</span>
@@ -93,12 +93,12 @@ function paneRow(side, idx) {
     const label = getSlideLabels(ctx.state.slideStructure)[idx] ?? '';
     return `
         <div class="slide-item" role="listitem" tabindex="0" data-pane="${side}" data-index-to="${idx}" title="Edit Slide ${escAttr(label)}">
-            <span class="slide-item-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${PANE_ICON[side]}</svg></span>
+            <span class="slide-item-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${PANE_ICON[side]}</svg></span>
             <span class="slide-item-text">
                 <span class="slide-item-name">Slide ${escHtml(label)}</span>
                 <span class="slide-item-kind">${side === 'left' ? 'Left Pane' : 'Right Pane'}</span>
             </span>
-            <svg class="slide-item-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+            <svg class="slide-item-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
         </div>`;
 }
 

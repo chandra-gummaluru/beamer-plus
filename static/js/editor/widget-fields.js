@@ -637,7 +637,7 @@ function buildListRow(field, item) {
             const mark = document.createElement('button');
             mark.type = 'button';
             mark.className = 'wf-list-correct';
-            mark.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>';
+            mark.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>';
             mark.addEventListener('click', () => {
                 const i = inputs().indexOf(inp);
                 correctRow = correctRow === i ? null : i;
@@ -771,7 +771,7 @@ function buildTemplateRow(field, item, variant) {
     insert.type = 'button';
     insert.className = 'wf-chip-btn';
     insert.title = `Insert ${token} at the cursor, or turn the selected text into one`;
-    insert.innerHTML = `<span class="wf-blank-chip">${escText(token)}</span> Insert blank`;
+    insert.innerHTML = `<span class="wf-blank-chip">${escText(token)}</span> Insert Blank`;
     const count = document.createElement('span');
     count.className = 'wf-blank-count';
     bar.appendChild(insert);
@@ -902,7 +902,7 @@ function pickWidgetAsset(field, item, input, btn) {
         const file = picker.files?.[0];
         if (!file) return;
         btn.disabled = true;
-        btn.textContent = 'Uploading…';
+        btn.textContent = 'Opening…';
         try {
             const buffer = await file.arrayBuffer();
             const path = await saveWidgetAsset(item, {
@@ -920,7 +920,7 @@ function pickWidgetAsset(field, item, input, btn) {
             console.warn('[editor] widget file upload failed:', err);
             window.BeamerModal?.show({
                 kind: 'error',
-                title: 'Upload failed',
+                title: 'Upload Failed',
                 message: `${err.message}\n\nThe file is still part of the presentation and will be included when you save, but the widget can't preview it until the upload succeeds.`,
             });
         } finally {

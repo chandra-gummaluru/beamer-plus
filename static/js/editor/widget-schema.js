@@ -164,7 +164,7 @@ const TEXT_SIZES = ['1', '1.2', '1.4', '1.7', '2', '2.4'];
 export function textSizeField(def = '1.4') {
     return {
         key: 'scale',
-        label: 'Text size',
+        label: 'Text Size',
         type: 'select',
         options: TEXT_SIZES.map(v => ({ v, l: `${Math.round(parseFloat(v) * 100)}%` })),
         default: def,

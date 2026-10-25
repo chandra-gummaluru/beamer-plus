@@ -56,7 +56,7 @@ function showProgress(message) {
     const modal = window.BeamerModal;
     const msgEl = modal?.open?.querySelector('.custom-modal-message');
     if (modal?.open?.classList.contains('modal-loading') && msgEl) { msgEl.textContent = message; return; }
-    modal?.show({ kind: 'loading', title: 'Building notes…', message });
+    modal?.show({ kind: 'loading', title: 'Building Notes…', message });
 }
 
 /* ─── text ─────────────────────────────────────────────────────── */

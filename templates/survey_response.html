@@ -12,24 +12,22 @@
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
 <script src="/static/vendor/marked.min.js"></script>
+<link rel="stylesheet" href="/static/css/tokens.css">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap');
-
 :root {
-  --bg:         #ffffff;
-  --bg-subtle:  #f9f9f8;
-  --border:     #e9e9e6;
-  --border-med: #d4d4cf;
-  --text:       #1a1a18;
-  --text-2:     #6b6b65;
-  --text-3:     #aeaea5;
-  --accent:     #52524e;
-  --accent-bg:  #f0f0ee;
-  --green:      #15803d;
-  --red:        #dc2626;
-  --radius:     8px;
-  --font-mono:  'JetBrains Mono', ui-monospace, monospace;
-  --font-ui:    'DM Sans', system-ui, sans-serif;
+  /* Local names for the app's tokens (static/css/tokens.css). */
+  --bg:        var(--surface-paper);
+  --bg-subtle: var(--surface-cream);
+  --border:    var(--line-1);
+  --border-med: var(--line-2);
+  --text:      var(--ink-1);
+  --text-2:    var(--ink-2);
+  --text-3:    var(--ink-3);
+  --accent-bg: var(--accent-soft);
+  --green:     var(--success);
+  --red:       var(--danger);
+  --radius:    var(--r-md);
+  --font-ui:   var(--font-sans);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }

@@ -197,14 +197,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // A new deck replaces this one: close any split first.
         if (state.splitView) await setSplitActive(false);
         const modal = window.BeamerModal;
-        modal?.show({ kind: 'loading', title: 'Uploading…', message: 'Parsing ZIP…' });
+        modal?.show({ kind: 'loading', title: 'Opening…', message: 'Parsing ZIP…' });
         try {
             const data = await readUserFileBytes(file);
             const zip  = await JSZip.loadAsync(data);
             await uploadZipToServer(zip, modal, file.name);
         } catch (err) {
             modal?.close();
-            window.BeamerModal?.show({ kind: 'error', title: 'Upload failed', message: err.message });
+            window.BeamerModal?.show({ kind: 'error', title: 'Can’t Open That File', message: err.message });
         }
     });
 
@@ -216,7 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function uploadZipToServer(zip, modal, name = 'presentation.zip') {
-    modal?.show({ kind: 'loading', title: 'Uploading…', message: 'Sending to server…' });
+    modal?.show({ kind: 'loading', title: 'Opening…', message: 'Sending to server…' });
     const blob  = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
     const form  = new FormData();
     form.append('file', blob, 'presentation.zip');
@@ -507,7 +507,7 @@ function toggleMute(force) {
 function launchTour() {
     if (isNavCollapsed()) setNavCollapsed(false, { persist: false });
     const loader = state.zipFile ? null : async () => {
-        window.BeamerModal?.show({ kind: 'loading', title: 'Loading demo…', message: 'Fetching demo presentation…' });
+        window.BeamerModal?.show({ kind: 'loading', title: 'Loading Demo…', message: 'Fetching demo presentation…' });
         const resp = await fetch('/api/demo-zip');
         if (!resp.ok) { window.BeamerModal?.close(); return; }
         const blob = await resp.blob();
@@ -1405,7 +1405,7 @@ function setStageControlsEnabled(enabled) {
     if (splitBtn && !state.splitView) {
         const tooFew = realSlideCount(state.slideStructure) < 2;
         splitBtn.disabled = tooFew;
-        splitBtn.title = tooFew ? 'Split view needs at least two slides' : 'Split view';
+        splitBtn.title = tooFew ? 'Split view needs at least two slides' : 'Split View';
     }
     // Undo/redo have their own enabled rule (does the active canvas have
     // history?) — hand them back to it rather than force-enabling them.
@@ -1901,7 +1901,7 @@ async function loadZipPresentation(file) {
     } catch (err) {
         console.error('ZIP load error:', err);
         modal?.close();
-        window.BeamerModal?.show({ kind: 'error', title: 'Upload failed', message: err.message });
+        window.BeamerModal?.show({ kind: 'error', title: 'Can’t Open That File', message: err.message });
     }
 }
 
@@ -1951,7 +1951,7 @@ async function loadPdfPresentation(file) {
     } catch (err) {
         console.error('PDF load error:', err);
         modal?.close();
-        window.BeamerModal?.show({ kind: 'error', title: 'Upload failed', message: err.message });
+        window.BeamerModal?.show({ kind: 'error', title: 'Can’t Open That File', message: err.message });
     }
 }
 

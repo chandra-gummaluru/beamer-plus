@@ -71,7 +71,7 @@ const ICON = {
     pdf: svg('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>'),
     down: svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>'),
     rec: svg('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/>'),
-    tick: '<svg class="lib-chip-tick" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+    tick: '<svg class="lib-chip-tick" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
 };
 const extOf = name => (/\.([a-z0-9]+)$/i.exec(name || '') || [, ''])[1].toLowerCase();
 const baseOf = name => String(name || '').replace(/\.(zip|pdf)$/i, '');
@@ -208,7 +208,7 @@ async function refreshWindow(w) {
         await browse(w, src, w.cwd);
     } catch (e) {
         if (e?.name === 'NotFoundError' && w.cwd) { w.cwd = ''; return refreshWindow(w); }   // that folder is gone
-        w.body.innerHTML = `<p class="lib-err">${esc(e?.message || e)}</p><p><button type="button" class="btn" data-retry>Try again</button></p>`;
+        w.body.innerHTML = `<p class="lib-err">${esc(e?.message || e)}</p><p><button type="button" class="btn" data-retry>Try Again</button></p>`;
         w.body.querySelector('[data-retry]').onclick = () => refreshWindow(w);
     }
 }
@@ -274,8 +274,8 @@ async function drawFolderRow(w) {
     }
     if (had) {
         w.body.innerHTML = `<p>Beamer+ needs your OK to ${role === 'save' ? 'save in' : 'open from'} <b></b> again.</p>
-            <p class="lib-row"><button type="button" class="btn btn--primary" data-allow>${ICON.folder}Allow access</button>
-            <button type="button" class="btn" data-choose>Choose another folder…</button></p>`;
+            <p class="lib-row"><button type="button" class="btn btn--primary" data-allow>${ICON.folder}Allow Access</button>
+            <button type="button" class="btn" data-choose>Choose Another Folder…</button></p>`;
         w.body.querySelector('b').textContent = Folder.rootName(role);
         w.body.querySelector('[data-allow]').onclick = async () => { if (await Folder.reconnect(role)) refreshWindow(w); };
         w.body.querySelector('[data-choose]').onclick = choose;
@@ -288,7 +288,7 @@ async function drawFolderRow(w) {
             (it can be a different folder from the one you open them from).</p>`
         : `<p>Choose the folder your presentations are in (your course folder, say).
             Beamer+ remembers it for next time.</p>`;
-    w.body.insertAdjacentHTML('beforeend', `<p class="lib-row"><button type="button" class="btn btn--primary" data-choose>${ICON.folder}Choose a folder…</button>
+    w.body.insertAdjacentHTML('beforeend', `<p class="lib-row"><button type="button" class="btn btn--primary" data-choose>${ICON.folder}Choose a Folder…</button>
         ${otherName ? `<button type="button" class="btn" data-adopt></button>` : ''}</p>`);
     w.body.querySelector('[data-choose]').onclick = choose;
     const adopt = w.body.querySelector('[data-adopt]');
@@ -381,7 +381,7 @@ async function drawSaveForm(w, src, path, dirs, decks) {
     const { takes, tooBig } = await takesFor(src, t0 ? targetKey(t0) : null);
     const zips = decks.filter(d => /\.zip$/i.test(d.name));
     w.body.innerHTML = `${src.kind === 'computer' ? '' : listHTML(path, dirs, zips, { filesQuiet: true })}
-        <label class="lib-field"><span>File name</span>
+        <label class="lib-field"><span>File Name</span>
             <input class="field" data-name value="${esc(w.name)}" spellcheck="false" autocomplete="off"></label>
         <div class="lib-field"><span>Save</span>
             <div class="lib-chips" role="group" aria-label="What to save">
@@ -482,14 +482,14 @@ async function writeOut(src, t, files, saved, { deck, notes }) {
         const kept = saved.length ? ' Your recordings stay in Beamer+, ready for the next save.' : '';
         const buttons = [
             { label: 'Close', kind: 'cancel' },
-            { label: 'Try again', kind: src.kind === 'computer' ? 'ok' : 'cancel', onClick: () => setTimeout(() => writeOut(src, t, files, saved, { deck, notes }), 0) },
+            { label: 'Try Again', kind: src.kind === 'computer' ? 'ok' : 'cancel', onClick: () => setTimeout(() => writeOut(src, t, files, saved, { deck, notes }), 0) },
         ];
         if (src.kind !== 'computer') {
-            buttons.push({ label: 'Download instead', kind: 'ok', onClick: () => setTimeout(() => writeOut(COMPUTER, t, files, saved, { deck, notes }), 0) });
+            buttons.push({ label: 'Download Instead', kind: 'ok', onClick: () => setTimeout(() => writeOut(COMPUTER, t, files, saved, { deck, notes }), 0) });
         }
         window.BeamerModal?.show({
             kind: 'error',
-            title: `Couldn’t save to ${src.where}`,
+            title: `Couldn’t Save to ${src.where}`,
             message: `${e?.message || String(e)}${kept}`,
             buttons,
         });

@@ -4,17 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Not Found — Beamer+</title>
+<link rel="stylesheet" href="/static/css/tokens.css">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap');
-
 :root {
-  --bg:         #ffffff;
-  --border:     #e9e9e6;
-  --text:       #1a1a18;
-  --text-3:     #aeaea5;
-  --red:        #dc2626;
-  --font-mono:  'JetBrains Mono', ui-monospace, monospace;
-  --font-ui:    'DM Sans', system-ui, sans-serif;
+  /* Local names for the app's tokens (static/css/tokens.css). */
+  --bg:        var(--surface-paper);
+  --border:    var(--line-1);
+  --text:      var(--ink-1);
+  --text-3:    var(--ink-3);
+  --red:       var(--danger);
+  --font-ui:   var(--font-sans);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }

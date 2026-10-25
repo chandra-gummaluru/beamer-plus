@@ -111,7 +111,7 @@ function openStartDialog() {
     if (!navigator.mediaDevices?.getDisplayMedia || typeof MediaRecorder === 'undefined') {
         window.BeamerModal?.show({
             kind: 'error',
-            title: 'Recording not available',
+            title: 'Recording Not Available',
             message: window.isSecureContext
                 ? 'This browser cannot record the screen. Use a recent Chrome, Edge or Firefox.'
                 : 'Screen recording needs a secure (https://) connection. Open Beamer+ through the https:// address the launcher prints.',
@@ -131,7 +131,7 @@ function openStartDialog() {
         </label>
         <label class="slide-setting">
             <span class="slide-setting-text">
-                <span class="slide-setting-name">Computer sound</span>
+                <span class="slide-setting-name">Computer Sound</span>
                 <span class="slide-setting-desc">Videos, audio clips and widgets</span>
             </span>
             <input type="checkbox" class="editor-switch" role="switch" id="rec-opt-sound">
@@ -161,7 +161,7 @@ function openStartDialog() {
             { label: 'Cancel', kind: 'cancel' },
             // Called straight from the click so the share picker still has
             // the user gesture it requires.
-            { label: 'Start recording', kind: 'ok', onClick: () => {
+            { label: 'Start Recording', kind: 'ok', onClick: () => {
                 const o = read();
                 savePrefs(o);
                 startRecording(o);
@@ -217,7 +217,7 @@ async function startRecording({ mic, sound }) {
         stopTracks(display);
         window.BeamerModal?.show({
             kind: 'warning',
-            title: 'Choose this tab',
+            title: 'Choose This Tab',
             message: 'Beamer+ records only its own tab. Start again and pick this tab when your browser asks.',
         });
         return;
@@ -521,11 +521,11 @@ function confirmNoMic(err) {
         const done = (v) => { if (!answered) { answered = true; resolve(v); } };
         window.BeamerModal?.show({
             kind: 'warning',
-            title: 'Microphone unavailable',
+            title: 'Microphone Unavailable',
             message: `${err?.name === 'NotAllowedError' ? 'Microphone access was blocked.' : 'No microphone could be opened.'} Record without your voice?`,
             buttons: [
                 { label: 'Cancel', kind: 'cancel', onClick: () => done(false) },
-                { label: 'Record without microphone', kind: 'ok', onClick: () => done(true) },
+                { label: 'Record Without Microphone', kind: 'ok', onClick: () => done(true) },
             ],
             canClose: () => { done(false); return true; },
         });

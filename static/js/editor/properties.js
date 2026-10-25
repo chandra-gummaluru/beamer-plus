@@ -317,7 +317,7 @@ const ITEM_ICONS = {
 };
 const KIND_LABELS = { widgets: 'Widget', videos: 'Video', audios: 'Audio', models: '3D Model', reveals: 'Reveal Box' };
 const GRIP = '<svg class="slide-item-grip" width="10" height="16" viewBox="0 0 10 16" fill="currentColor" aria-hidden="true"><circle cx="2.5" cy="3" r="1.4"/><circle cx="7.5" cy="3" r="1.4"/><circle cx="2.5" cy="8" r="1.4"/><circle cx="7.5" cy="8" r="1.4"/><circle cx="2.5" cy="13" r="1.4"/><circle cx="7.5" cy="13" r="1.4"/></svg>';
-const CHEVRON = '<svg class="slide-item-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
+const CHEVRON = '<svg class="slide-item-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
 
 /** What a thing on the slide is called in the list and the panel header. */
 function itemName(arrKey, item, index) {
@@ -366,7 +366,7 @@ export function refreshSlideItems() {
         row.title = `Edit ${name}`;
         row.innerHTML = `
             ${entries.length > 1 ? GRIP : ''}
-            <span class="slide-item-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ITEM_ICONS[arrKey]}</svg></span>
+            <span class="slide-item-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ITEM_ICONS[arrKey]}</svg></span>
             <span class="slide-item-text">
                 <span class="slide-item-name"></span>
                 <span class="slide-item-kind"></span>

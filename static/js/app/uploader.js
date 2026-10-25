@@ -35,7 +35,7 @@ export function openPresentationFile(file) {
     if (!kind) {
         window.BeamerModal?.show({
             kind: 'error',
-            title: 'Can’t open that file',
+            title: 'Can’t Open That File',
             message: `“${file?.name || 'This file'}” isn’t a PDF or a Beamer+ ZIP.`,
         });
         return;
