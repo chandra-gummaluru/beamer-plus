@@ -26,9 +26,6 @@ input[type=file] { display: none; }
 
 button { font-family: inherit; }
 
-/* Numerals — tabular for timer, slide numbers */
-.tabular { font-variant-numeric: tabular-nums; }
-
 /* Focus rings — accent ink blue */
 *:focus-visible {
     outline: 2px solid var(--accent);
@@ -48,10 +45,6 @@ button { font-family: inherit; }
     border-radius: var(--r-pill);
 }
 *::-webkit-scrollbar-thumb:hover { background: var(--ink-3); }
-
-/* Hide scrollbars on slide nav (intentional) */
-.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
-.no-scrollbar::-webkit-scrollbar { display: none; }
 
 /* Headings */
 h1, h2, h3, h4 {

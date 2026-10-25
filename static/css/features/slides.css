@@ -12,8 +12,7 @@
     background: var(--surface-stage);
 }
 
-#pdf-container,
-#viewer-container {
+#pdf-container {
     width: 100%;
     height: 100%;
     position: relative;
@@ -64,7 +63,6 @@ body.split-view-active #pdf-container-2 { display: flex; padding: var(--sp-3); m
    two read as a pair — is worked out by sizeSlideCanvases (--slide-x/-y). */
 body.split-view-active #pdf-container   { flex: 0 0 calc((100% - 8px) * var(--split-left, 0.5)); }
 body.split-view-active #pdf-container-2 { flex: 1 1 0; }
-
 
 #split-view-divider {
     display: none;
@@ -311,36 +309,6 @@ model-viewer { pointer-events: auto !important; }
     gap: var(--sp-2);
 }
 
-/* Nav action bars (top/bottom) */
-#slide-nav-top-actions,
-#slide-nav-bottom-actions {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 100%;
-    flex-shrink: 0;
-    background: var(--surface-cream);
-    padding: var(--sp-3) var(--sp-2);
-    gap: var(--sp-2);
-}
-#slide-nav-top-actions {
-    position: sticky; top: 0; z-index: 30;
-    border-bottom: var(--line-hairline);
-}
-#slide-nav-bottom-actions {
-    position: sticky; bottom: 0; z-index: 30;
-    margin-top: auto;
-    border-top: var(--line-hairline);
-}
-
-#slide-nav-top-actions .btn,
-#slide-nav-bottom-actions .btn {
-    width: calc(100% - 8px);
-    padding: 0 var(--sp-2);
-    font-size: var(--fs-sm);
-    min-height: var(--hit-min);
-}
-
 /* Slide thumbnail card */
 .slide-nav-item {
     flex-shrink: 0;
@@ -542,10 +510,6 @@ body.edit-mode .view-preview-sep { background: oklch(62% 0.09 200 / 0.5); }
     pointer-events: none;
 }
 
-/* Hide label when preview is present */
-.slide-nav-label { display: inline; }
-.slide-preview ~ .slide-nav-label { display: none; }
-
 /* ============================================================
    Bookmarks
    ============================================================ */
@@ -573,61 +537,6 @@ body.edit-mode .view-preview-sep { background: oklch(62% 0.09 200 / 0.5); }
 .slide-nav-item.active.bookmarked {
     box-shadow: 0 0 0 2px var(--bookmark), var(--shadow-2);
 }
-.slide-nav-item.bookmarked .slide-nav-label::after {
-    content: '★';
-    margin-left: 4px;
-    font-size: 0.85em;
-    color: var(--bookmark-ink);
-}
-
-/* Bookmark preview tooltip */
-#bookmark-tooltip {
-    position: fixed;
-    z-index: 600;
-    width: 200px;
-    min-height: 140px;
-    background: var(--surface-paper);
-    color: var(--ink-1);
-    border: var(--line-soft);
-    border-radius: var(--r-md);
-    box-shadow: var(--shadow-pop);
-    padding: var(--sp-2);
-    pointer-events: none;
-    transform: translateY(-50%);
-    box-sizing: border-box;
-    display: none;
-    font-family: var(--font-sans);
-}
-.slide-preview-tooltip-title {
-    font-family: var(--font-serif);
-    font-size: var(--fs-sm);
-    font-weight: 600;
-    color: var(--ink-1);
-    margin-bottom: var(--sp-2);
-    text-align: center;
-}
-.slide-preview-tooltip-body {
-    width: 100%;
-    aspect-ratio: 4 / 3;
-    background: #fff;
-    border: var(--line-hairline);
-    border-radius: var(--r-sm);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-}
-.slide-preview-tooltip-body img { width: 100%; height: 100%; object-fit: contain; }
-.slide-preview-tooltip-label,
-.slide-preview-tooltip-widget {
-    padding: var(--sp-3);
-    text-align: center;
-    font-size: var(--fs-sm);
-    line-height: 1.3;
-    font-weight: 500;
-    color: var(--ink-2);
-}
-.slide-preview-tooltip-widget { background: var(--accent-soft); color: var(--accent-strong); }
 
 /* ============================================================
    Split-view nav (horizontal at bottom)
@@ -677,28 +586,6 @@ body.split-view-active #slide-navigator .slide-nav-child {
     height: 53px;
 }
 
-body.split-view-active #slide-nav-top-actions,
-body.split-view-active #slide-nav-bottom-actions {
-    position: relative;
-    width: auto;
-    flex-direction: row;
-    height: 100%;
-    flex: 0 0 auto;
-    padding: 0 var(--sp-2);
-    background: transparent;
-    border: none;
-}
-body.split-view-active #slide-nav-top-actions { border-right: var(--line-hairline); }
-body.split-view-active #slide-nav-bottom-actions { border-left: var(--line-hairline); }
-
-body.split-view-active #slide-nav-top-actions .btn,
-body.split-view-active #slide-nav-bottom-actions .btn {
-    width: var(--hit-min);
-    min-width: var(--hit-min);
-    height: 50px;
-    padding: 0;
-}
-
 body.split-view-active #bookmark-pins {
     flex-direction: row;
     align-items: center;
@@ -731,7 +618,6 @@ body.split-view-active #bookmark-pins {
 
 .slide-split-zone--left  { left: 0;  border-right: 1px solid oklch(60% 0.005 260 / 0.2); border-radius: 0; }
 .slide-split-zone--right { right: 0; border-radius: 0; }
-
 
 /* ── Show in split view ─────────────────────────────────────── */
 body.split-view-active .slide-split-zone { display: block; }
@@ -788,13 +674,6 @@ body.edit-mode .slide-nav-item.is-hidden-slide:not(.active) {
     border-style: dashed;
     border-color: var(--ink-3);
 }
-body.edit-mode .slide-nav-item.is-hidden-slide .slide-nav-label::after {
-    content: '◌';
-    margin-left: 4px;
-    font-size: 0.8em;
-    color: var(--ink-3);
-    vertical-align: middle;
-}
 
 /* ============================================================
    Mobile / tablet — slide nav as bottom drawer
@@ -829,25 +708,7 @@ body.edit-mode .slide-nav-item.is-hidden-slide .slide-nav-label::after {
         margin: 0;
         height: 60px;
     }
-    #slide-nav-top-actions,
-    #slide-nav-bottom-actions {
-        position: relative;
-        flex-direction: row;
-        width: auto;
-        height: 100%;
-        padding: 0 var(--sp-2);
-        background: transparent;
-        border: none;
-    }
-    #slide-nav-top-actions { border-right: var(--line-hairline); }
-    #slide-nav-bottom-actions { border-left: var(--line-hairline); }
-    #slide-nav-top-actions .btn,
-    #slide-nav-bottom-actions .btn {
-        width: var(--hit-min);
-        min-width: var(--hit-min);
-        height: 56px;
-        padding: 0;
-    }
+
     #bookmark-pins {
         flex-direction: row;
         width: auto;
@@ -921,21 +782,7 @@ body.edit-mode .slide-nav-item.is-hidden-slide .slide-nav-label::after {
         aspect-ratio: 4 / 3;
         margin: 0 var(--sp-5);
     }
-    body:not(.split-view-active) #slide-nav-top-actions,
-    body:not(.split-view-active) #slide-nav-bottom-actions {
-        flex-direction: column;
-        width: 100%;
-        height: auto;
-        padding: var(--sp-3) var(--sp-2);
-    }
-    body:not(.split-view-active) #slide-nav-top-actions { border-right: none; border-bottom: var(--line-hairline); }
-    body:not(.split-view-active) #slide-nav-bottom-actions { border-left: none; border-top: var(--line-hairline); }
-    body:not(.split-view-active) #slide-nav-top-actions .btn,
-    body:not(.split-view-active) #slide-nav-bottom-actions .btn {
-        width: calc(100% - 8px);
-        height: auto;
-        min-height: var(--hit-min);
-    }
+
     body:not(.split-view-active) #bookmark-pins {
         flex-direction: column;
         width: 100%;
@@ -951,41 +798,6 @@ body.edit-mode .slide-nav-item.is-hidden-slide .slide-nav-label::after {
     body:not(.split-view-active) #floating-annotation-toolbar {
         bottom: var(--sp-3);
     }
-}
-
-/* ============================================================
-   Add-slide split button — left half inserts a blank slide,
-   right half duplicates the slide on stage.
-   ============================================================ */
-.btn-split {
-    display: flex;
-    width: calc(100% - 8px);
-}
-.btn-split > .btn {
-    flex: 1 1 0;
-    min-width: 0;
-}
-#slide-nav-bottom-actions .btn-split > .btn {
-    width: auto;
-}
-.btn-split > .btn:first-child {
-    border-top-right-radius: 0;
-    border-bottom-right-radius: 0;
-}
-.btn-split > .btn:last-child {
-    border-top-left-radius: 0;
-    border-bottom-left-radius: 0;
-    margin-left: -1px;   /* share the seam rather than doubling it */
-}
-.btn-split > .btn:hover { position: relative; z-index: 1; }
-
-/* In the horizontal (bottom-bar) navigator the pair sits side by side at
-   normal button width. */
-body.split-view-active .btn-split { width: auto; height: 100%; align-items: center; }
-body.split-view-active #slide-nav-bottom-actions .btn-split > .btn { flex: 0 0 auto; }
-@media (max-width: 1024px) {
-    .btn-split { width: auto; height: 100%; align-items: center; }
-    #slide-nav-bottom-actions .btn-split > .btn { flex: 0 0 auto; }
 }
 
 /* ============================================================
@@ -1168,7 +980,6 @@ body.slide-muted #mute-overlay {
 body.edit-mode #mute-overlay { display: none; }
 /* The text tool lifts the ink canvas high above the slide; not while muted. */
 body.slide-muted #ann-canvas, body.slide-muted #ann-canvas-2 { z-index: 2 !important; }
-
 
 /* ============================================================
    Add page chooser (slides/structure.js openAddPageModal)

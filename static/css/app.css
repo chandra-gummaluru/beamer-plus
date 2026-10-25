@@ -8,16 +8,12 @@
 
 @import url('./components/button.css');
 @import url('./components/modal.css');
-@import url('./components/timer.css');
-@import url('./components/toggle.css');
-@import url('./components/selector.css');
 
 @import url('./features/slides.css');
 @import url('./features/annotations.css');
 @import url('./editor.css');
 @import url('./features/top-bar.css');
 @import url('./features/splash.css');
-@import url('./features/shortcuts.css');
 @import url('./features/tour.css');
 @import url('./features/recorder.css');
 @import url('./features/library.css');

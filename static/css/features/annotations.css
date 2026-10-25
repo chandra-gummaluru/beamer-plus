@@ -158,54 +158,6 @@ body.split-view-active #annotation-stage-actions {
 }
 
 /* ============================================================
-   Shape sidebar (line/rect/circle/triangle)
-   Slides out next to the main toolbar when shape mode active.
-   ============================================================ */
-#shape-sidebar {
-    display: none;
-    flex-direction: column;
-    gap: var(--sp-1);
-    padding: var(--sp-2);
-    background: oklch(99% 0.003 80 / 0.86);
-    backdrop-filter: blur(12px) saturate(1.4);
-    -webkit-backdrop-filter: blur(12px) saturate(1.4);
-    border: var(--line-hairline);
-    border-radius: var(--r-lg);
-    box-shadow: var(--shadow-3);
-    position: fixed;
-    top: 50%;
-    right: calc(var(--toolbar-w) + var(--sp-3));
-    transform: translateY(-50%);
-    z-index: 229;
-    align-items: stretch;
-}
-
-#shape-sidebar .btn {
-    width: var(--hit-min);
-    height: var(--hit-min);
-    padding: 0;
-    border-color: transparent;
-    background: transparent;
-    border-radius: var(--r-md);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-#shape-sidebar .btn:hover {
-    background: var(--surface-cream-2);
-    border-color: oklch(82% 0.005 260);
-}
-
-#shape-sidebar .btn.btn_selected {
-    background: var(--accent);
-    color: var(--ink-on-accent);
-    border-color: var(--accent-strong);
-}
-
-#shape-sidebar svg { color: currentColor; }
-
-/* ============================================================
    Text-size sidebar (small / regular / large dots)
    Slides out next to the main toolbar when the text tool is active —
    same flyout treatment as the shape sidebar.
@@ -447,7 +399,6 @@ body.text-tool-active #ann-canvas-2 {
 .text-annotation-drag-handle:active { cursor: grabbing; }
 .text-annotation-drag-handle svg { width: 14px; height: 9px; }
 
-
 .text-annotation-editor {
     display: block;
     min-width: 120px;
@@ -573,15 +524,6 @@ body.magnify-lens-on #main-content { cursor: none; }
         padding-left: var(--sp-2);
         margin-left: var(--sp-1);
     }
-    #shape-sidebar {
-        top: auto;
-        bottom: calc(100px + var(--sp-3) + var(--hit-min) + var(--sp-3) + 8px);
-        right: 50%;
-        transform: translateX(50%);
-        flex-direction: row;
-    }
+
 }
 
-/* Ensure annotation panel toggle (legacy) stays hidden — we use the unified rail now */
-#annotation-panel-toggle,
-#floating-annotation-panel { display: none !important; }

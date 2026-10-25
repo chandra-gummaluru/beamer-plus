@@ -314,7 +314,6 @@ body.is-busy .welcome-btn:disabled {
     background: var(--surface-cream-2);
 }
 
-
 .welcome-hint {
     font-size: var(--fs-sm);
     color: var(--ink-3);

@@ -6,8 +6,7 @@
    - Press: subtle 1px depth
    ============================================================ */
 
-.btn,
-.btn_view_only {
+.btn {
     --_bg: var(--surface-paper);
     --_fg: var(--ink-1);
     --_bd: oklch(82% 0.005 260);

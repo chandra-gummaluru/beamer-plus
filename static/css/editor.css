@@ -17,7 +17,6 @@
 
 body.edit-mode #top-right-controls      { display: none !important; }
 body.edit-mode #floating-annotation-toolbar { display: none !important; }
-body.edit-mode #shape-sidebar               { display: none !important; }
 
 /* The panel takes its width from the stage, and the insert toolbar its
    height from the top of it. */
@@ -25,17 +24,11 @@ body.edit-mode #main-content {
     padding-right: var(--editor-panel-width);
 }
 body.edit-mode:not(.split-view-active) #pdf-container { padding-top: 64px; }
-/* A split view has nothing to add to: no insert toolbar while one is open. */
-/* A split view keeps the toolbar, with only its eye and trash live: they
-   act on the split view itself (editor.js _updateAddMediaButtons). */
-
-
 /* Hide actual media elements — only edit overlay boxes are shown */
 body.edit-mode #pdf-canvas video,
 body.edit-mode #pdf-canvas audio,
 body.edit-mode #pdf-canvas model-viewer,
 body.edit-mode #pdf-canvas .widget-iframe { display: none !important; }
-
 
 /* ─── Editor panel ────────────────────────────────────────────── */
 
@@ -138,14 +131,6 @@ body.edit-mode #editor-panel { display: flex; }
     background: var(--surface-cream-2);
 }
 
-/* Points at where the rest of a widget's configuration lives. */
-.editor-prop-hint {
-    font-size: var(--fs-xs);
-    line-height: 1.45;
-    color: var(--ink-3);
-    font-family: var(--font-sans);
-}
-
 /* Vertical rhythm between property rows — without this, an input sits flush
    against the next field's header. */
 #editor-properties-body {
@@ -170,20 +155,6 @@ body.edit-mode #editor-panel { display: flex; }
     display: flex;
     align-items: center;
     gap: var(--sp-1);
-}
-
-.editor-prop-label-note {
-    font-weight: 400;
-    text-transform: none;
-    letter-spacing: 0;
-    color: var(--ink-4);
-    font-size: 10px;
-}
-
-.editor-prop-row-2col {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--sp-2);
 }
 
 .editor-prop-input,
@@ -211,44 +182,6 @@ body.edit-mode #editor-panel { display: flex; }
     cursor: default;
 }
 
-/* ─── Widget's own declared fields ────────────────────────────── */
-/* Rendered from the widget's `widget-schema` block (editor/widget-schema.js),
-   below the geometry rows the editor owns. */
-
-/* The widget's fields are one child of #editor-properties-body, so they need
-   their own copy of its column rhythm — otherwise every row sits flush. */
-#widget-fields {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-4);
-}
-
-.editor-prop-divider {
-    height: 1px;
-    background: oklch(88% 0.004 260);
-    margin: 0;
-}
-.editor-prop-section {
-    font-size: var(--fs-xs);
-    font-weight: 600;
-    color: var(--ink-2);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-family: var(--font-sans);
-}
-
-.editor-prop-row--type-header { gap: var(--sp-2); }
-
-.editor-prop-type-badge {
-    align-self: flex-start;
-    padding: 2px var(--sp-2);
-    font-size: var(--fs-xs);
-    font-family: var(--font-sans);
-    color: var(--ink-2);
-    background: var(--surface-cream-2);
-    border: 1px solid oklch(88% 0.004 260);
-    border-radius: var(--r-pill);
-}
 /* An on/off setting: a row shaped like the inputs around it, label on the
    left and the editor's switch on the right (as "Hide in presentation"). */
 .editor-prop-checkbox-row {
@@ -314,7 +247,6 @@ body.edit-mode #editor-panel { display: flex; }
     color: var(--text-3);
 }
 
-
 /* ─── Insert toolbar ───────────────────────────────────────────────
    Docked to the top edge of the stage while editing, the way the annotation
    toolbar docks to the right edge while presenting: the same glass surface,
@@ -362,7 +294,6 @@ body.edit-mode #editor-add-row { display: flex; }
 }
 .editor-icon-btn:disabled { opacity: 0.35; cursor: default; }
 .editor-icon-btn svg { width: 17px; height: 17px; pointer-events: none; }
-
 
 /* ─── Edit overlays on the slide ─────────────────────────────── */
 
@@ -536,18 +467,7 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 #editor-slide-items { display: flex; flex-direction: column; gap: var(--sp-2); }
 #editor-slide-items:empty { display: none; }   /* no stray gap under the settings */
 .slide-items { display: flex; flex-direction: column; gap: 6px; }
-.slide-items-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--sp-2);
-    padding: var(--sp-2) 2px 0;
-    font-family: var(--font-sans);
-    font-size: var(--fs-xs);
-    font-weight: 600;
-    color: var(--ink-2);
-}
-.slide-items-hint { font-weight: 400; color: var(--ink-3); }
+
 /* Rows reorder by dragging: a grip on the left, a line where it will land. */
 .slide-item[draggable="true"] { cursor: grab; position: relative; }
 .slide-item.is-dragging { opacity: 0.45; }
@@ -589,25 +509,6 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
     text-overflow: ellipsis;
 }
 .slide-item-kind { font-size: var(--fs-xs); color: var(--ink-3); }
-.slide-item-btn {
-    flex: 0 0 auto;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    padding: 0;
-    background: none;
-    border: 1px solid transparent;
-    border-radius: var(--r-sm);
-    color: var(--ink-3);
-    cursor: pointer;
-    transition: color var(--dur-fast), background var(--dur-fast), border-color var(--dur-fast);
-}
-.slide-item-edit:hover { color: var(--ink-1); background: var(--surface-cream-2); border-color: oklch(86% 0.005 260); }
-.slide-item-delete:hover { color: var(--danger); background: oklch(from var(--danger) l c h / 0.08); }
-.slide-item-delete.is-armed { color: #fff; background: var(--danger); border-color: var(--danger); }
-.slide-item-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 /* The box a hovered list row refers to, or whose settings are open. */
 .edit-overlay.is-hinted,
@@ -616,7 +517,6 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
     background: oklch(45% 0.005 260 / 0.18);
     box-shadow: 0 0 0 3px oklch(45% 0.005 260 / 0.25);
 }
-
 
 /* Groups ("section" in the schema). */
 .wf { display: flex; flex-direction: column; gap: var(--sp-5); }
@@ -779,7 +679,6 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 
 /* The panel title is the widget's name — keep a long one to one line. */
 #editor-panel-title { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
 
 /* Sections, not cards: the widget's own groups, then Layout, straight on
    the panel, each under its heading. */
@@ -1123,31 +1022,6 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 }
 #editor-view-body .wf-group { gap: 10px; margin-top: 4px; }
 
-.editor-flow-range {
-    width: 100%;
-    height: 3px;
-    cursor: pointer;
-    accent-color: var(--accent);
-    display: block;
-    margin-top: var(--sp-2);
-    border-radius: 2px;
-}
-
-.editor-flow-range-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.editor-flow-range-val {
-    font-size: var(--fs-xs);
-    color: var(--ink-2);
-    font-family: var(--font-sans);
-    font-weight: 500;
-    min-width: 28px;
-    text-align: right;
-}
-
 /* ─── Mobile ─────────────────────────────────────────────────── */
 
 @media (max-width: 1024px) {
@@ -1191,55 +1065,16 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
         oklch(45% 0.005 260 / 0.18) 0 8px,
         oklch(45% 0.005 260 / 0.07) 8px 16px); }
 
-/* Slide title field in Slide Properties. */
-.slide-setting--title { cursor: text; }
-.slide-setting--title .slide-setting-name { flex: 0 0 auto; }
-.slide-title-input {
-    flex: 1 1 auto;
-    min-width: 0;
-    border: none;
-    outline: none;
-    background: transparent;
-    text-align: right;
-    font: inherit;
-    font-size: var(--fs-sm);
-    color: var(--ink-1);
-    padding: 0;
-}
-
 /* Blank-slide paper settings: the same rows as the settings above. */
 #slide-paper-settings, #paper-options { display: flex; flex-direction: column; gap: var(--sp-3); }
 #slide-paper-settings[hidden], #paper-options[hidden] { display: none; }
 .slide-setting > .slide-setting-name { flex: 1 1 auto; }
 .slide-setting > .slide-setting-name { min-width: 0; }
-/* Our own chevron rather than the native control's: the native arrow and
-   padding vary by platform and were clipping the chosen value. */
-.slide-setting-select {
-    flex: 0 0 auto;
-    appearance: none;
-    -webkit-appearance: none;
-    min-width: 0;
-    max-width: 60%;
-    margin: 0;
-    padding: 2px 20px 2px 6px;
-    border: none;
-    border-radius: var(--r-sm);
-    background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23555' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 4px center;
-    font: inherit;
-    font-size: var(--fs-sm);
-    line-height: 1.4;
-    color: var(--ink-1);
-    text-overflow: ellipsis;
-    cursor: pointer;
-}
-.slide-setting-select:hover { background-color: var(--surface-cream-2); }
-.slide-setting-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 /* The % sits where the spinner would — no spinner in these. */
 .wp-num input::-webkit-outer-spin-button,
 .wp-num input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .wp-num input { -moz-appearance: textfield; appearance: textfield; }
-
 
 /* ─── Expand: a long text field in a large editor (widget-fields.js) ── */
 .wf-expand-wrap { position: relative; }
@@ -1321,7 +1156,6 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 }
 .wf-xe-input.is-mono { font-family: var(--wf-mono, ui-monospace, monospace); font-size: 14px; }
 @media (prefers-reduced-motion: reduce) { .wf-xe-overlay { transition: none; } }
-
 
 /* ─── View slide: the split picker (editor/view-config.js) ──────── */
 /* The two panes drawn to scale; drag anywhere on it to move the line. */
@@ -1703,7 +1537,6 @@ body.wsheet-open #main-content { padding-right: 408px; }
     letter-spacing: 0;
     color: var(--ink-1);
 }
-.wsheet .editor-prop-label-note { font-size: var(--fs-xs); color: var(--ink-3); }
 
 /* Every control: same height, same border, same focus ring. */
 .wsheet .editor-prop-input,
@@ -2064,9 +1897,6 @@ body.wsheet-open #main-content { padding-right: 408px; }
     font-weight: 500;
     color: var(--ink-1);
 }
-.editor-switch-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.editor-switch-name { font-size: var(--fs-sm); font-weight: 500; color: var(--ink-1); }
-.editor-switch-desc { font-size: var(--fs-xs); font-weight: 400; color: var(--ink-3); line-height: 1.4; }
 
 /* ── Choices of two or three, and Text size ── */
 #editor-panel .wf-seg,

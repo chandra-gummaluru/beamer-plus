@@ -25,9 +25,6 @@
 }
 #top-right-controls .btn:disabled { opacity: 0.4; cursor: default; }
 
-/* Top-controls panel (legacy hidden) */
-#top-controls-panel { display: none; }
-
 body.split-view-active #top-right-controls {
     top: var(--sp-2);
 }
@@ -41,16 +38,11 @@ body.focus-mode #top-right-controls {
     display: none !important;
 }
 
-body.focus-mode #focus-mode-btn i {
-    /* swap icon to compress/exit when active */
-}
-
 body.focus-mode #main-content {
     margin-left: 0 !important;
     padding-right: 0 !important;
     width: 100vw !important;
 }
-
 
 @media (max-width: 1024px) {
     #top-right-controls {

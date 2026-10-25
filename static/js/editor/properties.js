@@ -417,8 +417,6 @@ function wireReorder(list) {
     for (const row of rows()) {
         row.draggable = true;
         row.addEventListener('dragstart', (e) => {
-            // Not from the Edit / Delete buttons.
-            if (e.target.closest?.('.slide-item-btn')) { e.preventDefault(); return; }
             dragged = row;
             row.classList.add('is-dragging');
             e.dataTransfer.effectAllowed = 'move';
