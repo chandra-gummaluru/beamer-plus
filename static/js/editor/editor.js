@@ -45,6 +45,19 @@ export function initEditor(state) {
 
     document.getElementById('editor-done-btn')?.addEventListener('click', () => { if (ctx.state.editMode) exitEditMode(); });
 
+    // Typing a widget's name in the header: letters are the name, not slide
+    // shortcuts; Enter or Esc puts it down.
+    const titleEl = document.getElementById('editor-panel-title');
+    titleEl?.addEventListener('keydown', e => {
+        if (titleEl.readOnly) return;
+        e.stopPropagation();
+        if (e.key === 'Enter' || e.key === 'Escape') titleEl.blur();
+    });
+    titleEl?.addEventListener('blur', () => {
+        // Show the fallback name again if it was cleared.
+        if (!titleEl.readOnly && !titleEl.value.trim()) titleEl.value = '';
+    });
+
     document.getElementById('slide-shown-toggle')?.addEventListener('change', e => {
         const obj = ctx.state?.slideStructure?.[ctx.state?.currentSlide];
         if (!obj) return;

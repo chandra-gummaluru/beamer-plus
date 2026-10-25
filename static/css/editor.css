@@ -25,6 +25,9 @@ body.edit-mode #main-content {
     padding-right: var(--editor-panel-width);
 }
 body.edit-mode:not(.split-view-active) #pdf-container { padding-top: 64px; }
+/* A split view has nothing to add to: no insert toolbar while one is open. */
+#editor-panel[data-mode="view"] ~ #editor-add-row,
+body.edit-mode.split-view-active #editor-add-row { display: none; }
 
 
 /* Hide actual media elements — only edit overlay boxes are shown */
@@ -1840,16 +1843,35 @@ body.wsheet-open #main-content { padding-right: 408px; }
 }
 #editor-panel-kicker[hidden] { display: none; }
 #editor-panel-title {
+    width: 100%;
+    min-width: 0;
+    margin: 0 0 0 -6px;
+    padding: 1px 6px;
+    border: 1px solid transparent;
+    border-radius: var(--r-sm);
+    background: transparent;
+    outline: none;
     font-family: var(--font-serif);
     font-size: 20px;
     font-weight: 500;
     line-height: 1.15;
     letter-spacing: -0.01em;
     color: var(--ink-1);
-    white-space: nowrap;
-    overflow: hidden;
     text-overflow: ellipsis;
+    cursor: default;
+    pointer-events: none;
 }
+/* A widget's name: renamed in place. A box shows on hover, a pencil hints. */
+#editor-panel-title.is-editable { cursor: text; pointer-events: auto; }
+#editor-panel-title.is-editable:hover { border-color: oklch(86% 0.004 260); background: var(--surface-paper); }
+#editor-panel-title.is-editable:focus {
+    border-color: var(--ink-2);
+    background: #fff;
+    box-shadow: 0 0 0 3px oklch(45% 0.005 260 / 0.10);
+    text-overflow: clip;
+}
+#editor-panel-title::placeholder { color: var(--ink-1); opacity: 1; }
+#editor-panel-title.is-editable:focus::placeholder { color: var(--ink-4); }
 /* The slide's header reads name first, what it is under it. */
 #editor-panel[data-mode="slide"] #editor-panel-kicker { order: 1; }
 .editor-done-btn {

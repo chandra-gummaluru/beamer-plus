@@ -9,7 +9,7 @@
 // `widget-schema` block — see widget-schema.js): selected by clicking it on
 // the slide, by Edit in the slide's item list, and straight after adding it.
 import { ctx, getSlideEl, getOrCreateConfig, escAttr, setPanelMode, setPanelTitle,
-         resolvePanelMode, slideName } from './context.js';
+         resolvePanelMode, slideName, setTitleEditable } from './context.js';
 import { cleanupEditOverlays, renderEditOverlays, positionOverlay, selectOverlayEl, overlayLabel, syncWidgetLock } from './overlays.js';
 import { WIDGET_LABELS } from './widget-picker.js';
 import { getWidgetSchema } from './widget-schema.js';
@@ -236,6 +236,18 @@ async function showWidgetPanel(index) {
     if (!item) return;
     setPanelMode('widget', item.title || widgetTypeLabel(item), `${slideName()} · ${widgetTypeLabel(item)}`);
     setRemoveLabel('Remove Widget');
+    // Its name is the header: click it and type. Empty falls back to the
+    // widget's own label, as a placeholder.
+    setTitleEditable(item, {
+        placeholder: widgetTypeLabel(item),
+        onRename: (value) => {
+            const v = value.trim();
+            if (v) item.title = v; else delete item.title;
+            const name = item.title || widgetTypeLabel(item);
+            const label = document.querySelector(`.edit-overlay[data-arr-key="widgets"][data-item-index="${index}"] .edit-overlay-label`);
+            if (label) label.textContent = overlayLabel('widgets', item, name);
+        },
+    });
     // Pressing on the same widget again (to drag it) keeps what's typed.
     if (_widgetShown?.item === item) return;
     const token = ++_widgetToken;

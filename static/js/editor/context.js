@@ -36,9 +36,29 @@ const PANEL_TITLES = {
 export function setPanelMode(mode, title, kicker = '') {
     const panel = document.getElementById('editor-panel');
     if (panel) panel.dataset.mode = mode;
+    // Only a widget's name is edited in the header; widget mode turns it on
+    // (properties.js), every other mode turns it off again.
+    if (mode !== 'widget') setTitleEditable(null);
     // The slide names itself: "Slide 10", over what it is.
     if (mode === 'slide' && title === undefined) { title = slideName(); kicker = slideKind(); }
     setPanelTitle(title ?? PANEL_TITLES[mode] ?? 'Edit Presentation', kicker);
+}
+
+/**
+ * Make the header's name editable for `item` (a widget's config item), or
+ * read-only again with null. `onRename(name)` runs on every keystroke.
+ */
+export function setTitleEditable(item, { placeholder = '', onRename } = {}) {
+    const el = document.getElementById('editor-panel-title');
+    if (!el) return;
+    const on = !!item;
+    el.readOnly = !on;
+    el.tabIndex = on ? 0 : -1;
+    el.placeholder = on ? placeholder : '';
+    el.classList.toggle('is-editable', on);
+    el.title = on ? 'Click to rename' : el.value;
+    el.oninput = on ? () => onRename?.(el.value) : null;
+    if (on && document.activeElement !== el) el.value = item.title || '';
 }
 
 /** "Slide 10" — the current slide, by its navigator label. */
@@ -59,7 +79,8 @@ function slideKind(i = ctx.state?.currentSlide) {
 
 export function setPanelTitle(title, kicker) {
     const el = document.getElementById('editor-panel-title');
-    if (el) el.textContent = title;
+    // Leave a name being typed alone.
+    if (el && document.activeElement !== el) { el.value = title; el.title = title; }
     if (kicker === undefined) return;
     const k = document.getElementById('editor-panel-kicker');
     if (k) { k.textContent = kicker; k.hidden = !kicker; }

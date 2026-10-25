@@ -55,6 +55,10 @@ body.split-view-active #main-content {
    hold the pane open and squeeze the other one while the split is measured. */
 body.split-view-active #pdf-container { padding: var(--sp-3); min-width: 0; }
 body.split-view-active #pdf-container-2 { display: flex; padding: var(--sp-3); min-width: 0; }
+/* Each slide sits against the divider, so the two read as a pair instead of
+   floating in the middle of panes of different widths. */
+body.split-view-active #pdf-container   { justify-content: flex-end; }
+body.split-view-active #pdf-container-2 { justify-content: flex-start; }
 
 
 #split-view-divider {

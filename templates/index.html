@@ -239,7 +239,8 @@
             </button>
             <div class="editor-panel-titles">
                 <span id="editor-panel-kicker"></span>
-                <span id="editor-panel-title">Slide</span>
+                <!-- An input: a selected widget is renamed right here (properties.js). -->
+                <input id="editor-panel-title" type="text" value="Slide" readonly tabindex="-1" autocomplete="off" spellcheck="false" aria-label="Name">
             </div>
             <!-- Leaves edit mode (editor.js). -->
             <button class="btn editor-done-btn" id="editor-done-btn" type="button" title="Finish editing">

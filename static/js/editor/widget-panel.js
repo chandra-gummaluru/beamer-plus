@@ -31,7 +31,8 @@ export function renderWidgetPanel(host, item, schema, { onLayout, onName } = {})
     host.textContent = '';
     // The 'panel' variant puts Name and Text size first, under "General",
     // and the widget's own fields after it in their schema sections.
-    const form = buildWidgetForm(schema, item, 'panel');
+    // Its name is edited in the panel's header, so not here as well.
+    const form = buildWidgetForm({ ...schema, fields: (schema.fields || []).filter(f => f.key !== 'title') }, item, 'panel');
     const layout = buildLayoutCard(item, schema, () => onLayout?.());
     const general = form.commonNode;
     form.node.insertBefore(layout.node, general ? general.nextSibling : form.node.firstChild);
