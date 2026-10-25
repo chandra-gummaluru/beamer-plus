@@ -118,7 +118,7 @@ export function createPaperPicker({ get, set, onChange, onStyleDblClick } = {}) 
 
     function dots() {
         const row = document.createElement('div');
-        row.className = 'paper-row';
+        row.className = 'paper-row paper-row--inline';   // the dots to the right of the label
         row.innerHTML = `<span class="paper-label" id="${id}-color">Colour</span>
             <div class="paper-dots" role="radiogroup" aria-labelledby="${id}-color">
                 ${PAPER_COLORS.map(o => `<button type="button" class="paper-dot" role="radio" data-v="${o.v}"

@@ -1297,6 +1297,7 @@ body.slide-muted #ann-canvas, body.slide-muted #ann-canvas-2 { z-index: 2 !impor
    the split view's divider; colour as three dots.
    ============================================================ */
 .paper-row { display: flex; flex-direction: column; gap: 6px; }
+.paper-row--inline { flex-direction: row; align-items: center; justify-content: space-between; }
 .paper-label { font-family: var(--font-sans); font-size: var(--fs-sm); font-weight: 600; color: var(--ink-1); }
 .paper-options { display: flex; flex-direction: column; gap: var(--sp-4); }
 .paper-options[hidden] { display: none; }
