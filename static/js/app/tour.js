@@ -21,7 +21,7 @@ const STEPS = [
         sel:   '#top-right-controls',
         place: 'auto',
         title: 'Your session',
-        body:  'Open a presentation (a plain PDF, or a saved Beamer+ ZIP with its widgets and annotations) from a folder on this computer, edit it, save it, and close the session. You can also drop a file anywhere on the window.',
+        body:  'Edit the presentation, and close the session when you are done (it asks whether to save first). A new session starts by opening a presentation: a plain PDF, or a saved Beamer+ ZIP with its widgets and annotations, from a folder on this computer or dropped on the window.',
     },
     {
         sel:   '#slide-navigator',

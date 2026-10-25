@@ -1,5 +1,5 @@
 /* ============================================================
-    Top-right controls — Open, Edit, Save, Close session
+    Top-right controls — Edit, and Close session
    ============================================================ */
 
 #top-right-controls {
@@ -13,8 +13,10 @@
     gap: var(--sp-2);
 }
 
-/* The session's buttons (Open, Edit, Save, Close): square icon buttons,
-   same paper look as every other control (app/session-buttons.js). */
+/* The session's buttons (Edit, Close): square icon buttons, same paper
+   look as every other control (app/session-buttons.js). Edit shows once a
+   deck is open. */
+#top-right-controls .btn[hidden] { display: none; }
 #top-right-controls .btn {
     width: var(--hit-min);
     min-width: var(--hit-min);

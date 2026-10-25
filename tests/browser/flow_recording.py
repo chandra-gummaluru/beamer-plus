@@ -91,7 +91,8 @@ def run():
         shot = lambda n: page.screenshot(path=f"{OUT}/{n}.png")
         go = lambda name: (page.locator(".lib-files .lib-item", has_text=name).first.click(), page.wait_for_timeout(400))
         # No Save button (saving is part of Close session): open the Save window directly.
-        menu = lambda key: page.evaluate("() => import('/static/js/library/ui.js').then(m => m.savePresentation())") if key == "save" else page.click({"open": "#session-open-btn", "record": "#record-btn"}[key])
+        LIB = "() => import('/static/js/library/ui.js').then(m => m.{}())"
+        menu = lambda key: page.click("#record-btn") if key == "record" else page.evaluate(LIB.format("savePresentation" if key == "save" else "openPresentation"))
         folder = lambda: page.evaluate(FOLDER_LS)
 
         page.goto(BASE); page.wait_for_timeout(500)

@@ -49,12 +49,15 @@ def run():
         page.on("crash", lambda: print("PAGE CRASHED"))
         shot = lambda n: page.screenshot(path=f"{OUT}/{n}.png")
         go = lambda name: (page.locator(".lib-files .lib-item", has_text=name).first.click(), page.wait_for_timeout(400))
-        BTN = {"open": "#session-open-btn", "edit": "#session-edit-btn",
-               "end": "#session-close-btn", "record": "#record-btn"}
-        # No Save button: saving is part of Close session. The steps that
-        # save mid-session open the same Save window directly.
-        menu = lambda key: page.evaluate("() => import('/static/js/library/ui.js').then(m => m.savePresentation())") if key == "save" else page.click(BTN[key])
-        shown = lambda: [b for b in page.eval_on_selector_all("#top-right-controls button", "els => els.filter(e => !e.hidden).map(e => e.id)")]
+        BTN = {"edit": "#session-edit-btn", "end": "#session-close-btn", "record": "#record-btn"}
+        # No Open or Save button: a session starts with the Open window, and
+        # saving is part of Close session. The steps that open or save
+        # mid-session open the same windows directly.
+        LIB = "() => import('/static/js/library/ui.js').then(m => m.{}())"
+        menu = lambda key: (page.evaluate(LIB.format("savePresentation")) if key == "save"
+                            else page.evaluate(LIB.format("openPresentation")) if key == "open"
+                            else page.click(BTN[key]))
+        shown = lambda: page.eval_on_selector_all("#top-right-controls button", "els => els.filter(e => e.getClientRects().length).map(e => e.id)")
         sid = lambda: re.search(r"/s/([^/]+)/", page.url).group(1)
 
         # 1. The start page: New Session and Try Demo.
@@ -68,12 +71,18 @@ def run():
               and page.inner_text("#welcome-demo-btn").strip() == "Try Demo")
         check("…no Last Session, no GitHub", page.locator("#welcome-last-btn").count() == 0 and "GitHub" not in page.content())
 
-        # 2. New Session: Open and Close; nothing open yet.
-        page.click("#welcome-new-btn"); page.wait_for_url("**/s/**"); page.wait_for_timeout(2200)
+        # 2. New Session: the Open window comes up by itself and stays.
+        page.click("#welcome-new-btn"); page.wait_for_url("**/s/**")
+        page.wait_for_selector(".lib", timeout=8000); page.wait_for_timeout(300)
         first = sid()
-        shot("s02-buttons-empty")
+        shot("s02-open-required")
+        check("new session: the Open window comes up by itself", page.locator(".lib[data-mode=open]").count() == 1)
+        page.keyboard.press("Escape"); page.mouse.click(5, 5); page.wait_for_timeout(900)
+        check("…and stays (no ×, Escape and clicking outside don't close it)",
+              page.locator(".lib[data-mode=open]").count() == 1 and not page.locator(".custom-modal-x-btn").is_visible())
+        check("…with a way back to the start page", page.locator(".lib [data-leave]").count() == 1)
         print("   buttons:", shown())
-        check("top-right, nothing open: Open and Close session", shown() == ["session-open-btn", "session-close-btn"])
+        check("top-right, nothing open: Close session only", shown() == ["session-close-btn"])
         check("record button in the corner", page.locator("#record-btn").is_visible())
         check("empty slide: 'Nothing here yet…' and how to start", page.inner_text("#stage-empty .stage-empty-title").strip() == "Nothing here yet…"
               and "opening a presentation" in page.inner_text("#stage-empty .stage-empty-hint")
@@ -152,7 +161,7 @@ def run():
 
         # 9. New Session starts empty; both folders are remembered, each where
         #    you last were in it; the saved deck reopens at the slide it was saved on.
-        page.click("#welcome-new-btn"); page.wait_for_url("**/s/**"); page.wait_for_timeout(2500)
+        page.click("#welcome-new-btn"); page.wait_for_url("**/s/**"); page.wait_for_selector(".lib", timeout=8000); page.wait_for_timeout(500)
         check("New Session: nothing open", not page.evaluate("() => !!window.beamerState.zipFile"))
         menu("open"); page.wait_for_timeout(800)
         check("next session, Open: Courses, where I last opened from",
@@ -175,14 +184,15 @@ def run():
         check("Try Demo: demo deck loaded, tour running", page.evaluate("() => window.beamerState.totalSlides") > 3
               and page.locator(".tour-card, .tour-popover, [class*='tour']").count() > 0)
 
-        # 11. A browser without folders: Open is the file picker.
+        # 11. A browser without folders: the Open window offers the file picker.
         ctx2 = b.new_context(viewport={"width": 1200, "height": 800})
         ctx2.add_init_script("delete window.showDirectoryPicker;")
         p2 = ctx2.new_page()
-        p2.goto(BASE); p2.wait_for_timeout(500); p2.click("#welcome-new-btn"); p2.wait_for_url("**/s/**"); p2.wait_for_timeout(2200)
+        p2.goto(BASE); p2.wait_for_timeout(500); p2.click("#welcome-new-btn"); p2.wait_for_url("**/s/**")
+        p2.wait_for_selector(".lib [data-pick]", timeout=8000)
         with p2.expect_file_chooser(timeout=3000) as fc:
-            p2.click("#session-open-btn")
-        check("no folder support: Open is the file picker", fc.value is not None)
+            p2.click(".lib [data-pick]")
+        check("no folder support: the Open window's Choose a File… is the file picker", fc.value is not None)
         ctx2.close()
 
         b.close()

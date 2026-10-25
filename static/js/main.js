@@ -440,7 +440,7 @@ function wireKeyboardNav() {
         // Fixed: navigation & escape
         if (e.key === 'ArrowLeft'  || e.key === 'PageUp')   navStep(-1, e.repeat);
         if (e.key === 'ArrowRight' || e.key === 'PageDown') navStep(+1, e.repeat);
-        if (e.key === 'Escape') { bus.emit('ui:escape'); BeamerModal?.close(); }
+        if (e.key === 'Escape') { bus.emit('ui:escape'); BeamerModal?.dismiss?.(); }
         if (e.key === '.' && state.slideStructure.length) toggleMute();
 
         // Configurable shortcuts
@@ -519,7 +519,7 @@ function toggleMute(force) {
     if (btn) {
         btn.classList.toggle('btn_selected', on);
         btn.setAttribute('aria-pressed', String(on));
-        btn.title = on ? 'Show slide (.)' : 'Hide slide (.)';
+        btn.title = on ? 'Show Slide (.)' : 'Hide Slide (.)';
     }
     if (on) document.querySelectorAll('#main-content video, #main-content audio').forEach(m => { try { m.pause(); } catch (_) {} });
 }
@@ -546,7 +546,13 @@ bus.on('demo:open', () => launchTour({ demo: true }));
 
 function maybeStartTourFromUrl() {
     const params = new URLSearchParams(window.location.search);
-    if (!params.has('tour')) return;
+    // A session starts by opening a presentation: the Open window comes up
+    // by itself, once the splash screen has gone, and stays until one opens
+    // (library/ui.js). Try Demo brings its own deck instead.
+    if (!params.has('tour')) {
+        setTimeout(() => { if (!state.zipFile) bus.emit('library:require'); }, 2100);
+        return;
+    }
     // Drop the flag so a reload doesn't restart the tour.
     params.delete('tour');
     const qs = params.toString();

@@ -61,9 +61,17 @@ const Modal = {
         document.body.appendChild(overlay);
         this.open = overlay;
         this._onClose = onClose;   // called once, however it closes
+        this._canClose = canClose;
+    },
+    // Escape: close it, unless it says it can't be closed yet.
+    dismiss() {
+        if (!this.open || this.open.classList.contains('modal-loading')) return;
+        if (this._canClose && !this._canClose()) return;
+        this.close();
     },
     close() {
         if (this.open) { this.open.remove(); this.open = null; }
+        this._canClose = null;
         const cb = this._onClose;
         this._onClose = null;
         if (typeof cb === 'function') { try { cb(); } catch (e) { console.error('[modal] onClose', e); } }

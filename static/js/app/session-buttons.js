@@ -1,16 +1,15 @@
 // Top-right: the session's buttons.
 //
-//   nothing open   Open, Close session
-//   a deck open    Edit, Close session
-//
-//   Open    browse the folder you open presentations from (library/ui.js);
-//           dropping a file on the window opens one too
-//   Edit    the editor (its own Done button closes it)
+//   Edit    the editor (its own Done button closes it); once a deck is open
 //   Close   back to the start page; with a deck open it asks whether to
 //           save first (the Save window, then the start page once saved)
+//
+// There is no Open button: a new session starts with the Open window, which
+// stays until a presentation opens (library/ui.js). Dropping a file on the
+// window opens one too.
 
 import { bus } from '../core/events.js';
-import { openPresentation, savePresentation } from '../library/ui.js';
+import { savePresentation } from '../library/ui.js';
 import { isRecording, stopRecording } from './recorder.js';
 
 let appState = null;
@@ -21,7 +20,6 @@ let leaveAfterSave = false;
 export function initSessionButtons(state) {
     appState = state;
     const $ = id => document.getElementById(id);
-    $('session-open-btn')?.addEventListener('click', () => openPresentation());
     $('session-edit-btn')?.addEventListener('click', () => $('edit-mode-btn')?.click());
     $('session-close-btn')?.addEventListener('click', closeSession);
     bus.on('deck:loaded', refresh);
@@ -35,9 +33,7 @@ export function initSessionButtons(state) {
 
 function refresh() {
     const deck = !!appState?.zipFile;
-    const open = document.getElementById('session-open-btn');
     const edit = document.getElementById('session-edit-btn');
-    if (open) open.hidden = deck;
     if (edit) { edit.hidden = !deck; edit.disabled = !deck; }
 }
 

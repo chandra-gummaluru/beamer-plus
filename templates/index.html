@@ -81,7 +81,7 @@
                     <path class="stage-empty-squiggle" d="M18 26 Q 27 13, 36 26 T 54 26"/>
                 </svg>
                 <p class="stage-empty-title">Nothing here yet…</p>
-                <p class="stage-empty-hint">Start by opening a presentation (top right) or adding a page (in the toolbar on the right).</p>
+                <p class="stage-empty-hint">Start by opening a presentation.</p>
             </div>
             <div class="slide-loading-overlay">
                 <svg class="slide-squiggle" viewBox="0 0 120 40">
@@ -114,19 +114,17 @@
         </button>
     </div>
 
-    <!-- Top-right: the session's buttons — Open, Edit, Save, Close session
-         (app/session-buttons.js). Open and Save use folders on this computer
-         (library/ui.js); Edit and Save need an open presentation. Dropping a
-         file on the window opens it too. -->
+    <!-- Top-right: Edit (once a presentation is open) and Close session
+         (app/session-buttons.js). A session opens its presentation from the
+         Open window it starts with (library/ui.js), or a file dropped on the
+         window. -->
     <div id="top-right-controls">
-        <button class="btn" id="session-open-btn" title="Open a Presentation" aria-label="Open a Presentation"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H9l2 2.5h7.5A2.5 2.5 0 0 1 21 10v7.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/></svg></button>
         <button class="btn" id="session-edit-btn" title="Edit Presentation" aria-label="Edit Presentation" hidden><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
         <button class="btn" id="session-close-btn" title="Close Session" aria-label="Close Session"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 17l5-5-5-5M15 12H4"/></svg></button>
     </div>
 
-    <!-- Record + Mute — bottom-right corner. Record opens the recorder
-         (app/recorder.js); Mute blanks the stage until pressed again
-         (shortcut "."; main.js toggleMute). -->
+    <!-- Record — bottom-right corner (top-left in split view). Opens the
+         recorder (app/recorder.js). Hide Slide is in the annotation toolbar. -->
     <div id="mute-container">
         <button class="btn" id="record-btn" title="Record This Tab"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/></svg></button>
         <!-- Recording bar — takes the record button's place while a take
@@ -143,7 +141,6 @@
                 <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
             </button>
         </div>
-        <button class="btn" id="mute-btn" title="Hide Slide (.)" aria-pressed="false"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button>
     </div>
 
     <!-- Annotation toolbar -->
@@ -170,6 +167,10 @@
             <button class="btn" id="split-toggle" title="Split View"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg></button>
             <button class="btn" id="add-blank-btn" title="Add Page…"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg></button>
             <button class="btn" id="duplicate-slide-btn" title="Duplicate This Slide"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M4 16V5a2 2 0 0 1 2-2h11"/></svg></button>
+        </div>
+        <!-- Hide the slide (main.js toggleMute, shortcut "."). -->
+        <div id="annotation-stage-actions">
+            <button class="btn" id="mute-btn" title="Hide Slide (.)" aria-pressed="false"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button>
         </div>
     </div>
 
