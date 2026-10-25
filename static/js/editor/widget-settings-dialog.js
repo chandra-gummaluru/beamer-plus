@@ -1,17 +1,17 @@
 // A widget's own settings, in a sheet opened from the widget itself.
 //
 // Every widget is self-contained: its specific settings (a poll's question,
-// a timer's duration, a video's link…) are edited from the pencil that shows
-// in the widget's top bar while the pointer is over it (or, laid over part of
-// a slide without a bar, in its corner). The editor's panel keeps only what
+// a timer's duration, a video's link…) are edited from the pencil in the
+// widget's top bar (or, laid over part of a slide without a bar, in its
+// corner). The editor's panel keeps only what
 // every widget has — Name, Text size and where it sits (widget-panel.js).
 //
 // Protocol
 //   ← widget   widget-edit-settings   { widgetId }   open the sheet
 //   → widget   widget-config          { config, live: true }   (live widgets)
 //
-// The sheet docks to the right of the window rather than covering the slide,
-// so the widget stays in view while it's being set up. Changes go onto the
+// The sheet is a fixed panel down the right edge, like the editor's, and the
+// stage makes room for it, so the widget stays in view while it's set up. Changes go onto the
 // widget's config item as they're made, and then:
 //
 //   - a widget whose schema declares "liveSettings": true is handed its new

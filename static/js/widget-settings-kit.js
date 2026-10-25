@@ -877,8 +877,7 @@
         var utils = el('div', 'bw-topbar-utils');
 
         if (hasOwnSettings()) {
-            // Discreet: it only shows while the pointer is over the widget
-            // (widget-base.css), so the room never sees it mid-talk.
+            // Always shown, first in the bar's utilities.
             var pencil = makeBtn({
                 variant: 'icon', title: 'Widget settings', icon: PENCIL_ICON, onClick: editSettings,
             });
@@ -941,8 +940,8 @@
         body.classList.add('bw-has-topbar');
 
         // No bar to hold the pencil (an overlay, or an inset without the
-        // utilities): a small one in the corner, shown while the pointer is
-        // over the widget (widget-base.css).
+        // utilities): a small one in the corner, always shown
+        // (widget-base.css).
         var floatEdit = null;
         if (cfg().role !== 'viewer' && hasOwnSettings()) {
             floatEdit = makeBtn({ variant: 'icon', title: 'Widget settings', icon: PENCIL_ICON, onClick: editSettings });

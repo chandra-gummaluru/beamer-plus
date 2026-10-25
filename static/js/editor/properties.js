@@ -32,7 +32,6 @@ export function updatePropertiesPanel() {
     if (!item) return;
 
     setPanelMode('item', itemName(arrKey, item, index), `${slideName()} · ${KIND_LABELS[arrKey]}`);
-    setRemoveLabel(`Remove ${KIND_LABELS[arrKey]}`);
 
     const body = document.getElementById('editor-properties-body');
     if (!body) return;
@@ -235,7 +234,6 @@ async function showWidgetPanel(index) {
     const item = getOrCreateConfig()?.widgets?.[index];
     if (!item) return;
     setPanelMode('widget', item.title || widgetTypeLabel(item), `${slideName()} · ${widgetTypeLabel(item)}`);
-    setRemoveLabel('Remove Widget');
     // Its name is the header: click it and type. Empty falls back to the
     // widget's own label, as a placeholder.
     setTitleEditable(item, {
@@ -275,35 +273,20 @@ async function showWidgetPanel(index) {
     });
 }
 
-/* ─── the footer's Remove ─────────────────────────────────────────── */
-// Remove whatever is selected: two clicks, the first arms it, since there's
-// no undo. The label names what goes ("Remove Video"); the panel sets it.
+/* ─── deleting what's selected ─────────────────────────────────────── */
+// The insert toolbar's trash deletes the selected item, when there is one
+// (editor.js); otherwise the slide.
 
-let _removeLabel = 'Remove';
-
-function setRemoveLabel(label) {
-    _removeLabel = label;
-    armRemove(false);
+/** What kind of thing is selected ("Widget", "Video"…), or null. */
+export function selectedItemKind() {
+    const sel = ctx.selectedOverlay;
+    return sel ? KIND_LABELS[sel.arrKey] || 'Item' : null;
 }
 
-function armRemove(on) {
-    const btn = document.getElementById('item-remove');
-    if (!btn) return;
-    clearTimeout(armRemove.timer);
-    btn.classList.toggle('is-armed', on);
-    btn.querySelector('span').textContent = on ? 'Click Again to Remove' : _removeLabel;
-    if (on) armRemove.timer = setTimeout(() => armRemove(false), 3000);
-}
-
-export function initItemRemove() {
-    const btn = document.getElementById('item-remove');
-    btn?.addEventListener('click', () => {
-        const sel = ctx.selectedOverlay;
-        if (!sel) return;
-        if (!btn.classList.contains('is-armed')) { armRemove(true); return; }
-        armRemove(false);
-        deleteItem(sel.arrKey, sel.index);
-    });
+/** Delete the selected item (no-op without one). */
+export function deleteSelectedItem() {
+    const sel = ctx.selectedOverlay;
+    if (sel) deleteItem(sel.arrKey, sel.index);
 }
 
 /* ─── the slide's list of what's on it ────────────────────────────── */

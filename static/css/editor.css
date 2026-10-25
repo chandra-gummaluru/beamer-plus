@@ -1291,24 +1291,21 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 .wf-list-add[hidden] { display: none; }
 
 /* ─── A widget's own settings sheet (editor/widget-settings-dialog.js) ───
-   Opened from the pencil on the widget. Docked to the right of the window,
-   over the tool rail, so the slide — and the widget changing as you edit —
-   stays in view. One column: headed groups separated by a hairline, labels
+   Opened from the pencil on the widget. A fixed panel down the right edge,
+   the same as the editor's (width, surface, header), over the tool rail, so
+   the slide — and the widget changing as you edit — stays in view. One column: headed groups separated by a hairline, labels
    as sentences, every control the same height. */
 .wsheet {
-    --wsheet-w: 384px;
     position: fixed;
-    top: 12px;
-    right: 12px;
-    bottom: 12px;
+    top: 0;
+    right: 0;
+    bottom: 0;
     z-index: 1100;
-    width: min(var(--wsheet-w), calc(100vw - 24px));
+    width: var(--editor-panel-width);
     display: flex;
     flex-direction: column;
-    background: var(--surface-paper);
-    border: var(--line-soft);
-    border-radius: var(--r-lg);
-    box-shadow: var(--shadow-pop);
+    background: var(--surface-cream);
+    border-left: var(--line-soft);
     font-family: var(--font-sans);
     color: var(--ink-1);
     opacity: 0;
@@ -1319,13 +1316,15 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 .wsheet.is-open { opacity: 1; transform: none; pointer-events: auto; }
 /* The stage makes room for it, as for the editor's panel. The tool rail
    stays where it is, under the sheet, until the sheet closes. */
-body.wsheet-open #main-content { padding-right: 408px; }
+body.wsheet-open #main-content { padding-right: var(--editor-panel-width); }
 
 .wsheet-head {
+    flex: 0 0 auto;
     display: flex;
-    align-items: flex-start;
-    gap: var(--sp-3);
-    padding: var(--sp-5) var(--sp-5) var(--sp-4);
+    align-items: center;
+    gap: var(--sp-2);
+    height: 64px;
+    padding: 0 14px 0 20px;
     border-bottom: var(--line-soft);
 }
 .wsheet-titles { flex: 1 1 auto; min-width: 0; }
@@ -1334,20 +1333,22 @@ body.wsheet-open #main-content { padding-right: 408px; }
     font-family: var(--font-serif);
     font-size: var(--fs-xl);
     font-weight: 500;
-    line-height: 1.2;
+    line-height: 1.15;
     letter-spacing: -0.01em;
     color: var(--ink-1);
-    overflow-wrap: anywhere;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .wsheet-kind { margin-top: 2px; font-size: var(--fs-sm); color: var(--ink-3); }
-.wsheet-close { flex: 0 0 auto; margin: -4px -6px 0 0; }
+.wsheet-close { flex: 0 0 auto; }
 
 .wsheet-body {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
-    padding: var(--sp-5);
+    padding: 18px 20px 24px;
     scrollbar-width: thin;
     scrollbar-color: var(--line-2) transparent;
 }
@@ -1734,19 +1735,9 @@ body.wsheet-open #main-content { padding-right: 408px; }
 .slide-item:hover .slide-item-chev { color: var(--ink-2); }
 .slide-items-empty { margin: 0; font-size: var(--fs-sm); line-height: 1.5; color: var(--ink-3); }
 
-/* ── Footer: Remove … (a selected item) ── */
-#editor-panel-footer {
-    flex: 0 0 auto;
-    display: flex;
-    padding: 10px 14px;
-    border-top: var(--line-soft);
-    background: var(--surface-cream);
-}
-#editor-panel[data-mode="view"] #editor-panel-footer,
-#editor-panel[data-mode="slide"] #editor-panel-footer { display: none; }
-
-/* Delete Slide: the trash at the end of the insert toolbar. The first click
-   arms it: red, widening to say "Click Again to Delete" (editor.js). */
+/* Delete: the trash at the end of the insert toolbar deletes the selected
+   item, or else the slide. The first click arms it: red, widening to say
+   "Click Again to Delete" (editor.js). */
 .editor-trash-btn .editor-delete-label { display: none; font-size: var(--fs-sm); }
 .editor-trash-btn.is-armed { width: auto; padding: 0 var(--sp-3); }
 .editor-trash-btn.is-armed .editor-delete-label { display: inline; }
