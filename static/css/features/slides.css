@@ -46,11 +46,14 @@ body.split-view-active #main-content {
     padding-right: 0;
     height: calc(100vh - 88px);
     height: calc(100dvh - 88px);
-    padding-top: var(--sp-4);
+    padding-top: 60px;   /* below the annotation toolbar, docked to the top */
     box-sizing: border-box;
     background: var(--surface-stage);
     gap: 0;
 }
+/* No toolbar to clear: focus mode hides it, edit mode has its own panel. */
+body.focus-mode.split-view-active #main-content,
+body.edit-mode.split-view-active #main-content { padding-top: var(--sp-4); }
 /* min-width: 0 so a pane's canvas (still sized for the previous layout) can't
    hold the pane open and squeeze the other one while the split is measured. */
 body.split-view-active #pdf-container { padding: var(--sp-3); min-width: 0; }

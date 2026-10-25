@@ -72,10 +72,12 @@
 /* ============================================================
    Split-view: toolbar switches to a horizontal top bar
    ============================================================ */
+/* Docked to the top edge, the way it docks to the right edge otherwise. */
 body.split-view-active #floating-annotation-toolbar {
     border: var(--line-hairline);
-    border-radius: var(--r-lg);
-    top: var(--sp-3);
+    border-top: 0;
+    border-radius: 0 0 var(--r-lg) var(--r-lg);
+    top: 0;
     bottom: auto;
     left: 50%;
     right: auto;
