@@ -1638,12 +1638,6 @@ body.wsheet-open #main-content { padding-right: var(--editor-panel-width); }
 .slide-item:hover .slide-item-chev { color: var(--ink-2); }
 .slide-items-empty { margin: 0; font-size: var(--fs-sm); line-height: 1.5; color: var(--ink-3); }
 
-/* Delete: the trash at the end of the insert toolbar deletes the selected
-   item, or else the slide. The first click arms it: red, widening to say
-   "Click Again to Delete" (editor.js). */
-.editor-trash-btn .editor-delete-label { display: none; font-size: var(--fs-sm); }
-.editor-trash-btn.is-armed { width: auto; padding: 0 var(--sp-3); }
-.editor-trash-btn.is-armed .editor-delete-label { display: inline; }
 
 /* ─── Picking a split view's slides (editor/pane-picker.js) ─────────
    A bar docked to the top of the stage says which pane comes next; the
