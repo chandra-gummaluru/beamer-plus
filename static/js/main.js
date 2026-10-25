@@ -570,6 +570,7 @@ function toggleFocusMode() {
     saveCurrentAnnotations();
     document.body.classList.toggle('focus-mode');
     setTimeout(async () => {
+        if (state.splitView) applySplitRatio();
         sizeSlideCanvases();
         state.annCvs?.resizeOnly?.();
         state.pdfCvs?.resizeOnly?.();
@@ -674,9 +675,14 @@ function wireSplitViewButton(annContainer2, pdfContainer2) {
             const rightContainer = document.getElementById('pdf-container-2');
             if (!mainContent || !leftContainer || !rightContainer) return;
 
+            // The divider's centre under the pointer, as a share of the room
+            // the panes split between them.
             const rect = mainContent.getBoundingClientRect();
-            const newLeftPercent = ((e.clientX - rect.left) / rect.width) * 100;
-            applySplitRatio(newLeftPercent);
+            const room = _splitRoom();
+            if (!room || room.width <= 0) return;
+            const padL = parseFloat(getComputedStyle(mainContent).paddingLeft) || 0;
+            const x = e.clientX - (rect.left + mainContent.clientLeft + padL) - room.dividerW / 2;
+            applySplitRatio((x / room.width) * 100);
             // Recompute 4:3 canvas sizes now that the containers have new widths.
             sizeSlideCanvases();
             // Widgets/video/audio/models are absolutely positioned in px within
@@ -701,33 +707,61 @@ function wireSplitViewButton(annContainer2, pdfContainer2) {
     }, { passive: false });
 }
 
-function getSplitRatioBounds() {
-    const mainContent = document.getElementById('main-content');
-    if (!mainContent) return { min: 20, max: 80 };
-    const rect = mainContent.getBoundingClientRect();
-    const totalWidth  = rect.width;
-    const totalHeight = rect.height;
-    if (!totalWidth || !totalHeight) return { min: 20, max: 80 };
-    // Compute the widest a single pane can be while keeping height as the
-    // binding 4:3 constraint (so the full slide height remains visible).
-    const maxContainerWidth = totalHeight * (4 / 3);
-    const maxPercent = (maxContainerWidth / totalWidth) * 100;
-    const min = Math.max(100 - maxPercent, 20);
-    const max = Math.min(maxPercent, 80);
-    if (min > max) return { min: 50, max: 50 };
-    return { min, max };
+// The room the two panes share: #main-content's content box less the divider.
+function _splitRoom() {
+    const mc = document.getElementById('main-content');
+    const pane = document.getElementById('pdf-container');
+    const divider = document.getElementById('split-view-divider');
+    if (!mc || !pane) return null;
+    const m = getComputedStyle(mc), p = getComputedStyle(pane);
+    const px = (cs, k) => parseFloat(cs[k]) || 0;
+    const dividerW = divider?.offsetWidth || 8;
+    return {
+        width:  mc.clientWidth  - px(m, 'paddingLeft') - px(m, 'paddingRight') - dividerW,
+        height: mc.clientHeight - px(m, 'paddingTop')  - px(m, 'paddingBottom'),
+        padX: px(p, 'paddingLeft') + px(p, 'paddingRight'),
+        padY: px(p, 'paddingTop')  + px(p, 'paddingBottom'),
+        dividerW,
+    };
 }
 
-function applySplitRatio(ratioPercent) {
+/**
+ * How far the divider can go (percent of the panes' room) with both slides
+ * still filling their pane's width: past that, the wider pane's slide runs
+ * out of height and the leftover would show up as an empty strip on its
+ * outer side. When the window is so wide that even 50/50 leaves both slides
+ * height-bound, both are the same size anyway, so the divider stays central
+ * and the spare room is shared evenly by the two outer edges.
+ */
+function getSplitRatioBounds() {
+    const room = _splitRoom();
+    if (!room || room.width <= 0 || room.height <= 0) return { min: 20, max: 80 };
+    const widestPane = (room.height - room.padY) * (4 / 3) + room.padX;
+    const maxPercent = (widestPane / room.width) * 100;
+    if (maxPercent <= 50) return { min: 50, max: 50 };
+    return { min: Math.max(100 - maxPercent, 20), max: Math.min(maxPercent, 80) };
+}
+
+/**
+ * Puts the divider at `ratioPercent` (of the panes' room), clamped to what
+ * the stage allows right now. The ratio asked for is remembered, so a window
+ * that shrinks and grows again (or the editor panel opening and closing)
+ * comes back to it instead of to the clamped value.
+ */
+let _splitRatioWanted = 50;
+function applySplitRatio(ratioPercent = _splitRatioWanted) {
     const leftContainer = document.getElementById('pdf-container');
     const rightContainer = document.getElementById('pdf-container-2');
     if (!leftContainer || !rightContainer) return state.splitRatio;
 
+    if (Number.isFinite(ratioPercent)) _splitRatioWanted = ratioPercent;
     const bounds = getSplitRatioBounds();
-    const clamped = Math.max(bounds.min, Math.min(bounds.max, ratioPercent));
+    const clamped = Math.max(bounds.min, Math.min(bounds.max, _splitRatioWanted));
     state.splitRatio = clamped;
-    leftContainer.style.flex = `1 1 ${clamped}%`;
-    rightContainer.style.flex = `1 1 ${100 - clamped}%`;
+    // Exact widths (slides.css): the left pane takes this share of the room,
+    // the right pane the rest. Only applies in split view, so closing the
+    // split needs no clean-up.
+    document.getElementById('main-content')?.style.setProperty('--split-left', String(clamped / 100));
     return clamped;
 }
 
@@ -1055,8 +1089,10 @@ async function setSplitActive(active, rightIndex = null, splitRatio = null) {
     // transition, 260ms). Measuring part-way through sized the slides for a
     // narrower stage, leaving wide empty margins until the divider was dragged.
     await waitForStageLayout();
+    // The ratio was clamped against the stage mid-transition: again, now
+    // that it has its final size.
+    if (active) applySplitRatio();
     sizeSlideCanvases(); // recompute 4:3 sizes for the new split / single layout
-    sizeSlideCanvases(); // again: each pane's old canvas size can skew the other's first measurement
     state.annCvs.resizeOnly?.();
     state.pdfCvs.resizeOnly?.();
     if (state.annCvs2) state.annCvs2.resizeOnly?.();
@@ -1473,6 +1509,7 @@ bus.on('annotations:flush', () => saveCurrentAnnotations());
 bus.on('view:set-ratio', (ratio) => {
     if (!state.splitView) return;
     applySplitRatio(ratio);
+    sizeSlideCanvases();   // CSS size and place only: the bitmaps stretch until the commit
     updateWidgetPositions(document.getElementById('pdf-canvas'));
     updateWidgetPositions(document.getElementById('pdf-canvas-2'));
     updateMediaPositions(document.getElementById('pdf-canvas'));
@@ -1572,26 +1609,53 @@ function sizeSlideCanvases() {
         const cv   = document.getElementById(cvId);
         const ann  = document.getElementById(annId);
         if (!pane || !cv) continue;
-        const availW = pane.clientWidth  * 0.95;
-        const availH = pane.clientHeight * 0.95;
-        if (!availW || !availH) continue;
-        let w, h;
-        if (availW / availH >= 4 / 3) {
-            h = availH; w = h * 4 / 3;   // height is the binding axis
+        const isRight = containerId === 'pdf-container-2';
+        if (isRight && !state.splitView) continue;
+        const cs = getComputedStyle(pane);
+        const pl = parseFloat(cs.paddingLeft) || 0, pr = parseFloat(cs.paddingRight) || 0;
+        const pt = parseFloat(cs.paddingTop)  || 0, pb = parseFloat(cs.paddingBottom) || 0;
+        const cw = pane.clientWidth - pl - pr, ch = pane.clientHeight - pt - pb;
+        if (cw <= 0 || ch <= 0) continue;
+        let box;
+        if (state.splitView) {
+            // Split: each slide fills its pane (the padding is the margin)
+            // and sits against the divider; spare height is shared above
+            // and below. Clearing the top-right buttons can only shrink it,
+            // since there is no room to move into.
+            const { w, h } = _fit43(cw, ch);
+            box = { w, h, x: isRight ? pl : pl + cw - w, y: pt + (ch - h) / 2 };
+            box = _clearTopRightControls(pane, box, { pl, cw, pt, ch, anchor: isRight ? 'left' : 'right' });
         } else {
-            w = availW; h = w * 3 / 4;   // width is the binding axis
+            // One slide: a little smaller than the pane, centred, then
+            // nudged clear of the top-right buttons and leaned left.
+            const { w, h } = _fit43(pane.clientWidth * 0.95, pane.clientHeight * 0.95);
+            box = { w, h, x: pl + (cw - w) / 2, y: pt + (ch - h) / 2 };
+            box = _clearTopRightControls(pane, box, { pl, cw, pt, ch, anchor: 'centre' });
+            box.x -= _leanLeft(box, pl);
         }
-        ({ w, h } = _clearTopRightControls(pane, w, h));
-        if (containerId === 'pdf-container' && !state.splitView) _leanLeft(pane, w);
-        cv.style.width  = `${w}px`;
-        cv.style.height = `${h}px`;
-        if (ann) { ann.style.width = `${w}px`; ann.style.height = `${h}px`; }
-        const overlay = pane.querySelector('.slide-loading-overlay');
-        if (overlay) { overlay.style.width = `${w}px`; overlay.style.height = `${h}px`; }
-        const empty = pane.querySelector('.stage-empty');
-        if (empty) { empty.style.width = `${w}px`; empty.style.height = `${h}px`; }
-        const undef = pane.querySelector('.pane-undefined');
-        if (undef) { undef.style.width = `${w}px`; undef.style.height = `${h}px`; }
+        _placeSlide(pane, [cv, ann], box);
+    }
+}
+
+function _fit43(availW, availH) {
+    return availW / availH >= 4 / 3
+        ? { w: availH * 4 / 3, h: availH }    // height is the binding axis
+        : { w: availW, h: availW * 3 / 4 };   // width is the binding axis
+}
+
+// Puts the slide and everything sized with it (ink, loading cover, empty
+// stage and undefined-pane cards) at box, in px from the pane's padding edge.
+// The cards that are added later read the same place from --slide-x/-y/-w/-h.
+function _placeSlide(pane, els, { w, h, x, y }) {
+    const px = v => `${Math.round(v * 100) / 100}px`;
+    pane.style.setProperty('--slide-x', px(x));
+    pane.style.setProperty('--slide-y', px(y));
+    pane.style.setProperty('--slide-w', px(w));
+    pane.style.setProperty('--slide-h', px(h));
+    pane.style.setProperty('--slide-centre', 'none');
+    for (const el of els) {
+        if (!el) continue;
+        el.style.width = px(w); el.style.height = px(h);
     }
 }
 
@@ -1612,62 +1676,67 @@ function _updateAllOverlayPositions() {
 // A single slide sits a little left of centre: it moves left by LEAN_LEFT of
 // the spare room on its left (the gap between the navigator and the slide),
 // leaving the extra space on the right, where the toolbar floats. Only uses
-// room that's there, so the slide never shrinks for it. Same mechanism as
-// _clearTopRightControls (extra right padding + --stage-shift).
+// room that's there, so the slide never shrinks for it. Returns how far.
 const LEAN_LEFT = 0.6;
-function _leanLeft(pane, w) {
-    const cs = getComputedStyle(pane);
-    const pl = parseFloat(cs.paddingLeft) || 0, pr = parseFloat(cs.paddingRight) || 0;
-    const r = pane.getBoundingClientRect();
-    const cx = (r.left + pl + r.right - pr) / 2;
-    const spare = (cx - w / 2) - (r.left + pl);
-    if (spare <= 1) return;
-    const lean = Math.round(spare * LEAN_LEFT);
-    const prev = parseFloat(pane.style.getPropertyValue('--stage-shift')) || 0;
-    pane.style.paddingRight = `${pr + 2 * lean}px`;
-    pane.style.setProperty('--stage-shift', `${prev + lean}px`);
+function _leanLeft(box, pl) {
+    const spare = box.x - pl;
+    return spare > 1 ? Math.round(spare * LEAN_LEFT) : 0;
 }
 
 /**
- * On narrower windows the slide can reach up under the session button in the
- * top-right corner. When it would, first nudge it left into whatever spare
- * room its pane has (extra right padding; --stage-shift moves the 50%-centred
- * overlays with it), then, if it still overlaps, shrink it just enough to
- * clear the button. Wide windows are left untouched.
+ * On narrower windows the slide can reach up under the session buttons in
+ * the top-right corner. When it would, first move it left into whatever
+ * spare room its pane has (a single slide only: a split pane's slide is held
+ * against the divider), then, if it still overlaps, shrink it just enough to
+ * clear the buttons, keeping its anchored edge where it was and re-centring
+ * it vertically. Wide windows are left untouched.
+ *   box   {w, h, x, y} in px from the pane's border edge
+ *   area  the pane's content box (pl, cw, pt, ch) and the slide's anchor:
+ *         'centre', 'left' (right pane) or 'right' (left pane)
  */
-function _clearTopRightControls(pane, w, h) {
-    pane.style.paddingRight = '';
-    pane.style.removeProperty('--stage-shift');
+function _clearTopRightControls(pane, box, { pl, cw, pt, ch, anchor }) {
     const ctrls = document.getElementById('top-right-controls');
     const c = ctrls?.getBoundingClientRect();
-    if (!c || !c.width || !c.height) return { w, h };   // hidden (focus mode)
-    const r  = pane.getBoundingClientRect();
-    const cs = getComputedStyle(pane);
-    const pl = parseFloat(cs.paddingLeft)  || 0, pr = parseFloat(cs.paddingRight)  || 0;
-    const pt = parseFloat(cs.paddingTop)   || 0, pb = parseFloat(cs.paddingBottom) || 0;
-    let cx = (r.left + pl + r.right - pr) / 2;
-    const cy = (r.top + pt + r.bottom - pb) / 2;
+    if (!c || !c.width || !c.height || getComputedStyle(ctrls).display === 'none') return box;
+    const r = pane.getBoundingClientRect();
     const GAP = 8;
-    const maxH = 2 * (cy - c.bottom - GAP);             // tallest slide that starts below the button
-    if (h <= maxH) return { w, h };
-    let overlap = (cx + w / 2) - (c.left - GAP);
-    if (overlap <= 0) return { w, h };
+    const ox = r.left + pane.clientLeft, oy = r.top + pane.clientTop;
+    const slideTop = oy + box.y;
+    if (slideTop >= c.bottom + GAP) return box;              // starts below the buttons
+    let overlap = (ox + box.x + box.w) - (c.left - GAP);
+    if (overlap <= 0 || c.left > r.right) return box;        // ends left of them
+    let { w, h, x } = box;
     // 1. Move it left into the pane's spare room on that side.
-    const shift = Math.min(overlap, Math.max(0, (cx - w / 2) - r.left));
-    if (shift > 0) {
-        pane.style.paddingRight = `${pr + 2 * shift}px`;
-        pane.style.setProperty('--stage-shift', `${shift}px`);
-        cx -= shift; overlap -= shift;
+    if (anchor === 'centre') {
+        const shift = Math.min(overlap, Math.max(0, x - pl));
+        x -= shift; overlap -= shift;
+        if (overlap <= 0) return { ...box, x };
     }
-    if (overlap <= 0) return { w, h };
-    // 2. Still under the button: shrink it just enough, either clearing the
-    //    button sideways or dropping its top below it, whichever keeps it bigger.
+    // 2. Still under the buttons: shrink it just enough, either clearing them
+    //    sideways or dropping its top below them, whichever keeps it bigger.
     const ratio = w / h;
-    const w2 = Math.max(w - 2 * overlap, maxH * ratio, w * 0.5);
-    return { w: w2, h: w2 / ratio };
+    const centreY = oy + pt + ch / 2;
+    const maxH = 2 * (centreY - c.bottom - GAP);             // tallest slide that starts below them
+    // (A left pane's slide is held at the divider, so it can't clear them sideways.)
+    const sideways = anchor === 'right' ? 0 : anchor === 'left' ? w - overlap : w - 2 * overlap;
+    const w2 = Math.min(w, Math.max(sideways, maxH * ratio, w * 0.5));
+    const h2 = w2 / ratio;
+    if (anchor === 'right') x = x + w - w2;                  // keep the edge on the divider
+    else if (anchor === 'centre') x = x + (w - w2) / 2;
+    return { w: w2, h: h2, x, y: pt + (ch - h2) / 2 };
 }
 
 function wireResizeAndFullscreen() {
+    // In split view the record / hide-slide buttons sit in the navigator's
+    // bar, which keeps their width free (--corner-w): it grows while a
+    // recording's timer and controls are showing.
+    const corner = document.getElementById('mute-container');
+    if (corner && 'ResizeObserver' in window) {
+        new ResizeObserver(() => {
+            const w = Math.ceil(corner.getBoundingClientRect().width);
+            if (w) document.body.style.setProperty('--corner-w', `${w}px`);
+        }).observe(corner);
+    }
     // The session button changes width (the presentation's name, edit mode):
     // re-fit the slide when it does.
     const ctrls = document.getElementById('top-right-controls');
@@ -1680,18 +1749,41 @@ function wireResizeAndFullscreen() {
             window.dispatchEvent(new Event('resize'));
         }).observe(ctrls);
     }
-    window.addEventListener('resize', () => {
+    const stage = document.getElementById('main-content');
+    const stageKey = () => `${stage?.clientWidth}x${stage?.clientHeight}:${state.splitView}`;
+    let laidOut = '';
+    const relayout = () => {
+        laidOut = stageKey();
+        // The divider first (the stage's new size changes how far it may
+        // go), then the slides in the panes it leaves.
+        const size = id => { const el = document.getElementById(id); return el ? `${el.style.width}x${el.style.height}` : ''; };
+        const before = [size('pdf-canvas'), size('pdf-canvas-2')];
+        if (state.splitView) applySplitRatio();
         sizeSlideCanvases();
-        state.annCvs?.resize?.();
-        if (state.splitView) state.annCvs2?.resize?.();
-        if (state.splitView) applySplitRatio(state.splitRatio);
+        // Only a slide whose size changed needs its ink scaled (resize()
+        // repaints from a snapshot, which mustn't race a render for nothing).
+        if (size('pdf-canvas') !== before[0]) state.annCvs?.resize?.();
+        if (state.splitView && size('pdf-canvas-2') !== before[1]) state.annCvs2?.resize?.();
         _updateAllOverlayPositions();
-    });
+    };
+    window.addEventListener('resize', relayout);
+    // The stage also changes size without the window doing so: the navigator
+    // moving between the side and the bottom, the editor panel, focus mode,
+    // all with transitions. Once it settles at a size the slides weren't
+    // laid out for, lay them out again.
+    if (stage && 'ResizeObserver' in window) {
+        let t = 0;
+        new ResizeObserver(() => {
+            clearTimeout(t);
+            t = setTimeout(() => { if (stageKey() !== laidOut) relayout(); }, 120);
+        }).observe(stage);
+    }
     document.addEventListener('fullscreenchange', () => {
         setTimeout(() => {
+            if (state.splitView) applySplitRatio();
             sizeSlideCanvases();
             state.annCvs?.resize?.();
-            if (state.splitView) applySplitRatio(state.splitRatio);
+            if (state.splitView) state.annCvs2?.resize?.();
             _updateAllOverlayPositions();
             renderSpotlight();
         }, 100);
@@ -1707,8 +1799,24 @@ bus.on('widgets:changed', async () => {
 });
 
 /* ─── editor: exit → re-render so added media appears immediately */
-bus.on('editor:exited', async () => {
-    await renderPane(state.currentSlide, false, false, true);
+bus.on('editor:exited', async ({ splitRatio = null } = {}) => {
+    if (state.splitView) {
+        // Back to the split's own ratio (edit mode previews a split you
+        // opened yourself at 50/50), then both panes: either may have new media.
+        if (splitRatio != null) applySplitRatio(splitRatio);
+        sizeSlideCanvases();
+        state.annCvs.resizeOnly?.();
+        state.annCvs2?.resizeOnly?.();
+        state.pdfCvs.resizeOnly?.();
+        state.pdfCvs2?.resizeOnly?.();
+        await Promise.all([
+            renderPane(state.currentSlide,    false, false, true),
+            renderPane(state.rightSlideIndex, true,  false, true),
+        ]);
+        _updateAllOverlayPositions();
+    } else {
+        await renderPane(state.currentSlide, false, false, true);
+    }
     updateStepBadge();   // reveal steps may have been added or removed
 });
 

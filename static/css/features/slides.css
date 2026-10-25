@@ -58,10 +58,12 @@ body.edit-mode.split-view-active #main-content { padding-top: var(--sp-4); }
    hold the pane open and squeeze the other one while the split is measured. */
 body.split-view-active #pdf-container { padding: var(--sp-3); min-width: 0; }
 body.split-view-active #pdf-container-2 { display: flex; padding: var(--sp-3); min-width: 0; }
-/* Each slide sits against the divider, so the two read as a pair instead of
-   floating in the middle of panes of different widths. */
-body.split-view-active #pdf-container   { justify-content: flex-end; }
-body.split-view-active #pdf-container-2 { justify-content: flex-start; }
+/* The divider's position: --split-left is the left pane's share of the room
+   left after the 8px divider (main.js applySplitRatio); the right pane takes
+   the rest. Where each slide sits in its pane — against the divider, so the
+   two read as a pair — is worked out by sizeSlideCanvases (--slide-x/-y). */
+body.split-view-active #pdf-container   { flex: 0 0 calc((100% - 8px) * var(--split-left, 0.5)); }
+body.split-view-active #pdf-container-2 { flex: 1 1 0; }
 
 
 #split-view-divider {
@@ -96,6 +98,8 @@ body.split-view-active #split-view-divider { display: block; }
    in main.js, so no CSS sizing rules are needed here. */
 #pdf-canvas, #pdf-canvas-2 {
     position: absolute;
+    left: var(--slide-x, auto);
+    top: var(--slide-y, auto);
     z-index: 1;
     background: #ffffff;
     border-radius: 0;
@@ -113,6 +117,8 @@ body.split-view-active #split-view-divider { display: block; }
 /* Annotation canvas — sized to match #pdf-canvas by sizeSlideCanvases(). */
 #ann-canvas, #ann-canvas-2 {
     position: absolute;
+    left: var(--slide-x, auto);
+    top: var(--slide-y, auto);
     z-index: 2;
     pointer-events: none;
     box-sizing: border-box;
@@ -149,9 +155,12 @@ model-viewer { pointer-events: auto !important; }
 /* Loading overlay — sized to match #pdf-canvas by sizeSlideCanvases(). */
 .slide-loading-overlay {
     position: absolute;
-    top: 50%;
-    left: calc(50% - var(--stage-shift, 0px));   /* follows the slide when it is nudged left (main.js) */
-    transform: translate(-50%, -50%);
+    /* Exactly over the slide: main.js sizeSlideCanvases sets these. */
+    top: var(--slide-y, 50%);
+    left: var(--slide-x, 50%);
+    width: var(--slide-w, auto);
+    height: var(--slide-h, auto);
+    transform: var(--slide-centre, translate(-50%, -50%));
     display: flex;
     align-items: center;
     justify-content: center;
@@ -194,9 +203,12 @@ model-viewer { pointer-events: auto !important; }
     --_hover:     oklch(96% 0.004 80);
 
     position: absolute;
-    top: 50%;
-    left: calc(50% - var(--stage-shift, 0px));   /* follows the slide when it is nudged left (main.js) */
-    transform: translate(-50%, -50%);
+    /* Exactly over the slide: main.js sizeSlideCanvases sets these. */
+    top: var(--slide-y, 50%);
+    left: var(--slide-x, 50%);
+    width: var(--slide-w, auto);
+    height: var(--slide-h, auto);
+    transform: var(--slide-centre, translate(-50%, -50%));
     z-index: 5;
     display: flex;
     flex-direction: column;
@@ -1248,9 +1260,12 @@ body.slide-muted #ann-canvas, body.slide-muted #ann-canvas-2 { z-index: 2 !impor
     --_line:     oklch(78% 0.006 260);
 
     position: absolute;
-    top: 50%;
-    left: calc(50% - var(--stage-shift, 0px));   /* follows the slide when it is nudged left (main.js) */
-    transform: translate(-50%, -50%);
+    /* Exactly over the slide: main.js sizeSlideCanvases sets these. */
+    top: var(--slide-y, 50%);
+    left: var(--slide-x, 50%);
+    width: var(--slide-w, auto);
+    height: var(--slide-h, auto);
+    transform: var(--slide-centre, translate(-50%, -50%));
     z-index: 9;
     display: flex;
     flex-direction: column;

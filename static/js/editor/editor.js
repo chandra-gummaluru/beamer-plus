@@ -214,10 +214,13 @@ async function enterEditMode() {
 }
 
 async function exitEditMode() {
-    // If a view slide was being previewed in split view, close that first
-    if (ctx.state.splitView && ctx.selectedViewIdx !== null) {
-        document.getElementById('split-toggle')?.click();
-        await new Promise(r => setTimeout(r, 200));
+    // A split on stage stays there, like any slide: Done leaves you where you
+    // were. Edit mode previews a split you opened yourself at 50/50, so it
+    // goes back to where you had the divider (a view slide keeps its ratio).
+    let splitRatio = null;
+    if (ctx.state.splitView) {
+        const v = ctx.state.currentViewIndex != null ? ctx.state.slideStructure[ctx.state.currentViewIndex] : null;
+        splitRatio = v?.type === 'view' ? (v.ratio ?? ctx.state.manualSplitRatio ?? 50) : (ctx.state.manualSplitRatio ?? 50);
     }
     cancelPick();
     ctx.state.editMode = false;
@@ -229,7 +232,7 @@ async function exitEditMode() {
     hideViewConfig();
     updatePropertiesPanel();
     window.dispatchEvent(new Event('resize'));
-    bus.emit('editor:exited');
+    bus.emit('editor:exited', { splitRatio });
 }
 
 /* ─── deselecting ───────────────────────────────────────────── */

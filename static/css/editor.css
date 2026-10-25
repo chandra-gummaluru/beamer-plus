@@ -1180,6 +1180,12 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
        and the insert toolbar centres on the whole width. */
     body.edit-mode #main-content { padding-right: 0; height: calc(100dvh - 45dvh - 88px); }
     #editor-add-row { left: 50%; }
+    /* The navigator's bar sits on top of the sheet, under the stage, rather
+       than hidden behind it (it's how you pick a split view's slides). */
+    body.edit-mode.split-view-active #slide-navigator { right: 0; bottom: 45dvh; }
+}
+@media (max-width: 1024px) and (orientation: portrait) {
+    body.edit-mode #slide-navigator { right: 0; bottom: 45dvh; }
 }
 
 @media (max-width: 480px) {
@@ -1190,6 +1196,8 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
     body.edit-mode #main-content {
         height: calc(100dvh - 50dvh - 88px);
     }
+    body.edit-mode.split-view-active #slide-navigator,
+    body.edit-mode #slide-navigator { bottom: 50dvh; }
     #editor-panel-body {
         padding: var(--sp-3);
     }

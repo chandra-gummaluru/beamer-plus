@@ -112,7 +112,7 @@ body.focus-mode #recorder-bar:focus-within { opacity: 1; }
     transition: opacity var(--dur-base), transform var(--dur-base) var(--ease-out);
 }
 #recorder-toast.is-visible { opacity: 1; transform: none; }
-body.split-view-active #recorder-toast { bottom: calc(88px + var(--sp-3) + var(--hit-min) + var(--sp-2)); }
+body.split-view-active #recorder-toast { bottom: calc(88px + var(--sp-3)); }
 @media (max-width: 1024px) {
     #recorder-toast { right: var(--sp-2); bottom: calc(100px + var(--sp-3) + var(--hit-min) + var(--sp-2)); }
 }
