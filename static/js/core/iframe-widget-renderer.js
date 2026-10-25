@@ -820,7 +820,7 @@ const _PRINT_PRELUDE = `<script id="bw-print-sandbox">
 // Windows of print copies — their messages must not be taken for the live
 // widget's (they share its widget id).
 const _printWindows = new WeakSet();
-export function isPrintWindow(win) { return !!win && _printWindows.has(win); }
+function isPrintWindow(win) { return !!win && _printWindows.has(win); }
 
 /**
  * Print one widget. Resolves to
@@ -931,7 +931,7 @@ export async function printWidget(w, { zipFile, box, fullBox = null, state, scal
 
 // ── Talking to one widget ──────────────────────────────────────────────────
 
-export function findWidgetIframe(widgetId) {
+function findWidgetIframe(widgetId) {
     return document.querySelector(`.widget-iframe[data-widget-id="${CSS.escape(String(widgetId))}"]`);
 }
 

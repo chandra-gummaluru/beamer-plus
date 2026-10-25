@@ -153,7 +153,7 @@ export function syncPropertiesPosition() {
     set('prop-h', Math.round((item.height ?? 0.3) * 100));
 }
 
-export function applyPropertiesQuiet() {
+function applyPropertiesQuiet() {
     const { arrKey, index, div } = ctx.selectedOverlay || {};
     if (!arrKey) return;
     const cfg  = getOrCreateConfig();
@@ -198,7 +198,7 @@ export function applyPropertiesQuiet() {
         item.path ? item.path.split('/').pop() : (item.type || arrKey));
 }
 
-export function deleteItem(arrKey, index) {
+function deleteItem(arrKey, index) {
     const cfg = getOrCreateConfig();
     if (!cfg?.[arrKey]) return;
     cfg[arrKey].splice(index, 1);

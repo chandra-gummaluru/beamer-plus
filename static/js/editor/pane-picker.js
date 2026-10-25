@@ -13,8 +13,6 @@
 
 let _pick = null;   // { picks: [], onDone, bar, cleanup }
 
-export function isPickingPanes() { return !!_pick; }
-
 export function pickPanes({ onDone, onCancel } = {}) {
     cancelPick();
     const bar = document.createElement('div');

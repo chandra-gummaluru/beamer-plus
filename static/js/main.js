@@ -12,13 +12,12 @@ import { updateWidgetPositions,
 
 import { initToolbar } from './annotations/toolbar.js';
 import { initPenSlots } from './annotations/pen-slots.js';
-import { initShapeTools } from './annotations/shape-tools.js';
 import { initTextAnnotations, wireTextCanvas, commitOpenTextEditor,
          clearTextBoxes, resetAllTextBoxes } from './annotations/text-annotate.js';
 
 import { initNavigator } from './slides/navigator.js';
 import { initThumbnails } from './slides/thumbnails.js';
-import { initSlideStructure, getSlideLabels, slideUid, configKeyOf, realSlideCount, isDeletableSlide } from './slides/structure.js';
+import { initSlideStructure, getSlideLabels, slideUid, configKeyOf, realSlideCount } from './slides/structure.js';
 import { initNavDrawer, isNavCollapsed, setNavCollapsed } from './slides/drawer.js';
 import { initReveals, renderReveals, resetRevealsOnArrival, stepReveal, updateStepBadge } from './slides/reveals.js';
 import { applyPaper } from './slides/paper.js';
@@ -27,14 +26,14 @@ import { initSpotlight, hideSpotlight, renderSpotlight,
 import { initMagnifier, hideMagnifier } from './slides/magnifier.js';
 import { initMedia, renderMedia, updateMediaPositions, resetMediaCache } from './slides/media.js';
 
-import { initSettings, loadShortcuts } from './app/settings.js';
+import { loadShortcuts } from './app/settings.js';
 import { initUploader } from './app/uploader.js';
 import { startTour } from './app/tour.js';
 import { initEditor } from './editor/editor.js';
 import { initRecorder } from './app/recorder.js';
 import { initLibrary } from './library/ui.js';
 import { initSessionButtons } from './app/session-buttons.js';
-import { getSessionId, sessionUrl, saveLastSession } from './app/session.js';
+import { getSessionId, sessionUrl } from './app/session.js';
 
 /* ─── Render generation counters ─────────────────────────────── */
 // Incremented each time a new render starts for each pane.
@@ -103,7 +102,7 @@ async function readUserFileBytes(file) {
     }
 }
 
-// The uploaded file's name without its extension — what Save names the ZIP.
+// The opened file's name without its extension — what Save names the ZIP.
 function deckNameOf(file) {
     const n = String(file?.name || '').replace(/\.(zip|pdf)$/i, '').trim();
     return n || 'presentation';
@@ -116,7 +115,6 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.replace('/');
         return;
     }
-    saveLastSession(sessionId);
 
     // splash
     setTimeout(() => {
@@ -157,15 +155,12 @@ document.addEventListener('DOMContentLoaded', () => {
     initMedia(state);
     initToolbar(state);
     initPenSlots(state);
-    // (the toolbar is fixed: docked right; it used to be draggable)
-    initShapeTools(state);
     initTextAnnotations(state);
     initUploader(state);
     initEditor(state);
     initRecorder(state);
     initLibrary(state);
     initSessionButtons(state);
-    initSettings();
     // Must run before applyDefaultPen(): that call emits a 'tool:change' to
     // sync other modules' tracked "previous tool" state (see below), and
     // spotlight.js's own 'tool:change' handler dereferences state that only
@@ -218,7 +213,6 @@ document.addEventListener('DOMContentLoaded', () => {
         await loadPdfPresentation(file);
     });
 
-    bus.emit('app:ready');
 });
 
 async function uploadZipToServer(zip, modal, name = 'presentation.zip') {
@@ -237,7 +231,7 @@ async function uploadZipToServer(zip, modal, name = 'presentation.zip') {
 
 /* ─── annotation canvas helpers ───────────────────────────────── */
 // Apply an operation to every annotation canvas (left + right pane) so tool,
-// pen, and shape selections configure whichever pane the user draws on.
+// and pen selections configure whichever pane the user draws on.
 function forEachAnnCvs(fn) {
     if (state.annCvs)  fn(state.annCvs);
     if (state.annCvs2) fn(state.annCvs2);
@@ -279,7 +273,6 @@ function applyDefaultPen() {
     const handBtn = document.querySelector('[data-tool="hand"], #hand-btn');
     state.annotationTool = 'hand';
     forEachAnnCvs(c => c.setPointerMode('hand'));
-    setShapeSidebarVisible(false);
     setTextToolActive(false);
     clearToolSelection();
     handBtn?.classList.add('btn_selected');
@@ -299,15 +292,14 @@ function wireHandButton() {
         commitOpenTextEditor(state);
         state.annotationTool = 'hand';
         forEachAnnCvs(c => c.setPointerMode('hand'));
-        setShapeSidebarVisible(false);
-        setTextToolActive(false);
+            setTextToolActive(false);
         clearToolSelection();
         btn.classList.add('btn_selected');
     });
 }
 
 function wireEraserButton() {
-    const btn = document.querySelector('[data-tool="eraser"], #eraser-btn');
+    const btn = document.querySelector('[data-tool="eraser"]');
     if (!btn) return;
     let held = false;
     addHoldListener(btn, () => {
@@ -321,8 +313,7 @@ function wireEraserButton() {
         commitOpenTextEditor(state);
         state.annotationTool = 'erase';
         forEachAnnCvs(c => { c.setPointerMode('erase'); c.setStrokeWidth(state.eraserSize ?? 2); });
-        setShapeSidebarVisible(false);
-        setTextToolActive(false);
+            setTextToolActive(false);
         clearToolSelection();
         btn.classList.add('btn_selected');
     });
@@ -345,7 +336,6 @@ bus.on('pen:select', (pen) => {
         c.setStrokeColor(pen.color);
         c.setStrokeWidth(pen.size);
     });
-    setShapeSidebarVisible(false);
     setTextToolActive(false);
 });
 
@@ -354,10 +344,9 @@ bus.on('tool:change', (tool) => {
     if (tool !== 'text') commitOpenTextEditor(state);
     state.annotationTool = tool;
     // Map toolbar tool names to canvas pointer modes
-    const modeMap = { eraser: 'erase', laser: 'hand', select: 'hand', shape: 'shape', hand: 'hand', spotlight: 'hand', magnify: 'hand', text: 'text' };
+    const modeMap = { eraser: 'erase', hand: 'hand', spotlight: 'hand', magnify: 'hand', text: 'text' };
     const mode = modeMap[tool] || 'hand';
     forEachAnnCvs(c => c.setPointerMode(mode));
-    if (tool !== 'shape') setShapeSidebarVisible(false);
     setTextToolActive(tool === 'text');
     // The magnifier needs the same thing the spotlight does: widgets that
     // don't swallow pointer moves, or the lens freezes over them.
@@ -365,19 +354,6 @@ bus.on('tool:change', (tool) => {
     if (tool !== 'spotlight') hideSpotlight(true);
     if (tool !== 'magnify') hideMagnifier();
 });
-
-bus.on('shape:select', (shape) => {
-    forEachAnnCvs(c => {
-        c.setShapeTool(shape);
-        c.setPointerMode('shape');
-    });
-});
-
-function setShapeSidebarVisible(visible) {
-    const sidebar = document.getElementById('shape-sidebar');
-    if (sidebar) sidebar.style.display = visible ? 'flex' : 'none';
-    document.body.classList.toggle('shape-tools-visible', visible);
-}
 
 // While the text tool is active, the annotation canvas needs to sit above
 // widgets/video/model-viewer so a tap over them places text instead of
@@ -528,9 +504,9 @@ function toggleMute(force) {
 // Launched from the welcome page's "Try Demo" button, which creates a
 // session and lands here with ?tour=1. Loads the demo deck if nothing is
 // loaded yet, so every step has something to point at.
-function launchTour({ demo = false } = {}) {
+function launchTour() {
     if (isNavCollapsed()) setNavCollapsed(false, { persist: false });
-    const loader = state.zipFile && !demo ? null : async () => {
+    const loader = state.zipFile ? null : async () => {
         window.BeamerModal?.show({ kind: 'loading', title: 'Loading demo…', message: 'Fetching demo presentation…' });
         const resp = await fetch('/api/demo-zip');
         if (!resp.ok) { window.BeamerModal?.close(); return; }
@@ -539,10 +515,6 @@ function launchTour({ demo = false } = {}) {
     };
     startTour(loader);
 }
-
-// "Demo presentation" (the upload window, the empty stage): always the demo
-// deck, then the tour.
-bus.on('demo:open', () => launchTour({ demo: true }));
 
 function maybeStartTourFromUrl() {
     const params = new URLSearchParams(window.location.search);
@@ -581,7 +553,6 @@ function wireBookmarkButton() {
 function toggleBookmark(i) {
     if (state.bookmarks[i]) delete state.bookmarks[i];
     else state.bookmarks[i] = true;
-    bus.emit('bookmarks:changed', state.bookmarks);
     populateBookmarkPins();
     syncBookmarkButton();
 }
@@ -883,15 +854,12 @@ async function showViewWithUndefinedPane(viewIdx, L, R, direction) {
     else blankPane(true);
 
     updateSlideNavigator();
-    updateBlankSlideButtons();
     updateStepBadge();
     bus.emit('slide:changed', state.currentSlide);
 }
 
 /* ─── slide navigation ────────────────────────────────────────── */
 bus.on('slide:goto', (i) => goToSlide(i));
-bus.on('slide:next', () => navStep(+1));
-bus.on('slide:prev', () => navStep(-1));
 bus.on('slide:goto-right', (i) => queueNav(async () => {
     if (!state.splitView || i === state.currentSlide) return;
     await commitOpenTextEditor(state);
@@ -1058,7 +1026,6 @@ async function _goToSlide(i, direction = null, isSplitPaneNav = false) {
         await renderLogicalSlide(i);
     }
     updateSlideNavigator();
-    updateBlankSlideButtons();
     updateStepBadge();
     bus.emit('slide:changed', i);
 }
@@ -1084,9 +1051,9 @@ async function setSplitActive(active, rightIndex = null, splitRatio = null) {
     document.body.classList.toggle('split-view-active', active);
     if (btn) btn.classList.toggle('btn_selected', active);
 
-    // Edit, download and upload all work in split view too: entering edit
-    // mode shows the view slide's configuration, saving keeps both panes'
-    // ink, and an upload closes the split before loading the new deck.
+    // Edit, save and open all work in split view too: entering edit mode
+    // shows the view slide's configuration, saving keeps both panes' ink,
+    // and opening another deck closes the split before loading it.
 
     if (active) {
         if (!state.annCvs2) {
@@ -1097,12 +1064,10 @@ async function setSplitActive(active, rightIndex = null, splitRatio = null) {
             wireAnnCanvasActivation(state.annCvs2);
         }
         // Mirror the left pane's current tool so the right pane is immediately
-        // drawable with the same pen/shape/mode the user already selected.
+        // drawable with the same pen and mode the user already selected.
         state.annCvs2.setPointerMode(state.annCvs.pointer_mode);
         state.annCvs2.setStrokeColor(state.annCvs.strokeColor);
         state.annCvs2.setStrokeWidth(state.annCvs.strokeWidth);
-        state.annCvs2.setShapeTool(state.annCvs.shapeTool);
-        state.annCvs2.setShapeMode(state.annCvs.shapeMode);
         state.rightSlideIndex = rightIndex ?? Math.min(state.currentSlide + 1, state.slideStructure.length - 1);
         applySplitRatio(splitRatio ?? state.splitRatio);
     }
@@ -1164,25 +1129,10 @@ function updateSlideNavigator() {
             rightZone.classList.toggle('is-disabled', state.splitView && idx === state.currentSlide   && idx !== state.rightSlideIndex);
         }
 
-        // Clear any legacy inline styles
-        el.style.pointerEvents = '';
-        el.style.opacity = '';
     });
     if (viewIdx != null) {
         document.querySelector(`#slide-nav-slides .slide-nav-item[data-index="${viewIdx}"]`)
             ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-    }
-}
-
-function updateBlankSlideButtons() {
-    const obj = state.slideStructure[state.currentSlide];
-    const addBtn  = document.getElementById('add-blank-btn');
-    const delBtn  = document.getElementById('delete-blank-btn');
-    if (delBtn) {
-        const deletable = isDeletableSlide(obj);
-        delBtn.disabled = !deletable;
-        delBtn.style.opacity = deletable ? '1' : '0.5';
-        delBtn.title = obj?.type === 'pdf' ? 'Delete duplicated slide' : 'Delete blank slide';
     }
 }
 
@@ -1422,12 +1372,11 @@ function saveCurrentAnnotations() {
 
 /* ─── empty stage placeholder ─────────────────────────────────── */
 // Controls that only mean anything once the deck holds at least one slide:
-// split view, save/download, bookmark, edit mode, and the whole annotation
+// split view, bookmark, edit mode, and the whole annotation
 // toolbar (tools, pen slots, undo/redo, clear). Disabling the buttons also
 // covers the keyboard shortcuts, which fire by clicking them — a disabled
 // button ignores .click().
-// Upload and "insert blank slide" stay live: they are how you leave the empty
-// state. Pen slots are built once by initPenSlots() during bootstrap, so they
+// "New page" stays live: it is a way out of the empty state. Pen slots are built once by initPenSlots() during bootstrap, so they
 // are already in the DOM the first time this runs.
 const STAGE_CONTROL_SELECTOR = [
     '#split-toggle',
@@ -1463,8 +1412,8 @@ function setStageControlsEnabled(enabled) {
     updateHistoryBtns();
 }
 
-// Shown only while the deck holds no slides at all (fresh session before any
-// upload, or after the last blank slide is deleted). Called from
+// Shown only while the deck holds no slides at all (a fresh session before a
+// presentation is opened, or after the last blank slide is deleted). Called from
 // populateSlideNavigator(), which every structure change funnels through.
 function updateStageEmptyState() {
     const el = document.getElementById('stage-empty');
@@ -1527,19 +1476,6 @@ bus.on('paper:changed', () => {
 bus.on('nav:refresh', () => populateSlideNavigator());
 // Duplicating a slide copies its annotations — commit what's on stage first.
 bus.on('annotations:flush', () => saveCurrentAnnotations());
-
-// Live divider-position preview while the slider is being dragged.
-// Only adjusts CSS flex proportions — does NOT resize canvas pixel dimensions,
-// so the existing rendered slide content stays visible (stretched slightly by CSS).
-bus.on('view:set-ratio', (ratio) => {
-    if (!state.splitView) return;
-    applySplitRatio(ratio);
-    sizeSlideCanvases();   // CSS size and place only: the bitmaps stretch until the commit
-    updateWidgetPositions(document.getElementById('pdf-canvas'));
-    updateWidgetPositions(document.getElementById('pdf-canvas-2'));
-    updateMediaPositions(document.getElementById('pdf-canvas'));
-    updateMediaPositions(document.getElementById('pdf-canvas-2'));
-});
 
 // Full resize + re-render committed when the slider is released.
 bus.on('view:ratio-commit', async (ratio) => {
@@ -1859,7 +1795,6 @@ bus.on('slides:reordered', async () => {
         await renderLogicalSlide(state.currentSlide, false, true);
     }
     updateSlideNavigator();
-    updateBlankSlideButtons();
 });
 
 /* ─── thumbnail generation ────────────────────────────────────── */
@@ -1880,7 +1815,7 @@ async function generateThumbnails() {
 }
 
 /* ─── upload (public) ─────────────────────────────────────────── */
-export async function loadZipPresentation(file) {
+async function loadZipPresentation(file) {
     const modal = window.BeamerModal;
     modal?.show({ kind: 'loading', title: 'Loading…', message: 'Parsing presentation…' });
 
@@ -1959,10 +1894,8 @@ export async function loadZipPresentation(file) {
         await renderLogicalSlide(0);
         await generateThumbnails();
         populateSlideNavigator();
-        updateBlankSlideButtons();
-
+    
         modal?.close();
-        enableControls();
         if (resumeAt) await goToSlide(resumeAt);
         bus.emit('deck:loaded', { kind: 'zip' });
     } catch (err) {
@@ -1972,7 +1905,7 @@ export async function loadZipPresentation(file) {
     }
 }
 
-export async function loadPdfPresentation(file) {
+async function loadPdfPresentation(file) {
     const modal = window.BeamerModal;
     modal?.show({ kind: 'loading', title: 'Loading…', message: 'Parsing PDF…' });
 
@@ -2013,9 +1946,7 @@ export async function loadPdfPresentation(file) {
         await renderLogicalSlide(0);
         await generateThumbnails();
         populateSlideNavigator();
-        updateBlankSlideButtons();
-        modal?.close();
-        enableControls();
+            modal?.close();
         bus.emit('deck:loaded', { kind: 'pdf' });
     } catch (err) {
         console.error('PDF load error:', err);
@@ -2034,7 +1965,3 @@ function adoptSource(file) {
     state.pendingTarget = null;
 }
 
-function enableControls() {
-    const els = document.querySelectorAll('.controls-disable-before-load');
-    els.forEach(el => { el.disabled = false; el.style.opacity = '1'; el.style.pointerEvents = 'auto'; });
-}

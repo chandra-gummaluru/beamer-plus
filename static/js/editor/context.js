@@ -94,11 +94,6 @@ export function resolvePanelMode() {
     return 'slide';
 }
 
-export function getCurrentPdfIndex() {
-    const obj = ctx.state.slideStructure[ctx.state.currentSlide];
-    return obj?.type === 'pdf' ? obj.pdfIndex : null;
-}
-
 export function getOrCreateConfig() {
     const obj = ctx.state.slideStructure[ctx.state.currentSlide];
     if (!obj) return null;
@@ -146,7 +141,3 @@ export function escHtml(s) {
     return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-// Safe element-id fragment for a custom field key (avoids CSS.escape dependency)
-export function fieldId(key) {
-    return 'prop-custom-' + key.replace(/[^a-zA-Z0-9_-]/g, '_');
-}

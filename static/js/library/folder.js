@@ -8,7 +8,6 @@
 // Uses the File System Access API (Chrome, Edge).
 
 const DB = 'beamer-folder', STORE = 'handles';
-export const ROLES = ['open', 'save'];
 
 export const supported = () => typeof window.showDirectoryPicker === 'function';
 

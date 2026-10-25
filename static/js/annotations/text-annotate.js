@@ -635,7 +635,6 @@ function closeActiveEditor(state, commit, revert = false) {
         if (rect) {
             boxes.push({ x, y, rect, size, color, text });
         }
-        bus.emit('textbox:committed');
         if (revert) restorePreviousSelection();
     });
 }

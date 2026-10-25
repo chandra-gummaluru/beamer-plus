@@ -25,7 +25,7 @@
 import { bus } from '../core/events.js';
 import * as Folder from './folder.js';
 import { toast } from '../app/toast.js';
-import { setUploadButtonHandler, setDropHandler, chooseLocalFile, openPresentationFile } from '../app/uploader.js';
+import { setDropHandler, chooseLocalFile, openPresentationFile } from '../app/uploader.js';
 import { buildPresentationZip } from '../editor/save.js';
 import { buildNotesPdf } from '../editor/notes-export.js';
 import { listRecordings, getRecording, updateRecording, downloadRecording, formatSize } from '../app/recorder.js';
@@ -43,8 +43,8 @@ const folderSource = role => ({
     refresh() {},
 });
 const FOLDERS = { open: folderSource('open'), save: folderSource('save') };
-// Where a target lives ('folder' is from before Open and Save had their own).
-const roleOf = t => (t?.src === 'save' ? 'save' : (t?.src === 'open' || t?.src === 'folder') ? 'open' : null);
+// Where a target lives: Open's folder or Save's.
+const roleOf = t => (t?.src === 'save' ? 'save' : t?.src === 'open' ? 'open' : null);
 // "Download instead": files go to the browser's downloads folder, one download each.
 const COMPUTER = {
     kind: 'computer', id: 'computer', name: 'this computer', where: 'this computer', limit: null,
@@ -79,7 +79,7 @@ const join = (dir, name) => (dir ? `${dir}/${name}` : name);
 const isDeck = name => /\.(zip|pdf)$/i.test(name);
 const byName = (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true });
 /** A name that's safe as a file name on any system. */
-export const cleanName = s => String(s || '').replace(/[\\/:*?"<>|#%\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/^\.+/, '');
+const cleanName = s => String(s || '').replace(/[\\/:*?"<>|#%\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/^\.+/, '');
 const wantNotes = () => { try { return localStorage.getItem(NOTES_KEY) !== '0'; } catch { return true; } };
 const showError = (title, err) => window.BeamerModal?.show({ kind: 'error', title, message: err?.message || String(err) });
 const loading = (title, message = '') => window.BeamerModal?.show({ kind: 'loading', title, message });
@@ -109,10 +109,8 @@ function recordingPath(t, meta, ext) {
 
 export function initLibrary(state) {
     appState = state;
-    setUploadButtonHandler(() => { openPresentation(); });
     // A file dropped on the window opens as it is (it isn't in the folder).
     setDropHandler((file) => { appState.pendingTarget = null; openPresentationFile(file); });
-    bus.on('library:open', () => openPresentation());
     bus.on('library:require', requirePresentation);
     bus.on('deck:loaded', () => {
         required = false;
@@ -125,14 +123,11 @@ export function initLibrary(state) {
 }
 
 /** The tab's title: the presentation's name. */
-export function updateTitle() {
+function updateTitle() {
     const t = appState?.target;
     const name = t?.name || (appState?.zipFile ? appState.deckName : '');
     document.title = name ? `${name} · Beamer+` : 'Beamer+';
 }
-
-/** The name of the folder a target lives in, for display (or ''). */
-export const folderLabel = t => (roleOf(t) ? Folder.rootName(roleOf(t)) : '');
 
 /* ─── the window ──────────────────────────────────────────────── */
 
@@ -484,7 +479,7 @@ async function writeOut(src, t, files, saved, { deck, notes }) {
         bus.emit('library:saved', { target: t });
     } catch (e) {
         console.error('[library] save failed', e);
-        const kept = saved.length ? ' Your recordings are still in Beamer+ (Download menu) until you delete them.' : '';
+        const kept = saved.length ? ' Your recordings stay in Beamer+, ready for the next save.' : '';
         const buttons = [
             { label: 'Close', kind: 'cancel' },
             { label: 'Try again', kind: src.kind === 'computer' ? 'ok' : 'cancel', onClick: () => setTimeout(() => writeOut(src, t, files, saved, { deck, notes }), 0) },

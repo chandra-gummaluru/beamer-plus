@@ -12,7 +12,7 @@ export function initMedia(state) {
 
 /* ─── media cache ─────────────────────────────────────────────── */
 
-export async function loadMedia(path) {
+async function loadMedia(path) {
     if (_state.mediaCache[path]) return _state.mediaCache[path];
     const f = _state.zipFile?.file(path);
     if (!f) return null;

@@ -30,7 +30,7 @@ const cfgOf = (obj) => {
 };
 
 /** The distinct step numbers on a slide, ascending. */
-export function stepsOf(cfg) {
+function stepsOf(cfg) {
     if (!cfg) return [];
     const set = new Set();
     const add = (it) => { const n = parseInt(it?.step, 10); if (n > 0) set.add(n); };

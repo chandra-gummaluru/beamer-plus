@@ -17,7 +17,7 @@
 import { ctx, WIDGET_RESERVED } from './context.js';
 import { resolveWidgetPath, findWidgetFile } from '../core/iframe-widget-renderer.js';
 
-// cache key → Promise<{ label, customSettings, fields } | null>. Keyed by
+// cache key → Promise<{ label, fields, … } | null>. Keyed by
 // source rather than by widget id: two survey widgets share one schema, and
 // the fetch should happen once per deck.
 const _cache = new Map();
@@ -41,11 +41,6 @@ export function getWidgetSchema(item) {
         }));
     }
     return _cache.get(key);
-}
-
-/** Drop the cache — a re-uploaded widget of the same type may declare different fields. */
-export function clearWidgetSchemaCache() {
-    _cache.clear();
 }
 
 async function loadSchema(item) {
@@ -87,7 +82,6 @@ async function loadSchema(item) {
 
     return {
         label: typeof schema?.label === 'string' ? schema.label : null,
-        customSettings: !!schema?.customSettings,
         // Takes setting changes while running (widget-settings-dialog.js).
         liveSettings: schema?.liveSettings === true,
         // Only works as the whole slide (a notebook, a workspace, a circuit
@@ -164,7 +158,7 @@ export function setWidgetDisplay(item, schema, display) {
 }
 
 /** The steps of the top bar's text-size stepper (SCALE_STEPS in widget-settings-kit.js). */
-export const TEXT_SIZES = ['1', '1.2', '1.4', '1.7', '2', '2.4'];
+const TEXT_SIZES = ['1', '1.2', '1.4', '1.7', '2', '2.4'];
 
 /** The universal Text size field. Keep in step with textSizeField() in widget-settings-kit.js. */
 export function textSizeField(def = '1.4') {

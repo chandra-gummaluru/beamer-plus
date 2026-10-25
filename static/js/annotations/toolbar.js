@@ -1,4 +1,4 @@
-// Annotation toolbar — owns tool selection (pen/eraser/laser/shape/select).
+// Annotation toolbar — owns tool selection (hand, spotlight, magnifier, text, eraser).
 import { bus } from '../core/events.js';
 
 export function initToolbar(state) {
@@ -11,9 +11,6 @@ export function initToolbar(state) {
             document.querySelectorAll('#tool-container .btn').forEach(b => b.classList.remove('btn_selected'));
             btn.classList.add('btn_selected');
             state.annotationTool = btn.dataset.tool;
-            const shapeSidebar = document.getElementById('shape-sidebar');
-            if (shapeSidebar) shapeSidebar.style.display =
-                btn.dataset.tool === 'shape' ? 'flex' : 'none';
             // Note: the text-size sidebar is deliberately NOT shown here —
             // it only appears once a textbox is actually open (see
             // main.js's textbox:opened/closed listeners), not just because

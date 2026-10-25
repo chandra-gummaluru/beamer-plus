@@ -1,10 +1,9 @@
 // Lecture recorder — records this tab (slides, ink, widgets) with optional
-// microphone and tab sound, and keeps every take until it is
-// downloaded or deleted.
+// microphone and tab sound, and keeps every take until it is saved with
+// the presentation (library/ui.js).
 //
-//   ● Record button (bottom-right, next to Mute) → options dialog → browser's share picker
+//   ● Record button (bottom-right) → options dialog → browser's share picker
 //   ● Recording bar (replaces the record button) → timer, pause / resume, stop
-//   ● Download menu              → lists every take (download-menu.js)
 //
 // Takes are written to IndexedDB a second at a time while recording, so a
 // reload or a crashed tab loses at most the last second. If IndexedDB is not
@@ -21,12 +20,11 @@ const VIDEO_BPS = 3_000_000;
 const AUDIO_BPS = 128_000;
 // Takes are split into parts of at most ~PART_BYTES, so no one file gets too
 // big to save, upload or play comfortably. A new part starts at ROTATE_AT.
-export const PART_BYTES = 45e6;
+const PART_BYTES = 45e6;
 const ROTATE_AT = 40e6;
 
 let appState = null;
 let active = null;              // the take in progress, or null
-const changeListeners = new Set();
 
 /* ─── public API ──────────────────────────────────────────────── */
 
@@ -53,22 +51,16 @@ export function initRecorder(state) {
 }
 
 /** Can this browser record the tab? */
-export const recordingSupported = () => !!navigator.mediaDevices?.getDisplayMedia && typeof MediaRecorder !== 'undefined';
+const recordingSupported = () => !!navigator.mediaDevices?.getDisplayMedia && typeof MediaRecorder !== 'undefined';
 
 /** The record button: the recorder's start dialog. */
-export function openRecorder() {
+function openRecorder() {
     if (active) return;
     openStartDialog();
 }
 
 /** True while a take is in progress (recording or paused). */
 export function isRecording() { return !!active; }
-
-/** Notified whenever the list of takes or the active take changes. */
-export function onRecordingsChange(fn) {
-    changeListeners.add(fn);
-    return () => changeListeners.delete(fn);
-}
 
 /** Every finished take, newest first. */
 export async function listRecordings() {
@@ -102,13 +94,6 @@ export async function updateRecording(id, patch) {
     const meta = (await store.allMeta()).find(m => m.id === id);
     if (!meta) return;
     await store.putMeta({ ...meta, ...patch });
-    emitChange();
-}
-
-export async function deleteRecording(id) {
-    if (active && (await store.allMeta()).some(m => m.id === id && m.status === 'recording')) return;
-    await store.remove(id);
-    emitChange();
 }
 
 /* ─── start dialog ────────────────────────────────────────────── */
@@ -320,7 +305,6 @@ async function startRecording({ mic, sound }) {
     display.getVideoTracks()[0]?.addEventListener('ended', () => stopRecording());
 
     showBar();
-    emitChange();
 
     if (sound && !displayAudio.length) {
         toast('No tab sound: “Also share tab audio” was off. Stop and start again to include it.');
@@ -406,7 +390,6 @@ async function rotatePart(a) {
     }
     a.doneMs += partElapsed(a, old);
     a.closing.push(closePart(a, old));
-    emitChange();
 }
 
 /** Stop part p's recorder; resolves once all of it is saved. */
@@ -420,7 +403,6 @@ function closePart(a, p) {
             p.meta.durationMs = Math.round(p.frozenMs);
             p.meta.status = 'done';
             try { await store.putMeta({ ...p.meta }); } catch (err) { console.warn('[recorder]', err); }
-            emitChange();
             resolve();
         };
         if (p.mr.state === 'inactive') { finish(); return; }
@@ -466,7 +448,6 @@ export function stopRecording() {
         try { await a.audioCtx?.close(); } catch { /* already closed */ }
         if (active === a) active = null;
         hideBar();
-        emitChange();
         toast(a.partCount > 1
             ? `Recording ${a.number} saved in ${a.partCount} parts — find them under Download.`
             : `Recording ${a.number} saved — find it under Download.`);
@@ -563,13 +544,9 @@ function showError(title, err) {
     window.BeamerModal?.show({ kind: 'error', title, message: err?.message || String(err) });
 }
 
-function emitChange() {
-    for (const fn of changeListeners) { try { fn(); } catch (e) { console.error(e); } }
-}
-
 /* ─── formatting ──────────────────────────────────────────────── */
 
-export function formatDuration(ms) {
+function formatDuration(ms) {
     const s = Math.max(0, Math.floor(ms / 1000));
     const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
     const pad = (n) => String(n).padStart(2, '0');
@@ -596,18 +573,15 @@ function safeName(s) {
 
 async function recoverInterrupted() {
     const all = await store.allMeta();
-    let changed = false;
     for (const m of all) {
         if (m.status !== 'recording') continue;
         if (active && m.group === active.group) continue;
         const chunks = await store.chunks(m.id);
-        if (!chunks.length) { await store.remove(m.id); changed = true; continue; }
+        if (!chunks.length) { await store.remove(m.id); continue; }
         m.status = 'done';
         m.recovered = true;
         await store.putMeta(m);
-        changed = true;
     }
-    if (changed) emitChange();
 }
 
 const store = (() => {

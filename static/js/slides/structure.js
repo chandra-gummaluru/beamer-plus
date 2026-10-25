@@ -23,7 +23,6 @@ export function initSlideStructure(state) {
     document.getElementById('add-view-btn')?.addEventListener('click',  () => {
         if (_state.editMode) bus.emit('view:insert-pick'); else insertViewAfterCurrent();
     });
-    document.getElementById('delete-blank-btn')?.addEventListener('click', () => deleteCurrentBlank());
     bus.on('slide:delete', (i) => deleteSlideAt(i));
 }
 
@@ -220,7 +219,7 @@ function insertBlankAfterCurrent(paper = null) {
 // on stage on the right, the one before it on the left (on slide 8: 7 | 8).
 // View slides are skipped. On the first slide there is nothing before it, so
 // it pairs with the one after instead.
-export function defaultViewPanes(structure, current) {
+function defaultViewPanes(structure, current) {
     const real = (i) => structure[i] && structure[i].type !== 'view';
     const prevReal = (i) => { for (let j = i - 1; j >= 0; j--) if (real(j)) return j; return null; };
     const nextReal = (i) => { for (let j = i + 1; j < structure.length; j++) if (real(j)) return j; return null; };
@@ -261,12 +260,6 @@ export function insertViewAfterCurrent(chosen = null) {
     bus.emit('slide:goto', ins);
 }
 
-// Slides the navigator's delete button may remove: blanks, and duplicated
-// PDF pages (the original page stays in the deck either way).
-export function isDeletableSlide(obj) {
-    return obj?.type === 'blank' || (obj?.type === 'pdf' && !!obj.cfgId);
-}
-
 // Delete any slide (Remove slide in the editor panel, edit mode). A PDF
 // page removed this way leaves the deck; its page stays in slides.pdf, so
 // re-uploading the deck brings it back.
@@ -279,19 +272,6 @@ function deleteSlideAt(idx) {
     s.currentSlide = Math.max(0, Math.min(wasCurrent ? idx : s.currentSlide, n - 1));
     bus.emit('nav:refresh');
     if (n) bus.emit('slide:goto', s.currentSlide);
-}
-
-function deleteCurrentBlank() {
-    const obj = _state.slideStructure[_state.currentSlide];
-    if (!isDeletableSlide(obj)) return;
-    const del = _state.currentSlide;
-    removeSlideAt(del);
-    // Deleting the only slide leaves an empty deck — clamp to 0 so the next
-    // insert lands at the start rather than off the front of the array.
-    const next = Math.max(0, Math.min(del, _state.slideStructure.length - 1));
-    _state.currentSlide = next;
-    bus.emit('nav:refresh');
-    bus.emit('slide:goto', next);
 }
 
 /* ─── duplicate ───────────────────────────────────────────────── */

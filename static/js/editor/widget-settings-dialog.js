@@ -27,10 +27,10 @@ import { enhanceSelects } from './dropdown.js';
 import { findWidgetItem } from './widget-settings.js';
 
 // What the editor panel edits instead (widget-panel.js).
-export const GENERAL_KEYS = new Set(['title', 'scale']);
+const GENERAL_KEYS = new Set(['title', 'scale']);
 
 /** The widget's own fields: everything but Name and Text size. */
-export const ownFields = (schema) => (schema?.fields || []).filter(f => !GENERAL_KEYS.has(f.key));
+const ownFields = (schema) => (schema?.fields || []).filter(f => !GENERAL_KEYS.has(f.key));
 
 // Long enough that a burst of typing is one update, short enough to feel live.
 const PUSH_DELAY = 250;
@@ -61,7 +61,7 @@ export function initWidgetSettingsDialog() {
     for (const ev of ['deck:loaded', 'session:ending']) bus.on(ev, () => closeWidgetSettings());
 }
 
-export async function openWidgetSettings(widgetId) {
+async function openWidgetSettings(widgetId) {
     const id = String(widgetId);
     // The same pencil again: the sheet is already there — bring focus back.
     if (_open?.id === id) { _open.form.focusFirst?.(); return; }

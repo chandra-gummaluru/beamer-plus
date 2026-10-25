@@ -1,25 +1,14 @@
 // Upload — loading a presentation from a PDF or a saved Beamer+ ZIP.
-// Ways in: the Open window a session starts with (library/ui.js), or dropping the file anywhere on the window. Opening
-// shows the folder browser (library/ui.js registers it here); both route by
-// file type and hand off through bus events, keeping this decoupled from
-// main.js.
+// Ways in: the Open window a session starts with (library/ui.js), or dropping
+// the file anywhere on the window. Both route by file type and hand off
+// through bus events, keeping this decoupled from main.js.
 import { bus } from '../core/events.js';
 
-// Opening a presentation shows the folder browser instead of the file picker
-// (library/ui.js registers that here).
-let buttonHandler = null;
-export function setUploadButtonHandler(fn) { buttonHandler = fn; }
-// …and a file dropped on the window goes here.
+// A file dropped on the window goes here (library/ui.js registers it).
 let dropHandler = null;
 export function setDropHandler(fn) { dropHandler = fn; }
-/** The computer's file picker, whatever openUpload does. */
+/** The computer's file picker. */
 export function chooseLocalFile() { document.getElementById('upload-presentation')?.click(); }
-/** Open a presentation: the folder browser, or the file picker without one. */
-export function openUpload() {
-    if (!uploadAllowed()) return;
-    if (buttonHandler && buttonHandler() !== false) return;
-    chooseLocalFile();
-}
 
 export function initUploader() {
     const input = document.getElementById('upload-presentation');

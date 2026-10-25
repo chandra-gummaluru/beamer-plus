@@ -1,10 +1,11 @@
 // Widget settings form — the controls for a widget's own declared fields,
 // built from its `widget-schema` block (see editor/widget-schema.js).
 //
-// Shown in the editor's right panel when a widget is selected
-// (widget-panel.js); the panel can be widened, and then the groups flow in
-// two columns. A choice of two or three short options is drawn as a
-// segmented control and Text size as a row of growing A's.
+// Two hosts: the widget's settings sheet, opened from its pencil while
+// presenting (widget-settings-dialog.js, variant 'sheet'), and the editor
+// panel, which only shows Text size (widget-panel.js, variant 'panel'). A
+// choice of two or three short options is drawn as a segmented control and
+// Text size as a row of growing A's.
 //
 // Beyond the basic field types, a schema can opt into richer editing with
 // hints that the in-widget settings kit simply ignores — so the kit keeps
@@ -13,7 +14,6 @@
 //   section: "Answers"        Starts a group. Fields without one join the
 //                             group above them. Groups whose fields are all
 //                             hidden (showIf) hide too.
-//   note: "Markdown · $…$"    A short aside shown next to the label.
 //   mono: true                Monospace textarea, for code.
 //   expand: true              On a textarea: an Expand button that opens it
 //                             in a large editor (code, a long question).
@@ -40,8 +40,9 @@ import { sessionUrl } from '../app/session.js';
 /**
  * @param {{label?:string, fields:object[]}} schema
  * @param {object} item            the widget's config item (read for initial values)
- * @param {'panel'|'modal'|'sheet'} variant  sheet: the widget's own settings
- *                                         sheet — one column, headed groups only
+ * @param {'panel'|'sheet'} variant  panel: everything under one General
+ *                                  group; sheet: the widget's own settings,
+ *                                  in its schema sections
  * @returns {{ node: HTMLElement, apply(item): void, syncVisibility(): void, focusFirst(): void }}
  */
 export function buildWidgetForm(schema, item, variant = 'panel') {
@@ -57,15 +58,14 @@ export function buildWidgetForm(schema, item, variant = 'panel') {
     const rows = [];
     const groups = [];
     let group = null;
-    // In the panel, what every widget has (Name, Text size) comes first under
-    // "General"; the widget's own settings follow, after whatever the panel
-    // puts between (its Layout section).
+    // In the panel, everything sits under "General"; the panel puts its
+    // Layout section after it.
     let common = null;
     for (const field of schema.fields) {
         if (claimed.has(field.key)) continue;
-        if (variant === 'panel' && (field.key === 'title' || field.key === 'scale')) {
+        if (variant === 'panel') {
             if (!common) {
-                common = makeGroup('General', variant);
+                common = makeGroup('General');
                 groups.push(common);
                 root.insertBefore(common.node, root.firstChild);
             }
@@ -77,7 +77,7 @@ export function buildWidgetForm(schema, item, variant = 'panel') {
             continue;
         }
         if (!group || (field.section && field.section !== group.title)) {
-            group = makeGroup(field.section || '', variant);
+            group = makeGroup(field.section || '');
             groups.push(group);
             root.appendChild(group.node);
         }
@@ -87,20 +87,6 @@ export function buildWidgetForm(schema, item, variant = 'panel') {
         if (row.wide) group.node.classList.add('is-wide');
         rows.push(row);
         group.body.appendChild(row.node);
-    }
-
-    // The dialog has room for two columns: the groups holding long content
-    // (a question, an answer list, a template) down the wide left column,
-    // everything short (name, toggles, pickers) stacked on the right.
-    if (variant === 'modal') {
-        const main = document.createElement('div');
-        main.className = 'wf-col wf-col--main';
-        const side = document.createElement('div');
-        side.className = 'wf-col wf-col--side';
-        for (const g of groups) (g.node.classList.contains('is-wide') ? main : side).appendChild(g.node);
-        if (main.children.length) root.appendChild(main);
-        if (side.children.length) root.appendChild(side);
-        root.classList.toggle('is-single', !main.children.length || !side.children.length);
     }
 
     function values() {
@@ -121,13 +107,6 @@ export function buildWidgetForm(schema, item, variant = 'panel') {
         for (const r of rows) r.node.hidden = !fieldVisible(r.field, vals);
         for (const g of groups) {
             g.node.hidden = !rows.some(r => r.group === g && !r.node.hidden);
-        }
-        // Dialog columns: drop one that has nothing showing, and let the
-        // other take the full width.
-        const cols = Array.from(root.querySelectorAll(':scope > .wf-col'));
-        if (cols.length) {
-            for (const col of cols) col.hidden = !Array.from(col.children).some(c => !c.hidden);
-            root.classList.toggle('is-single', cols.filter(c => !c.hidden).length < 2);
         }
     }
 
@@ -156,15 +135,13 @@ export function buildWidgetForm(schema, item, variant = 'panel') {
 
 /* ─── groups ─────────────────────────────────────────────────────────── */
 
-function makeGroup(title, variant) {
-    const node = document.createElement(variant === 'modal' ? 'section' : 'div');
+function makeGroup(title) {
+    const node = document.createElement('div');
     node.className = 'wf-group';
-    // In the dialog every card has a heading, so the first, unnamed group
-    // (Name, Text size, …) reads as "Settings" beside "Layout".
-    if (title || variant === 'modal' || variant === 'panel') {
+    if (title) {
         const h = document.createElement('div');
         h.className = 'wf-group-title';
-        h.textContent = titleCase(title || 'Settings');
+        h.textContent = titleCase(title);
         node.appendChild(h);
     }
     const body = document.createElement('div');
@@ -269,10 +246,10 @@ function buildFieldRow(field, item, variant) {
             }
         }
         row.appendChild(input);
-        // In the dialog, a choice of two or three is a row of buttons you can
-        // see all of at once, and Text size is a row of A's growing in size.
-        // The select stays (hidden) as the value everything else reads.
-        if (variant === 'modal' || variant === 'panel' || variant === 'sheet') {
+        // A choice of two or three is a row of buttons you can see all of at
+        // once, and Text size is a row of A's growing in size. The select
+        // stays (hidden) as the value everything else reads.
+        {
             const seg = field.key === 'scale' ? buildSizePicker(input)
                       : input.options.length >= 2 && input.options.length <= 3
                         && Array.from(input.options).every(o => o.textContent.length <= 14) ? buildSegmented(input)
@@ -302,7 +279,7 @@ function buildFieldRow(field, item, variant) {
         if (field.placeholder) input.placeholder = field.placeholder;
         input.value = Array.isArray(eff) ? eff.join('\n') : (eff == null ? '' : String(eff));
         row.appendChild(input);
-        autoGrow(input, variant);
+        autoGrow(input);
         wide = true;
         // A field the widget marks "expand": true — code, a long question —
         // gets a small icon in its top-right corner that opens it in a roomy
@@ -570,8 +547,8 @@ function durationTotal(mins, secs) {
 
 // Grow a textarea with its content (between its `rows` and a cap), so a long
 // question never hides behind a scrollbar in a box three lines tall.
-function autoGrow(ta, variant) {
-    const cap = variant === 'modal' ? 0.6 * window.innerHeight : 320;
+function autoGrow(ta) {
+    const cap = 320;
     const fit = () => {
         if (!ta.isConnected) return;
         ta.style.height = 'auto';
@@ -834,7 +811,7 @@ function buildTemplateRow(field, item, variant) {
         count.classList.toggle('is-empty', n === 0);
         mirror.scrollTop = ta.scrollTop;
     }
-    const grow = autoGrow(ta, variant);
+    const grow = autoGrow(ta);
     ta.addEventListener('input', paint);
     ta.addEventListener('scroll', () => { mirror.scrollTop = ta.scrollTop; });
     // Tab indents (it's code); Shift+Tab / Esc still leave the field.

@@ -226,37 +226,11 @@ async function modelSnapshot(url, m, box) {
     }
 }
 
-// The name the deck was uploaded with, without its extension.
-const deckBaseName = () => ctx.state.deckName || 'presentation';
-
 const baseName = (p) => String(p || '').split('/').pop() || 'file';
 
 /* ─── the exporter ─────────────────────────────────────────────── */
 
 let _busy = false;
-
-export async function downloadNotes() {
-    const s = ctx.state;
-    if (!s.zipFile) {
-        window.BeamerModal?.show({ kind: 'error', title: 'Nothing to export', message: 'No presentation loaded.' });
-        return;
-    }
-    if (_busy) return;
-    try {
-        const blob = await buildNotesPdf();
-        const url  = URL.createObjectURL(blob);
-        const a    = Object.assign(document.createElement('a'), { href: url, download: `${deckBaseName()}-notes.pdf` });
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 10000);
-        window.BeamerModal?.close();
-    } catch (err) {
-        console.error('[notes] export failed', err);
-        window.BeamerModal?.close();
-        window.BeamerModal?.show({ kind: 'error', title: 'Notes export failed', message: err.message || String(err) });
-    }
-}
 
 /** The notes PDF as a Blob (Save presentation writes it). Shows its own
  *  progress in the loading modal; leaves the modal open when done. */
@@ -420,7 +394,7 @@ export async function buildNotesPdf() {
 // pane that is hidden on its own, used only in the split, still makes it
 // in). Every slide appears at most once — a pane printed at its view is not
 // printed again at its own position.
-export function notesSlideOrder(structure, labels = getSlideLabels(structure)) {
+function notesSlideOrder(structure, labels = getSlideLabels(structure)) {
     const n = structure.length;
     const out = [];
     const done = new Set();

@@ -9,9 +9,8 @@
 // - widget-picker.js "Add Widget" modal
 // - view-config.js   view-slide (saved split view) configuration panel
 // - reorder.js       drag & drop slide reordering
-// - save.js          rebuild + download the presentation ZIP
+// - save.js          rebuild the presentation ZIP
 // - notes-export.js  the notes version: one flat PDF with everything drawn in
-// - download-menu.js the download button's chooser between the two
 import { bus } from '../core/events.js';
 import { ctx, setPanelMode } from './context.js';
 import { renderEditOverlays, cleanupEditOverlays, deselectOverlay, pickMediaFile, onMediaFileSelected, addReveal, repositionEditOverlays } from './overlays.js';

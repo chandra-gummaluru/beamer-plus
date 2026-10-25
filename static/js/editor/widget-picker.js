@@ -50,24 +50,10 @@ const WIDGET_CATEGORY_ORDER = [
     'Other',
 ];
 
-function _defaultLabel(type) {
-    return type.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-}
-
-// Older servers only have /api/widgets (bare file names); fall back to that.
 async function _loadCatalog() {
     try {
         const res = await fetch('/api/widgets/catalog');
         if (res.ok) return await res.json();
-    } catch (_) { /* fall through */ }
-    try {
-        const res = await fetch('/api/widgets');
-        if (res.ok) {
-            return (await res.json()).map(file => {
-                const type = file.replace(/\.html$/i, '');
-                return { file, type, label: _defaultLabel(type), category: 'Other' };
-            });
-        }
     } catch (e) {
         console.warn('Could not load widget list:', e);
     }

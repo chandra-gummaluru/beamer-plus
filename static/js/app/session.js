@@ -7,7 +7,7 @@ export function getSessionId() {
 }
 
 /** Base path for session-scoped API routes, e.g. `/s/ABC123`. */
-export function sessionPrefix() {
+function sessionPrefix() {
     const id = getSessionId();
     return id ? `/s/${id}` : '';
 }
@@ -17,12 +17,6 @@ export function sessionUrl(path) {
     const prefix = sessionPrefix();
     if (!prefix) return path;
     return prefix + (path.startsWith('/') ? path : `/${path}`);
-}
-
-/** Audience-facing origin + session prefix (for QR codes). */
-export function publicSessionBase() {
-    const prefix = sessionPrefix();
-    return prefix ? `${window.location.origin}${prefix}` : window.location.origin;
 }
 
 /** Widget iframe config fields shared by the presenter shell. */
@@ -38,25 +32,8 @@ export function widgetSessionConfig() {
     };
 }
 
-const STORAGE_KEY = 'beamer-last-session';
-
-export function saveLastSession(sessionId) {
-    if (sessionId) localStorage.setItem(STORAGE_KEY, sessionId);
-}
-
-export function getLastSession() {
-    return localStorage.getItem(STORAGE_KEY) || '';
-}
-
 export async function createSession() {
     const res = await fetch('/api/session/create', { method: 'POST' });
     if (!res.ok) throw new Error('Could not create session');
-    const data = await res.json();
-    saveLastSession(data.session_id);
-    return data;
-}
-
-export async function sessionExists(sessionId) {
-    const res = await fetch(`/api/session/${encodeURIComponent(sessionId)}`);
-    return res.ok;
+    return res.json();
 }

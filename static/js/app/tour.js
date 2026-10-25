@@ -117,7 +117,7 @@ export async function startTour(loadDemo) {
     _goto(0);
 }
 
-export function endTour() {
+function endTour() {
     if (!_nodes) return;
     document.removeEventListener('keydown', _keyFn, { capture: true });
     _nodes.backdrop.remove();

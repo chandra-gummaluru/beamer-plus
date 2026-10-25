@@ -1,7 +1,6 @@
 // Save — rebuilds the presentation ZIP from the in-memory state (slide
-// configs, slide order, annotations, widget states, newly added files) and
-// downloads it. buildPresentationZip() is the same ZIP as a Blob, for Save
-// presentation (library/ui.js).
+// configs, slide order, annotations, widget states, newly added files) as a
+// Blob, for Save (library/ui.js).
 import { collectWidgetStates, getLoadedWidgetStates } from '../core/iframe-widget-renderer.js';
 import { requestWidgetFileFlush } from './widget-settings.js';
 import { ctx } from './context.js';
@@ -28,28 +27,6 @@ function normalizeWidgetSrcs(cfg) {
             return w.type ? { ...rest, src: `widgets/${w.type}.html` } : rest;
         }),
     };
-}
-
-export async function savePresentation() {
-    if (!ctx.state.zipFile) {
-        window.BeamerModal?.show({ kind: 'error', title: 'Nothing to save', message: 'No presentation loaded.' });
-        return;
-    }
-    const modal = window.BeamerModal;
-    modal?.show({ kind: 'loading', title: 'Saving…', message: 'Building ZIP…' });
-    try {
-        const blob = await buildPresentationZip();
-        const url  = URL.createObjectURL(blob);
-        // Same name the deck was uploaded with (a PDF upload saves as
-        // <name>.zip), so re-saving overwrites rather than piling up copies.
-        const a    = Object.assign(document.createElement('a'), { href: url, download: `${ctx.state.deckName || 'presentation'}.zip` });
-        a.click();
-        URL.revokeObjectURL(url);
-        modal?.close();
-    } catch (err) {
-        modal?.close();
-        window.BeamerModal?.show({ kind: 'error', title: 'Save failed', message: err.message });
-    }
 }
 
 /** The presentation as it stands now, as a ZIP Blob. `extra` maps more

@@ -67,8 +67,6 @@ export class Canvas {
         this.lastMoveTime = 0;
         this.lastMovePoint = null;
         this.savedCanvasState = null;
-        this.shapeTool = null;
-        this.shapeMode = 'draw';
 
         this.setupEvents(drawable);
         this.commitHistory();
@@ -127,14 +125,6 @@ export class Canvas {
         } else {
             this.canvas.style.pointerEvents = 'auto';
         }
-    }
-
-    setShapeTool(shapeTool) {
-        this.shapeTool = shapeTool;
-    }
-
-    setShapeMode(shapeMode) {
-        this.shapeMode = shapeMode;
     }
 
     setupEvents(drawable) {
@@ -426,43 +416,6 @@ export class Canvas {
         let width = this.strokeWidth;
         let mode = this.pointer_mode;
 
-        if (this.pointer_mode === "shape") {
-            const shapeMode = this.shapeMode || 'draw';
-            if (shapeMode === 'highlight') {
-                const rect = this.canvas.getBoundingClientRect();
-                this.strokeBuffer.width = rect.width * this.dpr;
-                this.strokeBuffer.height = rect.height * this.dpr;
-                this.strokeBufferCtx = this.strokeBuffer.getContext("2d");
-                this.strokeBufferCtx.scale(this.dpr, this.dpr);
-                this.strokeBufferCtx.lineCap = 'round';
-                this.strokeBufferCtx.lineJoin = 'round';
-                this.strokeBufferCtx.imageSmoothingEnabled = true;
-                this.strokeBufferCtx.imageSmoothingQuality = 'high';
-                this.strokeBufferCtx.globalAlpha = 1;
-                this.strokeBufferCtx.globalCompositeOperation = "source-over";
-                this.savedCanvasState = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
-                width = this.strokeWidth * 8;
-            } else if (shapeMode === 'erase') {
-                this.ctx.globalCompositeOperation = "destination-out";
-                this.ctx.globalAlpha = 1;
-                width = this.strokeWidth * 12;
-                color = "white";
-            } else {
-                this.ctx.globalAlpha = 1;
-                this.ctx.globalCompositeOperation = "source-over";
-            }
-
-            this.currentStroke = {
-                start: p,
-                end: p,
-                color,
-                width,
-                mode: shapeMode,
-                shape: this.shapeTool
-            };
-            return;
-        }
-
         switch (this.pointer_mode) {
             case "draw":
                 this.ctx.globalAlpha = 1;
@@ -554,13 +507,6 @@ export class Canvas {
 
         const p = this.getPos(e);
 
-        // Explicit shape-tool preview
-        if (this.currentStroke && this.currentStroke.shape) {
-            this.currentStroke.end = p;
-            this.drawShapePreview(this.currentStroke);
-            return;
-        }
-
         // Drain all coalesced points — browser batches these between frames
         const coalesced = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
 
@@ -598,23 +544,6 @@ export class Canvas {
 
         this.drawing = false;
         e.preventDefault();
-
-        // Finalize explicit shape-tool drawing
-        if (this.currentStroke && this.currentStroke.shape) {
-            this.drawShapePreview(this.currentStroke);
-
-            if (this.currentStroke.mode === 'highlight') {
-                this.strokeBufferCtx.clearRect(0, 0, this.strokeBuffer.width, this.strokeBuffer.height);
-            }
-
-            this.currentStroke = null;
-            this.ctx.globalCompositeOperation = "source-over";
-            this.ctx.globalAlpha = 1;
-            this.savedCanvasState = null;
-            this.cachedRect = null;
-            this.commitHistory();
-            return;
-        }
 
         // Snapped to a shape (draw and hold): it is already drawn — drop the
         // leftover freehand points and finish.
@@ -733,7 +662,7 @@ export class Canvas {
         // Draw-and-hold on a closed stroke (end near the start) snaps it to the
         // shape it looks like: circle/ellipse, triangle or rectangle. Anything
         // else falls through to the straight-line behaviour below.
-        if (!this.currentStroke.shape && !this.currentStroke.polylineActive
+        if (!this.currentStroke.polylineActive
             && ['draw', 'highlight'].includes(this.currentStroke.mode)) {
             const fitted = this.fitClosedShape(this.currentStroke.points || []);
             if (fitted) {
@@ -745,7 +674,7 @@ export class Canvas {
             }
         }
 
-        if (!this.currentStroke.shape && ['draw', 'highlight'].includes(this.currentStroke.mode)) {
+        if (['draw', 'highlight'].includes(this.currentStroke.mode)) {
             const points = this.currentStroke.points || [];
             const endPoint = this.lastMovePoint || this.currentStroke.currentPoint || points[points.length - 1];
             const segmentStart = this.currentStroke.segmentStart || points[0];
@@ -972,72 +901,6 @@ export class Canvas {
         ctx.stroke();
     }
 
-    drawShapePreview(stroke) {
-        if (!stroke || !this.savedCanvasState) return;
-        if (stroke.mode === 'highlight') {
-            this.ctx.putImageData(this.savedCanvasState, 0, 0);
-            this.strokeBufferCtx.clearRect(0, 0, this.strokeBuffer.width, this.strokeBuffer.height);
-            this.strokeBufferCtx.lineJoin = 'round';
-            this.strokeBufferCtx.lineCap = 'round';
-            this.strokeBufferCtx.strokeStyle = stroke.color;
-            this.strokeBufferCtx.lineWidth = stroke.width;
-            this.strokeBufferCtx.globalAlpha = 1;
-            this.strokeBufferCtx.globalCompositeOperation = "source-over";
-            this.drawShapeFromPoints(stroke.shape, stroke.start, stroke.end, this.strokeBufferCtx);
-
-            const rect = this.canvas.getBoundingClientRect();
-            this.ctx.save();
-            this.ctx.globalAlpha = 0.4;
-            this.ctx.globalCompositeOperation = "multiply";
-            this.ctx.drawImage(this.strokeBuffer, 0, 0, rect.width, rect.height);
-            this.ctx.restore();
-            return;
-        }
-
-        this.ctx.putImageData(this.savedCanvasState, 0, 0);
-        this.ctx.lineJoin = 'round';
-        this.ctx.lineCap = 'round';
-        this.ctx.strokeStyle = stroke.color;
-        this.ctx.lineWidth = stroke.width;
-        this.ctx.globalAlpha = 1;
-        if (stroke.mode === 'erase') {
-            this.ctx.globalCompositeOperation = "destination-out";
-        } else {
-            this.ctx.globalCompositeOperation = "source-over";
-        }
-        this.drawShapeFromPoints(stroke.shape, stroke.start, stroke.end, this.ctx);
-    }
-
-    drawShapeFromPoints(type, start, end, ctx) {
-        if (!type || !start || !end) return;
-        const left = Math.min(start.x, end.x);
-        const right = Math.max(start.x, end.x);
-        const top = Math.min(start.y, end.y);
-        const bottom = Math.max(start.y, end.y);
-        const width = right - left;
-        const height = bottom - top;
-        const centerX = left + width / 2;
-        const centerY = top + height / 2;
-
-        ctx.beginPath();
-        if (type === 'line') {
-            ctx.moveTo(start.x, start.y);
-            ctx.lineTo(end.x, end.y);
-        } else if (type === 'rectangle') {
-            ctx.strokeRect(left, top, width, height);
-            return;
-        } else if (type === 'circle') {
-            const radius = Math.max(width, height) / 2;
-            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-        } else if (type === 'triangle') {
-            ctx.moveTo(centerX, top);
-            ctx.lineTo(right, bottom);
-            ctx.lineTo(left, bottom);
-            ctx.closePath();
-        }
-        ctx.stroke();
-    }
-
     detectShape(points) {
         const bbox = this.getBoundingBox(points);
         const width = bbox.maxX - bbox.minX;
@@ -1233,16 +1096,6 @@ export class Canvas {
             canvasContext: this.ctx,
             viewport: scaledViewport
         }).promise;
-    }
-    
-    // Get display width (for positioning elements)
-    getDisplayWidth() {
-        return this.pdfDpr ? this.canvas.width / this.pdfDpr : this.canvas.width;
-    }
-    
-    // Get display height (for positioning elements)
-    getDisplayHeight() {
-        return this.pdfDpr ? this.canvas.height / this.pdfDpr : this.canvas.height;
     }
     
     // Resize canvas to match container (for annotation canvas on window resize)

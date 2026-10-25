@@ -57,7 +57,7 @@ const CARD = { pct: 11, line: 1, dot: 1.6, c: 'rgba(26, 26, 24, 0.34)' };
  * strokes, for the navigator's small previews; `card` draws the close-up
  * used on the paper chooser's background cards.
  */
-export function paperCss(paper, { thumb = false, card = false, zoom = 1 } = {}) {
+function paperCss(paper, { thumb = false, card = false, zoom = 1 } = {}) {
     if (!paper || !paper.style || paper.style === 'none') return null;
     const p  = normalizePaper(paper);
     // zoom: the editor panel's little pages draw the pattern larger, so
