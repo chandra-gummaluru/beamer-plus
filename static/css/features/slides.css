@@ -1173,35 +1173,8 @@ body.slide-muted #ann-canvas, body.slide-muted #ann-canvas-2 { z-index: 2 !impor
 /* ============================================================
    Add page chooser (slides/structure.js openAddPageModal)
    ============================================================ */
-.add-page { display: flex; flex-direction: column; gap: var(--sp-4); text-align: left; }
-/* The large preview: what will actually be added, at slide proportions,
-   beside the settings that shape it (or, for a plain page, a short note). */
-.add-page-detail {
-    display: grid;
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-    gap: var(--sp-4);
-    align-items: start;
-}
-.add-page-preview {
-    width: 100%;
-    aspect-ratio: 4 / 3;
-    background-color: #fff;
-    border: 1px solid oklch(86% 0.005 260);
-    border-radius: var(--r-sm);
-    box-shadow: 0 1px 2px oklch(20% 0.01 260 / 0.06);
-}
-.add-page-note {
-    margin: 0;
-    font-family: var(--font-sans);
-    font-size: var(--fs-sm);
-    line-height: 1.45;
-    color: var(--ink-3);
-}
-.add-page-note[hidden] { display: none; }
-@media (max-width: 520px) {
-    .add-page .paper-tiles { grid-template-columns: repeat(2, 1fr); }
-    .add-page-detail { grid-template-columns: minmax(0, 1fr); }
-}
+/* The same chooser as the editor panel's, at the panel's width. */
+.add-page { display: flex; flex-direction: column; gap: var(--sp-4); width: min(340px, 80vw); text-align: left; }
 
 /* ============================================================
    Undefined split-view pane

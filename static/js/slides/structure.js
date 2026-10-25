@@ -6,7 +6,7 @@
 // remapSlideIndices, which moves all of it in one place.
 import { bus } from '../core/events.js';
 import { discardParkedWidgets, requestWidgetStates, seedWidgetStates } from '../core/iframe-widget-renderer.js';
-import { normalizePaper, applyPaper } from './paper.js';
+import { normalizePaper } from './paper.js';
 import { createPaperPicker } from './paper-picker.js';
 
 let _state = null;
@@ -174,46 +174,20 @@ function openAddPageModal() {
     const root = document.createElement('div');
     root.className = 'add-page';
 
-    // The same chooser as the editor panel's (paper-picker.js): the
-    // backgrounds across the top; below, a large preview of exactly what
-    // will be added (real spacing, weight and colour, at slide proportions)
-    // beside the rest of the settings. Double-click a background to add it.
+    // The same chooser as the editor panel's (paper-picker.js), laid out the
+    // same way. Double-click a background to add it straight away.
     const picker = createPaperPicker({
         get: () => choice,
         set: (key, v) => { choice[key] = v; },
-        onChange: () => showPreview(),
         onStyleDblClick: () => { add(); window.BeamerModal?.close(); },
     });
-    root.appendChild(picker.styles);
-
-    const detail = document.createElement('div');
-    detail.className = 'add-page-detail';
-    root.appendChild(detail);
-
-    const preview = document.createElement('div');
-    preview.className = 'add-page-preview';
-    preview.setAttribute('aria-hidden', 'true');
-    detail.appendChild(preview);
-    detail.appendChild(picker.options);
-
-    // Plain has nothing to set; say so in the same spot, so switching styles
-    // doesn't reflow the dialog.
-    const plainNote = document.createElement('p');
-    plainNote.className = 'add-page-note';
-    plainNote.textContent = 'A blank white page. Choose Lined, Grid or Dots for a pattern you can set the spacing, weight and colour of.';
-    detail.appendChild(plainNote);
-
-    function showPreview() {
-        applyPaper(preview, choice);
-        plainNote.hidden = choice.style !== 'none';
-    }
+    root.append(picker.styles, picker.options);
 
     function add() {
         _lastPaper = { ...choice };
         insertBlankAfterCurrent(choice.style === 'none' ? null : { ...choice });
     }
     picker.sync();
-    showPreview();
 
     window.BeamerModal?.show({
         kind: 'info',

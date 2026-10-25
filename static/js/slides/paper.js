@@ -44,19 +44,18 @@ export function normalizePaper(p) {
     };
 }
 
-// The style cards in the Add page chooser are ~80px wide. At the real
+// The background cards in the paper chooser (paper-picker.js) are ~70px wide. At the real
 // spacing a grid there is a 3px mesh of hairlines — grey mush, with lined,
 // grid and dots barely telling apart. So a card shows a close-up instead:
 // about nine cells across and a darker ink, enough to read the style at a
 // glance. It's centred, and the spacing isn't a whole fraction of the card,
 // so no line lands on the card's own border and doubles it.
-// (The chooser's large preview shows the real spacing, weight and colour.)
 const CARD = { pct: 11, line: 1, dot: 1.6, c: 'rgba(26, 26, 24, 0.34)' };
 
 /**
  * CSS background for `paper`, or null for plain. `thumb` draws hairline
  * strokes, for the navigator's small previews; `card` draws the close-up
- * used on the Add page chooser's style cards.
+ * used on the paper chooser's background cards.
  */
 export function paperCss(paper, { thumb = false, card = false, zoom = 1 } = {}) {
     if (!paper || !paper.style || paper.style === 'none') return null;
