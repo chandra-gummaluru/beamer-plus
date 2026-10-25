@@ -1423,20 +1423,17 @@ body.wsheet-open #main-content { padding-right: var(--editor-panel-width); }
 #editor-panel-title.is-editable:focus::placeholder { color: var(--ink-4); }
 .editor-done-btn { flex: 0 0 auto; }
 
-/* ── Footer: Hide During Presentation (slides and split views) and
-   Delete, for whatever the panel shows (editor.js). ── */
+/* ── Footer: Delete, for whatever the panel shows (editor.js). Hide During
+   Presentation (slides and split views) heads the body. ── */
 #editor-panel-footer {
     flex: 0 0 auto;
     display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--sp-2);
+    justify-content: flex-end;
     padding: var(--sp-3) 20px;
     border-top: var(--line-soft);
     background: var(--surface-cream);
 }
-#editor-panel-footer .editor-prop-checkbox-row[hidden] { display: none; }
-.editor-delete-btn { align-self: flex-end; }
+#panel-hide-row[hidden] { display: none; }
 
 /* ── Body and sections ── */
 #editor-panel-body { padding: 18px 20px 24px; gap: 18px; }

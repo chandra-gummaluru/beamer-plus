@@ -244,10 +244,18 @@
             </button>
         </div>
         <div id="editor-panel-body">
+            <!-- A slide or split view: skipped while presenting (editor.js). -->
+            <section class="wf-group" id="panel-hide-row">
+                <div class="wf-group-title">General</div>
+                <label class="editor-prop-checkbox-row">
+                    <span>Hide During Presentation</span>
+                    <input type="checkbox" class="editor-switch" role="switch" id="panel-hide">
+                </label>
+            </section>
             <!-- Nothing selected: the slide itself (editor.js) — its paper if
                  it's blank, and everything on it, front to back
-                 (properties.js, refreshSlideItems). Hide and Delete are
-                 the panel's footer. -->
+                 (properties.js, refreshSlideItems). Hide is at the top,
+                 Delete in the footer. -->
             <div id="editor-slide-settings">
                 <!-- Blank slides only: lined / grid / dotted paper — the same
                      chooser as the Add Page window (slides/paper-picker.js). -->
@@ -271,14 +279,9 @@
                 <div id="editor-widget-body"></div>
             </div>
         </div>
-        <!-- Whatever the panel is showing: a slide or split view can be
-             skipped while presenting, and anything can be deleted — two
-             clicks, the first arms it, since there's no undo (editor.js). -->
+        <!-- Delete whatever the panel is showing — two clicks, the first
+             arms it, since there's no undo (editor.js). -->
         <div id="editor-panel-footer">
-            <label class="editor-prop-checkbox-row" id="panel-hide-row">
-                <span>Hide During Presentation</span>
-                <input type="checkbox" class="editor-switch" role="switch" id="panel-hide">
-            </label>
             <button class="btn btn--sm btn--danger editor-delete-btn" id="panel-delete" type="button">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>
                 <span>Delete Slide</span>
