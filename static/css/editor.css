@@ -239,6 +239,8 @@ body.edit-mode #editor-panel { display: flex; }
     box-shadow: var(--shadow-3);
 }
 body.edit-mode #editor-add-row { display: flex; }
+/* A split view has nothing to add to. */
+body.edit-mode.split-view-active #editor-add-row { display: none; }
 .editor-rail-sep { width: 1px; height: 20px; background: var(--line-1); margin: 0 4px; }
 
 .editor-icon-btn svg { pointer-events: none; }
@@ -1421,6 +1423,21 @@ body.wsheet-open #main-content { padding-right: var(--editor-panel-width); }
 #editor-panel-title.is-editable:focus::placeholder { color: var(--ink-4); }
 .editor-done-btn { flex: 0 0 auto; }
 
+/* ── Footer: Hide During Presentation (slides and split views) and
+   Delete, for whatever the panel shows (editor.js). ── */
+#editor-panel-footer {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--sp-2);
+    padding: var(--sp-3) 20px;
+    border-top: var(--line-soft);
+    background: var(--surface-cream);
+}
+#editor-panel-footer .editor-prop-checkbox-row[hidden] { display: none; }
+.editor-delete-btn { align-self: flex-start; margin-left: -10px; }
+
 /* ── Body and sections ── */
 #editor-panel-body { padding: 18px 20px 24px; gap: 18px; }
 #editor-panel .wf,
@@ -1631,10 +1648,7 @@ body.wsheet-open #main-content { padding-right: var(--editor-panel-width); }
 .slide-item-name { font-size: var(--fs-base); font-weight: 500; color: var(--ink-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .slide-item-kind { font-size: var(--fs-xs); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .slide-item-chev { flex: 0 0 auto; color: var(--ink-4); }
-/* Each row's trash, before its chevron (properties.js). Hovering it marks
-   the row, so it's clear what goes. */
-.slide-item-delete { flex: 0 0 auto; margin-right: -4px; }
-.slide-item.is-deleting { border-color: var(--danger); }
+
 .slide-item:hover .slide-item-chev { color: var(--ink-2); }
 .slide-items-empty { margin: 0; font-size: var(--fs-sm); line-height: 1.5; color: var(--ink-3); }
 
@@ -1700,12 +1714,4 @@ body.picking-panes #slide-nav-slides .slide-nav-item:hover .slide-preview { outl
 .editor-secondary-btn { width: 100%; }
 .slide-item.is-empty { cursor: default; border-style: dashed; background: transparent; }
 .slide-item.is-empty .slide-item-name { color: var(--ink-3); }
-
-/* Show During Presentation: an eye, crossed out (and pressed) while the
-   slide is skipped. */
-#slide-shown-btn .slide-shown-off { display: none; }
-#slide-shown-btn.btn_selected .slide-shown-on { display: none; }
-#slide-shown-btn.btn_selected .slide-shown-off { display: contents; }
-#slide-shown-btn > span { display: contents; }
-#slide-shown-btn.btn_selected { background: var(--surface-cream-2); color: var(--ink-1); }
 

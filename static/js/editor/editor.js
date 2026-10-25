@@ -14,7 +14,7 @@
 import { bus } from '../core/events.js';
 import { ctx, setPanelMode } from './context.js';
 import { renderEditOverlays, cleanupEditOverlays, deselectOverlay, pickMediaFile, onMediaFileSelected, addReveal, repositionEditOverlays } from './overlays.js';
-import { updatePropertiesPanel, refreshSlideItems } from './properties.js';
+import { updatePropertiesPanel, refreshSlideItems, selectedItemKind, deleteSelectedItem } from './properties.js';
 import { addWidget } from './widget-picker.js';
 import { showViewConfig, hideViewConfig } from './view-config.js';
 import { applySlideReorder, removeSlideReorder } from './reorder.js';
@@ -58,30 +58,24 @@ export function initEditor(state) {
         if (!titleEl.readOnly && !titleEl.value.trim()) titleEl.value = '';
     });
 
-    // The toolbar's eye: shown or skipped while presenting.
-    document.getElementById('slide-shown-btn')?.addEventListener('click', () => {
-        const obj = ctx.state?.slideStructure?.[toolbarSlideIndex()];
+    // The panel's footer: Hide During Presentation (a slide or split view)
+    // and Delete — whatever the panel shows: the selected element, else the
+    // slide, or on a split view the split view (not its slides). Delete
+    // takes two clicks, the first arms it, since there's no undo.
+    document.getElementById('panel-hide')?.addEventListener('change', (e) => {
+        const obj = ctx.state?.slideStructure?.[panelSlideIndex()];
         if (!obj) return;
-        if (obj.hidden) delete obj.hidden;
-        else obj.hidden = true;
+        if (e.target.checked) obj.hidden = true; else delete obj.hidden;
         bus.emit('nav:refresh');
-        _updateAddMediaButtons();
     });
-
-    // The toolbar's trash: two clicks — the first arms it — since there's no
-    // undo. On a split view it deletes the split view (not its slides).
-    const delBtn = document.getElementById('slide-delete');
+    const delBtn = document.getElementById('panel-delete');
     delBtn?.addEventListener('click', () => {
-        const i = toolbarSlideIndex();
+        if (!delBtn.classList.contains('is-armed')) { armDelete(true); return; }
+        armDelete(false);
+        if (selectedItemKind()) { deleteSelectedItem(); return; }
+        const i = panelSlideIndex();
         const obj = i == null ? null : ctx.state?.slideStructure?.[i];
         if (!obj) return;
-        if (!delBtn.classList.contains('is-armed')) {
-            armSlideDelete(true);
-            clearTimeout(armSlideDelete.timer);
-            armSlideDelete.timer = setTimeout(() => armSlideDelete(false), 3000);
-            return;
-        }
-        armSlideDelete(false);
         if (obj.type === 'view') {
             // Close the panel first, so it isn't still pointing at the view
             // while removeSlideAt remaps everything position-keyed.
@@ -89,12 +83,14 @@ export function initEditor(state) {
             removeSlideAt(i);
             if (ctx.state.splitView) document.getElementById('split-toggle')?.click();
             bus.emit('nav:refresh');
-            // Once the split has closed, the toolbar is a slide's again.
+            // Once the split has closed, the panel is a slide's again.
             setTimeout(() => { if (!ctx.state.splitView) updateSlideSettingsPanel(); }, 400);
             return;
         }
         bus.emit('slide:delete', i);
     });
+    // Selecting something (or nothing) changes what the footer acts on.
+    bus.on('editor:panel-mode', () => { armDelete(false); updatePanelFooter(); });
 
     // The stage re-fits on resize (main.js); the edit boxes follow it.
     window.addEventListener('resize', () => {
@@ -282,19 +278,39 @@ function updateSlideSettingsPanel() {
     const obj   = ctx.state?.slideStructure?.[ctx.state?.currentSlide];
     syncPaperSettings(obj);
     refreshSlideItems();
-    armSlideDelete(false);
+    armDelete(false);
     _updateAddMediaButtons();
     // The header names the slide; a selection elsewhere names itself.
     if (!ctx.selectedOverlay && ctx.selectedViewIdx === null) setPanelMode('slide');
 }
 
-// Armed, the toolbar's trash turns red (its tooltip: "Click Again to Delete").
-function armSlideDelete(on) {
-    const btn = document.getElementById('slide-delete');
+// Armed, Delete turns red; a second click within 3 s deletes.
+function armDelete(on) {
+    const btn = document.getElementById('panel-delete');
     if (!btn) return;
+    clearTimeout(armDelete.timer);
     btn.classList.toggle('is-armed', on);
-    const view = ctx.state?.slideStructure?.[toolbarSlideIndex()]?.type === 'view';
-    btn.title = on ? 'Click Again to Delete' : view ? 'Delete Split View' : 'Delete Slide';
+    btn.title = on ? 'Click Again to Delete' : '';
+    if (on) armDelete.timer = setTimeout(() => armDelete(false), 3000);
+}
+
+// The footer for what the panel shows: Delete names it ("Delete Widget",
+// "Delete Slide"…); Hide is for slides and split views only. The last real
+// slide can't be deleted (a split view always can).
+function updatePanelFooter() {
+    const s = ctx.state;
+    const kind = selectedItemKind();
+    const i = panelSlideIndex();
+    const obj = i == null ? null : s?.slideStructure?.[i];
+    const del = document.getElementById('panel-delete');
+    if (del) {
+        del.querySelector('span').textContent = `Delete ${kind || (obj?.type === 'view' ? 'Split View' : 'Slide')}`;
+        del.disabled = !kind && (!obj || (obj.type !== 'view' && (s?.slideStructure?.length || 0) <= 1));
+    }
+    const row = document.getElementById('panel-hide-row');
+    if (row) row.hidden = !!kind || !obj;
+    const hide = document.getElementById('panel-hide');
+    if (hide) hide.checked = !!obj?.hidden;
 }
 
 /* ─── blank-slide paper ─────────────────────────────────────── */
@@ -328,19 +344,18 @@ function syncPaperSettings(obj) {
     if (obj?.type === 'blank') paperPicker?.sync();
 }
 
-// The slide the toolbar's eye and trash act on: the one on stage, or while
-// a split view is on stage, the split view itself (null for a split you
-// opened yourself, which isn't a slide).
-function toolbarSlideIndex() {
+// The slide the panel's footer acts on: the one on stage, or while a split
+// view is on stage, the split view itself (null for a split you opened
+// yourself, which isn't a slide).
+function panelSlideIndex() {
     const s = ctx.state;
     if (!s) return null;
     if (s.splitView) return ctx.selectedViewIdx ?? s.currentViewIndex ?? null;
     return s.currentSlide;
 }
 
-// What the insert toolbar can do here. On a split view only the eye and the
-// trash are live: everything else adds to a slide, and a split view has
-// none of its own.
+// What the insert toolbar can do here. On a split view nothing: everything
+// adds to a slide, and a split view has none of its own (the toolbar hides).
 function _updateAddMediaButtons() {
     const s = ctx.state;
     const split = !!s?.splitView;
@@ -349,20 +364,5 @@ function _updateAddMediaButtons() {
                       'edit-add-reveal-btn', 'edit-add-page-btn', 'edit-duplicate-btn', 'bookmark-btn']) set(id, split);
     // A split view pairs two real slides — none to pair until there are two.
     set('add-view-btn', split || realSlideCount(s?.slideStructure) < 2);
-
-    const i = toolbarSlideIndex();
-    const obj = i == null ? null : s?.slideStructure?.[i];
-    // The last real slide stays (a split view can always go).
-    set('slide-delete', !obj || (obj.type !== 'view' && (s?.slideStructure?.length || 0) <= 1));
-    const del = document.getElementById('slide-delete');
-    if (del && !del.classList.contains('is-armed')) del.title = obj?.type === 'view' ? 'Delete Split View' : 'Delete Slide';
-
-    const eye = document.getElementById('slide-shown-btn');
-    if (eye) {
-        eye.disabled = !obj;
-        const hidden = !!obj?.hidden;
-        eye.classList.toggle('btn_selected', hidden);
-        eye.setAttribute('aria-pressed', String(hidden));
-        eye.title = hidden ? 'Skipped During Presentation: Click to Show' : 'Hide During Presentation';
-    }
+    updatePanelFooter();
 }
