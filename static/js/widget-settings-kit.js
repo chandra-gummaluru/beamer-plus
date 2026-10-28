@@ -744,6 +744,180 @@
         if (!silent) post({ type: 'widget-settings-close', widgetId: cfg().id });
     }
 
+    /* ─── edit mode (editing on the widget itself) ──────────────── */
+    // A widget that declares "inlineEdit": true in its schema is set up on the
+    // widget itself: the Edit button (top right of the bar, or the corner
+    // pencil on an overlay) puts it into edit mode, body.bw-editing, where its
+    // own content becomes the form — the question is typed where the question
+    // shows, a timer's digits are the duration, a table's cells are its
+    // starting data. Done (or Escape) leaves it.
+    //
+    // The widget does the drawing; the kit only:
+    //   - toggles body.bw-editing and fires the window event 'bw-edit'
+    //     { detail: { editing } } — the widget listens and redraws;
+    //   - stores changes: BeamerWidget.edit.set(patch, remove) merges them into
+    //     the config, sends them to Beamer+ (which saves them with the slide) and
+    //     hands the widget its new config as an ordinary 'widget-config'
+    //     message — unless { silent: true }, for a widget that already shows it;
+    //   - grows an overlay or inset to the full slide while it is edited (there
+    //     is no room to edit a corner clock in its corner) and puts it back after;
+    //   - makes the Name (the bar's title, hidden otherwise) editable in place.
+    //
+    // Opened as a file, outside Beamer+, edit mode works the same; changes
+    // simply stay with the page until it is reloaded.
+    //
+    // Widgets without "inlineEdit" keep the older route: Edit opens the host's
+    // settings sheet, or, outside Beamer+, the kit's own form (openPanel).
+
+    var editing = false, editGrew = false;
+
+    function inlineEdit() { return readSchema() && !!(schema && schema.inlineEdit); }
+    function hosted() {
+        try { return window.parent !== window && cfg().id != null; } catch (e) { return false; }
+    }
+    function canEdit() {
+        if (cfg().role === 'viewer' || window.BEAMER_PRINT || cfg().printMode) return false;
+        try { if (new URLSearchParams(location.search).get('viewer') === '1') return false; } catch (e) {}
+        return hasOwnSettings() || inlineEdit();
+    }
+
+    function editSet(patch, remove, opts) {
+        if (remove && !Array.isArray(remove)) { opts = remove; remove = []; }
+        patch = patch || {}; remove = remove || []; opts = opts || {};
+        var c = cfg();
+        remove.forEach(function (k) { delete c[k]; });
+        Object.keys(patch).forEach(function (k) {
+            if (RESERVED.indexOf(k) === -1) c[k] = patch[k];
+        });
+        if (hosted()) post({ type: 'widget-settings', widgetId: c.id, patch: patch, remove: remove });
+        if ('title' in patch || remove.indexOf('title') >= 0) syncTitle();
+        if ('scale' in patch) { applyScale(); syncScaleButtons(); }
+        if (opts.silent) return;
+        selfDispatch = true;
+        try { window.dispatchEvent(new MessageEvent('message', { data: { type: 'widget-config', config: c, live: true } })); }
+        catch (e) {}
+        selfDispatch = false;
+    }
+
+    function syncTitle() {
+        if (!titleEl) return;
+        if (editing && document.activeElement === titleEl) return;   // being typed into
+        titleEl.textContent = editing ? customName() : barTitle();
+    }
+
+    var editBtn = null, floatEdit = null;
+    var PENCIL_SM = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>';
+    var CHECK_SM  = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+
+    function paintEditButtons() {
+        if (editBtn) {
+            editBtn.innerHTML = (editing ? CHECK_SM : PENCIL_SM) + '<span>' + (editing ? 'Done' : 'Edit') + '</span>';
+            editBtn.classList.toggle('bw-btn--primary', editing);
+            editBtn.title = editing ? 'Done editing (Esc)' : 'Edit this widget';
+            editBtn.setAttribute('aria-pressed', editing ? 'true' : 'false');
+        }
+        if (floatEdit) floatEdit.title = editing ? 'Done editing' : 'Edit this widget';
+    }
+
+    function onEditButton() {
+        if (editing) { exitEdit(); return; }
+        if (inlineEdit()) { enterEdit(); return; }
+        // Older widgets: a form, from the host or (opened as a file) our own.
+        if (hosted()) editSettings();
+        else { readSchema(); if (hasSettings) openPanel(); }
+    }
+
+    function enterEdit() {
+        if (editing || !canEdit() || !inlineEdit()) return;
+        editing = true;
+        // An overlay or an inset is too small to edit in place: grow it to the
+        // slide and show the full widget, with its bar, while it is edited.
+        editGrew = displayMode() === 'overlay' || isPartial();
+        if (editGrew) post({ type: 'widget-expand', widgetId: cfg().id });
+        document.body.classList.add('bw-editing');
+        if (titleEl) {
+            titleEl.setAttribute('contenteditable', 'plaintext-only');
+            if (titleEl.contentEditable !== 'plaintext-only') titleEl.setAttribute('contenteditable', 'true');
+            titleEl.setAttribute('data-bw-placeholder', (schema && schema.label) || 'Name');
+            titleEl.setAttribute('spellcheck', 'false');
+            titleEl.title = 'Name';
+        }
+        syncTitle();
+        syncLayoutMode();
+        paintEditButtons();
+        document.addEventListener('keydown', onEditKey, true);
+        fire(true);
+    }
+
+    function exitEdit() {
+        if (!editing) return;
+        if (document.activeElement && document.activeElement !== document.body) {
+            try { document.activeElement.blur(); } catch (e) {}
+        }
+        editing = false;
+        document.body.classList.remove('bw-editing');
+        if (titleEl) {
+            titleEl.removeAttribute('contenteditable');
+            titleEl.removeAttribute('title');
+        }
+        document.removeEventListener('keydown', onEditKey, true);
+        if (editGrew) post({ type: 'widget-collapse', widgetId: cfg().id });
+        editGrew = false;
+        syncTitle();
+        syncLayoutMode();
+        paintEditButtons();
+        fire(false);
+    }
+
+    function fire(on) {
+        try { window.dispatchEvent(new CustomEvent('bw-edit', { detail: { editing: on } })); } catch (e) {}
+    }
+
+    // Escape first leaves whatever is being typed into, then edit mode. A
+    // widget with a popup of its own open calls preventDefault() to keep it.
+    function onEditKey(e) {
+        if (e.key !== 'Escape' || e.defaultPrevented) return;
+        var a = document.activeElement;
+        setTimeout(function () {
+            if (e.defaultPrevented || !editing) return;
+            if (a && a !== document.body && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) {
+                a.blur();
+                return;
+            }
+            exitEdit();
+        }, 0);
+    }
+
+    function wireTitleEditing() {
+        if (!titleEl || titleEl.__bwWired) return;
+        titleEl.__bwWired = true;
+        titleEl.addEventListener('input', function () {
+            if (!editing) return;
+            var v = titleEl.textContent.replace(/\s+/g, ' ').trim();
+            if (v) editSet({ title: v }, [], { silent: true });
+            else editSet({}, ['title', 'downloadName'], { silent: true });
+        });
+        titleEl.addEventListener('keydown', function (e) {
+            if (editing && e.key === 'Enter') { e.preventDefault(); titleEl.blur(); }
+        });
+        titleEl.addEventListener('blur', function () { if (editing) syncTitle(); });
+    }
+
+    var editApi = {
+        /** Can this copy be edited at all (presenter, not a print copy)? */
+        available: function () { return canEdit() && inlineEdit(); },
+        /** Is the widget in edit mode now? */
+        get active() { return editing; },
+        isActive: function () { return editing; },
+        enter: enterEdit,
+        exit: exitEdit,
+        /**
+         * Change settings from the widget: set(patch, remove?, { silent? }).
+         * Saved with the slide inside Beamer+, kept until reload outside it.
+         */
+        set: editSet,
+    };
+
     /* ─── top bar ───────────────────────────────────────────────── */
     // Every widget carries the same bar, built here rather than in each widget:
     // the title, whatever controls the widget registers, and the shared
@@ -876,15 +1050,6 @@
 
         var utils = el('div', 'bw-topbar-utils');
 
-        if (hasOwnSettings()) {
-            // Always shown, first in the bar's utilities.
-            var pencil = makeBtn({
-                variant: 'icon', title: 'Widget settings', icon: PENCIL_ICON, onClick: editSettings,
-            });
-            pencil.classList.add('bw-edit-btn');
-            utils.appendChild(pencil);
-        }
-
         if (!(schema && schema.fontSize === false)) {
             var group = el('div', 'bw-fontsize');
             scaleDown = makeBtn({
@@ -906,6 +1071,15 @@
         utils.appendChild(makeBtn({
             variant: 'icon', title: 'Reset widget', icon: RESET_ICON, onClick: doReset,
         }));
+
+        // Edit sits last: the top-right corner of every widget.
+        if (canEdit()) {
+            editBtn = makeBtn({ onClick: onEditButton });
+            editBtn.classList.add('bw-edit-btn');
+            editBtn.setAttribute('data-bw-print-hide', '');
+            utils.appendChild(editBtn);
+            paintEditButtons();
+        }
 
         bar.appendChild(utils);
         return bar;
@@ -942,14 +1116,15 @@
         // No bar to hold the pencil (an overlay, or an inset without the
         // utilities): a faint one in the corner, shown while the pointer is
         // over the widget (widget-base.css).
-        var floatEdit = null;
-        if (cfg().role !== 'viewer' && hasOwnSettings()) {
-            floatEdit = makeBtn({ variant: 'icon', title: 'Widget settings', icon: PENCIL_ICON, onClick: editSettings });
+        if (canEdit()) {
+            floatEdit = makeBtn({ variant: 'icon', title: 'Edit this widget', icon: PENCIL_ICON, onClick: onEditButton });
             floatEdit.classList.add('bw-edit-float');
+            floatEdit.setAttribute('data-bw-print-hide', '');
             body.appendChild(floatEdit);
         }
 
         adoptOwnBar(wrap);
+        wireTitleEditing();
 
         // A widget that appends to <body> after this ran would land beside the
         // wrapper instead of inside it, and show up under the content. Move late
@@ -1052,6 +1227,7 @@
     }
 
     function displayMode() {
+        if (editing && editGrew) return 'full';   // grown to the slide while edited
         var m = declaredModes(), d = cfg().display;
         if (m.indexOf(d) >= 0) return d;
         if (m.length === 1) return m[0];
@@ -1063,6 +1239,7 @@
     function isPartial() {
         if (!readSchema()) return false;
         if (schema && schema.fullSlide === true) return false;
+        if (editing && editGrew) return false;
         return displayMode() === 'full' && !boxIsFull();
     }
 
@@ -1366,7 +1543,8 @@
         if (selfDispatch) return;   // our own local re-broadcast of widget-config
         var d = e.data || {};
         if (d.type === 'widget-open-settings')  { readSchema(); if (hasSettings) openPanel(); return; }
-        if (d.type === 'widget-close-settings') { closePanel(true); return; }
+        if (d.type === 'widget-close-settings') { closePanel(true); exitEdit(); return; }
+        if (d.type === 'widget-cleanup')        { exitEdit(); return; }
         if (d.type === 'widget-asset-saved')    { onAssetSaved(d); return; }
         if (d.type === 'widget-print')          { handlePrint(d); return; }
         if (d.type === 'widget-lens')           { handleLens(d, e.source); return; }
@@ -1384,7 +1562,8 @@
             }
             applyScale();
             syncScaleButtons();
-            if (titleEl) titleEl.textContent = barTitle();
+            syncTitle();
+            if (editing && !canEdit()) exitEdit();
             syncLayoutMode();
             announce();  // the id may only have arrived with this message
             return;
@@ -1410,7 +1589,9 @@
         serverUrl:     serverUrl,
         saveFile:      saveFile,
         onFlushFiles:  onFlushFiles,
-        openSettings:  editSettings,
+        openSettings:  onEditButton,
+        // Editing on the widget itself — see "edit mode" above.
+        edit:          editApi,
         closeSettings: function () { closePanel(); },
         hasSettings:   function () { readSchema(); return hasSettings; },
         topbar:        topbarApi,

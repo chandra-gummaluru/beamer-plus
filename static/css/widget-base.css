@@ -77,6 +77,12 @@
   --fs-code:  calc(13px * var(--u));
   --fs-small: calc(11.5px * var(--u));
 
+  /* Edit mode — the same teal Beamer+ uses for its own edit mode, so a
+     widget being set up reads as "being edited", not as live content. */
+  --edit:      oklch(50% 0.11 200);
+  --edit-soft: oklch(95% 0.04 200);
+  --edit-ink:  oklch(38% 0.08 200);
+
   /* Furniture metrics — shared so two widgets' toolbars line up. */
   --bar-h:  42px;
   --ctl-h:  28px;
@@ -556,6 +562,137 @@ body.bw-overlay:hover .bw-overlay-controls,
   position: relative;
   overflow: hidden;
 }
+
+/* ── Edit mode ────────────────────────────────────────────────────────────
+   body.bw-editing, set by the kit while a widget is being set up on itself
+   (BeamerWidget.edit). The widget's own content is the form: anything marked
+   .bw-editable gets a dashed teal outline, the bar turns teal along its
+   bottom edge, and Edit becomes Done.
+   ====================================================================== */
+
+/* Edit / Done: the last thing in the bar, the top-right corner. */
+.bw-edit-btn { gap: 6px; }
+body.bw-editing .bw-edit-btn.bw-btn--primary {
+  background: var(--edit); border-color: var(--edit); color: #fff;
+}
+body.bw-editing .bw-edit-btn.bw-btn--primary:hover:not(:disabled) {
+  background: var(--edit-ink); border-color: var(--edit-ink);
+}
+body.bw-editing .bw-topbar {
+  border-bottom-color: var(--edit);
+  box-shadow: inset 0 -1px 0 var(--edit);
+}
+
+/* Show a piece of UI only while editing, or only while not. */
+body:not(.bw-editing) .bw-edit-only { display: none !important; }
+body.bw-editing .bw-run-only { display: none !important; }
+
+/* The Name: hidden in the bar normally, typed into at its left while editing. */
+body.bw-editing .bw-topbar-title {
+  display: block !important;
+  min-width: 90px;
+  max-width: 34%;
+  padding: 4px 8px;
+  border-radius: var(--radius);
+  outline: 1px dashed var(--edit);
+  outline-offset: -1px;
+  cursor: text;
+  text-overflow: clip;
+}
+body.bw-editing .bw-topbar-title:focus { outline-style: solid; background: var(--edit-soft); }
+body.bw-editing .bw-topbar-title + .bw-sep,
+body.bw-editing .bw-adopted-bar > .bw-topbar-title + .bw-sep { display: block !important; }
+
+/* Anything set by clicking or typing on it. */
+body.bw-editing .bw-editable {
+  outline: 1.5px dashed color-mix(in oklab, var(--edit) 70%, transparent);
+  outline-offset: 4px;
+  border-radius: 4px;
+  cursor: text;
+  transition: outline-color var(--dur), background var(--dur);
+}
+body.bw-editing .bw-editable:hover { outline-color: var(--edit); }
+body.bw-editing .bw-editable:focus,
+body.bw-editing .bw-editable:focus-within {
+  outline: 2px solid var(--edit);
+  background: color-mix(in oklab, var(--edit-soft) 70%, transparent);
+}
+body.bw-editing button.bw-editable,
+body.bw-editing .bw-editable[role="button"] { cursor: pointer; }
+
+/* An empty editable shows what goes there. */
+[data-bw-placeholder]:empty::before {
+  content: attr(data-bw-placeholder);
+  color: var(--text-3);
+  pointer-events: none;
+}
+
+/* A quiet line saying what can be done here. */
+.bw-edit-hint {
+  font-size: var(--fs-chrome-sm);
+  color: var(--edit-ink);
+  white-space: nowrap;
+}
+
+/* Segmented choice: one of a few. Members are .bw-btn, the chosen one
+   .is-active. Used for settings picked on the widget in edit mode. */
+.bw-seg {
+  display: inline-flex;
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.bw-seg > .bw-btn { border: 0; border-radius: 0; height: calc(var(--ctl-h) - 2px); }
+.bw-seg > .bw-btn + .bw-btn { border-left: 1px solid var(--border); }
+body.bw-editing .bw-seg > .bw-btn.is-active,
+body.bw-editing .bw-toggle[aria-pressed="true"] {
+  background: var(--edit); border-color: var(--edit); color: #fff;
+}
+
+/* On / off, with its state drawn as a tick box. */
+.bw-toggle { gap: 7px; }
+.bw-toggle::before {
+  content: '';
+  width: 12px; height: 12px;
+  border: 1.5px solid currentColor;
+  border-radius: 3px;
+  opacity: 0.7;
+  flex: 0 0 auto;
+}
+.bw-toggle[aria-pressed="true"]::before {
+  opacity: 1;
+  background: currentColor;
+  box-shadow: inset 0 0 0 2px var(--edit);
+}
+
+/* A small number typed in place, inside a sentence or a control. */
+.bw-inline-num {
+  width: 5.5ch;
+  height: calc(var(--ctl-h) - 4px);
+  padding: 0 6px;
+  border: 1px solid var(--border-med);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.bw-inline-num:focus { outline: 2px solid var(--edit); outline-offset: -1px; border-color: var(--edit); }
+
+/* "+ Add …" at the end of a list being edited. */
+.bw-add {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px;
+  border: 1.5px dashed color-mix(in oklab, var(--edit) 60%, transparent);
+  border-radius: var(--radius);
+  background: none;
+  color: var(--edit-ink);
+  font: inherit;
+  cursor: pointer;
+}
+.bw-add:hover { border-color: var(--edit); background: var(--edit-soft); }
 
 /* Font size stepper — drives --u, which every content-sized token is built on. */
 .bw-fontsize {

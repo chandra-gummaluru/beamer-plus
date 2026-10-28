@@ -166,12 +166,24 @@ overlay — a small box over part of a content slide, with no bar (the timer,
 calculator and Python shell do).
 
 To add your own, drop an `.html` file in `widgets/`. A `<script
-id="widget-schema" type="application/json">` block in the file describes the
-fields edited from the pencil on the widget while presenting (the editor
-panel only holds its name, text size and position). The settings kit
-(`static/js/widget-settings-kit.js`) is injected into every widget and gives
-it the `BeamerWidget` API; a widget can say how it appears in the notes PDF by
-registering a print handler (`BeamerWidget.print.register`).
+id="widget-schema" type="application/json">` block in the file describes its
+settings (the editor panel only holds its name, text size and position). The
+settings kit (`static/js/widget-settings-kit.js`) gives every widget the
+`BeamerWidget` API and the Edit button in its top-right corner; a widget can
+say how it appears in the notes PDF by registering a print handler
+(`BeamerWidget.print.register`).
+
+A widget that declares `"inlineEdit": true` (Timer, Table and Audience
+Response so far) is set up on itself: Edit puts it into edit mode, where its
+own content is the form — the timer's digits are its duration, the poll's
+question and answers are typed where they show, the table's cells are its
+starting data — and `BeamerWidget.edit.set()` saves each change with the
+slide. Other widgets' Edit still opens a settings form.
+
+Every widget is self-contained, so it also works opened straight from disk:
+`python tools/stamp_widgets.py` copies the current `widget-base.css` and kit
+into each file in `widgets/` (re-run it after changing either; a test fails
+when a copy is stale). Opened on its own, edits last until the page reloads.
 
 ## Security model
 
