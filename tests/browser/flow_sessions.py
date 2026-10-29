@@ -9,12 +9,11 @@ file windows are faked over the browser's private file system (common.FAKE_FOLDE
 """
 import base64
 import os
-import re
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from playwright.sync_api import sync_playwright  # noqa: E402
-from common import BASE, OUT, make_pdf, make_zip, FAKE_FOLDER, FOLDER_RESET, FOLDER_PUT, FOLDER_LS  # noqa: E402
+from common import BASE, OUT, make_pdf, make_zip, FAKE_FOLDER, FOLDER_RESET, FOLDER_PUT  # noqa: E402
 
 L = "csc258/lectures"
 DECK = "05 - Binary Arithmetic"
@@ -47,7 +46,6 @@ def run():
         page.on("pageerror", lambda e: errors.append(f"pageerror: {e}"))
         page.on("crash", lambda: print("PAGE CRASHED"))
         shot = lambda n: page.screenshot(path=f"{OUT}/{n}.png")
-        go = lambda name: (page.locator(".lib-files .lib-item", has_text=name).first.click(), page.wait_for_timeout(400))
         BTN = {"edit": "#session-edit-btn", "end": "#session-close-btn", "record": "#record-btn"}
         # No Open or Save button: a session starts with the Open window, and
         # saving is part of Close session. The steps that open or save
@@ -57,7 +55,6 @@ def run():
                             else page.evaluate(LIB.format("openPresentation")) if key == "open"
                             else page.click(BTN[key]))
         shown = lambda: page.eval_on_selector_all("#top-right-controls button", "els => els.filter(e => e.getClientRects().length).map(e => e.id)")
-        sid = lambda: re.search(r"/s/([^/]+)/", page.url).group(1)
 
         # 1. The start page: New Session and Try Demo.
         page.goto(BASE); page.wait_for_timeout(600)
@@ -75,7 +72,7 @@ def run():
         page.evaluate("() => { window.__cancel = true; }")
         page.click("#welcome-new-btn"); page.wait_for_timeout(1200)
         types = page.evaluate("() => window.__openTypes")
-        check(f"New Session: the file window, .pdf and .zip only", types and sorted(sum(types[0]["accept"].values(), [])) == [".pdf", ".zip"])
+        check("New Session: the file window, .pdf and .zip only", types and sorted(sum(types[0]["accept"].values(), [])) == [".pdf", ".zip"])
         check("…cancelled: still on the start page", "/s/" not in page.url and page.locator("#welcome-new-btn").is_enabled())
         page.evaluate("p => { window.__open = p; }", f"Courses/{L}/{DECK}.zip")
         page.click("#welcome-new-btn"); page.wait_for_url("**/s/**")
@@ -104,39 +101,25 @@ def run():
         # 4. Go to slide 3 (Save keeps the slide you're on).
         page.keyboard.press("ArrowRight"); page.keyboard.press("ArrowRight"); page.wait_for_timeout(800)
 
-        # 5. Save: the title and what to save first, then the folder window.
+        # 5. Save: the title and what to save, then straight to the downloads folder.
+        got = {}
+        page.on("download", lambda d: got.__setitem__(d.suggested_filename, d.path()))
         menu("save"); page.wait_for_timeout(800); shot("s06-save")
         check("save: a window with the title and what to save", page.locator(".lib[data-mode=save]").count() == 1
               and page.input_value("[data-name]") == DECK and page.locator(".lib-chip").count() == 3)
-        check("…no folder browser in it", page.locator(".lib-files, .lib-folder, .lib-crumbs").count() == 0)
-        check("…Cancel and Save…, nothing else", [x.strip() for x in page.locator(".lib-foot .btn, .lib-foot .link").all_inner_texts()] == ["Cancel", "Save…"])
+        check("…Cancel and Save, nothing else", [x.strip() for x in page.locator(".lib-foot .btn, .lib-foot .link").all_inner_texts()] == ["Cancel", "Save"])
         page.locator(".lib-chip", has_text="Notes").click()            # just the deck
         page.fill("[data-name]", "05 - saved")
-        page.evaluate("() => { window.__cancel = true; }")
-        page.click("[data-save]"); page.wait_for_timeout(800)
-        check("cancel the folder window: the Save window stays, as filled in",
-              page.input_value("[data-name]") == "05 - saved" and not page.locator("[data-notes]").is_checked())
-        check("…the folder window started by the opened deck", page.evaluate("() => window.__startIn") == f"{DECK}.zip")
-        page.evaluate("() => { window.__pick = 'Saves'; }")
         page.click("[data-save]"); page.wait_for_timeout(2500)
-        files = page.evaluate(FOLDER_LS, "Saves")
-        check("saved into the chosen folder", "05 - saved.zip" in files and "05 - saved.pdf" not in files)
-        check("…toast says where", "Saved Saves/05 - saved.zip" in page.inner_text("#recorder-toast"))
-        # Again, into the same folder: asks before replacing.
-        menu("save"); page.wait_for_timeout(800)
-        page.click("[data-save]"); page.wait_for_timeout(800)
-        check("…the folder window starts where it last saved", page.evaluate("() => window.__startIn") == "Saves")
-        check("…same title there: asks before replacing", "Replace" in page.inner_text(".custom-modal-overlay"))
-        page.locator(".custom-modal-buttons .btn", has_text="Cancel").click(); page.wait_for_timeout(500)
-        check("…Cancel goes back to the Save window", page.locator(".lib[data-mode=save]").count() == 1 and page.input_value("[data-name]") == "05 - saved")
-        page.evaluate("() => { window.__pick = 'Saves/csc258'; }")
-        page.click("[data-save]"); page.wait_for_timeout(2500)
-        files = page.evaluate(FOLDER_LS, "Saves")
-        check("saved into a subfolder", "csc258/05 - saved.zip" in files)
+        print("   downloaded:", sorted(got))
+        check("saved: downloaded, no folder window", sorted(got) == ["05 - saved.zip"] and page.evaluate("() => window.__startIn") is None)
+        check("…toast says where", "Saved 05 - saved.zip to your Downloads folder." in page.inner_text("#recorder-toast"))
+        saved_zip = open(got["05 - saved.zip"], "rb").read()
 
         # 6. No Ctrl+S shortcut: the browser's own (nothing saved, no window).
+        n = len(got)
         page.keyboard.press("Control+s"); page.wait_for_timeout(1200)
-        check("Ctrl+S does nothing in Beamer+", page.locator(".lib").count() == 0 and page.evaluate(FOLDER_LS, "Saves") == files)
+        check("Ctrl+S does nothing in Beamer+", page.locator(".lib").count() == 0 and len(got) == n)
 
         # 7. Record with the record button.
         if not os.environ.get("SKIPREC"):
@@ -160,11 +143,11 @@ def run():
         check("…Save… opens the Save window", page.locator(".lib [data-save]").count() == 1)
         page.fill("[data-name]", "05 - closing"); page.click("[data-save]")
         page.wait_for_url(BASE, timeout=15000); page.wait_for_timeout(800)
-        check("…saves, then back on the start page", page.locator("#welcome-new-btn").is_visible()
-              and any(k.endswith("05 - closing.zip") for k in page.evaluate(FOLDER_LS, "Saves")))
+        check("…saves, then back on the start page", page.locator("#welcome-new-btn").is_visible() and "05 - closing.zip" in got)
 
         # 9. New Session starts empty; the saved deck reopens at the slide it was saved on.
-        page.evaluate("() => { window.__open = 'Saves/csc258/05 - saved.zip'; }")
+        page.evaluate(FOLDER_PUT, {"saved/05 - saved.zip": b64(saved_zip)})
+        page.evaluate("() => { window.__open = 'Courses/saved/05 - saved.zip'; }")
         page.click("#welcome-new-btn"); page.wait_for_url("**/s/**")
         page.wait_for_function("() => window.beamerState?.totalSlides === 6", timeout=15000); page.wait_for_timeout(1500)
         check("saved deck reopens on slide 3", page.evaluate("() => window.beamerState.currentSlide") == 2)

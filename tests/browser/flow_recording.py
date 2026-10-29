@@ -15,19 +15,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from playwright.sync_api import sync_playwright  # noqa: E402
-from common import BASE, OUT, make_pdf, make_zip, FAKE_FOLDER, FOLDER_RESET, FOLDER_PUT, FOLDER_LS  # noqa: E402
+from common import BASE, OUT, make_pdf, make_zip, FAKE_FOLDER, FOLDER_RESET, FOLDER_PUT  # noqa: E402
 
 L = "csc258/f26/lectures/05 - Binary Arithmetic"
-# Writes into the folder fail while window.__failWrites is true.
-FAIL_WRITES = """
-(() => {
-  const cw = FileSystemFileHandle.prototype.createWritable;
-  FileSystemFileHandle.prototype.createWritable = function (...a) {
-    if (window.__failWrites) return Promise.reject(new DOMException('The disk is full.', 'QuotaExceededError'));
-    return cw.apply(this, a);
-  };
-})();
-"""
 
 FAKE_SCREEN = """
 (() => {
@@ -84,7 +74,6 @@ def run():
         ctx.route(re.compile(r".*/static/js/app/recorder\.js(\?.*)?$"), patch_recorder)
         ctx.add_init_script(FAKE_SCREEN)
         ctx.add_init_script(FAKE_FOLDER)
-        ctx.add_init_script(FAIL_WRITES)
         page = ctx.new_page()
         page.on("console", lambda m: errors.append(f"{m.type}: {m.text}") if m.type == "error" else None)
         page.on("pageerror", lambda e: errors.append(f"pageerror: {e}"))
@@ -92,10 +81,6 @@ def run():
         # No Save button (saving is part of Close session): open the Save window directly.
         LIB = "() => import('/static/js/library/ui.js').then(m => m.{}())"
         menu = lambda key: page.click("#record-btn") if key == "record" else page.evaluate(LIB.format("savePresentation" if key == "save" else "openPresentation"))
-        folder = lambda: page.evaluate(FOLDER_LS, "Saves")
-        # Save…, then the folder window (it hands back Saves); Replace if asked.
-        save = lambda: (page.click("[data-save]"), page.wait_for_timeout(800),
-                        page.locator(".custom-modal-buttons .btn", has_text="Replace").count() and page.locator(".custom-modal-buttons .btn", has_text="Replace").click())
 
         page.goto(BASE); page.wait_for_timeout(500)
         page.evaluate(FOLDER_RESET)
@@ -163,36 +148,17 @@ def run():
         check("one take: same group, durations add up",
               len({m["group"] for m in metas}) == 1 and abs(sum(m["durationMs"] for m in metas) - 12000) < 2500)
 
-        # 3. Saving into the folder fails: nothing lost, try again or download instead.
-        menu("save"); page.wait_for_timeout(800)
-        page.evaluate("() => { window.__pick = 'Saves'; }"); shot("r03-save")
+        # 3. Save downloads the deck and every part, numbered; they aren't offered again.
+        menu("save"); page.wait_for_timeout(800); shot("r03-save")
         chip = " ".join(page.locator(".lib-chip", has_text="Recordings").inner_text().split())
         check(f"save offers every part ({chip})", chip == f"Recordings {len(metas)}")
-        before = set(folder())
-        page.evaluate("() => { window.__failWrites = true; }")
-        save(); page.wait_for_timeout(3200); shot("r04-failed")
-        btns = [x.inner_text().strip() for x in page.locator(".custom-modal-buttons .btn").all()]
-        check(f"failed save: Close / Try Again / Download Instead ({btns})", btns == ["Close", "Try Again", "Download Instead"])
-        check("…and says the recordings are still safe", "stay in Beamer+" in page.inner_text(".custom-modal-overlay"))
         got = []
         page.on("download", lambda d: got.append(d.suggested_filename))
-        page.locator(".custom-modal-buttons .btn", has_text="Download Instead").click()
-        page.wait_for_timeout(1500 + 500 * len(metas))
+        page.click("[data-save]")
+        page.wait_for_timeout(3000 + 500 * len(metas)); shot("r05-saved")
         print("   downloaded:", got)
-        check("download instead gets everything that was built",
-              "05 - Binary Arithmetic.zip" in got and sum(1 for g in got if re.search(r"-part\d+\.(webm|mp4)$", g)) == len(metas))
-        check("nothing reached the folder", set(folder()) == before)
-        menu("save"); page.wait_for_timeout(1500)
-        check("the parts are still offered for the folder", " ".join(page.locator(".lib-chip", has_text="Recordings").inner_text().split()) == f"Recordings {len(metas)}")
-        save(); page.wait_for_timeout(2200)
-        page.locator(".custom-modal-buttons .btn", has_text="Try Again").click()
-        page.wait_for_timeout(1000)
-        page.evaluate("() => { window.__failWrites = false; }")
-        page.locator(".custom-modal-buttons .btn", has_text="Try Again").click()
-        page.wait_for_timeout(4000); shot("r05-saved")
-        parts = sorted(k for k in folder() if re.match(rf"05 - Binary Arithmetic-\d{{4}}(-\d\d){{4}}-part\d+\.(webm|mp4)$", k))
-        print("   in the folder:", parts)
-        check("try again saves every part into the folder, numbered", len(parts) == len(metas))
+        parts = [g for g in got if re.match(r"05 - Binary Arithmetic-\d{4}(-\d\d){4}-part\d+\.(webm|mp4)$", g)]
+        check("save downloads the deck and every part, numbered", "05 - Binary Arithmetic.zip" in got and len(parts) == len(metas))
         menu("save"); page.wait_for_timeout(1500)
         check("…and they aren't offered again", "Recordings" in page.inner_text(".lib-chips") and page.locator("[data-recs]").is_disabled())
         page.keyboard.press("Escape")
