@@ -89,21 +89,19 @@ def run():
         page.on("console", lambda m: errors.append(f"{m.type}: {m.text}") if m.type == "error" else None)
         page.on("pageerror", lambda e: errors.append(f"pageerror: {e}"))
         shot = lambda n: page.screenshot(path=f"{OUT}/{n}.png")
-        go = lambda name: (page.locator(".lib-files .lib-item", has_text=name).first.click(), page.wait_for_timeout(400))
         # No Save button (saving is part of Close session): open the Save window directly.
         LIB = "() => import('/static/js/library/ui.js').then(m => m.{}())"
         menu = lambda key: page.click("#record-btn") if key == "record" else page.evaluate(LIB.format("savePresentation" if key == "save" else "openPresentation"))
-        folder = lambda: page.evaluate(FOLDER_LS)
+        folder = lambda: page.evaluate(FOLDER_LS, "Saves")
+        # Save…, then the folder window (it hands back Saves); Replace if asked.
+        save = lambda: (page.click("[data-save]"), page.wait_for_timeout(800),
+                        page.locator(".custom-modal-buttons .btn", has_text="Replace").count() and page.locator(".custom-modal-buttons .btn", has_text="Replace").click())
 
         page.goto(BASE); page.wait_for_timeout(500)
         page.evaluate(FOLDER_RESET)
         page.evaluate(FOLDER_PUT, {f"{L}/05 - Binary Arithmetic.zip": base64.b64encode(make_zip(make_pdf())).decode()})
-        page.click("#welcome-new-btn"); page.wait_for_url("**/s/**"); page.wait_for_timeout(2200)
-        menu("open"); page.wait_for_timeout(500)
-        page.click(".lib [data-choose]"); page.wait_for_timeout(600)
-        for n in ["csc258", "f26", "lectures", "05 - Binary Arithmetic", "05 - Binary Arithmetic.zip"]:
-            go(n)
-        page.wait_for_timeout(2500)
+        page.evaluate("p => { window.__open = p; }", f"Courses/{L}/05 - Binary Arithmetic.zip")
+        page.click("#welcome-new-btn"); page.wait_for_url("**/s/**"); page.wait_for_timeout(4500)
 
         # 1. Split view fills the stage straight away (no divider drag needed).
         fit0 = page.evaluate(FIT1)
@@ -167,12 +165,12 @@ def run():
 
         # 3. Saving into the folder fails: nothing lost, try again or download instead.
         menu("save"); page.wait_for_timeout(800)
-        page.click(".lib [data-adopt]"); page.wait_for_timeout(1200); shot("r03-save")   # save in the Open folder too
+        page.evaluate("() => { window.__pick = 'Saves'; }"); shot("r03-save")
         chip = " ".join(page.locator(".lib-chip", has_text="Recordings").inner_text().split())
         check(f"save offers every part ({chip})", chip == f"Recordings {len(metas)}")
         before = set(folder())
         page.evaluate("() => { window.__failWrites = true; }")
-        page.click("[data-save]"); page.wait_for_timeout(4000); shot("r04-failed")
+        save(); page.wait_for_timeout(3200); shot("r04-failed")
         btns = [x.inner_text().strip() for x in page.locator(".custom-modal-buttons .btn").all()]
         check(f"failed save: Close / Try Again / Download Instead ({btns})", btns == ["Close", "Try Again", "Download Instead"])
         check("…and says the recordings are still safe", "stay in Beamer+" in page.inner_text(".custom-modal-overlay"))
@@ -186,13 +184,13 @@ def run():
         check("nothing reached the folder", set(folder()) == before)
         menu("save"); page.wait_for_timeout(1500)
         check("the parts are still offered for the folder", " ".join(page.locator(".lib-chip", has_text="Recordings").inner_text().split()) == f"Recordings {len(metas)}")
-        page.click("[data-save]"); page.wait_for_timeout(3000)
+        save(); page.wait_for_timeout(2200)
         page.locator(".custom-modal-buttons .btn", has_text="Try Again").click()
         page.wait_for_timeout(1000)
         page.evaluate("() => { window.__failWrites = false; }")
         page.locator(".custom-modal-buttons .btn", has_text="Try Again").click()
         page.wait_for_timeout(4000); shot("r05-saved")
-        parts = sorted(k for k in folder() if re.match(rf"{re.escape(L)}/05 - Binary Arithmetic-\d{{4}}(-\d\d){{4}}-part\d+\.(webm|mp4)$", k))
+        parts = sorted(k for k in folder() if re.match(rf"05 - Binary Arithmetic-\d{{4}}(-\d\d){{4}}-part\d+\.(webm|mp4)$", k))
         print("   in the folder:", parts)
         check("try again saves every part into the folder, numbered", len(parts) == len(metas))
         menu("save"); page.wait_for_timeout(1500)

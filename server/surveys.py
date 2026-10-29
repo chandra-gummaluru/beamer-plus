@@ -14,7 +14,7 @@ surveys_bp = Blueprint('surveys', __name__)
 
 # What the audience is asked to give. Decides which response page they get
 # and what that page asks for; the server stores every answer as text either way.
-SURVEY_KINDS = {'open', 'choice', 'truefalse', 'rating', 'numeric', 'wordcloud', 'fill'}
+SURVEY_KINDS = {'open', 'choice', 'truefalse', 'rating', 'numeric', 'wordcloud', 'fill', 'plot'}
 
 
 def _clean_meta(meta):

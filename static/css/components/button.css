@@ -1,10 +1,12 @@
 /* ============================================================
-   Buttons — the one button in Beamer+.
+   Buttons — the one button in Beamer+, styled as Lectern's
+   (static/css/shell.css there): semibold labels, light yellow on hover.
 
-   .btn                 paper, hairline border, ink label
-   .btn--primary        the one main action of a page or dialog
+   .btn                 white, grey outline; yellow fill + gold outline on hover
+   .btn--primary        the one main action of a page or dialog: a black outline
+   .btn--add            adds something: dashed gold outline, gold label
    .btn--ghost          no fill or border until hovered: toolbars, ×, quiet links
-   .btn--danger         destructive; filled once armed (.is-armed)
+   .btn--danger         destructive; filled red once armed (.is-armed)
    .btn--sm             --ctl-h tall: the editor panel and settings sheet
    .btn--icon           square, for an icon alone
    .btn_selected        a toggle that is on (tools, split view, bookmark)
@@ -15,9 +17,11 @@
    ============================================================ */
 
 .btn {
-    --_bg: var(--surface-paper);
-    --_fg: var(--ink-1);
-    --_bd: var(--line-2);
+    --_bg: #fff;
+    --_fg: var(--btn-ink);
+    --_bd: var(--btn-line);
+    --_bw: 1px;
+    --_bs: solid;
 
     display: inline-flex;
     align-items: center;
@@ -26,18 +30,18 @@
 
     min-width: var(--hit-min);
     min-height: var(--hit-min);
-    padding: 0 var(--sp-3);
+    padding: 0 15px;
 
     font-family: var(--font-sans);
     font-size: var(--fs-base);
-    font-weight: 500;
+    font-weight: 600;
     line-height: 1;
     white-space: nowrap;
 
     color: var(--_fg);
     background: var(--_bg);
-    border: 1px solid var(--_bd);
-    border-radius: var(--r-md);
+    border: var(--_bw) var(--_bs) var(--_bd);
+    border-radius: var(--r-btn);
 
     cursor: pointer;
     text-decoration: none;
@@ -56,14 +60,13 @@
 .btn svg { width: 18px; height: 18px; flex: none; }
 
 .btn:hover {
-    --_bg: var(--surface-cream-2);
-    --_bd: var(--line-3);
+    --_bg: var(--btn-gold-soft);
+    --_bd: var(--btn-gold);
 }
 
-.btn:active {
-    transform: translateY(1px);
-    background: var(--surface-cream-3);
-}
+.btn:active { transform: translateY(1px); }
+
+.btn:focus-visible { outline: 2px solid var(--btn-gold); outline-offset: 2px; }
 
 .btn:disabled,
 .btn[disabled] {
@@ -75,20 +78,34 @@
 
 /* ---------- Variants ---------- */
 
-.btn--primary,
+/* The main action: white with a black outline (Lectern's "main"). */
+.btn--primary {
+    --_bd: var(--btn-ink);
+    --_bw: 1.5px;
+}
+.btn--primary:hover { --_bd: var(--btn-ink); }
+
+/* Adds something: dashed gold, solid once hovered. */
+.btn--add {
+    --_bg: transparent;
+    --_fg: var(--btn-gold);
+    --_bd: var(--btn-gold);
+    --_bw: 1.5px;
+    --_bs: dashed;
+}
+.btn--add:hover { --_bs: solid; --_fg: var(--btn-gold); }
+
+/* A toggle that is on (tools, split view, bookmark): filled graphite. */
 .btn_selected,
 .btn.btn_selected {
     --_bg: var(--accent);
     --_fg: var(--ink-on-accent);
     --_bd: var(--accent-strong);
 }
-.btn--primary:hover,
 .btn_selected:hover {
     --_bg: var(--accent-strong);
     --_bd: var(--accent-strong);
 }
-.btn--primary:active,
-.btn_selected:active { background: var(--accent-strong); }
 
 .btn--ghost {
     --_bg: transparent;
@@ -96,23 +113,23 @@
     --_fg: var(--ink-2);
 }
 .btn--ghost:hover {
-    --_bg: var(--surface-cream-2);
+    --_bg: var(--btn-gold-soft);
     --_bd: transparent;
-    --_fg: var(--ink-1);
+    --_fg: var(--btn-ink);
 }
 
-.btn--danger { --_fg: var(--danger-ink); }
+.btn--danger { --_fg: var(--btn-danger); }
 /* Outlined (not ghost): the usual outline, in a pale red. */
-.btn--danger:not(.btn--ghost) { --_bd: oklch(from var(--danger) l c h / 0.45); }
-.btn--danger:hover { --_bg: var(--danger-soft); --_fg: var(--danger-ink); }
-.btn--danger:not(.btn--ghost):hover { --_bd: var(--danger); }
+.btn--danger:not(.btn--ghost) { --_bd: var(--btn-danger-line); }
+.btn--danger:hover { --_bg: var(--btn-danger-soft); --_fg: var(--btn-danger); }
+.btn--danger:not(.btn--ghost):hover { --_bd: var(--btn-danger-line); }
 /* An icon alone (a toolbar's trash) keeps the toolbar's ink until hovered. */
 .btn--icon.btn--danger:not(:hover):not(.is-armed) { --_fg: var(--ink-2); }
 .btn--danger.is-armed,
 .btn--danger.is-armed:hover {
-    --_bg: var(--danger);
-    --_bd: var(--danger);
-    --_fg: var(--ink-on-accent);
+    --_bg: var(--btn-danger);
+    --_bd: var(--btn-danger);
+    --_fg: #fff;
 }
 
 /* ---------- Sizes ---------- */

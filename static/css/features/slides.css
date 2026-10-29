@@ -261,6 +261,9 @@ model-viewer { pointer-events: auto !important; }
     margin: var(--sp-2) 0 0;
 }
 
+/* Open a File… (library/ui.js): the way in when nothing is open. */
+.stage-empty-open { margin-top: var(--sp-4); user-select: none; }
+
 /* Narrow stages (phones, tiny split panes): smaller. */
 @media (max-width: 600px), (max-height: 460px) {
     .stage-empty-icon { width: 68px; height: 49px; margin-bottom: var(--sp-3); }

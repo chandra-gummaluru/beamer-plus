@@ -1,15 +1,17 @@
-// The folders on this computer that Open and Save browse (library/ui.js):
-// one to open presentations from ('open') and one to save them into
-// ('save'). They can be the same folder or different ones; each is chosen
-// once and remembered in this browser across sessions (IndexedDB). After the
-// browser restarts it asks once to allow access again (Chrome's "Allow on
-// every visit" skips that).
+// The computer's own file windows, for Open and Save (library/ui.js):
+//   Open:  the system's Open window, showing presentations only (.zip, .pdf);
+//          New Session (start page) shows it, then hands the file over.
+//   Save:  the system's folder window, to choose where the files go.
+// Each starts where you last were (the browser remembers it per window, and
+// Save also starts in the folder of the deck you opened or last saved).
 //
-// Uses the File System Access API (Chrome, Edge).
+// Uses the File System Access API (Chrome, Edge). Other browsers: Open is
+// the plain file input and Save downloads (supported() is false).
 
 const DB = 'beamer-folder', STORE = 'handles';
 
-export const supported = () => typeof window.showDirectoryPicker === 'function';
+export const supported = () => typeof window.showOpenFilePicker === 'function'
+    && typeof window.showDirectoryPicker === 'function';
 
 function idb() {
     return new Promise((res) => {
@@ -36,103 +38,98 @@ async function idbSet(key, v) {
     });
 }
 
-const roots = { open: null, save: null };     // FileSystemDirectoryHandle per role
-let loaded = null;
+// The folder last saved into (across sessions), read early so the Save
+// click can open the folder window at once.
+let lastSave = null;
+const ready = idbGet('save-dir').then(h => { lastSave = h; }).catch(() => {});
+export const warm = () => ready;
 
-// Read both from IndexedDB once. A folder remembered before Open and Save
-// had their own ('root') becomes both.
-function load() {
-    return (loaded ||= (async () => {
-        const [o, s, old] = await Promise.all([idbGet('open'), idbGet('save'), idbGet('root')]);
-        roots.open = o || old || null;
-        roots.save = s || old || null;
-        if (old && !o) await idbSet('open', old);
-        if (old && !s) await idbSet('save', old);
-        if (old) await idbSet('root', null);
-    })());
-}
+const abort = e => e?.name === 'AbortError';
 
-/** The remembered folder for `role`, if any (permission may still be needed). */
-export async function remembered(role) {
-    await load();
-    return roots[role] || null;
-}
-/** Its name ('' if none). */
-export const rootName = role => roots[role]?.name || '';
-/** 'granted', 'prompt', 'denied', or 'none' when no folder is remembered. */
-export async function permission(role) {
-    await load();
-    const h = roots[role];
-    if (!h) return 'none';
-    try { return await h.queryPermission({ mode: 'readwrite' }); } catch { return 'denied'; }
-}
-/** Ask to use the remembered folder again (needs a click). */
-export async function reconnect(role) {
-    await load();
-    const h = roots[role];
-    if (!h) return false;
-    try { return (await h.requestPermission({ mode: 'readwrite' })) === 'granted'; } catch { return false; }
-}
-/** Choose the folder for `role` (needs a click). Returns false if cancelled. */
-export async function choose(role) {
-    await load();
-    let h;
-    // Browsers don't let a page into your home folder by itself: the system
-    // picker opens (in Documents the first time, then wherever you last
-    // chose a folder for this role).
-    try { h = await window.showDirectoryPicker({ id: `beamer-${role}`, mode: 'readwrite', startIn: roots[role] || 'documents' }); }
-    catch (e) { if (e?.name === 'AbortError') return false; throw e; }
-    roots[role] = h;
-    await idbSet(role, h);
-    return true;
-}
-/** Use the folder of role `from` for `role` too. */
-export async function adopt(role, from) {
-    await load();
-    if (!roots[from]) return false;
-    roots[role] = roots[from];
-    await idbSet(role, roots[from]);
-    return true;
-}
-/** Are both roles the same folder? */
-export async function same(a, b) {
-    await load();
-    if (!roots[a] || !roots[b]) return false;
-    try { return await roots[a].isSameEntry(roots[b]); } catch { return false; }
+/** The system's Open window, presentations only. Returns { file, handle }, or null if cancelled. */
+export async function pickDeck() {
+    let handles;
+    try {
+        handles = await window.showOpenFilePicker({
+            id: 'beamer-open',
+            types: [{ description: 'Presentations (PDF or Beamer+ ZIP)', accept: { 'application/pdf': ['.pdf'], 'application/zip': ['.zip'] } }],
+            excludeAcceptAllOption: true,
+            multiple: false,
+        });
+    } catch (e) { if (abort(e)) return null; throw e; }
+    const handle = handles?.[0];
+    return handle ? { file: await handle.getFile(), handle } : null;
 }
 
-const isDir = h => h.kind === 'directory';
-
-async function dirAt(role, path, create = false) {
-    let d = roots[role];
-    if (!d) throw new Error('Choose a folder first.');
-    for (const p of path.split('/').filter(Boolean)) d = await d.getDirectoryHandle(p, { create });
-    return d;
+/** The system's Open window without the File System Access API: a plain
+ *  file input. Returns { file, handle: null }, or null if cancelled. */
+export function pickDeckPlain() {
+    return new Promise((res) => {
+        const input = Object.assign(document.createElement('input'), { type: 'file', accept: '.pdf,.zip,application/pdf,application/zip' });
+        input.addEventListener('change', () => res(input.files?.[0] ? { file: input.files[0], handle: null } : null));
+        input.addEventListener('cancel', () => res(null));
+        input.click();
+    });
 }
 
-/** What's in a folder of `role` (path '' is the chosen folder): [{ name, path, type: 'dir'|'file', handle }]. */
-export async function list(role, path) {
-    const d = await dirAt(role, path);
+/** Hand a chosen file from the start page to the session it starts
+ *  (the page changes in between). */
+export async function stashOpen(got) {
+    // A copy of the bytes: some browsers can't keep a file read from disk in IndexedDB.
+    const f = got.file, file = new File([await f.arrayBuffer()], f.name, { type: f.type, lastModified: f.lastModified });
+    await idbSet('pending-open', { file, handle: got.handle || null, at: Date.now() });
+}
+/** The file the start page chose for this session, once (null if none). */
+export async function takeOpen() {
+    const v = await idbGet('pending-open');
+    if (v) await idbSet('pending-open', null);
+    return v && Date.now() - v.at < 10 * 60_000 ? v : null;
+}
+
+/** The system's folder window, to save in. `near` (a file or folder handle)
+ *  is where it starts; else the last folder saved into. Null if cancelled. */
+export async function pickSaveFolder(near = null) {
+    let dir;
+    try {
+        dir = await window.showDirectoryPicker({ id: 'beamer-save', mode: 'readwrite', startIn: near || lastSave || 'documents' });
+    } catch (e) {
+        if (abort(e)) return null;
+        // A remembered folder that's gone: start in Documents instead.
+        if (e?.name === 'NotFoundError' || e?.name === 'TypeError') {
+            try { dir = await window.showDirectoryPicker({ id: 'beamer-save', mode: 'readwrite', startIn: 'documents' }); }
+            catch (e2) { if (abort(e2)) return null; throw e2; }
+        } else throw e;
+    }
+    lastSave = dir;
+    idbSet('save-dir', dir);
+    return dir;
+}
+
+/** Which of `names` are already in `dir`. */
+export async function existing(dir, names) {
     const out = [];
-    for await (const [name, h] of d.entries()) {
-        if (name.startsWith('.')) continue;
-        out.push({ name, path: path ? `${path}/${name}` : name, type: isDir(h) ? 'dir' : 'file', handle: h });
+    for (const n of names) {
+        try { await dir.getFileHandle(n); out.push(n); } catch { /* not there */ }
     }
     return out;
 }
 
-export async function read(entry) { return (await entry.handle.getFile()).arrayBuffer(); }
-export async function changed(entry) { try { return new Date((await entry.handle.getFile()).lastModified); } catch { return null; } }
-
-/** Write files ([{ path, blob }], paths from the `role` folder), making folders as needed. */
-export async function write(role, files, onStep = () => {}) {
-    for (let i = 0; i < files.length; i++) {
-        const f = files[i], parts = f.path.split('/');
-        onStep(`Writing ${parts[parts.length - 1]}${files.length > 1 ? ` (${i + 1} of ${files.length})` : ''}…`);
-        const d = await dirAt(role, parts.slice(0, -1).join('/'), true);
-        const fh = await d.getFileHandle(parts[parts.length - 1], { create: true });
-        const w = await fh.createWritable();
-        await w.write(f.blob);
-        await w.close();
+/** Write files ([{ path, blob }], file names in `dir`). */
+export async function write(dir, files, onStep = () => {}) {
+    if ((await dir.queryPermission?.({ mode: 'readwrite' })) === 'prompt') await dir.requestPermission({ mode: 'readwrite' });
+    const made = [];                                      // new files, removed again if it fails
+    try {
+        for (let i = 0; i < files.length; i++) {
+            const f = files[i];
+            onStep(`Writing ${f.path}${files.length > 1 ? ` (${i + 1} of ${files.length})` : ''}…`);
+            if (!(await existing(dir, [f.path])).length) made.push(f.path);
+            const fh = await dir.getFileHandle(f.path, { create: true });
+            const w = await fh.createWritable();
+            await w.write(f.blob);
+            await w.close();
+        }
+    } catch (e) {
+        for (const n of made) { try { await dir.removeEntry(n); } catch { /* leave it */ } }
+        throw e;
     }
 }

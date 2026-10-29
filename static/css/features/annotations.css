@@ -137,8 +137,8 @@ body.split-view-active #annotation-stage-actions {
 }
 
 #floating-annotation-toolbar .btn:hover {
-    background: var(--surface-cream-2);
-    border-color: var(--line-2);
+    background: var(--btn-gold-soft);
+    border-color: var(--btn-gold);
 }
 
 #floating-annotation-toolbar .btn.btn_selected {
@@ -297,7 +297,7 @@ body.split-view-active #text-size-sidebar {
     color: var(--ink-1);
 }
 #pen-flyout .btn svg { width: 16px; height: 16px; }
-#pen-flyout .btn:hover { background: var(--surface-cream-2); border-color: var(--line-2); }
+#pen-flyout .btn:hover { background: var(--btn-gold-soft); border-color: var(--btn-gold); }
 #pen-flyout .btn.btn_selected { background: var(--accent); border-color: var(--accent-strong); color: var(--ink-on-accent); }
 .pen-size-dot { display: block; border-radius: 50%; background: var(--ink-1); }
 #pen-flyout .btn.btn_selected .pen-size-dot { background: var(--ink-on-accent); }

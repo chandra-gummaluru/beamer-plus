@@ -53,17 +53,31 @@ def make_zip(pdf):
 # and handed back as the handle. FOLDER_RESET empties the folder.
 FAKE_FOLDER = """
 (() => {
-  // The picker hands back 'Courses', or the folder named in window.__pick.
+  // The folder window hands back 'Courses', or the folder named in
+  // window.__pick ('Saves', 'Saves/csc258'). The Open window hands back the
+  // file at window.__open ('Courses/…'). Each records where it was asked to
+  // start (window.__startIn: a handle's name). Cancel: window.__cancel = true.
+  if (!navigator.storage?.getDirectory) return;           // not a page that can have one
   const NAMES = ['Courses', 'Saves'];
-  const get = name => navigator.storage.getDirectory().then(r => r.getDirectoryHandle(name, { create: true }));
+  const get = async (path, create = true) => { let d = await navigator.storage.getDirectory();
+    for (const p of path.split('/').filter(Boolean)) d = await d.getDirectoryHandle(p, { create }); return d; };
   window.__fakeFolders = {};
   for (const n of NAMES) get(n).then(h => { window.__fakeFolders[n] = h; });
-  window.showDirectoryPicker = () => get(window.__pick || 'Courses');
+  const cancel = () => { if (window.__cancel) { window.__cancel = false; throw new DOMException('cancelled', 'AbortError'); } };
+  window.showDirectoryPicker = async (o = {}) => { window.__startIn = o.startIn?.name ?? o.startIn; cancel();
+    const p = window.__pick || 'Courses'; const h = await get(p); window.__fakeFolders[h.name] = h; return h; };
+  window.showOpenFilePicker = async (o = {}) => { window.__openTypes = o.types; cancel();
+    const parts = (window.__open || '').split('/'); const d = await get(parts.slice(0, -1).join('/'), false);
+    return [await d.getFileHandle(parts.at(-1))]; };
   const P = FileSystemHandle.prototype;
   P.queryPermission = async () => 'granted';
   P.requestPermission = async () => 'granted';
   const put = IDBObjectStore.prototype.put;
-  IDBObjectStore.prototype.put = function (v, ...rest) { return put.call(this, v instanceof FileSystemHandle ? '__fake_folder__:' + v.name : v, ...rest); };
+  // (This browser can't keep a private-file-system handle in IndexedDB: a
+  // folder is kept by name; a handle inside an object is dropped.)
+  const keep = v => v instanceof FileSystemHandle ? '__fake_folder__:' + v.name
+    : v && v.constructor === Object ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, x instanceof FileSystemHandle ? null : x])) : v;
+  IDBObjectStore.prototype.put = function (v, ...rest) { return put.call(this, keep(v), ...rest); };
   const res = Object.getOwnPropertyDescriptor(IDBRequest.prototype, 'result');
   Object.defineProperty(IDBRequest.prototype, 'result', { configurable: true,
     get() { const r = res.get.call(this);

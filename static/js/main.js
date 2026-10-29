@@ -518,11 +518,10 @@ function launchTour() {
 
 function maybeStartTourFromUrl() {
     const params = new URLSearchParams(window.location.search);
-    // A session starts by opening a presentation: the Open window comes up
-    // by itself, once the splash screen has gone, and stays until one opens
+    // New Session chose a presentation on the start page: open it
     // (library/ui.js). Try Demo brings its own deck instead.
     if (!params.has('tour')) {
-        setTimeout(() => { if (!state.zipFile) bus.emit('library:require'); }, 2100);
+        if (!state.zipFile) bus.emit('library:require');
         return;
     }
     // Drop the flag so a reload doesn't restart the tour.

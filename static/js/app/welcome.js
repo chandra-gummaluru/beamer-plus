@@ -1,7 +1,10 @@
-// The start page: "New Session" starts an empty session; "Try Demo" starts
-// one with the demo presentation and its guided tour (main.js, ?tour=1).
+// The start page: "New Session" shows the computer's Open window and starts
+// a session with the presentation chosen (cancel it and nothing happens);
+// "Try Demo" starts one with the demo presentation and its guided tour
+// (main.js, ?tour=1).
 
 import { createSession } from './session.js';
+import * as Folder from '../library/folder.js';
 
 const newBtn = document.getElementById('welcome-new-btn');
 const demoBtn = document.getElementById('welcome-demo-btn');
@@ -19,7 +22,14 @@ function setBusy(on) {
 }
 
 async function start({ demo = false } = {}) {
-    setStatus(demo ? 'Setting up the demo…' : 'Creating session…');
+    if (!demo) {
+        let got = null;
+        try { got = await (Folder.supported() ? Folder.pickDeck() : Folder.pickDeckPlain()); }
+        catch (e) { setStatus(e?.message || 'Could not open that file.', true); return; }
+        if (!got) return;                                 // cancelled
+        await Folder.stashOpen(got);
+    }
+    setStatus(demo ? 'Setting up the demo…' : 'Opening…');
     setBusy(true);
     try {
         const data = await createSession();

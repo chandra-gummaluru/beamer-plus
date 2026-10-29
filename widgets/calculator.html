@@ -99,11 +99,19 @@
   --fs-code:  calc(13px * var(--u));
   --fs-small: calc(11.5px * var(--u));
 
-  /* Edit mode — the same teal Beamer+ uses for its own edit mode, so a
-     widget being set up reads as "being edited", not as live content. */
-  --edit:      oklch(50% 0.11 200);
-  --edit-soft: oklch(95% 0.04 200);
-  --edit-ink:  oklch(38% 0.08 200);
+  /* Edit mode — yellow, so a widget being set up reads as "being edited",
+     not as live content. Yellow is too light to carry text or a thin line on
+     white, hence five tokens rather than three:
+       --edit       fill (the chosen segment, Done)
+       --on-edit    ink on that fill — dark, never white
+       --edit-line  outlines and borders, a deeper yellow that still shows
+       --edit-soft  wash behind something being typed into
+       --edit-ink   text: hints, "+ Add", the type picker */
+  --edit:      oklch(86% 0.16 92);
+  --on-edit:   oklch(28% 0.05 80);
+  --edit-line: oklch(74% 0.16 80);
+  --edit-soft: oklch(97% 0.05 98);
+  --edit-ink:  oklch(48% 0.11 70);
 
   /* Furniture metrics — shared so two widgets' toolbars line up. */
   --bar-h:  42px;
@@ -588,21 +596,21 @@ body.bw-overlay:hover .bw-overlay-controls,
 /* ── Edit mode ────────────────────────────────────────────────────────────
    body.bw-editing, set by the kit while a widget is being set up on itself
    (BeamerWidget.edit). The widget's own content is the form: anything marked
-   .bw-editable gets a dashed teal outline, the bar turns teal along its
+   .bw-editable gets a dashed yellow outline, the bar turns yellow along its
    bottom edge, and Edit becomes Done.
    ====================================================================== */
 
 /* Edit / Done: the last thing in the bar, the top-right corner. */
 .bw-edit-btn { gap: 6px; }
 body.bw-editing .bw-edit-btn.bw-btn--primary {
-  background: var(--edit); border-color: var(--edit); color: #fff;
+  background: var(--edit); border-color: var(--edit-line); color: var(--on-edit);
 }
 body.bw-editing .bw-edit-btn.bw-btn--primary:hover:not(:disabled) {
-  background: var(--edit-ink); border-color: var(--edit-ink);
+  background: var(--edit-line); border-color: var(--edit-line); color: var(--on-edit);
 }
 body.bw-editing .bw-topbar {
-  border-bottom-color: var(--edit);
-  box-shadow: inset 0 -1px 0 var(--edit);
+  border-bottom-color: var(--edit-line);
+  box-shadow: inset 0 -1px 0 var(--edit-line);
 }
 
 /* Show a piece of UI only while editing, or only while not. */
@@ -616,7 +624,7 @@ body.bw-editing .bw-topbar-title {
   max-width: 34%;
   padding: 4px 8px;
   border-radius: var(--radius);
-  outline: 1px dashed var(--edit);
+  outline: 1px dashed var(--edit-line);
   outline-offset: -1px;
   cursor: text;
   text-overflow: clip;
@@ -627,16 +635,16 @@ body.bw-editing .bw-adopted-bar > .bw-topbar-title + .bw-sep { display: block !i
 
 /* Anything set by clicking or typing on it. */
 body.bw-editing .bw-editable {
-  outline: 1.5px dashed color-mix(in oklab, var(--edit) 70%, transparent);
+  outline: 1.5px dashed color-mix(in oklab, var(--edit-line) 75%, transparent);
   outline-offset: 4px;
   border-radius: 4px;
   cursor: text;
   transition: outline-color var(--dur), background var(--dur);
 }
-body.bw-editing .bw-editable:hover { outline-color: var(--edit); }
+body.bw-editing .bw-editable:hover { outline-color: var(--edit-line); }
 body.bw-editing .bw-editable:focus,
 body.bw-editing .bw-editable:focus-within {
-  outline: 2px solid var(--edit);
+  outline: 2px solid var(--edit-line);
   background: color-mix(in oklab, var(--edit-soft) 70%, transparent);
 }
 body.bw-editing button.bw-editable,
@@ -669,7 +677,7 @@ body.bw-editing .bw-editable[role="button"] { cursor: pointer; }
 .bw-seg > .bw-btn + .bw-btn { border-left: 1px solid var(--border); }
 body.bw-editing .bw-seg > .bw-btn.is-active,
 body.bw-editing .bw-toggle[aria-pressed="true"] {
-  background: var(--edit); border-color: var(--edit); color: #fff;
+  background: var(--edit); border-color: var(--edit); color: var(--on-edit);
 }
 
 /* On / off, with its state drawn as a tick box. */
@@ -701,20 +709,20 @@ body.bw-editing .bw-toggle[aria-pressed="true"] {
   font-variant-numeric: tabular-nums;
   text-align: center;
 }
-.bw-inline-num:focus { outline: 2px solid var(--edit); outline-offset: -1px; border-color: var(--edit); }
+.bw-inline-num:focus { outline: 2px solid var(--edit-line); outline-offset: -1px; border-color: var(--edit-line); }
 
 /* "+ Add …" at the end of a list being edited. */
 .bw-add {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 6px 12px;
-  border: 1.5px dashed color-mix(in oklab, var(--edit) 60%, transparent);
+  border: 1.5px dashed color-mix(in oklab, var(--edit-line) 75%, transparent);
   border-radius: var(--radius);
   background: none;
   color: var(--edit-ink);
   font: inherit;
   cursor: pointer;
 }
-.bw-add:hover { border-color: var(--edit); background: var(--edit-soft); }
+.bw-add:hover { border-color: var(--edit-line); background: var(--edit-soft); }
 
 /* Font size stepper — drives --u, which every content-sized token is built on. */
 .bw-fontsize {

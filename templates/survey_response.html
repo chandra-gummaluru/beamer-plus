@@ -158,6 +158,28 @@ textarea::placeholder { color: var(--text-3); }
 }
 .scale-ends span:last-child { text-align: right; }
 
+/* 2D plot: a square to tap anywhere in, axis names along two edges and the
+   ends' labels at the corners, the way the slide draws it. */
+.plot { display: grid; grid-template-columns: auto 1fr; gap: 6px 8px; }
+.plot-ylab {
+  writing-mode: vertical-rl; transform: rotate(180deg);
+  text-align: center; font-size: 13px; color: var(--text-2);
+}
+.plot-box {
+  position: relative; aspect-ratio: 1; width: 100%;
+  border-left: 2px solid var(--text, #1a1a18); border-bottom: 2px solid var(--text, #1a1a18);
+  background: var(--bg-subtle, #f7f6f2);
+  touch-action: none; cursor: crosshair; -webkit-tap-highlight-color: transparent;
+}
+.plot-box.is-off { pointer-events: none; opacity: 0.6; }
+.plot-dot {
+  position: absolute; width: 18px; height: 18px; margin: -9px 0 0 -9px;
+  border-radius: 50%; background: var(--text, #1a1a18); display: none;
+}
+.plot-corner { position: absolute; font-size: 11px; color: var(--text-3); pointer-events: none; }
+.plot-xlab { grid-column: 2; display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--text-3); }
+.plot-xname { font-size: 13px; color: var(--text-2); }
+
 .hint-text {
   font-size: 12px; color: var(--text-3);
   text-align: center; font-family: var(--font-mono);
@@ -272,7 +294,7 @@ function showCard(id) {
 
 // ── Answer input, by survey kind ─────────────────────────────────────────
 // Every kind posts plain text; the presenter's widget interprets it.
-let kind = 'open', rating = null, inputEl = null;
+let kind = 'open', rating = null, inputEl = null, point = null;
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -314,6 +336,41 @@ function buildInput(data) {
     }
     btn.disabled = true;
     hint.textContent = 'Tap a number, then submit';
+    return;
+  }
+
+  if (kind === 'plot') {
+    // Tap (or drag) anywhere in the square; the answer is where the dot is,
+    // 0–1 across and 0–1 up.
+    const wrap = el('div', 'plot');
+    const box  = el('div', 'plot-box');
+    const dot  = el('div', 'plot-dot');
+    box.appendChild(dot);
+    const corner = (text, css) => { if (!text) return; const c = el('span', 'plot-corner', text); Object.assign(c.style, css); box.appendChild(c); };
+    corner(meta.yHigh, { top: '4px', left: '6px' });
+    corner(meta.yLow,  { bottom: '4px', left: '6px' });
+    wrap.appendChild(el('div', 'plot-ylab', meta.yLabel || ''));
+    wrap.appendChild(box);
+    const xl = el('div', 'plot-xlab');
+    xl.appendChild(el('span', '', meta.xLow || ''));
+    xl.appendChild(el('span', 'plot-xname', meta.xLabel || ''));
+    xl.appendChild(el('span', '', meta.xHigh || ''));
+    wrap.appendChild(xl);
+    const place = e => {
+      const r = box.getBoundingClientRect();
+      const x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+      const y = Math.min(1, Math.max(0, 1 - (e.clientY - r.top) / r.height));
+      point = [Math.round(x * 1000) / 1000, Math.round(y * 1000) / 1000];
+      dot.style.display = 'block';
+      dot.style.left = (x * 100) + '%';
+      dot.style.top  = ((1 - y) * 100) + '%';
+      btn.disabled = false;
+    };
+    box.addEventListener('pointerdown', e => { box.setPointerCapture(e.pointerId); place(e); });
+    box.addEventListener('pointermove', e => { if (e.buttons) place(e); });
+    slot.appendChild(wrap);
+    btn.disabled = true;
+    hint.textContent = 'Tap to place your dot, then submit';
     return;
   }
 
@@ -387,6 +444,7 @@ function readAnswer() {
   const err = document.getElementById('field-error');
   err.textContent = '';
   if (kind === 'rating') return rating == null ? null : String(rating);
+  if (kind === 'plot')   return point == null ? null : JSON.stringify(point);
   if (kind === 'fill') {
     const inputs = [...document.querySelectorAll('.blank-input')];
     const vals   = inputs.map(i => i.value.trim());
@@ -414,6 +472,7 @@ function setInputsDisabled(off) {
   document.getElementById('submit-btn').disabled = off;
   if (inputEl) inputEl.disabled = off;
   document.querySelectorAll('.scale-btn, .blank-input').forEach(b => { b.disabled = off; });
+  document.querySelectorAll('.plot-box').forEach(b => b.classList.toggle('is-off', off));
 }
 
 async function submit() {

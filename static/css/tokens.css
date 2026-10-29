@@ -43,6 +43,15 @@
     --edit-tint-ink:    oklch(38% 0.08 200);
     --guide:            oklch(62% 0.21 350);   /* snap guides while dragging */
 
+    /* ---------- Buttons (Lectern's: static/css/shell.css there) ---------- */
+    --btn-gold:         #a67c00;   /* hover outline, Add buttons */
+    --btn-gold-soft:    #fdf3d6;   /* hover fill */
+    --btn-line:         #cfd0d3;   /* a plain button's outline */
+    --btn-ink:          #1f2329;   /* the main button's outline */
+    --btn-danger:       #b42318;
+    --btn-danger-soft:  #fdf0ee;
+    --btn-danger-line:  #f3cdc7;
+
     /* ---------- Lines (borders, dividers, tracks) ---------- */
     --line-1:           oklch(90% 0.005 260);  /* dividers, card edges */
     --line-2:           oklch(85% 0.005 260);  /* control borders */
@@ -79,6 +88,7 @@
     --r-md: 8px;
     --r-lg: 12px;
     --r-pill: 999px;
+    --r-btn:  9px;     /* buttons, as in Lectern */
 
     /* ---------- Shadows (soft, paper-on-paper) ---------- */
     --shadow-1: 0 1px 2px oklch(20% 0.01 260 / 0.05),

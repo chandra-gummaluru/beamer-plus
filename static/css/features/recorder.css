@@ -71,7 +71,7 @@ body.is-recording #record-btn { display: none; }
     border: none;
     background: transparent;
 }
-#recorder-bar .btn:hover { background: var(--surface-cream-2); }
+#recorder-bar .btn:hover { background: var(--btn-gold-soft); }
 #recorder-bar .btn svg { width: 13px; height: 13px; }
 #recorder-stop-btn { color: var(--recording); }
 #recorder-pause-btn .recorder-icon-resume { display: none; color: var(--recording); }
