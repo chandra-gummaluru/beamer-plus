@@ -150,6 +150,7 @@
 }
 #tour-popover::after { display: none; }
 .tour-title {
+    font-size: var(--fs-xl);
     display: inline-block;
     background: #f7c548;
     padding: 0 .18em;
