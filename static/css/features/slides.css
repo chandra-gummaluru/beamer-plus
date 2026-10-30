@@ -715,6 +715,10 @@ body.split-view-active .slide-nav-item.is-right-slide {
 }
 /* ── Hidden slide indicator ─────────────────────────────────── */
 .slide-nav-item.is-hidden-slide:not(.active) { opacity: 0.38; }
+/* On a split widget slide the cards are plain: no left/right zones, no
+   pane marks — it isn't split view (main.js, syncSplitWidgetMode). */
+body.split-widget-active .slide-split-zone { display: none !important; }
+body.split-widget-active .slide-nav-item.is-right-slide { outline: none; box-shadow: none; }
 /* A split widget slide's own halves: kept in the list (indices line up)
    but never shown. */
 .slide-nav-item.is-owned { display: none !important; }

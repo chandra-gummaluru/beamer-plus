@@ -922,8 +922,10 @@ async function _goToSlide(i, direction = null, isSplitPaneNav = false) {
     // undefined, rightSlideIndex only stands in at its index.)
     // In edit mode a split is only ever a view slide's preview: picking any
     // other slide (in the navigator, say) leaves it and shows that slide.
-    if (direction === null && !isSplitPaneNav && state.editMode && state.splitView &&
-        state.slideStructure[i]?.type !== 'view') {
+    // On a split widget slide there is no split view to put a slide into:
+    // picking any other slide leaves it and shows that slide on its own.
+    if (direction === null && !isSplitPaneNav && state.splitView &&
+        (state.editMode || onSplitWidgetSlide()) && state.slideStructure[i]?.type !== 'view') {
         await setSplitActive(false);
     }
     if (direction === null && !isSplitPaneNav && state.splitView && i === state.rightSlideIndex &&
@@ -1056,6 +1058,26 @@ async function _goToSlide(i, direction = null, isSplitPaneNav = false) {
     bus.emit('slide:changed', i);
 }
 
+// A split widget slide (a view slide made by the Split Widget button) is
+// shown as a split, but it isn't split view: no Split View button lit, no
+// left/right zones on the slide cards (body.split-widget-active).
+function onSplitWidgetSlide() {
+    return !!(state.splitView && state.currentViewIndex != null &&
+              state.slideStructure[state.currentViewIndex]?.widgetLabel);
+}
+function syncSplitWidgetMode() {
+    const on = onSplitWidgetSlide();
+    document.body.classList.toggle('split-widget-active', on);
+    const btn = document.getElementById('split-toggle');
+    if (btn) {
+        btn.classList.toggle('btn_selected', state.splitView && !on);
+        // Turning split view "off" here would only uncover the widget's
+        // hidden halves; the arrows or a slide card leave it instead.
+        if (on) { btn.disabled = true; btn.dataset.splitWidget = '1'; }
+        else if (btn.dataset.splitWidget) { btn.disabled = false; delete btn.dataset.splitWidget; }
+    }
+}
+
 async function setSplitActive(active, rightIndex = null, splitRatio = null) {
     const annContainer2 = document.getElementById('ann-canvas-2');
     const pdfContainer2 = document.getElementById('pdf-canvas-2');
@@ -1135,6 +1157,7 @@ function updateSlideNavigator() {
     const viewIdx = state.splitView && state.currentViewIndex != null &&
                     state.slideStructure[state.currentViewIndex]?.type === 'view' ? state.currentViewIndex : null;
     const here = viewIdx ?? state.currentSlide;
+    syncSplitWidgetMode();
     const halves = splitHalves();
     document.querySelectorAll('#slide-nav-slides .slide-nav-item').forEach((el, idx) => {
         el.classList.toggle('is-split-half',   halves.has(idx));
