@@ -545,12 +545,21 @@ body.bw-has-topbar {
 }
 .bw-topbar-actions > * { flex-shrink: 0; }
 
-/* Shared utilities — same controls, same place, in every widget. */
+/* Shared utilities — same controls, same place, in every widget. They stay
+   put at the bar's right end while a crowded bar scrolls under them. */
 .bw-topbar-utils {
   display: flex;
   align-items: center;
   gap: 4px;
   flex: 0 0 auto;
+  position: sticky;
+  right: calc(-1 * var(--pad-x));
+  margin-right: calc(-1 * var(--pad-x));
+  padding: 0 var(--pad-x) 0 10px;
+  background: var(--bg);
+  box-shadow: -12px 0 10px -8px var(--bg);
+  z-index: 2;
+  align-self: stretch;
 }
 
 /* Partial-slide mode (the widget is an inset on part of the slide, set by the
@@ -662,6 +671,9 @@ body.bw-overlay:hover .bw-overlay-controls,
 
 /* Edit / Done: the last thing in the bar, the top-right corner. */
 .bw-edit-btn { gap: 6px; }
+/* Edit and Done are the same size, so the bar doesn't shift when editing
+   starts or ends. */
+.bw-edit-btn { width: 80px; min-width: 80px; justify-content: center; flex: 0 0 80px; }
 /* Done: an ordinary bar button, in bold — the way out, not a loud one. */
 body.bw-editing .bw-edit-btn.bw-btn--primary,
 body.bw-editing .bw-edit-btn.bw-btn--primary:hover:not(:disabled) {
@@ -843,9 +855,12 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
 
 /* The bar keeps the app's faces, whatever the slide uses. */
 :is(.bw-topbar, .bw-toolbar) {
+  /* One face on the bar: even its numbers (a page number, a zoom level) are
+     in the chrome sans, with fixed-width figures, not a second, mono face. */
   --font-ui:   var(--font-chrome);
-  --font-mono: var(--font-chrome-mono);
+  --font-mono: var(--font-chrome);
   font-family: var(--font-chrome);
+  font-variant-numeric: tabular-nums;
 }
 
 ::selection { background: color-mix(in srgb, #f7c548 60%, transparent); color: inherit; }
@@ -2771,6 +2786,9 @@ body.bw-editing .bw-topbar-title + .bw-sep,
   justify-content: center;
   gap: calc(16px * var(--u));
   padding-bottom: 6%;           /* bias slightly above true centre */
+  /* Room for the dashed outlines edit mode draws round the question and the
+     answers, kept in both modes so nothing moves when editing starts. */
+  padding-top: 6px; padding-left: 6px; padding-right: 6px;
   /* With the banner under it, the column scrolls as one if it has to
      (fitStage() shrinks the type first), rather than running under it. */
   overflow-y: auto;
@@ -3635,7 +3653,7 @@ body.bw-editing #join-n { color: var(--ar-faint); }
    countdown's length is typed into its digits. Always the question's set-up:
    no sample data, no results. */
 /* Room for the editables' outlines, which the scrolling column would clip. */
-body.bw-editing #stage #prompt { padding: 6px 6px 10px; }
+body.bw-editing #stage #prompt { padding-bottom: 10px; }
 body.bw-editing #question { min-height: 1.25em; cursor: text; }
 /* Focused, the question and the template show their source: what's typed. */
 #question.is-src, #fill-tpl.is-src { white-space: pre-wrap; tab-size: 4; }
@@ -3713,7 +3731,10 @@ body.bw-editing #choices.is-tf .opt { cursor: pointer; }
 body.bw-editing #choices.is-tf .choice:not(.is-correct) .opt:hover { background: var(--edit-soft); }
 body.bw-editing .choice-label { cursor: text; }
 .choice-label[contenteditable] { min-width: 6ch; min-height: 1.3em; outline-offset: 3px !important; }
-.ed-remove { flex: 0 0 auto; width: 24px; height: 24px; opacity: 0; }
+.opt { position: relative; }
+/* Out of the flow, in the box's corner: the answer's text keeps the width it
+   has on the slide, so editing never re-wraps it. */
+.ed-remove { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; opacity: 0; }
 .opt:hover .ed-remove, .ed-remove:focus-visible { opacity: 0.6; }
 .ed-remove svg { width: 13px; height: 13px; }
 

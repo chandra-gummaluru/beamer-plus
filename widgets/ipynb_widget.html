@@ -519,12 +519,21 @@ body.bw-has-topbar {
 }
 .bw-topbar-actions > * { flex-shrink: 0; }
 
-/* Shared utilities — same controls, same place, in every widget. */
+/* Shared utilities — same controls, same place, in every widget. They stay
+   put at the bar's right end while a crowded bar scrolls under them. */
 .bw-topbar-utils {
   display: flex;
   align-items: center;
   gap: 4px;
   flex: 0 0 auto;
+  position: sticky;
+  right: calc(-1 * var(--pad-x));
+  margin-right: calc(-1 * var(--pad-x));
+  padding: 0 var(--pad-x) 0 10px;
+  background: var(--bg);
+  box-shadow: -12px 0 10px -8px var(--bg);
+  z-index: 2;
+  align-self: stretch;
 }
 
 /* Partial-slide mode (the widget is an inset on part of the slide, set by the
@@ -636,6 +645,9 @@ body.bw-overlay:hover .bw-overlay-controls,
 
 /* Edit / Done: the last thing in the bar, the top-right corner. */
 .bw-edit-btn { gap: 6px; }
+/* Edit and Done are the same size, so the bar doesn't shift when editing
+   starts or ends. */
+.bw-edit-btn { width: 80px; min-width: 80px; justify-content: center; flex: 0 0 80px; }
 /* Done: an ordinary bar button, in bold — the way out, not a loud one. */
 body.bw-editing .bw-edit-btn.bw-btn--primary,
 body.bw-editing .bw-edit-btn.bw-btn--primary:hover:not(:disabled) {
@@ -817,9 +829,12 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
 
 /* The bar keeps the app's faces, whatever the slide uses. */
 :is(.bw-topbar, .bw-toolbar) {
+  /* One face on the bar: even its numbers (a page number, a zoom level) are
+     in the chrome sans, with fixed-width figures, not a second, mono face. */
   --font-ui:   var(--font-chrome);
-  --font-mono: var(--font-chrome-mono);
+  --font-mono: var(--font-chrome);
   font-family: var(--font-chrome);
+  font-variant-numeric: tabular-nums;
 }
 
 ::selection { background: color-mix(in srgb, #f7c548 60%, transparent); color: inherit; }
