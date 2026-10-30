@@ -2803,8 +2803,8 @@ body.is-viewer .bw-sep:not(:first-of-type) { display: none !important; }
    floating with a drop shadow on a grey reading stage. */
 #shell { --stage: var(--bg); }
 #page-wrap {
-  border-radius: var(--sn-r);
-  box-shadow: 0 0 0 var(--sn-line) var(--sn-ink);
+  border-radius: 0;
+  box-shadow: none;   /* the page fills the width: no outline round it */
   overflow: hidden;
 }
 #pdf-canvas { border-radius: 0; }
@@ -2961,13 +2961,9 @@ body.bw-editing #pdf-pages, body.is-viewer #pdf-pages { display: none; }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
       </button>
     </div>
-    <!-- Fit and zoom, on the page area itself (bottom right). -->
+    <!-- Zoom, on the page area itself (bottom right). The page always fits
+         the width; zoom goes in from there, never out past it. -->
     <div id="pdf-float" class="bw-float bw-float--br bw-run-only">
-    <div class="seg">
-      <button class="bw-btn" id="btn-fit-page">Fit page</button>
-      <button class="bw-btn" id="btn-fit-width">Fit width</button>
-    </div>
-    <span class="bw-float-sep" aria-hidden="true"></span>
     <span id="zoom-group" class="page-nav">
       <button class="bw-btn bw-btn--icon" id="btn-zoom-out" title="Zoom out (−)">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.4"/><path d="M4.6 7h4.8M10.3 10.3l3 3"/></svg>
@@ -3032,7 +3028,7 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
   let currentPage = 1;
   let rangeStart  = 1;
   let rangeEnd    = Infinity;
-  let fitMode     = 'page';   // 'page' | 'width'
+  const fitMode   = 'width';  // the page always fills the width
   let renderTask  = null;
   let resizeTimer = null;
   let isViewer    = false;
@@ -3055,25 +3051,28 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
   // Pan / zoom
   let zoom = 1.0, panX = 0, panY = 0;
 
+  // The page never leaves a gap: along an axis where it's bigger than the
+  // stage it pans only as far as its edges; where it's smaller it is centred.
   function clampPan() {
     const aW = canvasArea.offsetWidth;
     const aH = canvasArea.offsetHeight;
     const pw = pageWrap.offsetWidth  * zoom;
     const ph = pageWrap.offsetHeight * zoom;
-    // Keep at least 80px of the page visible on each axis
-    const margin = 80;
-    const maxX = (aW + pw) / 2 - margin;
-    const maxY = (aH + ph) / 2 - margin;
+    const maxX = Math.max(0, (pw - aW) / 2);
+    const maxY = Math.max(0, (ph - aH) / 2);
     panX = Math.max(-maxX, Math.min(maxX, panX));
     panY = Math.max(-maxY, Math.min(maxY, panY));
   }
 
+  // A new page (or a fresh fit) starts at its top.
+  let toTop = true;
   function applyTransform() {
+    if (toTop) panY = Infinity;
     clampPan();
     pageWrap.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
   }
 
-  function resetTransform() { zoom = 1.0; panX = 0; panY = 0; applyTransform(); }
+  function resetTransform() { zoom = 1.0; panX = 0; panY = 0; toTop = true; applyTransform(); }
 
   // ── DOM refs ──────────────────────────────────────────────────────────────────
   const canvasArea = document.getElementById('canvas-area');
@@ -3085,8 +3084,6 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
   const pageTotalEl = document.getElementById('page-total');
   const btnPrev    = document.getElementById('btn-prev');
   const btnNext    = document.getElementById('btn-next');
-  const btnFitPage = document.getElementById('btn-fit-page');
-  const btnFitWid  = document.getElementById('btn-fit-width');
   const btnDownload = document.getElementById('btn-download');
   const zoomGroup  = document.getElementById('zoom-group');
   const zoomVal    = document.getElementById('zoom-val');
@@ -3133,14 +3130,13 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
     btnPrev.disabled = isViewer || !pdfDoc || currentPage <= rangeStart;
     btnNext.disabled = isViewer || !pdfDoc || currentPage >= endAbs;
 
-    btnFitPage.classList.toggle('is-active', fitMode === 'page');
-    btnFitWid.classList.toggle('is-active',  fitMode === 'width');
 
     pageInput.readOnly = isViewer;
     // The audience gets the page and nothing to press.
     document.body.classList.toggle('is-viewer', isViewer);
     pageReadout.textContent = pdfDoc ? `${disp} / ${total !== null ? total : '?'}` : '';
     zoomVal.textContent = Math.round(zoom * 100) + '%';
+    btnZoomOut.disabled = !pdfDoc || zoom <= 1.001;   // the width is as far out as it goes
   }
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -3161,8 +3157,8 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
     catch (_) { showOverlay('<div style="color:var(--red)">Page error</div>'); return; }
 
     const areaRect = canvasArea.getBoundingClientRect();
-    const aW = Math.max(areaRect.width  - 32, 100);
-    const aH = Math.max(areaRect.height - 32, 100);
+    const aW = Math.max(areaRect.width, 100);
+    const aH = Math.max(areaRect.height, 100);
     const vp0 = page.getViewport({ scale: 1 });
 
     const scale = fitMode === 'width'
@@ -3181,6 +3177,8 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
     pageWrap.style.width  = w + 'px';
     pageWrap.style.height = h + 'px';
     pageWrap.style.display = 'block';
+    applyTransform();   // now its size is known: top of the page, edges kept
+    toTop = false;
 
     const transform = dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null;
 
@@ -3212,8 +3210,7 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
 
   // ── Fit mode ─────────────────────────────────────────────────────────────────
 
-  function setFitMode(mode) {
-    fitMode = mode;
+  function setFitMode() {
     if (pdfDoc) { resetTransform(); renderPage(currentPage); }
     updateToolbar();
   }
@@ -3413,14 +3410,12 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
   // Restore display value if user abandons edit
   pageInput.addEventListener('blur', () => updateToolbar());
 
-  btnFitPage.addEventListener('click', () => setFitMode('page'));
-  btnFitWid.addEventListener('click',  () => setFitMode('width'));
   if (btnDownload) btnDownload.addEventListener('click', downloadSource);
 
   // Zoom about the centre of the stage, so the slide does not wander.
   function nudgeZoom(factor) {
     if (!pdfDoc) return;
-    const newZ  = Math.max(0.25, Math.min(8, zoom * factor));
+    const newZ  = Math.max(1, Math.min(8, zoom * factor));   // never smaller than the width
     const ratio = newZ / zoom;
     panX *= ratio; panY *= ratio;
     zoom = newZ;
@@ -3439,7 +3434,7 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
       const cx    = e.clientX - rect.left  - rect.width  / 2;
       const cy    = e.clientY - rect.top   - rect.height / 2;
       const delta = e.deltaY < 0 ? 1.12 : 1 / 1.12;
-      const newZ  = Math.max(0.25, Math.min(8, zoom * delta));
+      const newZ  = Math.max(1, Math.min(8, zoom * delta));
       const ratio = newZ / zoom;
       panX = cx * (1 - ratio) + panX * ratio;
       panY = cy * (1 - ratio) + panY * ratio;
