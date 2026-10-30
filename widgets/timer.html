@@ -1697,6 +1697,9 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
     function canEdit() {
         if (cfg().role === 'viewer' || window.BEAMER_PRINT || cfg().printMode) return false;
         try { if (new URLSearchParams(location.search).get('viewer') === '1') return false; } catch (e) {}
+        // "edit": false — nothing to set up: whatever the widget holds (code,
+        // a circuit, a function) is written on it directly. No Edit button.
+        if (readSchema() && schema && schema.edit === false) return false;
         return hasOwnSettings() || inlineEdit();
     }
 
@@ -2760,9 +2763,11 @@ body.bw-editing #bar, body.bw-editing #ring { opacity: 0.55; }
       <button class="bw-btn" data-min="5">5m</button>
       <button class="bw-btn" data-min="10">10m</button>
     </span>
-    <!-- Edit mode: how it looks and behaves. The duration itself is set on
-         the digits. -->
-    <span class="bw-edit-only" style="display:contents">
+    <!-- Edit mode sets only what the timer does: count down or up (above)
+         and for how long (the presets, or typed on the digits). How the time
+         is shown and the line/ring are no longer offered; these stay in the
+         page only so older settings keep working. -->
+    <span class="bw-edit-only" style="display:none !important" hidden>
       <div class="bw-sep"></div>
       <div class="bw-seg" id="ed-format" title="How the time is shown">
         <button class="bw-btn" data-v="clock">3:00</button>

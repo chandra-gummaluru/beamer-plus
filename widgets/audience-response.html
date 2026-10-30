@@ -1717,6 +1717,9 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
     function canEdit() {
         if (cfg().role === 'viewer' || window.BEAMER_PRINT || cfg().printMode) return false;
         try { if (new URLSearchParams(location.search).get('viewer') === '1') return false; } catch (e) {}
+        // "edit": false — nothing to set up: whatever the widget holds (code,
+        // a circuit, a function) is written on it directly. No Edit button.
+        if (readSchema() && schema && schema.edit === false) return false;
         return hasOwnSettings() || inlineEdit();
     }
 
@@ -4837,7 +4840,10 @@ body.bw-editing #ed-secs[hidden] { display: none; }
     // shows the preview of whatever type that is. Being edited, it is never a
     // preview: the slide shows the question's own set-up (see editView).
     const ed = editing();
-    const preview = !ed && (IS_VIEWER ? !S.question : !ready());
+    // No faded sample preview any more: a new widget starts with a real
+    // question (starterConfig), and one left incomplete shows as it is, with
+    // the banner saying what's missing.
+    const preview = false;
     const D = ed ? editView() : preview ? sample(S.type) : S;
     const t = D.type;
 
@@ -4883,6 +4889,8 @@ body.bw-editing #ed-secs[hidden] { display: none; }
     $('join-sub-open').hidden = shut || waiting;
     $('join-sub-closed').hidden = !shut;
     $('join-sub-waiting').hidden = !waiting;
+    $('join-sub-waiting').textContent = !waiting ? '' : IS_VIEWER ? 'Answers open when it starts'
+                                      : (missing() || 'Answers open when it starts');
     // A template (or a list of answers) is read from the top, not centred.
     // Always from the top: a centred question sits in a different place in
     // each phase (QR up, closed, results) and visibly jumps between them.
@@ -4927,7 +4935,7 @@ body.bw-editing #ed-secs[hidden] { display: none; }
     renderJoin(D, preview, ed);
     renderTimer();
     renderSpotlight(D);
-    renderToolbar(preview);
+    renderToolbar(!ed && !ready() && S.phase === 'idle');
     renderEdit(ed);
     lastShowData = showData;
     fitStage();
@@ -4937,7 +4945,6 @@ body.bw-editing #ed-secs[hidden] { display: none; }
   // close the poll, put the results on the slide, then reveal the answer —
   // or, for open-ended answers summarised by AI, show the summary. Past the
   // last step it stays, quietly, as the way back.
-  const ARROW_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>';
   function nextStep() {
     const t = S.type, p = S.phase;
     const canReveal = (isChoiceLike(t) && S.correct != null) || ((t === 'numeric' || t === 'exact') && S.answer != null);
@@ -4962,7 +4969,8 @@ body.bw-editing #ed-secs[hidden] { display: none; }
     const st = nextStep();
     stepGo = st.go;
     stepBtn.style.display = 'inline-flex';
-    stepBtn.innerHTML = escHtml(st.label) + (st.done ? '' : ' ' + ARROW_SVG);
+    // Just the words: the label already says what comes next.
+    stepBtn.textContent = st.label;
     stepBtn.classList.toggle('is-done', !!st.done);
     stepBtn.disabled = !!st.disabled;
     stepBtn.title = st.title || '';
@@ -6002,12 +6010,36 @@ body.bw-editing #ed-secs[hidden] { display: none; }
   // apart while typing). Everything outside the poll's identity — layout,
   // timer, correct answer, revealed value, autoStart, AI options — simply
   // applies in place. An identity change is handled in the block below.
+  // A widget just added has never had a question: it starts with a real
+  // one of its type (the same examples the old sample preview showed), saved
+  // into its settings, ready to edit in place or run as it is.
+  let seeded = false;
+  function starterConfig(type) {
+    const d = sample(type);
+    const patch = { question: d.question };
+    if (type === 'choice') Object.assign(patch, { options: d.options.slice(), correctAnswer: 2 });
+    if (type === 'truefalse') patch.correctTF = 'false';
+    if (type === 'rating') Object.assign(patch, { ratingLow: d.scale.low, ratingHigh: d.scale.high });
+    if (type === 'plot') Object.assign(patch, { plotX: d.plot.x, plotY: d.plot.y, plotXLow: d.plot.xLow,
+                                                plotXHigh: d.plot.xHigh, plotYLow: d.plot.yLow, plotYHigh: d.plot.yHigh });
+    return patch;
+  }
+
   function applyConfig(c, live = false) {
     if (!c) return;
     const prevAuto = cfg.autoStart !== false;
     cfg       = { ...cfg, ...c };
     WIDGET_ID = cfg.id || cfg.widgetId || WIDGET_ID;
     IS_VIEWER = cfg.role === 'viewer' || IS_VIEWER;
+
+    if (!IS_VIEWER && !seeded && cfg.question == null && cfg.template == null && !cfg.printMode) {
+      seeded = true;
+      const type = TYPES[cfg.responseType] ? cfg.responseType : 'choice';
+      const patch = starterConfig(type);
+      cfg = { ...cfg, ...patch };
+      // Saved with the slide, so it is the widget's own question from now on.
+      try { window.BeamerWidget?.edit?.set?.(patch, [], { silent: true }); } catch (_) {}
+    }
 
     initSocket(cfg.socketUrl);
     if (IS_VIEWER) { render(); return; }

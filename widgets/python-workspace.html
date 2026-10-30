@@ -5,6 +5,7 @@
 <script id="widget-schema" type="application/json">
 {
   "label": "Python Workspace",
+  "edit": false,
   "fullSlide": true,
   "category": "Computer Science",
   "liveSettings": true,
@@ -1720,6 +1721,9 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
     function canEdit() {
         if (cfg().role === 'viewer' || window.BEAMER_PRINT || cfg().printMode) return false;
         try { if (new URLSearchParams(location.search).get('viewer') === '1') return false; } catch (e) {}
+        // "edit": false — nothing to set up: whatever the widget holds (code,
+        // a circuit, a function) is written on it directly. No Edit button.
+        if (readSchema() && schema && schema.edit === false) return false;
         return hasOwnSettings() || inlineEdit();
     }
 
@@ -8436,6 +8440,10 @@ def _debug_file(src, fname, limit):
 
   function focusInput() {
     if (IS_VIEWER || phase === 'loading' || phase === 'error' || !isShown('shell')) return;
+    // Only within the widget: Python finishing its boot (or a slide arriving)
+    // must not take the keyboard from the presentation, or → stops moving
+    // to the next slide.
+    if (!document.hasFocus()) return;
     // Never pull focus out of the editor or a drawing the presenter is using.
     const a = document.activeElement;
     if (a && a !== document.body && a !== inputEl && /^(TEXTAREA|INPUT|SELECT)$/.test(a.tagName)) return;

@@ -9,9 +9,7 @@
   "liveSettings": true,
   "category": "Computer Science",
   "fields": [
-    { "key": "notebook", "label": "Notebook file", "type": "file", "accept": ".ipynb", "folder": "assets", "rebuild": true },
-    { "key": "packages", "label": "Extra packages (one per line)", "type": "textarea-lines", "rows": 4, "placeholder": "pandas\nsympy\nrequests==2.31.0" },
-    { "key": "autoImport", "label": "Auto-load packages from imports", "type": "checkbox", "default": true }
+    { "key": "notebook", "label": "Notebook file", "type": "file", "accept": ".ipynb", "folder": "assets", "rebuild": true }
   ]
 }
 </script>
@@ -1692,6 +1690,9 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
     function canEdit() {
         if (cfg().role === 'viewer' || window.BEAMER_PRINT || cfg().printMode) return false;
         try { if (new URLSearchParams(location.search).get('viewer') === '1') return false; } catch (e) {}
+        // "edit": false — nothing to set up: whatever the widget holds (code,
+        // a circuit, a function) is written on it directly. No Edit button.
+        if (readSchema() && schema && schema.edit === false) return false;
         return hasOwnSettings() || inlineEdit();
     }
 

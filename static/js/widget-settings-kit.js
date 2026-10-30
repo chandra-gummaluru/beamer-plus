@@ -778,6 +778,9 @@
     function canEdit() {
         if (cfg().role === 'viewer' || window.BEAMER_PRINT || cfg().printMode) return false;
         try { if (new URLSearchParams(location.search).get('viewer') === '1') return false; } catch (e) {}
+        // "edit": false — nothing to set up: whatever the widget holds (code,
+        // a circuit, a function) is written on it directly. No Edit button.
+        if (readSchema() && schema && schema.edit === false) return false;
         return hasOwnSettings() || inlineEdit();
     }
 

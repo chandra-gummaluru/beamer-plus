@@ -99,7 +99,7 @@ const STEPS = [
         sel:   null,
         place: 'center',
         title: 'Now Explore the Demo',
-        body:  'Press → to step through the demo deck. Every slide is live: uncover a proof step by step, play a video that grows to fill the slide, rotate a 3D heart, drag a slider on a 3D surface, flip switches on an SR latch, run Python, and answer a live poll from your phone.',
+        body:  'Press → to step through the demo deck. Every slide is live: uncover a proof step by step, play a video that grows to fill the slide, rotate a 3D heart, drag a slider on a 3D surface, flip switches on an SR latch, run Python (and split one workspace across a split view: code on one slide, memory model on the other), and answer a live poll from your phone.',
     },
 ];
 

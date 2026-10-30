@@ -5,6 +5,7 @@
 <script id="widget-schema" type="application/json">
 {
   "label": "Python Shell",
+  "edit": false,
   "category": "Computer Science",
   "modes": ["overlay", "full"],
   "overlaySize": { "width": 0.46, "height": 0.42 },
@@ -1694,6 +1695,9 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
     function canEdit() {
         if (cfg().role === 'viewer' || window.BEAMER_PRINT || cfg().printMode) return false;
         try { if (new URLSearchParams(location.search).get('viewer') === '1') return false; } catch (e) {}
+        // "edit": false — nothing to set up: whatever the widget holds (code,
+        // a circuit, a function) is written on it directly. No Edit button.
+        if (readSchema() && schema && schema.edit === false) return false;
         return hasOwnSettings() || inlineEdit();
     }
 
