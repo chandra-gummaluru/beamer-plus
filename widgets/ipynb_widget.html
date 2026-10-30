@@ -7,6 +7,7 @@
   "label": "Python Notebook",
   "fullSlide": true,
   "liveSettings": true,
+  "inlineEdit": true,
   "category": "Computer Science",
   "fields": [
     { "key": "notebook", "label": "Notebook file", "type": "file", "accept": ".ipynb", "folder": "assets", "rebuild": true }
@@ -3288,6 +3289,13 @@ body:not(.bw-editing) #toolbar .tb-btn,
 body:not(.bw-editing) #toolbar .tb-btn.primary { border-color: var(--border-med); background: var(--bg); color: var(--text); }
 body:not(.bw-editing) #toolbar .tb-btn:hover:not(:disabled),
 body:not(.bw-editing) #toolbar .tb-btn.primary:hover:not(:disabled) { border-color: var(--text); background: var(--sn-node); color: var(--text); }
+
+/* No Run All or download in the bar: cells run one by one on the slide. */
+#btn-run-all, #btn-download, #toolbar > .sep { display: none !important; }
+.nb-ed { display: inline-flex; align-items: center; gap: 10px; }
+.nb-ed-msg { color: var(--text-3); white-space: nowrap; }
+.nb-ed-msg.is-err { color: var(--err); }
+body.bw-editing #notebook-area.is-over { outline: 2px dashed var(--sn-ink, #222); outline-offset: -8px; background: var(--edit-soft); }
 </style>
 </head>
 <body>
@@ -3299,7 +3307,11 @@ body:not(.bw-editing) #toolbar .tb-btn.primary:hover:not(:disabled) { border-col
        next to it. The kit adopts the element itself, so the updates this
        widget writes to it still land. -->
   <span id="notebook-title" data-bw-title>Untitled.ipynb</span>
-  <div class="sep"></div>
+  <!-- Edit mode only: which notebook (also dropped on the page). -->
+  <span class="bw-edit-only nb-ed">
+    <button class="tb-btn" type="button" id="nb-choose">Choose Notebook…</button>
+    <span class="nb-ed-msg" id="nb-ed-msg"></span>
+  </span>
 
   <button class="tb-btn primary" id="btn-run-all" disabled onclick="runAll()">
     Run All
@@ -4896,6 +4908,56 @@ window.addEventListener('message', function(e) {
     }
   }
 });
+
+// ── Edit mode: choosing the notebook ─────────────────────────────────────────
+// Edit (top right) shows "Choose Notebook…" in the bar; a .ipynb can also be
+// dropped on the page while editing. It is opened here at once and saved into
+// the deck as this widget's notebook.
+(function () {
+  const btn = document.getElementById('nb-choose');
+  const msg = document.getElementById('nb-ed-msg');
+  const area = document.getElementById('notebook-area');
+  if (!btn) return;
+  const editing = () => !!(window.BeamerWidget && BeamerWidget.edit && BeamerWidget.edit.active);
+  const say = (t, err) => { msg.textContent = t || ''; msg.classList.toggle('is-err', !!err); };
+  const picker = document.createElement('input');
+  picker.type = 'file'; picker.accept = '.ipynb,application/x-ipynb+json,application/json';
+  picker.addEventListener('change', () => { if (picker.files[0]) useFile(picker.files[0]); picker.value = ''; });
+  btn.addEventListener('click', () => picker.click());
+
+  async function useFile(file) {
+    let nb;
+    try { nb = JSON.parse(await file.text()); }
+    catch (_) { say('That isn’t a notebook (.ipynb)', true); return; }
+    if (!nb || !Array.isArray(nb.cells)) { say('That isn’t a notebook (.ipynb)', true); return; }
+    // Replace what's on the page with the new notebook's cells.
+    document.querySelectorAll('.cell-block').forEach(b => b.remove());
+    cellMeta.clear();
+    contentLoaded = false;
+    renderNotebook(nb, file.name);
+    say('');
+    const hosted = window.parent !== window && (window.WIDGET_CONFIG || {}).id != null;
+    if (hosted && window.BeamerWidget && BeamerWidget.saveFile) {
+      try {
+        const buffer = await file.arrayBuffer();
+        const path = await BeamerWidget.saveFile({ key: 'notebook', name: file.name, folder: 'assets', buffer });
+        BeamerWidget.edit.set({ notebook: path }, [], { silent: true });
+      } catch (_) { say('Opened, but couldn’t be saved into the deck', true); }
+    }
+    try { window.parent.postMessage({ type: 'widget-state', widgetId: WIDGET_ID, state: _nbGetState() }, '*'); } catch (_) {}
+  }
+
+  area.addEventListener('dragover', e => { if (!editing()) return; e.preventDefault(); area.classList.add('is-over'); });
+  area.addEventListener('dragleave', e => { if (!area.contains(e.relatedTarget)) area.classList.remove('is-over'); });
+  area.addEventListener('drop', e => {
+    area.classList.remove('is-over');
+    if (!editing()) return;
+    e.preventDefault();
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) useFile(f);
+  });
+  window.addEventListener('bw-edit', e => { if (e.detail.editing) say(notebookTitleSet ? '' : 'or drop a .ipynb on the page'); });
+})();
 </script>
 </body>
 </html>
