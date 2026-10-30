@@ -22,3 +22,10 @@
     --font-serif: var(--font-sans);
     font-family: var(--font-sans);
 }
+/* One weight there. Computer Modern's bold is a wide, heavy cut that reads
+   as a different typeface beside the regular, so these areas don't use it:
+   emphasis comes from ink colour and size instead. */
+:is(.slide-nav-tools, #recorder-bar, #editor-panel, .editor-dd-menu),
+:is(.slide-nav-tools, #recorder-bar, #editor-panel, .editor-dd-menu) * {
+    font-weight: 400 !important;
+}
