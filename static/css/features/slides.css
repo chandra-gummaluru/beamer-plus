@@ -323,11 +323,16 @@ model-viewer { pointer-events: auto !important; }
 /* While editing they stay, Record and Close disabled and Edit pressed
    (clicking it again leaves the editor; editor.js). While a take is in
    progress Record stays: it is the take's timer (recorder.css). */
+/* Along the bottom: Record at the start, Edit and Close side by side at the
+   end, all on the thumbnails' centre line. */
 body.split-view-active .slide-nav-tools {
+    flex-direction: row;
+    align-items: center;
     justify-content: center;
-    padding: 0 var(--sp-2);
+    padding: 0 var(--sp-3);
     border: none;
 }
+body.split-view-active :is(#slide-nav-top, #slide-nav-foot) { padding-block: 0; border-top: none; }
 body.split-view-active .slide-nav-tool { width: var(--ctl-h); padding: 0; }
 body.split-view-active .slide-nav-tool span { display: none; }
 
@@ -1205,11 +1210,14 @@ body.edit-mode #split-widget-layer .widget-iframe[data-split-live="false"] { opa
 /* Small screens: the navigator runs along the bottom (as in split view),
    except in landscape, where it is a narrow column again. */
 @media (max-width: 1024px) {
-    .slide-nav-tools { justify-content: center; padding: 0 var(--sp-2); border: none; }
+    .slide-nav-tools { flex-direction: row; align-items: center; justify-content: center; padding: 0 var(--sp-3); border: none; }
     .slide-nav-tool { width: var(--ctl-h); padding: 0; }
     .slide-nav-tool span { display: none; }
 }
+@media (max-width: 1024px) and (orientation: portrait) {
+    :is(#slide-nav-top, #slide-nav-foot) { padding-block: 0; border-top: none; }
+}
 @media (max-width: 1024px) and (orientation: landscape) {
-    body:not(.split-view-active) .slide-nav-tools { padding: var(--sp-2); }
+    body:not(.split-view-active) .slide-nav-tools { flex-direction: column; align-items: stretch; padding: var(--sp-2); }
     body:not(.split-view-active) .slide-nav-tool { width: 100%; }
 }
