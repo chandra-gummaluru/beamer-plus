@@ -3067,6 +3067,25 @@ body.bw-overlay .cbtn { font-size: clamp(12px, min(5.4cqw, 6cqh), 30px); }
   // ── LaTeX ────────────────────────────────────────────────────────────────────
   // The calculator's notation (×, ÷, √, π, ln for the natural log, log for
   // base 10, %) handed to math.js, whose toTex() KaTeX then sets.
+  // Fractions set inline, a/b, rather than stacked: they read on one line,
+  // like the rest of the expression. A side that is a sum keeps brackets.
+  function inlineFrac(tex) {
+    const grab = (s, i) => {          // s[i] === '{' → [content, index after '}']
+      let d = 0, j = i;
+      for (; j < s.length; j++) { if (s[j] === '{') d++; else if (s[j] === '}' && --d === 0) break; }
+      return [s.slice(i + 1, j), j + 1];
+    };
+    const side = t => (/[+\-]/.test(t.replace(/\{[^{}]*\}/g, '')) ? `\\left(${t}\\right)` : `{${t}}`);
+    let out = tex, k;
+    while ((k = out.indexOf('\\frac{')) >= 0) {
+      const [num, a] = grab(out, k + 5);
+      if (out[a] !== '{') break;
+      const [den, b] = grab(out, a);
+      out = out.slice(0, k) + side(inlineFrac(num)) + '/' + side(inlineFrac(den)) + out.slice(b);
+    }
+    return out;
+  }
+
   function toTex(raw) {
     let src = String(raw || '').trim();
     if (!src || !window.math) return null;
@@ -3077,7 +3096,7 @@ body.bw-overlay .cbtn { font-size: clamp(12px, min(5.4cqw, 6cqh), 30px); }
       .replace(/\blog\(/g, 'log10(').replace(/\bln\(/g, 'log(')
       .replace(/%/g, '*PCTSIGN');
     try {
-      return math.parse(src).toTex({ parenthesis: 'auto', implicit: 'hide' })
+      return inlineFrac(math.parse(src).toTex({ parenthesis: 'auto', implicit: 'hide' }))
         .replace(/\\log_\{10\}/g, '\\log')
         .replace(/\\cdot\s*PCTSIGN/g, '\\%')
         .replace(/\\cdot/g, '\\times')
@@ -3113,7 +3132,7 @@ body.bw-overlay .cbtn { font-size: clamp(12px, min(5.4cqw, 6cqh), 30px); }
       if (t) b.innerHTML = katex.renderToString(t, { throwOnError: false });
     });
     const fr = document.getElementById('btn-frac');
-    if (fr) fr.innerHTML = katex.renderToString('\\tfrac{a}{b}', { throwOnError: false });
+    if (fr) fr.innerHTML = katex.renderToString('a/b', { throwOnError: false });
   }
   function typesetAll() {
     typesetKeys();

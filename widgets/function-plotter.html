@@ -3317,11 +3317,30 @@ function toggleVisible(id) {
 // ── Expressions in LaTeX ──────────────────────────────────
 // math.js turns the typed expression into TeX; KaTeX sets it. Anything it
 // can't read (half-typed, a point) falls back to the text as typed.
+// Fractions set inline, a/b, rather than stacked: they read on one line,
+// like the rest of the expression. A side that is a sum keeps brackets.
+function inlineFrac(tex) {
+  const grab = (s, i) => {          // s[i] === '{' → [content, index after '}']
+    let d = 0, j = i;
+    for (; j < s.length; j++) { if (s[j] === '{') d++; else if (s[j] === '}' && --d === 0) break; }
+    return [s.slice(i + 1, j), j + 1];
+  };
+  const side = t => (/[+\-]/.test(t.replace(/\{[^{}]*\}/g, '')) ? `\\left(${t}\\right)` : `{${t}}`);
+  let out = tex, k;
+  while ((k = out.indexOf('\\frac{')) >= 0) {
+    const [num, a] = grab(out, k + 5);
+    if (out[a] !== '{') break;
+    const [den, b] = grab(out, a);
+    out = out.slice(0, k) + side(inlineFrac(num)) + '/' + side(inlineFrac(den)) + out.slice(b);
+  }
+  return out;
+}
+
 function exprTex(src) {
   const s = String(src || '').trim();
   if (!s || !window.math) return null;
   const opts = { parenthesis: 'auto', implicit: 'hide' };
-  const tex = (e) => math.parse(e).toTex(opts)
+  const tex = (e) => inlineFrac(math.parse(e).toTex(opts))
     // a·x reads as ax on a slide; keep the dot only between numbers.
     .replace(/\\cdot\s*(?=[a-zA-Z\\({])/g, '\\,');
   try {
