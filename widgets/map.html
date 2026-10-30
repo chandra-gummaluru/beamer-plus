@@ -3252,10 +3252,11 @@ body.is-viewer #map-zoom { display: none; } #map:empty ~ #map-zoom { display: no
         const label = short(h) || q.value.trim();
         const markers = [{ lat, lng, label }];
         renderMarkers(markers);
-        if (h.display_name) q.value = short(h);
+        // The field holds the place's full address; nothing beside it.
+        if (h.display_name) q.value = h.display_name;
         save({ center: [lat, lng], zoom, address: q.value.trim(), markers });
         hits = []; on = -1; showSugg();
-        say(label);
+        say('');
       }
       // Look up as you type (a moment after the last key), so the place is
       // found before you finish: pick it from the list, or Enter for the first.
