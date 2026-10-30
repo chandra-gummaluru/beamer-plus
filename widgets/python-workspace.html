@@ -939,6 +939,14 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
   position: absolute; inset: 0; z-index: 30; opacity: 1;
   overflow-y: auto;
 }
+/* edit.form(): a popover the widget places, drawn like a slide node. */
+.bws-root.bws-pop {
+  position: fixed; inset: auto; z-index: 40;
+  border: var(--sn-line) solid var(--sn-ink); border-radius: var(--sn-r);
+  box-shadow: 0 12px 36px rgb(0 0 0 / .18);
+  overflow-y: auto; opacity: 1;
+}
+.bws-pop .bws-body { padding: 14px 16px 16px; gap: 14px; overflow: visible; }
 .bws-inline .bws-body {
   width: min(560px, 100%); margin: 0 auto; box-sizing: border-box;
   padding: 20px 16px 28px; gap: 16px; overflow: visible;
@@ -1889,6 +1897,38 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
         rows = [];
     }
 
+    // edit.form(keys): some of the schema's fields as a form the widget places
+    // itself (a "Settings" popover in its edit bar, say), for the settings that
+    // have no place of their own on the widget. Each change is saved through
+    // edit.set like any other edit. Returns the form's element; call its
+    // .flush() before taking it away so a change still pending is saved.
+    function editForm(keys) {
+        readSchema();
+        injectStyles();
+        var own = [], timer = null;
+        var node = el('div', 'bws-root bws-pop');
+        var body = el('div', 'bws-body');
+        function save() {
+            timer = null;
+            var patch = {}, remove = [];
+            own.forEach(function (r) {
+                var res = r.read();
+                if (res.remove) remove.push(r.key); else patch[r.key] = res.value;
+            });
+            editSet(patch, remove);
+        }
+        (fields || []).forEach(function (f) {
+            if (keys.indexOf(f.key) === -1) return;
+            var row = buildRow(f, function () { if (timer) clearTimeout(timer); timer = setTimeout(save, 200); });
+            row.field = f;
+            own.push(row);
+            body.appendChild(row.node);
+        });
+        node.appendChild(body);
+        node.flush = function () { if (timer) { clearTimeout(timer); save(); } };
+        return node;
+    }
+
     /* ─── edit mode (editing on the widget itself) ──────────────── */
     // A widget that declares "inlineEdit": true in its schema is set up on the
     // widget itself: the Edit button (top right of the bar, or the corner
@@ -2070,6 +2110,8 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
          * Saved with the slide inside Beamer+, kept until reload outside it.
          */
         set: editSet,
+        /** Some schema fields as a form for the widget to place: form(keys). */
+        form: editForm,
     };
 
     /* ─── top bar ───────────────────────────────────────────────── */
@@ -3751,6 +3793,7 @@ body.ws-split.ws-no-left #bw-topbar,
 body.ws-split.ws-no-left .bw-edit-float { display: none !important; }
 body.ws-split #layout-wrap,
 body.ws-split #layout-wrap + .bw-sep,
+body.ws-split #layout-wrap + .ws-ed-sep,
 body.ws-split .pane-max,
 body.ws-split .splitter { display: none !important; }
 .split-tabs { display: none; }
@@ -3792,6 +3835,8 @@ body.bw-editing #gutter { cursor: pointer; }
         <span class="bl">Layout</span>
       </button>
     </div>
+    <span class="ws-ed-sep bw-edit-only" aria-hidden="true"></span>
+    <button class="bw-btn bw-edit-only" type="button" id="ed-more" aria-haspopup="true" aria-expanded="false" title="The workspace's other settings">Settings</button>
     <div class="bw-spacer"></div>
     <span class="bw-status" id="view-badge">View-only · synced with presenter</span>
     <input type="file" id="file-input" accept=".py,.txt,text/x-python,text/plain">
@@ -10162,7 +10207,42 @@ def _debug_file(src, fname, limit):
     gutterMode = b.dataset.v;
     paintEditBar();
   });
+  // Settings with no place of their own on the workspace, in a popover under
+  // the bar while it's edited (the kit builds the fields: edit.form).
+  const MORE_KEYS = ['readOnly', 'clearOnRun', 'banner', 'startup', 'packages', 'autoImport',
+                     'memoryMode', 'theme', 'zoom'];
+  const moreBtn = $('ed-more');
+  let morePop = null;
+  function closeMore() {
+    if (!morePop) return;
+    morePop.flush();
+    morePop.remove();
+    morePop = null;
+    moreBtn?.setAttribute('aria-expanded', 'false');
+    moreBtn?.classList.remove('is-active');
+  }
+  function openMore() {
+    if (morePop || !window.BeamerWidget?.edit?.form) return;
+    morePop = BeamerWidget.edit.form(MORE_KEYS);
+    document.body.appendChild(morePop);
+    const r = moreBtn.getBoundingClientRect();
+    const w = Math.min(340, window.innerWidth - 16);
+    morePop.style.width = w + 'px';
+    morePop.style.left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)) + 'px';
+    morePop.style.top = (r.bottom + 6) + 'px';
+    morePop.style.maxHeight = Math.max(160, window.innerHeight - r.bottom - 14) + 'px';
+    moreBtn.setAttribute('aria-expanded', 'true');
+    moreBtn.classList.add('is-active');
+  }
+  moreBtn?.addEventListener('click', () => (morePop ? closeMore() : openMore()));
+  window.addEventListener('blur', () => setTimeout(() => { if (!document.hasFocus()) closeMore(); }, 0));
+  document.addEventListener('pointerdown', e => {
+    if (morePop && !morePop.contains(e.target) && !moreBtn.contains(e.target)) closeMore();
+  }, true);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && morePop) { e.stopPropagation(); closeMore(); } }, true);
+
   window.addEventListener('bw-edit', e => {
+    if (!e.detail.editing) closeMore();
     if (e.detail.editing) {
       // The starting code as it will open: no run, trace or debug session in
       // the way of typing into it.

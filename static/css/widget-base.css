@@ -884,6 +884,14 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
   position: absolute; inset: 0; z-index: 30; opacity: 1;
   overflow-y: auto;
 }
+/* edit.form(): a popover the widget places, drawn like a slide node. */
+.bws-root.bws-pop {
+  position: fixed; inset: auto; z-index: 40;
+  border: var(--sn-line) solid var(--sn-ink); border-radius: var(--sn-r);
+  box-shadow: 0 12px 36px rgb(0 0 0 / .18);
+  overflow-y: auto; opacity: 1;
+}
+.bws-pop .bws-body { padding: 14px 16px 16px; gap: 14px; overflow: visible; }
 .bws-inline .bws-body {
   width: min(560px, 100%); margin: 0 auto; box-sizing: border-box;
   padding: 20px 16px 28px; gap: 16px; overflow: visible;

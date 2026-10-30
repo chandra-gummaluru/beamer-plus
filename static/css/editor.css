@@ -1796,5 +1796,9 @@ body.picking-panes #slide-nav-slides .slide-nav-item:hover .slide-preview { outl
 .view-split-add-icon { display: inline-flex; }
 .view-split-add-icon svg,
 .view-split-item .slide-item-icon svg { width: 16px; height: 16px; }
-.view-split-item { cursor: default; padding-right: 6px; }
+.view-split-item { padding-right: 6px; }
+.view-split-item.is-open,
+.view-split-item.is-open:hover { border-color: var(--ink-1); }
+#view-split-props:not(:empty) { margin-top: var(--sp-3); }
+#view-split-props .wf-group-title { display: none; }
 .view-split-item .btn.is-armed { --_bg: var(--btn-danger); --_fg: var(--ink-on-accent); }

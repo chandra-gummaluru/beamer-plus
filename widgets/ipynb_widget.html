@@ -909,6 +909,14 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
   position: absolute; inset: 0; z-index: 30; opacity: 1;
   overflow-y: auto;
 }
+/* edit.form(): a popover the widget places, drawn like a slide node. */
+.bws-root.bws-pop {
+  position: fixed; inset: auto; z-index: 40;
+  border: var(--sn-line) solid var(--sn-ink); border-radius: var(--sn-r);
+  box-shadow: 0 12px 36px rgb(0 0 0 / .18);
+  overflow-y: auto; opacity: 1;
+}
+.bws-pop .bws-body { padding: 14px 16px 16px; gap: 14px; overflow: visible; }
 .bws-inline .bws-body {
   width: min(560px, 100%); margin: 0 auto; box-sizing: border-box;
   padding: 20px 16px 28px; gap: 16px; overflow: visible;
@@ -1859,6 +1867,38 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
         rows = [];
     }
 
+    // edit.form(keys): some of the schema's fields as a form the widget places
+    // itself (a "Settings" popover in its edit bar, say), for the settings that
+    // have no place of their own on the widget. Each change is saved through
+    // edit.set like any other edit. Returns the form's element; call its
+    // .flush() before taking it away so a change still pending is saved.
+    function editForm(keys) {
+        readSchema();
+        injectStyles();
+        var own = [], timer = null;
+        var node = el('div', 'bws-root bws-pop');
+        var body = el('div', 'bws-body');
+        function save() {
+            timer = null;
+            var patch = {}, remove = [];
+            own.forEach(function (r) {
+                var res = r.read();
+                if (res.remove) remove.push(r.key); else patch[r.key] = res.value;
+            });
+            editSet(patch, remove);
+        }
+        (fields || []).forEach(function (f) {
+            if (keys.indexOf(f.key) === -1) return;
+            var row = buildRow(f, function () { if (timer) clearTimeout(timer); timer = setTimeout(save, 200); });
+            row.field = f;
+            own.push(row);
+            body.appendChild(row.node);
+        });
+        node.appendChild(body);
+        node.flush = function () { if (timer) { clearTimeout(timer); save(); } };
+        return node;
+    }
+
     /* ─── edit mode (editing on the widget itself) ──────────────── */
     // A widget that declares "inlineEdit": true in its schema is set up on the
     // widget itself: the Edit button (top right of the bar, or the corner
@@ -2040,6 +2080,8 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
          * Saved with the slide inside Beamer+, kept until reload outside it.
          */
         set: editSet,
+        /** Some schema fields as a form for the widget to place: form(keys). */
+        form: editForm,
     };
 
     /* ─── top bar ───────────────────────────────────────────────── */

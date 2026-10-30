@@ -8,6 +8,9 @@ import { ctx, escAttr, escHtml, setPanelMode, resolvePanelMode } from './context
 import { pickPanes } from './pane-picker.js';
 import { splitWidgetsOf, queueSync, loadSplitConfig } from '../slides/split-widgets.js';
 import { widgetCatalog, widgetIcon } from './widget-picker.js';
+import { getWidgetSchema } from './widget-schema.js';
+import { buildWidgetForm } from './widget-fields.js';
+import { pushWidgetConfig } from '../core/iframe-widget-renderer.js';
 
 export function showViewConfig(i) {
     const obj = ctx.state?.slideStructure?.[i];
@@ -229,6 +232,20 @@ const PANE_NAMES = { editor: 'Editor', shell: 'Shell', memory: 'Memory', debug: 
 const TRASH_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>';
 
 let _fillToken = 0;
+let _splitOpen = null;   // the split widget whose Text size is showing
+
+async function fillSplitProps(w, token) {
+    const schema = await getWidgetSchema(w);
+    const host = document.getElementById('view-split-props');
+    if (token !== _fillToken || !host) return;
+    const scale = (schema?.fields || []).filter(f => f.key === 'scale');
+    if (!scale.length) return;
+    const form = buildWidgetForm({ ...schema, fields: scale }, w, 'panel');
+    host.appendChild(form.node);
+    const apply = () => { form.apply(w); pushWidgetConfig(w.id, w); };
+    form.node.addEventListener('input', apply);
+    form.node.addEventListener('change', apply);
+}
 async function fillSplitWidgetSection(i, obj) {
     const token = ++_fillToken;
     const host = document.getElementById('view-split-widget');
@@ -266,7 +283,7 @@ async function fillSplitWidgetSection(i, obj) {
     const right = w.splitRight || w.split?.right || spec.right?.[0];
     host.innerHTML = `${title}
         <div class="slide-items" role="list">
-            <div class="slide-item view-split-item" role="listitem">
+            <div class="slide-item view-split-item${_splitOpen === w.id ? ' is-open' : ''}" role="listitem" tabindex="0" aria-expanded="${_splitOpen === w.id}">
                 <span class="slide-item-icon">${widgetIcon(w.type)}</span>
                 <span class="slide-item-text">
                     <span class="slide-item-name">${escHtml(label)}</span>
@@ -275,7 +292,15 @@ async function fillSplitWidgetSection(i, obj) {
                 <button type="button" class="btn btn--ghost btn--icon btn--sm btn--danger" id="view-split-delete" title="Delete" aria-label="Delete">${TRASH_ICON}</button>
             </div>
         </div>
-        <p class="slide-items-empty">Its settings are on the widget itself: leave the editor and press Edit in its bar.</p>`;
+        <div id="view-split-props"></div>`;
+
+    // Clicked, like a widget on a slide: what every widget has (Text size)
+    // under it. Its own settings are edited on the widget itself.
+    const row = host.querySelector('.view-split-item');
+    const toggle = () => { _splitOpen = _splitOpen === w.id ? null : w.id; fillSplitWidgetSection(i, obj); };
+    row.addEventListener('click', e => { if (!e.target.closest('#view-split-delete')) toggle(); });
+    row.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === row) { e.preventDefault(); toggle(); } });
+    if (_splitOpen === w.id) fillSplitProps(w, token);
 
     const del = host.querySelector('#view-split-delete');
     del?.addEventListener('click', () => {
