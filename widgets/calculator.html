@@ -3035,6 +3035,10 @@ body.bw-overlay .cbtn { font-size: clamp(12px, min(5.4cqw, 6cqh), 30px); }
 
   function evaluate(raw) {
     if (!raw.trim()) return { value: '', ok: true };
+    // Brackets left open (the function keys type "sin(") are closed at the
+    // end, as the typeset expression already shows them.
+    const open = (raw.match(/\(/g) || []).length - (raw.match(/\)/g) || []).length;
+    if (open > 0) raw += ')'.repeat(open);
     try {
       const san = sanitize(raw);
       // Only allow safe math characters after sanitization
