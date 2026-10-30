@@ -5,7 +5,7 @@
 <script id="widget-schema" type="application/json">
 {
   "label": "Function Plotter",
-  "edit": false,
+  "inlineEdit": true,
   "category": "Mathematics",
   "modes": ["full", "overlay"],
   "overlaySize": { "width": 0.45, "height": 0.55 },
@@ -3007,6 +3007,8 @@ body.is-viewer #trace-tip { display: none !important; }
 }
 .expr-row.has-tex:not(:focus-within) .expr-tex { display: flex; }
 .expr-row.has-tex:not(:focus-within) .expr-input { color: transparent; }
+.expr-row.has-tex:not(:focus-within) .expr-input::placeholder { color: transparent; }
+.expr-tex.is-ph { color: var(--text-3); }
 .expr-tex .katex, .ov-item .katex, .ov-slider .katex { font-size: 1em; }
 #ov-legend { font-family: var(--font-ui); font-size: calc(13px * var(--u)); padding: 5px 10px; gap: 4px; }
 #ov-sliders { font-family: var(--font-ui); font-size: calc(13px * var(--u)); padding: 6px 11px; }
@@ -3023,7 +3025,8 @@ body.is-viewer #trace-tip { display: none !important; }
   <!-- ── Toolbar (moved into the host bar by the settings kit) ──────────── -->
   <div id="toolbar" class="bw-toolbar" data-bw-topbar>
     <span class="bw-toolbar-title">Function Plotter</span>
-    <div class="bw-sep"></div>
+    <!-- Edit mode only: 2D or 3D, grid, labels — saved with the slide. -->
+    <span class="bw-edit-only" style="display:contents">
     <div class="seg" id="mode-seg">
       <button class="bw-btn is-active" id="btn-2d" title="Curves y = f(x)">2D</button>
       <button class="bw-btn"           id="btn-3d" title="Surfaces z = f(x, y)">3D</button>
@@ -3031,6 +3034,7 @@ body.is-viewer #trace-tip { display: none !important; }
     <div class="bw-sep"></div>
     <button class="bw-btn is-active" id="btn-grid">Grid</button>
     <button class="bw-btn is-active" id="btn-labels">Labels</button>
+    </span>
     <div class="bw-spacer"></div>
     <button class="bw-btn" id="btn-reset">Reset view</button>
   </div>
@@ -3354,8 +3358,11 @@ function paintRowTex(row) {
   const inp = document.getElementById(`ei-${row.id}`);
   const out = document.getElementById(`et-${row.id}`);
   if (!div || !inp || !out) return;
-  const html = row.expr.trim() ? katexHtml(exprTex(row.expr)) : null;
+  // An empty row shows its hint typeset too, in grey.
+  const ph = !row.expr.trim();
+  const html = ph ? katexHtml('y = f(x),\\; a = 3,\\; (1, 2)') : katexHtml(exprTex(row.expr));
   div.classList.toggle('has-tex', !!html);
+  out.classList.toggle('is-ph', ph);
   out.innerHTML = html || '';
   if (html) {
     const pad = parseFloat(getComputedStyle(inp).paddingLeft) || 0;
@@ -4409,6 +4416,25 @@ function setMode(next, quiet) {
 }
 
 document.getElementById('btn-2d').addEventListener('click', () => setMode('2d'));
+// ── Edit mode ───────────────────────────────────────────────────────────────
+// 2D/3D, Grid and Labels are only on the bar while editing, and what they're
+// set to there is how the slide opens. The functions typed while editing are
+// saved as the slide's functions too.
+function fpEditing() { return !!(window.BeamerWidget && BeamerWidget.edit && BeamerWidget.edit.active); }
+function fpSave(patch) { if (fpEditing()) BeamerWidget.edit.set(patch, [], { silent: true }); }
+document.getElementById('btn-2d').addEventListener('click', () => fpSave({ mode: '2d' }));
+document.getElementById('btn-3d').addEventListener('click', () => fpSave({ mode: '3d' }));
+document.getElementById('btn-grid').addEventListener('click', () => fpSave({ showGrid }));
+document.getElementById('btn-labels').addEventListener('click', () => fpSave({ showLabels }));
+window.addEventListener('bw-edit', e => {
+  if (e.detail.editing) return;
+  const fns = expressions.map(r => String(r.expr || '').trim()).filter(Boolean);
+  appliedFunctions = JSON.stringify(fns);
+  if (window.BeamerWidget && BeamerWidget.edit) {
+    if (fns.length) BeamerWidget.edit.set({ functions: fns }, [], { silent: true });
+    else BeamerWidget.edit.set({}, ['functions'], { silent: true });
+  }
+});
 document.getElementById('btn-3d').addEventListener('click', () => setMode('3d'));
 
 document.getElementById('add-expr-btn').addEventListener('click', () => addExpression('', null, true));
