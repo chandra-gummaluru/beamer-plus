@@ -3020,7 +3020,10 @@ body.bw-editing .bw-topbar-title + .bw-sep,
   line-height: 1.55;
   letter-spacing: 0;
   color: var(--text);
-  white-space: pre;
+  /* Long lines wrap under their own text (the gutter keeps the numbering)
+     rather than scrolling sideways. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   tab-size: 4;
 }
 /* One line, one row, numbered in the gutter — so a question can say
@@ -3807,9 +3810,6 @@ body.bw-editing #join-n { color: var(--ar-faint); }
 #fill-tpl::-webkit-scrollbar, #question pre::-webkit-scrollbar { display: none; }
 /* …unless it genuinely can't fit: then a hairline bar, so the room can tell
    there's more rather than missing the end of the question. */
-/* Still too wide at the smallest size: long lines wrap under their own
-   text (the gutter keeps the numbering) instead of running off the panel. */
-#stage.is-overflow #question pre code { white-space: pre-wrap; overflow-wrap: anywhere; }
 /* Vertical bars never show on the slide; what doesn't fit scrolls by wheel. */
 .ar-split-pane { scrollbar-width: none; }
 .ar-split-pane::-webkit-scrollbar { display: none; }
@@ -3853,8 +3853,8 @@ body.bw-editing #question { min-height: 1.25em; cursor: text; }
   font-family: var(--ar-tt);
   font-size: 0.82em;
   line-height: 1.55;
-  white-space: pre;
-  overflow-x: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   color: var(--ar-ink);
 }
 .fence-mark { color: var(--ar-faint); }
