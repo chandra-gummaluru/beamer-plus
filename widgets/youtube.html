@@ -2822,10 +2822,14 @@ html, body {
 
 #placeholder.hidden { display: none; }
 
-#placeholder svg {
-  width: 44px;
-  height: 44px;
-  fill: var(--ink-4);
+/* Drawn in outline, like the deck's other empty states (camera, PDF). */
+#placeholder svg.ph-icon {
+  width: 52px;
+  height: 52px;
+  fill: none;
+  stroke: currentColor;
+  color: var(--sn-cap);
+  opacity: 0.7;
 }
 
 #placeholder p {
@@ -3076,7 +3080,7 @@ body.bw-editing #player-wrap { z-index: 41; }
   </div>
 
   <div id="placeholder">
-    <svg viewBox="0 0 24 24"><path d="M21.58 7.19c-.23-.86-.91-1.54-1.77-1.77C18.25 5 12 5 12 5s-6.25 0-7.81.42c-.86.23-1.54.91-1.77 1.77C2 8.75 2 12 2 12s0 3.25.42 4.81c.23.86.91 1.54 1.77 1.77C5.75 19 12 19 12 19s6.25 0 7.81-.42c.86-.23 1.54-.91 1.77-1.77C22 15.25 22 12 22 12s0-3.25-.42-4.81zM10 15V9l5.2 3-5.2 3z"/></svg>
+    <svg class="ph-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3.5"/><path d="M10 9.2v5.6l4.8-2.8z"/></svg>
     <p>No video loaded</p>
     <div id="url-row">
       <input type="text" id="url-input" placeholder="YouTube URL or video ID…">
