@@ -8,6 +8,7 @@
   "category": "Audience Response",
   "liveSettings": true,
   "inlineEdit": true,
+  "split": { "left": ["question"], "right": ["answers"], "hide": [] },
   "fields": [
     {"key": "responseType", "label": "Question type", "type": "select", "default": "choice", "options": [{"v": "choice", "l": "Multiple choice", "d": "Pick one of a list of answers"}, {"v": "truefalse", "l": "True / False", "d": "Two buttons: true or false"}, {"v": "rating", "l": "Rating scale", "d": "A scale, e.g. 1 to 5"}, {"v": "numeric", "l": "Numeric estimate", "d": "Any number; see how the guesses spread"}, {"v": "exact", "l": "Numerical answer", "d": "A number checked against the right answer"}, {"v": "wordcloud", "l": "Word cloud", "d": "A word or two, shown as a cloud"}, {"v": "fill", "l": "Fill in the blanks", "d": "Complete a sentence with gaps"}, {"v": "plot", "l": "2D plot", "d": "Place a dot on two axes"}, {"v": "open", "l": "Open-ended", "d": "Short written answers"}], "section": "Question"},
     {"key": "question", "expand": true, "label": "Question text", "type": "textarea", "rows": 4, "placeholder": "Consider the following code:\n\n```python\nx = 5\nif x > 2:\n    x = -3\n```\n\nWhat is `x`?", "note": "Markdown & $LaTeX$"},
@@ -4044,6 +4045,27 @@ body.bw-editing #ed-secs[hidden] { display: none; }
 #qr-slot.is-go:hover #qr-cue, #qr-slot.is-go:focus-visible #qr-cue { opacity: 1; }
 /* The step button in the bar is gone: the QR square does it. */
 #step-btn { display: none !important; }
+/* ── Split across a split view (setSplit) ─────────────────────────────────
+   The bar and the question on the left slide; the answers or results and
+   the QR banner on the right. Each pane lays out like the stage itself. */
+body.ar-split { background: var(--bg); }
+body.ar-split #bw-topbar-body { position: absolute; inset: 0; }
+body.ar-split #bw-topbar { position: absolute; box-sizing: border-box; z-index: 5; }
+body.ar-split.ar-no-left #bw-topbar { display: none !important; }
+body.ar-split #stage { position: absolute; inset: 0; display: block; padding: 0; }
+.ar-split-pane { position: absolute; box-sizing: border-box; min-height: 0; overflow: hidden; }
+#ar-split-left {
+  display: flex; flex-direction: column; justify-content: center; gap: calc(16px * var(--u));
+  padding: calc(14px * var(--u)) calc(36px * var(--u)) calc(18px * var(--u));
+  overflow-y: auto;
+}
+#ar-split-right {
+  display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto;
+  gap: calc(18px * var(--u));
+  padding: calc(18px * var(--u)) calc(36px * var(--u)) calc(18px * var(--u));
+}
+#ar-split-right #prompt { padding-bottom: 0; }
+body.ar-static .ar-split-pane { pointer-events: none; }
 </style>
 </head>
 <body>
@@ -5289,7 +5311,8 @@ body.bw-editing #ed-secs[hidden] { display: none; }
     if (choicesEl.classList.contains('is-tf')) { set(2); return; }
     // Vertical: one answer under another. Horizontal: side by side — all in
     // one row up to four, then in even rows (six as 3 × 2, eight as 4 × 2).
-    if (S.choiceLayout === 'vertical') return;
+    // Split across two slides, the answers have half the width: one column.
+    if (S.choiceLayout === 'vertical' || document.body.classList.contains('ar-split')) return;
     set(n <= 4 ? n : Math.ceil(n / Math.ceil(n / 4)));
   }
 
@@ -6955,9 +6978,76 @@ body.bw-editing #ed-secs[hidden] { display: none; }
   }
 
   // ── Beamer+ message bridge ──────────────────────────────────────────────────
+  // ── Split across a split view ───────────────────────────────────────────────
+  // On a split view Beamer+ lays this one widget over both slides and says
+  // where each half is (widget-split: rects in this frame's px). The bar and
+  // the question take the left slide; the answers (or results) and the poll's
+  // QR banner the right. The question's nodes are moved into a left pane and
+  // the rest of the stage into a right one, and put back when the split ends.
+  let SPLIT = null;
+  const splitPanes = { left: null, right: null };
+  const splitHome = [];   // [node, marker] to put each moved node back
+  const LEFT_IDS = ['banner', 'kicker', 'question'];
+  function splitMount() {
+    if (splitPanes.left) return;
+    const mk = (side) => { const el = document.createElement('div'); el.id = 'ar-split-' + side; el.className = 'ar-split-pane'; return el; };
+    splitPanes.left = mk('left'); splitPanes.right = mk('right');
+    const stageEl = document.getElementById('stage');
+    stageEl.appendChild(splitPanes.left); stageEl.appendChild(splitPanes.right);
+    const move = (node, to) => {
+      const marker = document.createComment('ar-split');
+      node.parentNode.insertBefore(marker, node);
+      splitHome.push([node, marker]);
+      to.appendChild(node);
+    };
+    LEFT_IDS.forEach(id => { const n = document.getElementById(id); if (n) move(n, splitPanes.left); });
+    move(document.getElementById('prompt'), splitPanes.right);
+    move(document.getElementById('side'), splitPanes.right);
+  }
+  function splitUnmount() {
+    if (!splitPanes.left) return;
+    while (splitHome.length) { const [node, marker] = splitHome.pop(); marker.parentNode.insertBefore(node, marker); marker.remove(); }
+    splitPanes.left.remove(); splitPanes.right.remove();
+    splitPanes.left = splitPanes.right = null;
+    const bar = document.getElementById('bw-topbar');
+    if (bar) ['left', 'top', 'width'].forEach(k => bar.style.removeProperty(k));
+  }
+  function splitLayout() {
+    if (!SPLIT) return;
+    const bar = document.getElementById('bw-topbar');
+    const stageEl = document.getElementById('stage');
+    const base = stageEl.getBoundingClientRect();
+    let barH = 0;
+    if (bar && SPLIT.left) {
+      bar.style.left = SPLIT.left.x + 'px'; bar.style.top = SPLIT.left.y + 'px'; bar.style.width = SPLIT.left.w + 'px';
+      barH = bar.offsetHeight;
+    }
+    const at = (el, r, top) => {
+      if (!r) { el.hidden = true; return; }
+      el.hidden = false;
+      Object.assign(el.style, { left: (r.x - base.left) + 'px', top: (r.y - base.top + top) + 'px',
+                                width: r.w + 'px', height: Math.max(0, r.h - top) + 'px' });
+    };
+    at(splitPanes.left, SPLIT.left, barH);
+    at(splitPanes.right, SPLIT.right, 0);
+  }
+  function setSplit(d) {
+    const rect = r => r && [r.x, r.y, r.w, r.h].every(Number.isFinite) && r.w > 0 && r.h > 0 ? { x: r.x, y: r.y, w: r.w, h: r.h } : null;
+    const next = d && (d.left || d.right) ? { live: !!d.live, left: rect(d.left), right: rect(d.right) } : null;
+    SPLIT = next && (next.left || next.right) ? next : null;
+    document.body.classList.toggle('ar-split', !!SPLIT);
+    document.body.classList.toggle('ar-static', !!SPLIT && !SPLIT.live);
+    document.body.classList.toggle('ar-no-left', !!SPLIT && !SPLIT.left);
+    if (SPLIT && !SPLIT.live && document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+    if (SPLIT) { splitMount(); requestAnimationFrame(splitLayout); } else splitUnmount();
+    render();   // the answers' columns follow the split
+  }
+  window.addEventListener('resize', () => { if (SPLIT) splitLayout(); });
+
   window.addEventListener('message', e => {
     const d = e.data || {};
     if (d.type === 'widget-config')  applyConfig(d.config, !!d.live);
+    if (d.type === 'widget-split')   setSplit(d);
     if (d.type === 'widget-cleanup') destroy();
     if (d.type === 'widget-get-state') {
       window.parent.postMessage({ type: 'widget-state', widgetId: WIDGET_ID, state: getState() }, '*');

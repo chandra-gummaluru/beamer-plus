@@ -222,8 +222,12 @@ function wireSplitPicker(box, obj, commit) {
    A view can carry one widget that spans both of its slides — the Python
    workspace's code on the left slide and a pane of it on the right. It is
    kept in the view's own config and works only while the split is on
-   screen; each slide alone shows its half as it was left. */
-const PANE_NAMES = { editor: 'Editor', shell: 'Shell', memory: 'Memory', debug: 'Debugger' };
+   screen; each slide alone shows its half as it was left. The widget's
+   schema names its halves ("split": { left: [...], right: [...] }); the
+   first of each is where it starts. Audience Response: the question left,
+   the answers and the QR banner right. */
+const PANE_NAMES = { editor: 'Editor', shell: 'Shell', memory: 'Memory', debug: 'Debugger',
+                     question: 'Question', answers: 'Answers & QR' };
 const SETTINGS_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>';
 const TRASH_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>';
 
@@ -251,13 +255,15 @@ async function fillSplitWidgetSection(i, obj) {
                 </button>`).join('') || '<p class="slide-items-empty">No widget can be split yet.</p>'}
             </div>`;
         host.querySelectorAll('[data-add-split]').forEach(b =>
-            b.addEventListener('click', () => addSplitWidget(i, obj, b.dataset.addSplit)));
+            b.addEventListener('click', () => addSplitWidget(i, obj, b.dataset.addSplit,
+                catalog.find(c => c.type === b.dataset.addSplit)?.split)));
         return;
     }
 
     const entry = catalog.find(c => c.type === w.type);
     const label = w.title || entry?.label || w.type;
     const spec = entry?.split || { left: ['editor'], right: ['shell', 'memory', 'debug'] };
+    const leftName = PANE_NAMES[w.split?.left || spec.left?.[0]] || w.split?.left || 'Editor';
     const right = w.split?.right || spec.right?.[0];
     host.innerHTML = `${title}
         <div class="slide-items" role="list">
@@ -265,7 +271,7 @@ async function fillSplitWidgetSection(i, obj) {
                 <span class="slide-item-icon">${widgetIcon(w.type)}</span>
                 <span class="slide-item-text">
                     <span class="slide-item-name">${escHtml(label)}</span>
-                    <span class="slide-item-kind">${escHtml(PANE_NAMES[w.split?.left] || 'Editor')} left · ${escHtml(PANE_NAMES[right] || right)} right</span>
+                    <span class="slide-item-kind">${escHtml(leftName)} left · ${escHtml(PANE_NAMES[right] || right)} right</span>
                 </span>
                 <button type="button" class="btn btn--ghost btn--icon btn--sm" id="view-split-settings" title="Settings" aria-label="Settings">${SETTINGS_ICON}</button>
                 <button type="button" class="btn btn--ghost btn--icon btn--sm btn--danger" id="view-split-delete" title="Delete" aria-label="Delete">${TRASH_ICON}</button>
@@ -301,7 +307,7 @@ async function fillSplitWidgetSection(i, obj) {
     }));
 }
 
-function addSplitWidget(i, obj, type) {
+function addSplitWidget(i, obj, type, spec) {
     const s = ctx.state;
     const key = obj.viewId;
     if (!s.slideConfigs[key]) s.slideConfigs[key] = {};
@@ -316,7 +322,7 @@ function addSplitWidget(i, obj, type) {
         builtin: true,
         x: 0, y: 0, width: 1, height: 1,
         zIndex: 10,
-        split: { left: 'editor', right: 'shell' },
+        split: { left: spec?.left?.[0] || 'editor', right: spec?.right?.[0] || 'shell' },
     });
     queueSync();
     fillSplitWidgetSection(i, obj);
