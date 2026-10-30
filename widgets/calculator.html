@@ -3104,12 +3104,14 @@ body.bw-overlay .cbtn { font-size: clamp(12px, min(5.4cqw, 6cqh), 30px); }
     catch (_) { return null; }
   }
   const exprTexEl = document.getElementById('expr-tex');
+  // Typed in the typewriter face while you're at it; set in LaTeX once you're
+  // done (= pressed, or the field left).
   function renderExprTex() {
     const v = exprEl.value;
-    if (!v.trim() || !window.katex) { exprTexEl.innerHTML = ''; return; }
+    if (!v.trim() || !window.katex || document.activeElement === exprEl) { exprTexEl.innerHTML = ''; return; }
     const html = texHtml(v);
     exprTexEl.innerHTML = (html || `<span class="tx-raw">${escHtml(v)}</span>`)
-      + (document.activeElement === exprEl ? '<span class="tx-caret"></span>' : '');
+      ;
   }
   exprEl.addEventListener('input', renderExprTex);
   exprEl.addEventListener('focus', renderExprTex);
@@ -3180,6 +3182,7 @@ body.bw-overlay .cbtn { font-size: clamp(12px, min(5.4cqw, 6cqh), 30px); }
     const expr = exprEl.value.trim();
     if (!expr) return;
     const { value, ok } = evaluate(expr);
+    exprEl.blur();          // done: the expression is typeset
     showResult(value, !ok);
     if (ok && value) {
       lastAnswer = value;
