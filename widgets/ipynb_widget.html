@@ -3448,7 +3448,7 @@ body.bw-editing #notebook-area.is-over { outline: 2px dashed var(--sn-ink, #222)
        source row as every widget's. -->
   <div class="bw-edit-only bw-source nb-ed">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg>
-    <span class="bw-source-name" id="nb-ed-name" data-empty="No notebook chosen"></span>
+    <span class="bw-source-name" id="nb-ed-name" data-empty="Untitled.ipynb — a blank notebook"></span>
     <span class="bw-source-msg" id="nb-ed-msg"></span>
     <button class="bw-btn" type="button" id="nb-choose">Choose Notebook…</button>
   </div>
@@ -4895,6 +4895,9 @@ if (IS_VIEWER) {
     else    addPlaceholderCell();
   });
 } else {
+  // No notebook chosen: start a blank one at once, rather than an empty page
+  // while Python downloads. Typing in it makes it this slide's notebook.
+  if (!NOTEBOOK_PATH && !contentLoaded) addPlaceholderCell();
   // Presenter: full Pyodide kernel
   initPyodide().catch(e => {
     removeBoot();
