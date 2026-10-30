@@ -628,21 +628,23 @@ body.bw-overlay:hover .bw-overlay-controls,
 /* ── Edit mode ────────────────────────────────────────────────────────────
    body.bw-editing, set by the kit while a widget is being set up on itself
    (BeamerWidget.edit). The widget's own content is the form: anything marked
-   .bw-editable gets a dashed yellow outline, the bar turns yellow along its
-   bottom edge, and Edit becomes Done.
+   .bw-editable gets a dashed yellow outline, the bar gets a highlighter line
+   along its bottom edge, and Edit becomes Done. The bar's buttons keep the
+   live bar's one style (below): being edited changes what's in the bar, not
+   how its buttons look.
    ====================================================================== */
 
 /* Edit / Done: the last thing in the bar, the top-right corner. */
 .bw-edit-btn { gap: 6px; }
-body.bw-editing .bw-edit-btn.bw-btn--primary {
-  background: var(--edit); border-color: var(--edit-line); color: var(--on-edit);
-}
+/* Done: an ordinary bar button, in bold — the way out, not a loud one. */
+body.bw-editing .bw-edit-btn.bw-btn--primary,
 body.bw-editing .bw-edit-btn.bw-btn--primary:hover:not(:disabled) {
-  background: var(--edit-line); border-color: var(--edit-line); color: var(--on-edit);
+  background: var(--bg); border-color: var(--text); color: var(--text); font-weight: 700;
 }
+body.bw-editing .bw-edit-btn.bw-btn--primary:hover:not(:disabled) { background: var(--sn-node); }
 body.bw-editing .bw-topbar {
-  border-bottom-color: var(--edit-line);
-  box-shadow: inset 0 -1px 0 var(--edit-line);
+  border-bottom: 2px solid var(--sn-hl);
+  box-shadow: none;
 }
 
 /* Show a piece of UI only while editing, or only while not. */
@@ -707,9 +709,10 @@ body.bw-editing .bw-editable[role="button"] { cursor: pointer; }
 }
 .bw-seg > .bw-btn { border: 0; border-radius: 0; height: calc(var(--ctl-h) - 2px); }
 .bw-seg > .bw-btn + .bw-btn { border-left: 1px solid var(--border); }
-body.bw-editing .bw-seg > .bw-btn.is-active,
-body.bw-editing .bw-toggle[aria-pressed="true"] {
-  background: var(--edit); border-color: var(--edit); color: var(--on-edit);
+/* The chosen one: as a chosen button anywhere — ink, pale fill, bold. */
+.bw-seg > .bw-btn.is-active,
+.bw-toggle[aria-pressed="true"] {
+  background: var(--sn-node); color: var(--text); font-weight: 700;
 }
 
 /* On / off, with its state drawn as a tick box. */
@@ -881,30 +884,31 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
    looks the same: a light grey outline round ink text. Hovered, the outline
    goes ink over a pale fill; a chosen view or mode keeps that look, in bold.
    A widget's "primary" (Start, Run All, the poll's next step) is no louder
-   than the rest. Edit-mode bars keep their own yellow styling. */
-body:not(.bw-editing) :is(.bw-topbar, .bw-toolbar) .bw-btn {
+   than the rest. The same in edit mode, so a bar being set up looks like
+   the bar it will be. */
+:is(.bw-topbar, .bw-toolbar) .bw-btn {
   border: 1px solid var(--border-med);
   background: var(--bg);
   color: var(--text);
 }
-body:not(.bw-editing) :is(.bw-topbar, .bw-toolbar) .bw-btn:hover:not(:disabled),
-body:not(.bw-editing) :is(.bw-topbar, .bw-toolbar) .bw-btn:focus-visible {
+:is(.bw-topbar, .bw-toolbar) .bw-btn:hover:not(:disabled),
+:is(.bw-topbar, .bw-toolbar) .bw-btn:focus-visible {
   border-color: var(--text);
   background: var(--sn-node);
   color: var(--text);
 }
-body:not(.bw-editing) :is(.bw-topbar, .bw-toolbar) .bw-btn.is-active,
-body:not(.bw-editing) :is(.bw-topbar, .bw-toolbar) .bw-btn[aria-pressed="true"] {
+:is(.bw-topbar, .bw-toolbar) .bw-btn.is-active,
+:is(.bw-topbar, .bw-toolbar) .bw-btn[aria-pressed="true"] {
   border-color: var(--text);
   background: var(--sn-node);
   color: var(--text);
   font-weight: 700;
 }
 /* A segmented group: the group is one outline, its members split by rules. */
-body:not(.bw-editing) :is(.bw-topbar, .bw-toolbar) .bw-seg { border-color: var(--border-med); }
-body:not(.bw-editing) :is(.bw-topbar, .bw-toolbar) .bw-seg > .bw-btn { border: 0; }
-body:not(.bw-editing) :is(.bw-topbar, .bw-toolbar) .bw-seg > .bw-btn + .bw-btn { border-left: 1px solid var(--border-med); }
-body:not(.bw-editing) :is(.bw-topbar, .bw-toolbar) .bw-seg > .bw-btn:hover:not(:disabled) { border-color: var(--border-med); }
+:is(.bw-topbar, .bw-toolbar) .bw-seg { border-color: var(--border-med); }
+:is(.bw-topbar, .bw-toolbar) .bw-seg > .bw-btn { border: 0; }
+:is(.bw-topbar, .bw-toolbar) .bw-seg > .bw-btn + .bw-btn { border-left: 1px solid var(--border-med); }
+:is(.bw-topbar, .bw-toolbar) .bw-seg > .bw-btn:hover:not(:disabled) { border-color: var(--border-med); }
 </style>
 <script id="bw-kit">
 // Beamer+ widget settings kit — runs INSIDE each widget iframe.

@@ -654,21 +654,23 @@ body.bw-overlay:hover .bw-overlay-controls,
 /* ── Edit mode ────────────────────────────────────────────────────────────
    body.bw-editing, set by the kit while a widget is being set up on itself
    (BeamerWidget.edit). The widget's own content is the form: anything marked
-   .bw-editable gets a dashed yellow outline, the bar turns yellow along its
-   bottom edge, and Edit becomes Done.
+   .bw-editable gets a dashed yellow outline, the bar gets a highlighter line
+   along its bottom edge, and Edit becomes Done. The bar's buttons keep the
+   live bar's one style (below): being edited changes what's in the bar, not
+   how its buttons look.
    ====================================================================== */
 
 /* Edit / Done: the last thing in the bar, the top-right corner. */
 .bw-edit-btn { gap: 6px; }
-body.bw-editing .bw-edit-btn.bw-btn--primary {
-  background: var(--edit); border-color: var(--edit-line); color: var(--on-edit);
-}
+/* Done: an ordinary bar button, in bold — the way out, not a loud one. */
+body.bw-editing .bw-edit-btn.bw-btn--primary,
 body.bw-editing .bw-edit-btn.bw-btn--primary:hover:not(:disabled) {
-  background: var(--edit-line); border-color: var(--edit-line); color: var(--on-edit);
+  background: var(--bg); border-color: var(--text); color: var(--text); font-weight: 700;
 }
+body.bw-editing .bw-edit-btn.bw-btn--primary:hover:not(:disabled) { background: var(--sn-node); }
 body.bw-editing .bw-topbar {
-  border-bottom-color: var(--edit-line);
-  box-shadow: inset 0 -1px 0 var(--edit-line);
+  border-bottom: 2px solid var(--sn-hl);
+  box-shadow: none;
 }
 
 /* Show a piece of UI only while editing, or only while not. */
@@ -733,9 +735,10 @@ body.bw-editing .bw-editable[role="button"] { cursor: pointer; }
 }
 .bw-seg > .bw-btn { border: 0; border-radius: 0; height: calc(var(--ctl-h) - 2px); }
 .bw-seg > .bw-btn + .bw-btn { border-left: 1px solid var(--border); }
-body.bw-editing .bw-seg > .bw-btn.is-active,
-body.bw-editing .bw-toggle[aria-pressed="true"] {
-  background: var(--edit); border-color: var(--edit); color: var(--on-edit);
+/* The chosen one: as a chosen button anywhere — ink, pale fill, bold. */
+.bw-seg > .bw-btn.is-active,
+.bw-toggle[aria-pressed="true"] {
+  background: var(--sn-node); color: var(--text); font-weight: 700;
 }
 
 /* On / off, with its state drawn as a tick box. */
@@ -907,30 +910,31 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
    looks the same: a light grey outline round ink text. Hovered, the outline
    goes ink over a pale fill; a chosen view or mode keeps that look, in bold.
    A widget's "primary" (Start, Run All, the poll's next step) is no louder
-   than the rest. Edit-mode bars keep their own yellow styling. */
-body:not(.bw-editing) :is(.bw-topbar, .bw-toolbar) .bw-btn {
+   than the rest. The same in edit mode, so a bar being set up looks like
+   the bar it will be. */
+:is(.bw-topbar, .bw-toolbar) .bw-btn {
   border: 1px solid var(--border-med);
   background: var(--bg);
   color: var(--text);
 }
-body:not(.bw-editing) :is(.bw-topbar, .bw-toolbar) .bw-btn:hover:not(:disabled),
-body:not(.bw-editing) :is(.bw-topbar, .bw-toolbar) .bw-btn:focus-visible {
+:is(.bw-topbar, .bw-toolbar) .bw-btn:hover:not(:disabled),
+:is(.bw-topbar, .bw-toolbar) .bw-btn:focus-visible {
   border-color: var(--text);
   background: var(--sn-node);
   color: var(--text);
 }
-body:not(.bw-editing) :is(.bw-topbar, .bw-toolbar) .bw-btn.is-active,
-body:not(.bw-editing) :is(.bw-topbar, .bw-toolbar) .bw-btn[aria-pressed="true"] {
+:is(.bw-topbar, .bw-toolbar) .bw-btn.is-active,
+:is(.bw-topbar, .bw-toolbar) .bw-btn[aria-pressed="true"] {
   border-color: var(--text);
   background: var(--sn-node);
   color: var(--text);
   font-weight: 700;
 }
 /* A segmented group: the group is one outline, its members split by rules. */
-body:not(.bw-editing) :is(.bw-topbar, .bw-toolbar) .bw-seg { border-color: var(--border-med); }
-body:not(.bw-editing) :is(.bw-topbar, .bw-toolbar) .bw-seg > .bw-btn { border: 0; }
-body:not(.bw-editing) :is(.bw-topbar, .bw-toolbar) .bw-seg > .bw-btn + .bw-btn { border-left: 1px solid var(--border-med); }
-body:not(.bw-editing) :is(.bw-topbar, .bw-toolbar) .bw-seg > .bw-btn:hover:not(:disabled) { border-color: var(--border-med); }
+:is(.bw-topbar, .bw-toolbar) .bw-seg { border-color: var(--border-med); }
+:is(.bw-topbar, .bw-toolbar) .bw-seg > .bw-btn { border: 0; }
+:is(.bw-topbar, .bw-toolbar) .bw-seg > .bw-btn + .bw-btn { border-left: 1px solid var(--border-med); }
+:is(.bw-topbar, .bw-toolbar) .bw-seg > .bw-btn:hover:not(:disabled) { border-color: var(--border-med); }
 </style>
 <script id="bw-kit">
 // Beamer+ widget settings kit — runs INSIDE each widget iframe.
@@ -2625,7 +2629,9 @@ body:not(.bw-editing) :is(.bw-topbar, .bw-toolbar) .bw-seg > .bw-btn:hover:not(:
   --edit-ink:  #8a6400;
   --edit-soft: color-mix(in srgb, #f7c548 22%, var(--bg));
 }
-body, .bw-topbar, .bw-toolbar, .ed-menu { font-family: var(--ar-sans); }
+body { font-family: var(--ar-sans); }
+/* The bar and its menus are chrome: the app's UI face, like every widget's. */
+.ed-menu { font-family: var(--font-chrome); }
 
 /* ── The bar ────────────────────────────────────────────
    Live, it stays out of the slide's way: no rule under it, grey text
@@ -2638,18 +2644,15 @@ body:not(.bw-editing) .bw-topbar { background: var(--bg); border-bottom-color: t
 #step-btn { display: none; gap: 6px; }
 #step-btn svg { width: 13px; height: 13px; }
 
-body.bw-editing .bw-topbar { background: var(--edit-soft); border-bottom: 2px solid var(--ar-hl); box-shadow: none; }
+body.bw-editing .bw-topbar { background: var(--bg); border-bottom: 2px solid var(--ar-hl); box-shadow: none; }
 /* No Name here: the question type already says what the slide is. */
 body.bw-editing .bw-topbar-title,
 body.bw-editing .bw-topbar-title + .bw-sep,
 .bw-topbar-actions > .bw-sep:first-child { display: none !important; }
-body.bw-editing .bw-topbar .bw-seg > .bw-btn.is-active { font-weight: 700; }
-body.bw-editing .bw-edit-btn.bw-btn--primary,
-body.bw-editing .bw-edit-btn.bw-btn--primary:hover:not(:disabled) { background: var(--ar-ink); border-color: var(--ar-ink); color: var(--bg); }
 .ar-group { display: contents; }
 .ar-group[hidden] { display: none; }
-.ar-field { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; color: var(--text-2); white-space: nowrap; }
-.ar-sep { flex: 0 0 auto; width: 1px; height: 16px; background: color-mix(in srgb, var(--edit-line) 45%, transparent); }
+.ar-field { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; color: var(--text-3); white-space: nowrap; }
+.ar-sep { flex: 0 0 auto; width: 1px; height: 16px; background: var(--border-med); }
 #viewer-badge { display: none; }
 /* Small fields typed in the bar (open-ended: the AI settings). */
 .ar-in {
@@ -3486,6 +3489,24 @@ body.bw-editing #ed-qr {
 #join-sub-closed[hidden], #join-sub-open[hidden] { display: none; }
 /* Closed: the QR stays where it was, faded, so the slide doesn't jump. */
 #join.is-closed #qr-wrap { opacity: 0.18; filter: grayscale(1); }
+/* Not open yet: no code to show, so the edit stand-in holds its place, faint. */
+#join-sub-waiting[hidden] { display: none; }
+#join.is-waiting #qr-wrap { display: none; }
+body:not(.bw-editing) #join.is-waiting #ed-qr {
+  flex: 0 0 auto;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  width: calc(96px * var(--u));
+  height: calc(96px * var(--u));
+  box-sizing: border-box;
+  border: var(--ar-line) dashed var(--ar-faint);
+  border-radius: 5px;
+  color: var(--ar-faint);
+}
+#join.is-waiting #ed-qr span { display: none; }
+#join.is-waiting #ed-qr svg { width: calc(34px * var(--u)); height: calc(34px * var(--u)); }
+#join.is-waiting #join-n { color: var(--ar-faint); }
 .join-sub { font-size: var(--fs-body); color: var(--ar-cap); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #join-link { font-family: var(--ar-tt); color: var(--ar-ink); }
 #join > .bw-spacer { flex: 1 1 auto; }
@@ -3972,6 +3993,7 @@ body.bw-editing #ed-secs[hidden] { display: none; }
           <span class="join-h" id="join-h">Scan to answer</span>
           <span class="join-sub" id="join-sub-open">or go to <span id="join-link">[join link]</span></span>
           <span class="join-sub" id="join-sub-closed" hidden>No more answers are being taken</span>
+          <span class="join-sub" id="join-sub-waiting" hidden>Answers open when it starts</span>
         </div>
         <span class="bw-spacer"></span>
         <div class="join-fig" id="join-count">
@@ -4848,12 +4870,19 @@ body.bw-editing #ed-secs[hidden] { display: none; }
     // draws no banner.
     // Closed, the banner stays (the QR faded, "Poll closed") until the
     // results go up.
+    // Before it opens, the banner is already there, waiting: the QR's place
+    // held by a faded stand-in, "Poll not open yet", the count at 0 and a
+    // countdown at its full length — so starting the poll changes what's in
+    // the strip, not the layout of the slide.
     const shut = D.phase === 'closed' && !ed && !preview;
-    const withJoin = collect || ed || shut;
+    const waiting = D.phase === 'idle' && !ed && !preview;
+    const withJoin = collect || ed || shut || waiting;
     joinEl.classList.toggle('is-closed', shut);
-    $('join-h').textContent = shut ? 'Poll closed' : 'Scan to answer';
-    $('join-sub-open').hidden = shut;
+    joinEl.classList.toggle('is-waiting', waiting);
+    $('join-h').textContent = shut ? 'Poll closed' : waiting ? 'Poll not open yet' : 'Scan to answer';
+    $('join-sub-open').hidden = shut || waiting;
     $('join-sub-closed').hidden = !shut;
+    $('join-sub-waiting').hidden = !waiting;
     // A template (or a list of answers) is read from the top, not centred.
     // Always from the top: a centred question sits in a different place in
     // each phase (QR up, closed, results) and visibly jumps between them.
@@ -5377,6 +5406,12 @@ body.bw-editing #ed-secs[hidden] { display: none; }
       joinNL.textContent = 'responses';
       return;
     }
+    if (S.phase === 'idle') {
+      joinN.textContent = '0';
+      joinNL.textContent = 'responses';
+      lastTally = 0;
+      return;
+    }
     if (S.phase !== 'collect' && S.phase !== 'closed') return;
     // Only marked as drawn once it actually is: the QR library may arrive late.
     if (qrEl.dataset.url !== S.joinUrl && typeof QRCode !== 'undefined') {
@@ -5493,6 +5528,17 @@ body.bw-editing #ed-secs[hidden] { display: none; }
   function renderTimer() {
     if (editing()) return;   // the banner's timer is a field then (renderEdit)
     const mode = S.timer.mode;
+    // Not open yet: a countdown shows its full length, standing still.
+    if (S.phase === 'idle' && mode === 'down') {
+      timerEl.classList.add('is-on', 'is-down');
+      timerEl.classList.remove('is-urgent');
+      timerText.classList.remove('is-ghost');
+      timerText.hidden = false;
+      timerCap.textContent = '';
+      timerText.textContent = fmtClock(S.timer.secs);
+      timerFill.style.transform = 'scaleX(1)';
+      return;
+    }
     const on   = mode !== 'none' && S.phase === 'collect' && S.timerStart != null;
     timerEl.classList.toggle('is-on', on);
     timerText.classList.remove('is-ghost');
