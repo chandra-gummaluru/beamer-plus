@@ -126,17 +126,19 @@
     .custom-modal-buttons .btn { width: 100%; }
 }
 
-/* ── Outlined like the slides' nodes; type in the app's own faces ────────
+/* ── Outlined like the slides' nodes; in the slides' face (CM Sans) ────
    Every dialog (the loading one too) is a white card with an ink outline,
-   its title in the app's serif on the deck's highlighter yellow. */
+   its title on the deck's highlighter yellow. One weight: CM's bold reads
+   as a different typeface beside the regular. */
 .custom-modal-content {
     border: 2px solid var(--ink-1);
     border-radius: 7px;
     box-shadow: 0 12px 36px rgb(0 0 0 / .18);
 }
 .custom-modal-title {
-    font-size: var(--fs-xl);
-    font-weight: 600;
+    font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', var(--font-sans);
+    font-size: 24px;
+    font-weight: 400;
     color: var(--ink-1);
     display: inline;
     background: #f7c548;
@@ -147,3 +149,6 @@
 }
 .custom-modal-title + .custom-modal-message,
 .custom-modal-title + * { margin-top: 12px; }
+.custom-modal-overlay, .custom-modal-message, .custom-modal-content .btn { font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', var(--font-sans); }
+.custom-modal-content, .custom-modal-content * { font-weight: 400 !important; }
+.custom-modal-message { font-size: 16px; }
