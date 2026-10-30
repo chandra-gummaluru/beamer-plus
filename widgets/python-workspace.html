@@ -3487,6 +3487,40 @@ html[data-theme="dark"]{
 .splitter::after { background: var(--sn-faint); }
 .splitter:hover::after, .splitter.is-dragging::after { background: var(--sn-ink); }
 
+/* What the trace prints goes to the shell when it's on screen. */
+#mm-pane.output-in-shell #output { display: none; }
+.sh-trace .fresh { background: var(--mutate-soft, color-mix(in srgb, var(--sn-hl) 35%, transparent)); border-radius: 3px; }
+
+/* Pane-head buttons: the bar's one button style (widget-base.css) — a light
+   outline, ink on hover, the chosen one bold on a pale fill. Run is no
+   louder than the rest. */
+.pane-head .bw-btn,
+.pane-head .bw-btn.bw-btn--primary {
+  border: 1px solid var(--border-med);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-chrome);
+}
+.pane-head .bw-btn:hover:not(:disabled),
+.pane-head .bw-btn.bw-btn--primary:hover:not(:disabled),
+.pane-head .bw-btn:focus-visible {
+  border-color: var(--text);
+  background: var(--sn-node);
+  color: var(--text);
+}
+.pane-head .bw-btn.is-active,
+.pane-head .bw-btn[aria-pressed="true"] {
+  border-color: var(--text);
+  background: var(--sn-node);
+  color: var(--text);
+  font-weight: 700;
+}
+.pane-head .modeswitch { border: 1px solid var(--border-med); }
+.pane-head .modeswitch .bw-btn,
+.pane-head .modeswitch .bw-btn:hover:not(:disabled),
+.pane-head .modeswitch .bw-btn[aria-pressed="true"] { border: 0; }
+.pane-head .modeswitch .bw-btn + .bw-btn { border-left: 1px solid var(--border-med); }
+
 /* ── Split across a split view ───────────────────────────────
    Beamer+ lays this one widget over both slides of a split view and tells
    it where each half is (widget-split, rects in this frame's px). The bar
@@ -6387,6 +6421,9 @@ function renderOutput(state, prev){
     out.textContent = text;
   }
   out.scrollTop = out.scrollHeight;
+  // The workspace shows what the traced program prints in its shell, when
+  // the shell is on screen (see showTraceOutput there).
+  if (window.__wsTraceOut) window.__wsTraceOut(text, before);
 }
 
 function renderStatus(state){
@@ -7936,6 +7973,9 @@ print(shopping)
   // chunks of the same kind are merged into one element.
   function append(k, s, p) {
     if (!s && k !== 'in') return;
+    // The shell moves on: a trace's output stays with the diagram until the
+    // next step shows it here again.
+    if (!traceOut.hidden) { traceText.stale = true; traceOut.hidden = true; }
     const last = S.entries[S.entries.length - 1];
     if (last && k !== 'in' && last.k === k && transcript.lastChild) {
       last.s += s;
@@ -7963,6 +8003,36 @@ print(shopping)
 
   function scrollShell() {
     requestAnimationFrame(() => { shellBody.scrollTop = shellBody.scrollHeight; });
+  }
+
+  // ── What the memory model's trace prints ──────────────────────────────────
+  // While stepping through the program, its printed output so far belongs in
+  // the shell, under everything else, like a run's — not in a strip under the
+  // diagram. It follows the step (stepping back takes lines away), so it is
+  // one block at the foot of the transcript rather than transcript entries.
+  // The new part since the last step is marked, as in the diagram. With no
+  // shell on screen the strip under the diagram shows it as before.
+  const traceOut = document.createElement('pre');
+  traceOut.className = 'sh-line sh-out sh-trace';
+  traceOut.hidden = true;
+  transcript.after(traceOut);
+  let traceText = { text: '', before: '', stale: true };
+  window.__wsTraceOut = (text, before) => {
+    traceText = { text: text || '', before: before || '', stale: false };
+    showTraceOutput();
+  };
+  function showTraceOutput() {
+    const inShell = isShown('shell') && isShown('memory');
+    mmPaneEl.classList.toggle('output-in-shell', inShell);
+    const { text, before, stale } = traceText;
+    traceOut.hidden = !inShell || stale || !text;
+    if (traceOut.hidden) return;
+    if (before && text.startsWith(before) && text.length > before.length) {
+      traceOut.innerHTML = escHtml(before) + '<span class="fresh">' + escHtml(text.slice(before.length)) + '</span>';
+    } else {
+      traceOut.textContent = text;
+    }
+    scrollShell();
   }
 
   function clearShell() {
@@ -8738,6 +8808,7 @@ def _debug_file(src, fname, limit):
     }
 
     mmTools.hidden = IS_VIEWER || !!DBG.session || !shown.includes('memory');
+    showTraceOutput();
     fitToolbar();
     PV.setVisible(shown.includes('memory'));
     syncScroll();
@@ -8780,6 +8851,7 @@ def _debug_file(src, fname, limit):
 
     // The memory model's controls follow its pane into and out of view.
     mmTools.hidden = IS_VIEWER || !!DBG.session || !shown.includes('memory');
+    showTraceOutput();
     fitToolbar();
     PV.setVisible(shown.includes('memory'));
     syncScroll();

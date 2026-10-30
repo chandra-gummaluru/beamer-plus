@@ -2540,6 +2540,26 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
 </script>
 <!-- bw-kit:end -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
+<!-- KaTeX sets each expression as the slide would (in the list, the legend
+     and the sliders): Beamer+'s own copy first, the CDN when opened alone. -->
+<script>
+(function () {
+  var CDN = 'https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/';
+  var l = document.createElement('link');
+  l.rel = 'stylesheet'; l.href = '/static/vendor/katex/katex.min.css';
+  l.onerror = function () { l.onerror = null; l.href = CDN + 'katex.min.css'; };
+  document.head.appendChild(l);
+  var done = function () { window.dispatchEvent(new Event('fp-katex')); };
+  var s = document.createElement('script');
+  s.src = '/static/vendor/katex/katex.min.js'; s.async = false; s.onload = done;
+  s.onerror = function () {
+    var t = document.createElement('script');
+    t.src = CDN + 'katex.min.js'; t.async = false; t.onload = done;
+    document.head.appendChild(t);
+  };
+  document.head.appendChild(s);
+})();
+</script>
 <script src="/static/vendor/socket.io.min.js"></script>
 
 <style>
@@ -2969,7 +2989,31 @@ body.is-viewer #trace-tip { display: none !important; }
 .zoom-btn { border: 1.5px solid var(--sn-faint); border-radius: var(--sn-r); color: var(--sn-ink); }
 .zoom-btn:hover { background: var(--sn-node); border-color: var(--sn-ink); color: var(--sn-ink); }
 #ov-legend, #ov-sliders { border: 1.5px solid var(--sn-faint); border-radius: var(--sn-r); color: var(--sn-ink); }
-.ov-slider input { accent-color: var(--sn-hl); }
+
+/* Expressions set in LaTeX (KaTeX): in the list while not being typed in
+   (click one to edit its source), in the legend, and on the sliders. The
+   slider is drawn like the rest of the figure: an ink rule for the track,
+   the highlighter for the thumb. */
+.expr-main { position: relative; }
+.expr-tex {
+  display: none;
+  position: absolute; top: 0; bottom: 0;
+  align-items: center;
+  overflow: hidden; white-space: nowrap;
+  pointer-events: none;
+  color: var(--sn-ink);
+  font-size: calc(14.5px * var(--u));
+}
+.expr-row.has-tex:not(:focus-within) .expr-tex { display: flex; }
+.expr-row.has-tex:not(:focus-within) .expr-input { color: transparent; }
+.expr-tex .katex, .ov-item .katex, .ov-slider .katex { font-size: 1em; }
+#ov-legend { font-family: var(--font-ui); font-size: calc(13px * var(--u)); padding: 5px 10px; gap: 4px; }
+#ov-sliders { font-family: var(--font-ui); font-size: calc(13px * var(--u)); padding: 6px 11px; }
+.ov-slider { gap: 10px; }
+.ov-slider .ov-name { flex: 0 0 auto; }
+.ov-slider .ov-val { min-width: 3.2em; text-align: right; color: var(--sn-ink); }
+.slider-range, .ov-slider input.slider-range { height: 1.5px; background: var(--sn-ink); border-radius: 0; accent-color: auto; }
+.slider-range:disabled { opacity: 1; }
 </style>
 </head>
 <body>
@@ -3265,6 +3309,54 @@ function toggleVisible(id) {
   emitState();
 }
 
+// ── Expressions in LaTeX ──────────────────────────────────
+// math.js turns the typed expression into TeX; KaTeX sets it. Anything it
+// can't read (half-typed, a point) falls back to the text as typed.
+function exprTex(src) {
+  const s = String(src || '').trim();
+  if (!s || !window.math) return null;
+  const opts = { parenthesis: 'auto', implicit: 'hide' };
+  const tex = (e) => math.parse(e).toTex(opts)
+    // a·x reads as ax on a slide; keep the dot only between numbers.
+    .replace(/\\cdot\s*(?=[a-zA-Z\\({])/g, '\\,');
+  try {
+    const pt = s.match(/^\(\s*(.+)\s*,\s*(.+)\s*\)$/);
+    if (pt) return `\\left(${tex(pt[1])},\\ ${tex(pt[2])}\\right)`;
+    const eq = s.indexOf('=');
+    if (eq > 0) return `${tex(s.slice(0, eq))} = ${tex(s.slice(eq + 1))}`;
+    return tex(s);
+  } catch (_) { return null; }
+}
+function katexHtml(tex) {
+  if (tex == null || !window.katex) return null;
+  try { return katex.renderToString(tex, { throwOnError: false, output: 'html' }); }
+  catch (_) { return null; }
+}
+// A row's expression as it would read in a legend: "y = …" (or "z = …")
+// unless it already says what it is.
+function legendTex(row) {
+  const t = exprTex(row.expr);
+  if (t == null) return null;
+  if (row.type === 'point' || row.expr.includes('=')) return t;
+  return (mode === '3d' ? 'z = ' : 'y = ') + t;
+}
+// Set over the list's text field while it isn't being edited.
+function paintRowTex(row) {
+  const div = document.getElementById(`er-${row.id}`);
+  const inp = document.getElementById(`ei-${row.id}`);
+  const out = document.getElementById(`et-${row.id}`);
+  if (!div || !inp || !out) return;
+  const html = row.expr.trim() ? katexHtml(exprTex(row.expr)) : null;
+  div.classList.toggle('has-tex', !!html);
+  out.innerHTML = html || '';
+  if (html) {
+    const pad = parseFloat(getComputedStyle(inp).paddingLeft) || 0;
+    out.style.left  = (inp.offsetLeft + pad) + 'px';
+    out.style.width = Math.max(0, inp.offsetWidth - pad) + 'px';
+  }
+}
+window.addEventListener('fp-katex', () => { renderList(); });
+
 // ── Overlay view: legend + sliders ───────────────────────
 // Rebuilt whenever the expression list is; a slider moved here drives the
 // same row as the one in the full view's list.
@@ -3281,15 +3373,18 @@ function renderOverlay() {
       const wrap = document.createElement('label');
       wrap.className = 'ov-slider';
       const lbl = document.createElement('span');
-      lbl.textContent = name;
+      lbl.className = 'ov-name';
+      const nameHtml = katexHtml(name);
+      if (nameHtml) lbl.innerHTML = nameHtml; else lbl.textContent = name;
       const rng = document.createElement('input');
+      rng.className = 'slider-range';
       Object.assign(rng, { type: 'range', min: row.sliderMin, max: row.sliderMax,
                            step: (row.sliderMax - row.sliderMin) / 400, value: row.sliderVal,
                            disabled: IS_VIEWER });
       const out = document.createElement('span');
       out.className = 'ov-val';
       out.id = `ov-sv-${row.id}`;
-      out.textContent = (+row.sliderVal).toFixed(2);
+      setOvVal(out, row.sliderVal);
       rng.addEventListener('input', () => onSliderMove(row.id, rng.value));
       wrap.append(lbl, rng, out);
       sliders.appendChild(wrap);
@@ -3300,8 +3395,12 @@ function renderOverlay() {
       dot.className = 'ov-dot';
       dot.style.background = swatch(row.color);
       const txt = document.createElement('span');
-      const e = row.expr.trim().replace(/\*/g, '·');
-      txt.textContent = (e.includes('=') || row.type === 'point' ? '' : mode === '3d' ? 'z = ' : 'y = ') + e;
+      const html = katexHtml(legendTex(row));
+      if (html) txt.innerHTML = html;
+      else {
+        const e = row.expr.trim().replace(/\*/g, '·');
+        txt.textContent = (e.includes('=') || row.type === 'point' ? '' : mode === '3d' ? 'z = ' : 'y = ') + e;
+      }
       item.append(dot, txt);
       legend.appendChild(item);
     }
@@ -3317,14 +3416,22 @@ function onSliderMove(id, val) {
   row.expr      = newExpr;
   const inp = document.getElementById(`ei-${id}`);
   if (inp) inp.value = newExpr;
+  paintRowTex(row);
   const lbl = document.getElementById(`sv-${id}`);
   if (lbl) lbl.textContent = row.sliderVal.toFixed(3);
   const ov = document.getElementById(`ov-sv-${id}`);
-  if (ov) ov.textContent = row.sliderVal.toFixed(2);
+  if (ov) setOvVal(ov, row.sliderVal);
   const rngFull = document.getElementById(`sr-${id}`);
   if (rngFull && rngFull.value !== String(val)) rngFull.value = row.sliderVal;
   plot();
   emitState();
+}
+
+// The slider's value, set as maths like its name.
+function setOvVal(el, v) {
+  const s = (+v).toFixed(2);
+  const html = katexHtml(s);
+  if (html) el.innerHTML = html; else el.textContent = s;
 }
 
 function onSliderBound(id, which, val) {
@@ -3373,6 +3480,7 @@ function renderList() {
                autocomplete="off"
                autocorrect="off"
                ${IS_VIEWER ? 'disabled' : ''} />
+        <div class="expr-tex" id="et-${row.id}" aria-hidden="true"></div>
 
         ${IS_VIEWER ? '' : `
         <div class="expr-actions">
@@ -3412,9 +3520,12 @@ function renderList() {
     `;
 
     list.appendChild(div);
+    paintRowTex(row);
 
     if (!IS_VIEWER) {
       const inp = document.getElementById(`ei-${row.id}`);
+      // Typed as source; set in LaTeX again once the cursor leaves.
+      inp.addEventListener('blur', () => paintRowTex(row));
       inp.addEventListener('input', () => onExprInput(row.id, inp.value));
       inp.addEventListener('keydown', e => {
         if (e.key === 'Enter') plot();

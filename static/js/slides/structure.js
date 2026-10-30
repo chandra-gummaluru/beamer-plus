@@ -6,8 +6,6 @@
 // remapSlideIndices, which moves all of it in one place.
 import { bus } from '../core/events.js';
 import { discardParkedWidgets, requestWidgetStates, seedWidgetStates } from '../core/iframe-widget-renderer.js';
-import { normalizePaper } from './paper.js';
-import { createPaperPicker } from './paper-picker.js';
 
 let _state = null;
 
@@ -16,7 +14,9 @@ export function initSlideStructure(state) {
     // New page and duplicate: in the annotation toolbar while presenting,
     // in the insert toolbar while editing.
     for (const id of ['add-blank-btn', 'edit-add-page-btn'])
-        document.getElementById(id)?.addEventListener('click', () => openAddPageModal());
+        // A plain blank page, straight in after the slide on stage. Its paper
+        // (lined, grid…) is chosen in the editor's slide panel, like any blank's.
+        document.getElementById(id)?.addEventListener('click', () => insertBlankAfterCurrent());
     for (const id of ['duplicate-slide-btn', 'edit-duplicate-btn'])
         document.getElementById(id)?.addEventListener('click', () => duplicateCurrentSlide());
     // In the editor the two slides are picked by clicking them (editor.js).
@@ -164,44 +164,9 @@ export function removeSlideAt(idx) {
 
 /* ─── blank / view slide management ───────────────────────────── */
 
-/* ─── add page (with a style) ─────────────────────────────────── */
-// The add button opens a small chooser: Plain, Lined, Grid or Dots, plus
-// spacing / weight / colour for the patterned ones, previewed live. The last
-// choice is remembered for the session, so adding several pages of the same
-// paper is one click each.
-let _lastPaper = { style: 'none' };
-
-function openAddPageModal() {
-    const choice = normalizePaper(_lastPaper);
-    const root = document.createElement('div');
-    root.className = 'add-page';
-
-    // The same chooser as the editor panel's (paper-picker.js), laid out the
-    // same way. Double-click a background to add it straight away.
-    const picker = createPaperPicker({
-        get: () => choice,
-        set: (key, v) => { choice[key] = v; },
-        onStyleDblClick: () => { add(); window.BeamerModal?.close(); },
-    });
-    root.append(picker.styles, picker.options);
-
-    function add() {
-        _lastPaper = { ...choice };
-        insertBlankAfterCurrent(choice.style === 'none' ? null : { ...choice });
-    }
-    picker.sync();
-
-    window.BeamerModal?.show({
-        kind: 'info',
-        title: 'Add Page',
-        body: root,
-        buttons: [
-            { label: 'Cancel', kind: 'cancel' },
-            { label: 'Add Page', kind: 'ok', onClick: add },
-        ],
-    });
-}
-
+/* ─── add page ────────────────────────────────────────────────── */
+// The add button inserts a plain blank page; its paper is changed in edit
+// mode (the slide panel's paper picker).
 function insertBlankAfterCurrent(paper = null) {
     // On an empty deck (fresh session, nothing uploaded) there is no "current"
     // slide to insert after — the blank becomes slide 0. Otherwise it lands
