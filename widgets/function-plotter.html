@@ -2742,22 +2742,25 @@ body { display: flex; flex-direction: column; }
 .expr-row:hover .expr-actions,
 .expr-row:focus-within .expr-actions { display: flex; }
 
+.expr-actions { gap: calc(4px * var(--u)); }
+/* Drawn like the slide: ink line icons; pointed at, an ink outline on a
+   node fill. A hidden curve's eye is struck through and greyed. */
 .expr-btn {
-  width: calc(15px * var(--u)); height: calc(15px * var(--u));
-  border: none;
+  width: calc(26px * var(--u)); height: calc(26px * var(--u));
+  border: 1.5px solid transparent;
   background: none;
-  color: var(--text-3);
+  color: var(--sn-ink);
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  border-radius: 3px;
-  font-size: calc(11px * var(--u));
-  transition: color var(--dur), background var(--dur);
+  border-radius: var(--sn-r);
   padding: 0;
   flex-shrink: 0;
   line-height: 1;
 }
-.expr-btn:hover { color: var(--text-2); background: var(--border); }
-.expr-btn.del:hover { color: var(--red); background: var(--red-bg); }
+.expr-btn svg { width: calc(15px * var(--u)); height: calc(15px * var(--u)); }
+.expr-btn.is-off { color: var(--sn-cap); }
+.expr-btn:hover, .expr-btn:focus-visible { border-color: var(--sn-ink); background: var(--sn-node); color: var(--sn-ink); outline: none; }
+.expr-btn.del:hover { background: var(--sn-hl); }
 
 /* Error message */
 .expr-error {
@@ -3357,7 +3360,7 @@ function toggleVisible(id) {
   const inp = document.getElementById(`ei-${id}`);
   if (inp) inp.classList.toggle('hidden-expr', !row.visible);
   const btn = document.getElementById(`vis-${id}`);
-  if (btn) btn.textContent = row.visible ? '◉' : '○';
+  if (btn) { btn.innerHTML = visIcon(row.visible); btn.title = row.visible ? 'Hide' : 'Show'; btn.classList.toggle('is-off', !row.visible); }
   plot();
   emitState();
 }
@@ -3540,6 +3543,15 @@ function onSliderBound(id, which, val) {
 // ─────────────────────────────────────────────────────────
 // Render expression list
 // ─────────────────────────────────────────────────────────
+// Row actions: line icons in the slide's ink (an eye, struck through when
+// the curve is hidden; a cross to delete).
+const _ICO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
+function visIcon(on) {
+  return _ICO + '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'
+       + (on ? '' : '<path d="M4 4l16 16"/>') + '</svg>';
+}
+const DEL_ICON = _ICO + '<path d="M6 6l12 12M18 6L6 18"/></svg>';
+
 function renderList() {
   renderOverlay();
   const list = document.getElementById('expr-list');
@@ -3573,12 +3585,12 @@ function renderList() {
 
         ${IS_VIEWER ? '' : `
         <div class="expr-actions">
-          <button class="expr-btn" id="vis-${row.id}"
+          <button class="expr-btn${row.visible ? '' : ' is-off'}" id="vis-${row.id}"
                   onclick="toggleVisible(${row.id})"
-                  title="${row.visible ? 'Hide' : 'Show'}">${row.visible ? '◉' : '○'}</button>
+                  title="${row.visible ? 'Hide' : 'Show'}">${visIcon(row.visible)}</button>
           <button class="expr-btn del"
                   onclick="removeExpression(${row.id})"
-                  title="Delete">×</button>
+                  title="Delete">${DEL_ICON}</button>
         </div>`}
       </div>
       <div class="expr-error" id="ee-${row.id}"></div>
