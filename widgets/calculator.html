@@ -2818,6 +2818,8 @@ body.bw-overlay .cbtn { font-size: clamp(12px, min(5.4cqw, 6cqh), 30px); }
 #result .katex, .hist-result .katex { font-size: 1.05em; }
 .hist-expr .katex { font-size: 1.05em; color: var(--sn-cap); }
 .cbtn .katex { font-size: 1.1em; }
+/* Every key in the typewriter face. */
+.cbtn, .cbtn.fn { font-family: var(--font-mono) !important; }
 /* No history button: the history panel is always there (not as an overlay). */
 #btn-history { display: none !important; }
 </style>
@@ -3170,7 +3172,8 @@ body.bw-overlay .cbtn { font-size: clamp(12px, min(5.4cqw, 6cqh), 30px); }
     tx('btn-clear', '\\mathrm{C}');
   }
   function typesetAll() {
-    typesetKeys();
+    // The keys stay in the typewriter face; only the expression, the result
+    // and the history are typeset.
     renderExprTex();
     if (resultEl.classList.contains('ok')) showResult(resultEl.dataset.raw || '', false);
     renderHistory();
