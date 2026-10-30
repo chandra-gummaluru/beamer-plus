@@ -2924,7 +2924,6 @@ body.is-viewer #map-zoom { display: none; } #map:empty ~ #map-zoom { display: no
         <span class="map-sugg" id="map-sugg" role="listbox" hidden></span>
       </span>
       <span class="map-ed-msg bw-source-msg" id="map-msg"></span>
-      <button class="bw-btn" type="submit">Go</button>
     </form>
   </div>
   <div id="map-wrap">
@@ -3271,6 +3270,7 @@ body.is-viewer #map-zoom { display: none; } #map:empty ~ #map-zoom { display: no
         if (e.key === 'ArrowDown' && hits.length) { e.preventDefault(); on = (on + 1) % hits.length; showSugg(); }
         else if (e.key === 'ArrowUp' && hits.length) { e.preventDefault(); on = (on - 1 + hits.length) % hits.length; showSugg(); }
         else if (e.key === 'Escape') { hits = []; showSugg(); }
+        else if (e.key === 'Enter') { e.preventDefault(); form.requestSubmit(); }   // no Go button: Enter searches
       });
       q.addEventListener('blur', () => setTimeout(() => { hits = []; showSugg(); }, 150));
       form.addEventListener('submit', async e => {
