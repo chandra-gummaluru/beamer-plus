@@ -8,8 +8,6 @@ import { ctx, escAttr, escHtml, setPanelMode, resolvePanelMode } from './context
 import { pickPanes } from './pane-picker.js';
 import { splitWidgetsOf, queueSync, loadSplitConfig } from '../slides/split-widgets.js';
 import { widgetCatalog, widgetIcon } from './widget-picker.js';
-import { openWidgetSettings } from './widget-settings-dialog.js';
-import { pushWidgetConfig } from '../core/iframe-widget-renderer.js';
 
 export function showViewConfig(i) {
     const obj = ctx.state?.slideStructure?.[i];
@@ -228,7 +226,6 @@ function wireSplitPicker(box, obj, commit) {
    the answers and the QR banner right. */
 const PANE_NAMES = { editor: 'Editor', shell: 'Shell', memory: 'Memory', debug: 'Debugger',
                      question: 'Question', answers: 'Answers & QR' };
-const SETTINGS_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>';
 const TRASH_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>';
 
 let _fillToken = 0;
@@ -264,7 +261,9 @@ async function fillSplitWidgetSection(i, obj) {
     const label = w.title || entry?.label || w.type;
     const spec = entry?.split || { left: ['editor'], right: ['shell', 'memory', 'debug'] };
     const leftName = PANE_NAMES[w.split?.left || spec.left?.[0]] || w.split?.left || 'Editor';
-    const right = w.split?.right || spec.right?.[0];
+    // The right slide's starting pane is set on the widget itself, in its edit
+    // mode (the pane tabs), like the rest of its settings.
+    const right = w.splitRight || w.split?.right || spec.right?.[0];
     host.innerHTML = `${title}
         <div class="slide-items" role="list">
             <div class="slide-item view-split-item" role="listitem">
@@ -273,19 +272,11 @@ async function fillSplitWidgetSection(i, obj) {
                     <span class="slide-item-name">${escHtml(label)}</span>
                     <span class="slide-item-kind">${escHtml(leftName)} left · ${escHtml(PANE_NAMES[right] || right)} right</span>
                 </span>
-                <button type="button" class="btn btn--ghost btn--icon btn--sm" id="view-split-settings" title="Settings" aria-label="Settings">${SETTINGS_ICON}</button>
                 <button type="button" class="btn btn--ghost btn--icon btn--sm btn--danger" id="view-split-delete" title="Delete" aria-label="Delete">${TRASH_ICON}</button>
             </div>
         </div>
-        ${(spec.right || []).length > 1 ? `
-        <div class="editor-prop-row">
-            <span class="editor-prop-label">Right Slide Starts On</span>
-            <div class="wf-seg" role="group" id="view-split-right">
-                ${spec.right.map(p => `<button type="button" class="wf-seg-btn${p === right ? ' is-active' : ''}" data-v="${escAttr(p)}" aria-pressed="${p === right}">${escHtml(PANE_NAMES[p] || p)}</button>`).join('')}
-            </div>
-        </div>` : ''}`;
+        <p class="slide-items-empty">Its settings are on the widget itself: leave the editor and press Edit in its bar.</p>`;
 
-    host.querySelector('#view-split-settings')?.addEventListener('click', () => openWidgetSettings(w.id));
     const del = host.querySelector('#view-split-delete');
     del?.addEventListener('click', () => {
         // Armed first, like the panel's own Delete: a second click deletes.
@@ -299,12 +290,6 @@ async function fillSplitWidgetSection(i, obj) {
         removeSplitWidget(obj, w);
         fillSplitWidgetSection(i, obj);
     });
-    host.querySelectorAll('#view-split-right [data-v]').forEach(b => b.addEventListener('click', () => {
-        w.split = { ...(w.split || {}), right: b.dataset.v };
-        // The running widget switches over too (it takes settings live).
-        pushWidgetConfig(w.id, w);
-        fillSplitWidgetSection(i, obj);
-    }));
 }
 
 function addSplitWidget(i, obj, type, spec) {

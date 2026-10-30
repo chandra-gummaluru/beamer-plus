@@ -9037,6 +9037,8 @@ def _debug_file(src, fname, limit):
   function setSplitRight(name) {
     if (!SPLIT_PANES.includes(name) || name === S.splitRight) return;
     S.splitRight = name;
+    // Being edited, the tab picked is the pane the right slide starts on.
+    if (editing()) editSet({ splitRight: name });
     renderLayout();
     emitState();
     PV.render();
@@ -9109,6 +9111,7 @@ def _debug_file(src, fname, limit):
         b.setAttribute('aria-pressed', String(on));
         b.classList.toggle('is-active', on);
         b.disabled = IS_VIEWER;
+        b.title = editing() ? 'The right slide starts on the pane picked here' : '';
       });
     } else if (splitTabs.parentNode) {
       splitTabs.remove();
@@ -9851,8 +9854,14 @@ def _debug_file(src, fname, limit):
       synced = true;
     }
 
-    if (changed('split') && cfg.split && SPLIT_PANES.includes(cfg.split.right)) {
+    if (changed('split') && cfg.split && SPLIT_PANES.includes(cfg.split.right) && !SPLIT_PANES.includes(cfg.splitRight)) {
       S.splitRight = cfg.split.right;
+      synced = true;
+    }
+    // The starting pane chosen in edit mode (the pane tabs) wins over the
+    // split's default.
+    if (changed('splitRight') && SPLIT_PANES.includes(cfg.splitRight)) {
+      S.splitRight = cfg.splitRight;
       synced = true;
     }
 
@@ -10160,6 +10169,9 @@ def _debug_file(src, fname, limit):
       if (DBG.session || DBG.recording) stopDebug({ keepLayout: true });
       PV.reset();
       gutterMode = 'bp';
+      // Split: show the pane the right slide starts on, the one being set.
+      const start = SPLIT_PANES.includes(cfg.splitRight) ? cfg.splitRight : cfg.split?.right;
+      if (S.split && SPLIT_PANES.includes(start)) S.splitRight = start;
       paintEditBar();
     } else {
       clearTimeout(codeSaveTimer);
