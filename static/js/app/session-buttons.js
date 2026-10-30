@@ -54,7 +54,7 @@ export function endSession(title, message) {
         kind: 'error',
         title,
         message: `${message} You'll go back to the start page to begin a new session.`,
-        buttons: [{ label: 'Back to Start', kind: 'ok' }],
+        buttons: [{ label: 'Close', kind: 'ok' }],
         onClose: () => { leave(); },
     });
 }
