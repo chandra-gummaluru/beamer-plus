@@ -33,7 +33,7 @@ import { startTour } from './app/tour.js';
 import { initEditor } from './editor/editor.js';
 import { initRecorder } from './app/recorder.js';
 import { initLibrary } from './library/ui.js';
-import { initSessionButtons } from './app/session-buttons.js';
+import { initSessionButtons, endSession } from './app/session-buttons.js';
 import { getSessionId, sessionUrl } from './app/session.js';
 
 /* ─── Render generation counters ─────────────────────────────── */
@@ -206,7 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
             await uploadZipToServer(zip, modal, file.name);
         } catch (err) {
             modal?.close();
-            window.BeamerModal?.show({ kind: 'error', title: 'Can’t Open That File', message: err.message });
+            openFailed(err);
         }
     });
 
@@ -1417,10 +1417,7 @@ function setStageControlsEnabled(enabled) {
 // presentation is opened, or after the last blank slide is deleted). Called from
 // populateSlideNavigator(), which every structure change funnels through.
 function updateStageEmptyState() {
-    const el = document.getElementById('stage-empty');
-    if (!el) return;
     const isEmpty = state.slideStructure.length === 0;
-    el.hidden = !isEmpty;
     setStageControlsEnabled(!isEmpty);
     if (isEmpty) toggleMute(false);   // nothing left to hide
     if (!isEmpty) return;
@@ -1902,7 +1899,7 @@ async function loadZipPresentation(file) {
     } catch (err) {
         console.error('ZIP load error:', err);
         modal?.close();
-        window.BeamerModal?.show({ kind: 'error', title: 'Can’t Open That File', message: err.message });
+        openFailed(err);
     }
 }
 
@@ -1952,7 +1949,17 @@ async function loadPdfPresentation(file) {
     } catch (err) {
         console.error('PDF load error:', err);
         modal?.close();
-        window.BeamerModal?.show({ kind: 'error', title: 'Can’t Open That File', message: err.message });
+        openFailed(err);
+    }
+}
+
+// A presentation that can't be opened: with another one already open, just
+// say so; with nothing open, the session has nothing to present and ends.
+function openFailed(err) {
+    if (state.slideStructure.length) {
+        window.BeamerModal?.show({ kind: 'error', title: 'Can’t Open That File', message: err?.message || String(err) });
+    } else {
+        endSession('Couldn’t Open the Presentation', String(err?.message || err).replace(/\.?\s*$/, '.'));
     }
 }
 

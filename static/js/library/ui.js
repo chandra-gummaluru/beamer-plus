@@ -22,6 +22,7 @@ import { setDropHandler, chooseLocalFile, openPresentationFile } from '../app/up
 import { buildPresentationZip } from '../editor/save.js';
 import { buildNotesPdf } from '../editor/notes-export.js';
 import { listRecordings, getRecording, updateRecording } from '../app/recorder.js';
+import { endSession } from '../app/session-buttons.js';
 
 let appState = null;
 
@@ -80,7 +81,6 @@ export function initLibrary(state) {
     setDropHandler((file) => { appState.pendingTarget = null; openPresentationFile(file); });
     bus.on('library:require', requirePresentation);
     bus.on('deck:loaded', updateTitle);
-    document.getElementById('stage-open-btn')?.addEventListener('click', () => openPresentation());
 }
 
 /** The tab's title: the presentation's name. */
@@ -104,11 +104,15 @@ export async function openPresentation() {
 }
 
 /* A session from New Session: open the file the start page chose. Without
-   one (a reload, a link), the empty stage's Open a File… does it. */
+   one (a reload, a link) there is nothing to present: the session ends. */
 async function requirePresentation() {
     if (appState.zipFile) return;
     const got = await Folder.takeOpen().catch(() => null);
-    if (!got?.file || appState.zipFile) return;
+    if (appState.zipFile) return;
+    if (!got?.file) {
+        endSession('This Session Has Ended', 'Its presentation is no longer open (the page was reloaded, or opened from a link).');
+        return;
+    }
     appState.pendingTarget = { src: 'folder', dir: '', name: baseOf(got.file.name), file: got.handle || null };
     openPresentationFile(got.file);
 }

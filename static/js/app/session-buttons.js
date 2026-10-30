@@ -40,8 +40,32 @@ function refresh() {
 async function leave() {
     if (isRecording()) await stopRecording();
     bus.emit('session:ending');
+    leaving = true;
     window.location.href = '/';
 }
+
+// A session is its presentation: it can't go on without one. When the deck
+// can't be opened, or isn't there (the page was reloaded or opened from a
+// link: the file is only ever in this tab), say so and go back to the start
+// page however the message is closed.
+let leaving = false;
+export function endSession(title, message) {
+    window.BeamerModal?.show({
+        kind: 'error',
+        title,
+        message: `${message} You'll go back to the start page to begin a new session.`,
+        buttons: [{ label: 'Back to Start', kind: 'ok' }],
+        onClose: () => { leave(); },
+    });
+}
+
+// Reloading (or closing the tab) ends the session, so ask first while a
+// presentation is open.
+window.addEventListener('beforeunload', (e) => {
+    if (leaving || !appState?.zipFile) return;
+    e.preventDefault();
+    e.returnValue = '';
+});
 
 // Back to the start page. With nothing open (and no recording) it just goes;
 // otherwise it asks whether to save first.

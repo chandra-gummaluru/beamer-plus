@@ -82,17 +82,6 @@
         <div id="pdf-container">
             <div id="pdf-canvas"></div>
             <div id="ann-canvas"></div>
-            <!-- Empty-stage placeholder — shown while the deck has no slides at all
-                 (fresh session, nothing uploaded yet). Sized to the slide card by
-                 sizeSlideCanvases(); toggled by updateStageEmptyState() in main.js. -->
-            <div id="stage-empty" class="stage-empty" hidden>
-                <svg class="stage-empty-icon" viewBox="0 0 72 52" fill="none" aria-hidden="true">
-                    <path class="stage-empty-squiggle" d="M18 26 Q 27 13, 36 26 T 54 26"/>
-                </svg>
-                <p class="stage-empty-title">Nothing here yet…</p>
-                <p class="stage-empty-hint">Start by opening a presentation.</p>
-                <button type="button" class="btn btn--primary stage-empty-open" id="stage-open-btn">Open a File…</button>
-            </div>
             <div class="slide-loading-overlay">
                 <svg class="slide-squiggle" viewBox="0 0 120 40">
                     <path d="M5 20 Q 15 5, 25 20 T 45 20 T 65 20 T 85 20 T 105 20" />
