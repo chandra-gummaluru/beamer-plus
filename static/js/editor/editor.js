@@ -202,10 +202,26 @@ function toggleEditMode() {
     if (ctx.state.editMode) exitEditMode(); else enterEditMode();
 }
 
+// The navigator's buttons while editing: Edit shows pressed (clicking it
+// again leaves the editor), Record and Close are disabled until Done.
+function syncNavTools(editing) {
+    ['record-btn', 'session-close-btn'].forEach(id => {
+        const b = document.getElementById(id);
+        if (b) b.disabled = editing;
+    });
+    const e = document.getElementById('session-edit-btn');
+    if (!e) return;
+    e.classList.toggle('btn_selected', editing);
+    e.setAttribute('aria-pressed', String(editing));
+    e.title = editing ? 'Finish Editing' : 'Edit Presentation';
+    e.setAttribute('aria-label', e.title);
+}
+
 async function enterEditMode() {
     closeWidgetSettings();   // its widget is about to become a box on the slide
     ctx.state.editMode = true;
     document.body.classList.add('edit-mode');
+    syncNavTools(true);
     setPanelMode('slide');
     // The panel and the insert toolbar take room from the stage: re-fit it.
     window.dispatchEvent(new Event('resize'));
@@ -246,6 +262,7 @@ async function exitEditMode() {
     cancelPick();
     ctx.state.editMode = false;
     document.body.classList.remove('edit-mode');
+    syncNavTools(false);
     if (ctx.state.annCvs?.canvas) ctx.state.annCvs.canvas.style.pointerEvents = '';
     cleanupEditOverlays();
     removeSlideReorder();

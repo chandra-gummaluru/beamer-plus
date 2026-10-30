@@ -73,6 +73,9 @@
     \draw[black!80,line width=.6pt,-{Stealth[length=2.1pt,width=2.6pt]}] (2.76,3.76) -- (8.46,3.76);}}
 
 % "try …!" hints: a small hand-drawn arrow ending at #3,#4 from #1,#2.
+% Q-bar in the typewriter face, like the latch's other signal names.
+\newcommand{\Qbar}{\ensuremath{\overline{\mbox{\texttt{Q}}}}}
+
 \newcommand{\hint}[8]{%
   \draw[line width=.9pt,-{Stealth[length=2.8pt,width=2.6pt]}]
     (#1,#2) .. controls (#5,#6) and (#7,#8) .. (#3,#4);}
@@ -300,9 +303,10 @@
   \txt{30.09}{167.69}{Then $4k^2 = 2q^2$, so $q^2 = 2k^2$ $\;\Rightarrow\;$ $q$ is even too.}
   \txt{30.09}{192.59}{So $p$ and $q$ are both even, and share a factor of 2.}
 
+  % flush with the step discs' left edge (19.60 - 10.96/2)
   \node[anchor=base west,fill=hl,font=\bfseries,inner xsep=2pt,
-        text height=8.56pt,text depth=1.0pt,inner ysep=1pt] at (30.09,217.98) {Contradiction!};
-  \txt{112.28}{217.98}{Lowest terms can’t both be even.\,$\blacksquare$}
+        text height=8.56pt,text depth=1.0pt,inner ysep=1pt] at (14.12,217.98) {Contradiction!};
+  \txt{96.31}{217.98}{Lowest terms can’t both be even.\,$\square$}
 
   \txt[font=\footnotesize]{280.0}{250.64}{press \arrowkey{} to reveal!}
   \hint{271.24}{246.83}{256.37}{235.04}{257.29}{246.83}{259.28}{240.86}
@@ -318,13 +322,14 @@
     {pens, highlighters, shapes, \LaTeX{} text boxes, a spotlight and a magnifier}
     {example usage: working a projectile problem live in a Physics class}
 
-  \txt{11.07}{89.07}{A ball is kicked at $v_0 = 20\,\mathrm{m/s}$, at}
-  \txt{11.07}{102.62}{$\theta = 30^\circ$ above level ground. How far}
-  \txt{11.07}{116.17}{away does it land?}
-  \txt[font=\small]{11.07}{139.63}{The range is}
-  \txt{18.13}{165.11}{$R = \dfrac{v_0^2 \sin 2\theta}{g} = \dfrac{(20)^2 \sin 60^\circ}{9.81}$}
+  \txt{11.07}{89.07}{A ball is kicked at $v_0 = 20\,\mathrm{m/s}$, at $\theta = 30^\circ$ above level ground.}
+  \txt{11.07}{102.62}{How far away does it land?}
+  \txt[font=\small]{11.07}{126.08}{The range is}
+  \txt{18.13}{151.56}{$R = \dfrac{v_0^2 \sin 2\theta}{g} = \dfrac{(20)^2 \sin 60^\circ}{9.81}$}
 
   % the kick: ground, trajectory, launch angle, range
+  % (raised 25pt, to sit beside the working rather than under it)
+  \begin{scope}[shift={(0,-25)}]
   \draw[black!60,line width=.6pt] (196.27,199.25) -- (353.68,199.25);
   \foreach \gx in {200.25,208.22,...,351.69} \draw[black!35,line width=.4pt] (\gx,199.25) -- (\gx-3.98,203.24);
   \draw[black!60,line width=.9pt,dash pattern=on 2.99pt off 2.99pt]
@@ -337,6 +342,7 @@
   \node[fill=white,inner xsep=1.5pt,inner ysep=1pt,font=\footnotesize,text=black!50] at (273.97,211.21) {$R$};
   \txt[font=\small]{227.79}{173.06}{$v_0$}
   \txt[font=\footnotesize]{226.49}{196.15}{$\theta$}
+  \end{scope}
 
   % the fine print the magnifier is for
   \txt[font=\fontsize{3}{3.6}\selectfont,text=black!55]{11.07}{245.6}{Psst, you found the fine print! Scroll while the magnifier is on to zoom anywhere from}
@@ -446,10 +452,10 @@
     \draw (136.74,188.87) -- (136.74,169.67) -- (74.71,169.67) -- (74.71,150.88);
     \fill (127.56,142.94) circle (.8) (136.74,188.87) circle (.8);
   \end{scope}
-  \txt[font=\footnotesize]{34.07}{138.25}{$S$}
-  \txt[font=\footnotesize]{33.18}{200.06}{$R$}
-  \txt[font=\footnotesize]{160.52}{145.32}{$Q$}
-  \txt[font=\footnotesize]{160.52}{191.87}{$\bar{Q}$}
+  \txt[font=\footnotesize]{34.07}{138.25}{\texttt{S}}
+  \txt[font=\footnotesize]{33.18}{200.06}{\texttt{R}}
+  \txt[font=\footnotesize]{160.52}{145.32}{\texttt{Q}}
+  \txt[font=\footnotesize]{160.52}{191.87}{\Qbar}
   \ctxt[font=\fontsize{7}{8}\selectfont,text=black!50]{100.0}{224.5}{cross-coupled NOR gates}
   \ctxt[font=\fontsize{7}{8}\selectfont,text=black!50]{100.0}{235.0}{inputs are \textit{active-high}}
 
@@ -461,8 +467,8 @@
     \draw (249.57,133.71) -- (249.57,205.35) (287.20,133.71) -- (287.20,205.35);
   \end{scope}
   \begin{scope}[font=\scriptsize]
-    \foreach \y/\s/\r/\q/\nq/\st in {144.80/$S$/$R$/$Q$/$\bar Q$/state,
-                                     159.45/0/0/$Q$/$\bar Q$/hold,
+    \foreach \y/\s/\r/\q/\nq/\st in {144.80/\texttt{S}/\texttt{R}/\texttt{Q}/\Qbar/state,
+                                     159.45/0/0/\texttt{Q}/\Qbar/hold,
                                      173.70/1/0/1/0/set,
                                      187.95/0/1/0/1/reset} {
       \ctxt{222.08}{\y}{\s} \ctxt{240.04}{\y}{\r}
@@ -507,8 +513,9 @@
       \ctxt[text=cap]{\cx}{166.67}{\c} \ctxt[text=cap]{\cx}{177.63}{\d}
     }
   \end{scope}
-  \txt[font=\footnotesize]{252.90}{247.72}{try the record button!}
-  \hint{342.91}{244.38}{356.88}{263.23}{352.88}{244.38}{354.87}{256.18}
+  % Record is at the top of the slide navigator, off the page's left edge
+  \txt[font=\footnotesize]{27.0}{247.72}{try the record button!}
+  \hint{23.0}{245.0}{5.0}{226.0}{13.0}{246.5}{6.5}{237.0}
 \end{page}
 \end{frame}
 

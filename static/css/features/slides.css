@@ -313,10 +313,11 @@ model-viewer { pointer-events: auto !important; }
 #slide-nav-top:not(:has(.btn:not([hidden]))) { display: none; }
 .slide-nav-tool { width: 100%; gap: var(--sp-2); }
 .slide-nav-tool[hidden] { display: none; }
-/* Neither while editing (the editor has its own Done), nor Record while a
-   take is in progress (the recording bar stands in for it). */
-body.edit-mode .slide-nav-tools,
-body.is-recording #record-btn { display: none; }
+/* While editing they stay, Record and Close disabled and Edit pressed
+   (clicking it again leaves the editor; editor.js). Record hides while a
+   take is in progress: the recording bar stands in for it. */
+body.is-recording #record-btn,
+body.is-recording #slide-nav-top { display: none; }
 body.split-view-active .slide-nav-tools {
     justify-content: center;
     padding: 0 var(--sp-2);
