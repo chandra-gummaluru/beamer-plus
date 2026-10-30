@@ -5,7 +5,7 @@
 <script id="widget-schema" type="application/json">
 {
   "label": "Map",
-  "edit": false,
+  "inlineEdit": true,
   "category": "Tools",
   "fontSize": false,
   "liveSettings": true,
@@ -2746,9 +2746,26 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
       font-size: var(--fs-body);
       color: var(--sn-cap);
     }
-  </style>
+  
+.map-ed { display: inline-flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; }
+.map-ed-l { color: var(--text-3); white-space: nowrap; }
+#map-q { flex: 1 1 auto; min-width: 120px; max-width: 420px; height: var(--ctl-h); }
+.map-ed-msg { color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.map-ed-msg.is-err { color: var(--err); }
+</style>
 </head>
 <body>
+  <!-- Edit mode only: where the map opens. Search an address, or pan and
+       zoom the map itself; saved with the slide. -->
+  <div id="toolbar" class="bw-toolbar" data-bw-topbar>
+    <span class="bw-toolbar-title">Map</span>
+    <form class="bw-edit-only map-ed" id="map-search" autocomplete="off">
+      <span class="map-ed-l">Starts at</span>
+      <input class="bw-input" id="map-q" type="text" placeholder="Search an address or place" spellcheck="false">
+      <button class="bw-btn" type="submit">Go</button>
+      <span class="map-ed-msg" id="map-msg"></span>
+    </form>
+  </div>
   <div id="map"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -3004,6 +3021,54 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
       center: DEFAULT_CENTER,
       zoom:   DEFAULT_ZOOM,
     });
-  </script>
+  
+    // ── Edit mode: where the map starts ──────────────────────────────────────
+    // An address searched in the bar (OpenStreetMap's Nominatim) moves the map
+    // there and drops a pin; panning or zooming while editing sets the view
+    // too. Saved as center, zoom (and the pin) with the slide.
+    (function () {
+      const form = document.getElementById('map-search');
+      const q = document.getElementById('map-q');
+      const msg = document.getElementById('map-msg');
+      if (!form) return;
+      const editing = () => !!(window.BeamerWidget && BeamerWidget.edit && BeamerWidget.edit.active);
+      const save = (patch, remove) => { if (window.BeamerWidget && BeamerWidget.edit) BeamerWidget.edit.set(patch, remove || [], { silent: true }); Object.assign(cfg, patch); (remove || []).forEach(k => delete cfg[k]); };
+      const say = (t, err) => { msg.textContent = t || ''; msg.classList.toggle('is-err', !!err); };
+      q.addEventListener('keydown', e => e.stopPropagation());
+      form.addEventListener('submit', async e => {
+        e.preventDefault();
+        const text = q.value.trim();
+        if (!text || !map) return;
+        say('Searching…');
+        try {
+          const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(text), { headers: { 'Accept': 'application/json' } });
+          const hits = await r.json();
+          if (!hits.length) { say('No place found', true); return; }
+          const h = hits[0], lat = +h.lat, lng = +h.lon;
+          const zoom = Math.max(map.getZoom(), 15);
+          map.setView([lat, lng], zoom, { animate: true });
+          const label = h.display_name ? h.display_name.split(',').slice(0, 2).join(',') : text;
+          const markers = [{ lat, lng, label }];
+          renderMarkers(markers);
+          save({ center: [lat, lng], zoom, address: text, markers });
+          say(label);
+        } catch (_) { say('Couldn’t search (offline?)', true); }
+      });
+      // Panning and zooming while editing is choosing the view too.
+      const hook = () => {
+        if (!map) { setTimeout(hook, 200); return; }
+        map.on('moveend', () => {
+          if (!editing()) return;
+          const c = map.getCenter();
+          save({ center: [+c.lat.toFixed(6), +c.lng.toFixed(6)], zoom: map.getZoom() });
+        });
+      };
+      hook();
+      window.addEventListener('bw-edit', e => {
+        if (e.detail.editing) { q.value = cfg.address || ''; say(''); setTimeout(() => map && map.invalidateSize(), 60); }
+        else setTimeout(() => map && map.invalidateSize(), 60);
+      });
+    })();
+</script>
 </body>
 </html>
