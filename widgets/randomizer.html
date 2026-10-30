@@ -405,9 +405,9 @@
   /* Type */
   /* Computer Modern, as on the slides (see "Slide-native look" below). */
   --font-ui:   'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', 'DM Sans', system-ui, -apple-system, sans-serif;
-  /* Chrome — the bar's buttons, the settings sheet — keeps the app's UI
-     face: it is furniture, not part of the slide. */
-  --font-chrome: 'DM Sans', system-ui, -apple-system, sans-serif;
+  /* Chrome — the bar's buttons, the settings sheet — in the slides' face
+     too, in one weight (see the end of this file). */
+  --font-chrome: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', 'DM Sans', system-ui, -apple-system, sans-serif;
   --font-chrome-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
   --font-mono: 'BW CM Typewriter', 'CMU Typewriter Text', 'Latin Modern Mono', 'JetBrains Mono', ui-monospace, monospace;
 
@@ -1346,6 +1346,10 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
   cursor: pointer; white-space: nowrap;
 }
 .bw-pick:hover:not(:disabled), .bw-source .bw-btn:hover:not(:disabled) { background: var(--sn-hl); border-color: var(--sn-ink); }
+
+/* One weight in the chrome: Computer Modern's bold is a wide, heavy cut that
+   reads as a different typeface beside the regular. */
+:is(.bw-topbar, .bw-toolbar, .bws-root), :is(.bw-topbar, .bw-toolbar, .bws-root) * { font-weight: 400 !important; }
 </style>
 <script id="bw-kit">
 // Beamer+ widget settings kit — runs INSIDE each widget iframe.
