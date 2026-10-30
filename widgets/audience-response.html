@@ -3864,6 +3864,25 @@ body.bw-editing #ed-secs[hidden] { display: none; }
   #ed-type { max-width: 140px; }
   #ed-type-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
+
+/* ── The QR square drives the poll ───────────────────────────────────── */
+#qr-slot { position: relative; flex: 0 0 auto; display: flex; border-radius: 5px; outline: none; }
+#qr-slot.is-go { cursor: pointer; }
+#qr-slot.is-go:hover, #qr-slot.is-go:focus-visible {
+  box-shadow: 0 0 0 3px var(--ar-hl);
+}
+#qr-slot.is-go:hover #ed-qr, #qr-slot.is-go:focus-visible #ed-qr { border-color: var(--ar-ink) !important; color: var(--ar-ink) !important; background: var(--ar-hl); }
+#qr-cue {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding: 3px 4px; text-align: center;
+  background: var(--ar-hl); color: var(--ar-ink);
+  font-size: calc(11px * var(--u)); line-height: 1.2; white-space: nowrap;
+  border-radius: 0 0 5px 5px;
+  opacity: 0; transition: opacity 0.15s; pointer-events: none;
+}
+#qr-slot.is-go:hover #qr-cue, #qr-slot.is-go:focus-visible #qr-cue { opacity: 1; }
+/* The step button in the bar is gone: the QR square does it. */
+#step-btn { display: none !important; }
 </style>
 </head>
 <body>
@@ -4043,8 +4062,14 @@ body.bw-editing #ed-secs[hidden] { display: none; }
     <!-- The banner along the bottom while collecting (and while editing). -->
     <aside id="side">
       <div id="join">
-        <div id="qr-wrap"><div id="qr"></div></div>
-        <div id="ed-qr" class="bw-edit-only" title="The join QR code goes here while collecting"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3"/></svg><span>QR Code</span></div>
+        <!-- The QR's square is also the poll's control: click it to start the
+             poll, again to close it, then to show the results and reveal
+             the answer (nextStep). Its cue says what the next click does. -->
+        <div id="qr-slot" role="button" tabindex="0">
+          <div id="qr-wrap"><div id="qr"></div></div>
+          <div id="ed-qr" class="bw-edit-only" title="The join QR code goes here while collecting"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3"/></svg><span>QR Code</span></div>
+          <span id="qr-cue" aria-hidden="true"></span>
+        </div>
         <div id="join-text">
           <span class="join-h" id="join-h">Scan to answer</span>
           <span class="join-sub" id="join-sub-open">or go to <span id="join-link">[join link]</span></span>
@@ -4133,6 +4158,8 @@ body.bw-editing #ed-secs[hidden] { display: none; }
   const titleEl     = $('wtitle');
   const viewerBadge = $('viewer-badge');
   const stepBtn     = $('step-btn');
+  const qrSlot      = $('qr-slot');
+  const qrCue       = $('qr-cue');
   const bannerEl    = $('banner');
   const kickerEl    = $('kicker');
   const promptEl    = $('prompt');
@@ -5019,7 +5046,7 @@ body.bw-editing #ed-secs[hidden] { display: none; }
   let stepGo = null;
   function renderToolbar(preview) {
     viewerBadge.style.display = IS_VIEWER ? 'inline-flex' : 'none';
-    if (IS_VIEWER || preview) { stepBtn.style.display = 'none'; stepGo = null; return; }
+    if (IS_VIEWER || preview) { stepBtn.style.display = 'none'; stepGo = null; qrSlot.classList.remove('is-go'); return; }
     const st = nextStep();
     stepGo = st.go;
     stepBtn.style.display = 'inline-flex';
@@ -5028,6 +5055,12 @@ body.bw-editing #ed-secs[hidden] { display: none; }
     stepBtn.classList.toggle('is-done', !!st.done);
     stepBtn.disabled = !!st.disabled;
     stepBtn.title = st.title || '';
+    // The same step, on the QR square.
+    const go = !st.disabled && !window.BeamerWidget?.edit?.active;
+    qrSlot.classList.toggle('is-go', go);
+    qrSlot.title = go ? st.label : '';
+    qrSlot.setAttribute('aria-label', st.label);
+    qrCue.textContent = st.label;
   }
 
   // ── Choice / true-false rows ────────────────────────────────────────────────
@@ -6773,6 +6806,9 @@ body.bw-editing #ed-secs[hidden] { display: none; }
 
   // ── Event wiring ────────────────────────────────────────────────────────────
   stepBtn   .addEventListener('click', () => { if (stepGo) stepGo(); });
+  const qrGo = () => { if (stepGo && qrSlot.classList.contains('is-go') && !window.BeamerWidget?.edit?.active) stepGo(); };
+  qrSlot.addEventListener('click', qrGo);
+  qrSlot.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); qrGo(); } });
   // Set up on the widget itself (edit mode), not in a separate form.
   previewBtn.addEventListener('click', () => {
     if (window.BeamerWidget?.edit?.available?.()) BeamerWidget.edit.enter();
