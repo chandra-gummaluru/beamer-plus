@@ -2826,7 +2826,7 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
     .fe-row svg { flex: 0 0 auto; width: calc(14px * var(--u)); height: calc(14px * var(--u)); }
     .fe-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
     .fe-row.is-dir .fe-name { font-weight: 700; }
-    .fe-row.is-start .fe-name::after { content: '  ← starts here'; font-weight: 400; color: var(--sn-cap); }
+    .fe-row.is-start .fe-name::after { content: '(starts here)'; margin-left: 0.6em; font-family: var(--font-ui); font-size: 0.9em; font-weight: 400; color: var(--sn-cap); }
     .fe-row.is-sel.is-start .fe-name::after { color: var(--sn-ink); }
     .fe-ren {
       flex: 1; min-width: 0; height: calc(22px * var(--u));
