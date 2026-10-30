@@ -3096,6 +3096,8 @@ body.is-viewer #trace-tip { display: none !important; }
   height: 1px; background: var(--sn-faint);
 }
 .cp-custom:hover { background: var(--sn-hl); }
+/* CM Sans sits high in its line box: drop the label onto the swatch's centre. */
+.cp-custom-t { position: relative; top: 0.12em; }
 
 .slider-range { height: 2px; background: var(--sn-faint); }
 .slider-range::-webkit-slider-thumb {
@@ -3395,7 +3397,7 @@ function buildColorPop() {
     '<div class="cp-grid">' +
     PALETTE.map(c => `<button type="button" class="cp-chip" data-c="${c}" style="background:${swatch(c)}" aria-label="${c}"></button>`).join('') +
     '</div>' +
-    '<label class="cp-custom"><input type="color" id="cp-input"> Custom colour…</label>';
+    '<label class="cp-custom"><input type="color" id="cp-input"><span class="cp-custom-t">Custom colour…</span></label>';
   colorPop.addEventListener('click', e => {
     const chip = e.target.closest('.cp-chip');
     if (!chip || colorFor == null) return;
