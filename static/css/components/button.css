@@ -2,9 +2,9 @@
    Buttons — the one button in Beamer+, styled as Lectern's
    (static/css/shell.css there): semibold labels, light yellow on hover.
 
-   .btn                 white, grey outline; yellow fill + gold outline on hover
+   .btn                 white, grey outline; yellow fill + ink outline on hover
    .btn--primary        the one main action of a page or dialog: a black outline
-   .btn--add            adds something: dashed gold outline, gold label
+   .btn--add            adds something: dashed ink outline, yellow when hovered
    .btn--ghost          no fill or border until hovered: toolbars, ×, quiet links
    .btn--danger         destructive; filled red once armed (.is-armed)
    .btn--sm             --ctl-h tall: the editor panel and settings sheet
@@ -60,13 +60,13 @@
 .btn svg { width: 18px; height: 18px; flex: none; }
 
 .btn:hover {
-    --_bg: var(--btn-gold-soft);
-    --_bd: var(--btn-gold);
+    --_bg: var(--btn-hover-fill);
+    --_bd: var(--btn-hover-line);
 }
 
 .btn:active { transform: translateY(1px); }
 
-.btn:focus-visible { outline: 2px solid var(--btn-gold); outline-offset: 2px; }
+.btn:focus-visible { outline: 2px solid var(--btn-hover-line); outline-offset: 2px; }
 
 .btn:disabled,
 .btn[disabled] {
@@ -85,15 +85,15 @@
 }
 .btn--primary:hover { --_bd: var(--btn-ink); }
 
-/* Adds something: dashed gold, solid once hovered. */
+/* Adds something: dashed ink, solid (and yellow) once hovered. */
 .btn--add {
     --_bg: transparent;
-    --_fg: var(--btn-gold);
-    --_bd: var(--btn-gold);
+    --_fg: var(--btn-hover-line);
+    --_bd: var(--btn-hover-line);
     --_bw: 1.5px;
     --_bs: dashed;
 }
-.btn--add:hover { --_bs: solid; --_fg: var(--btn-gold); }
+.btn--add:hover { --_bs: solid; --_fg: var(--btn-hover-line); }
 
 /* A toggle that is on (tools, split view, bookmark): the deck's yellow with
    an ink outline, as every chosen toggle in Beamer+ is. */
@@ -111,8 +111,8 @@
     --_fg: var(--ink-2);
 }
 .btn--ghost:hover {
-    --_bg: var(--btn-gold-soft);
-    --_bd: var(--btn-gold);   /* the ink outline every button gets when pointed at */
+    --_bg: var(--btn-hover-fill);
+    --_bd: var(--btn-hover-line);   /* the ink outline every button gets when pointed at */
     --_fg: var(--btn-ink);
 }
 

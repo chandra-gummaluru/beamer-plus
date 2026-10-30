@@ -1,9 +1,10 @@
 /* ============================================================
-   Dialog (BeamerModal, core/modal.js) — the one dialog shell, as
-   Lectern's (.lt-modal in its static/css/shell.css): a plain white
-   card, a serif title, the message, the buttons right-aligned with
-   the main action last. No icon; no × when the dialog has its own
-   buttons. The loading dialog is centred.
+   Dialog (BeamerModal, core/modal.js) — the one dialog shell, drawn like
+   the slides' nodes: a white card with an ink outline, in the slides' face
+   (Computer Modern Sans, one weight: its bold reads as another typeface),
+   the title on the deck's highlighter yellow, then the message and the
+   buttons right-aligned with the main action last. No icon; no × when the
+   dialog has its own buttons. The loading dialog is centred.
    ============================================================ */
 
 .custom-modal-overlay {
@@ -18,7 +19,7 @@
     align-items: center;
     justify-content: center;
     z-index: 10000;
-    font-family: var(--font-sans);
+    font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', var(--font-sans);
     animation: modal-overlay-in var(--dur-base) var(--ease-out);
 }
 
@@ -29,9 +30,9 @@
 
 .custom-modal-content {
     background: #fff;
-    border: 0;
-    border-radius: var(--r-lg);
-    box-shadow: 0 20px 60px rgb(0 0 0 / .3);
+    border: 2px solid var(--ink-1);
+    border-radius: 7px;
+    box-shadow: 0 12px 36px rgb(0 0 0 / .18);
     padding: 22px 22px 18px;
     max-width: 460px;
     width: calc(100% - 32px);
@@ -39,6 +40,7 @@
     position: relative;
     animation: modal-content-in var(--dur-slow) var(--ease-out);
 }
+.custom-modal-content, .custom-modal-content * { font-weight: 400 !important; }
 
 @keyframes modal-content-in {
     from { opacity: 0; transform: translateY(8px) scale(0.98); }
@@ -48,21 +50,29 @@
 .custom-modal-icon { display: none; }
 
 .custom-modal-title {
-    font-family: var(--font-serif);
-    margin: 0 var(--sp-6) 8px 0;   /* clear of the × */
-    font-size: 26px;
-    line-height: 1.15;
-    font-weight: 500;
-    color: var(--btn-ink);
+    font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', var(--font-sans);
+    margin: 0 var(--sp-6) 0 0;   /* clear of the × */
+    font-size: 24px;
+    line-height: 1.35;
+    color: var(--ink-1);
+    display: inline;
+    background: #f7c548;
+    padding: 0 .18em;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
 }
+.custom-modal-title + * { margin-top: 12px; }
 
 .custom-modal-message {
+    font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', var(--font-sans);
     color: var(--ink-2);
     line-height: 1.55;
     margin: 0;
     user-select: text;
-    font-size: var(--fs-base);
+    font-size: 16px;
 }
+
+.custom-modal-content .btn { font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', var(--font-sans); }
 
 .custom-modal-buttons {
     display: flex;
@@ -126,32 +136,6 @@
     .custom-modal-buttons .btn { width: 100%; }
 }
 
-/* ── Outlined like the slides' nodes; in the slides' face (CM Sans) ────
-   Every dialog (the loading one too) is a white card with an ink outline,
-   its title on the deck's highlighter yellow. One weight: CM's bold reads
-   as a different typeface beside the regular. */
-.custom-modal-content {
-    border: 2px solid var(--ink-1);
-    border-radius: 7px;
-    box-shadow: 0 12px 36px rgb(0 0 0 / .18);
-}
-.custom-modal-title {
-    font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', var(--font-sans);
-    font-size: 24px;
-    font-weight: 400;
-    color: var(--ink-1);
-    display: inline;
-    background: #f7c548;
-    padding: 0 .18em;
-    box-decoration-break: clone;
-    -webkit-box-decoration-break: clone;
-    line-height: 1.35;
-}
-.custom-modal-title + .custom-modal-message,
-.custom-modal-title + * { margin-top: 12px; }
-.custom-modal-overlay, .custom-modal-message, .custom-modal-content .btn { font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', var(--font-sans); }
-.custom-modal-content, .custom-modal-content * { font-weight: 400 !important; }
-.custom-modal-message { font-size: 16px; }
 /* Loading: no x to clear, so the title sits exactly in the middle, and the
    message starts on its own line under it. */
 .modal-loading .custom-modal-title { margin: 0; }

@@ -13,8 +13,8 @@
 /* ── Where the app's own UI is in the slides' face ──────────────────
    Most of the app's chrome keeps the system face, but these speak in
    the slides' voice: the slide navigator's Record / Edit / Close, and
-   everything in the edit panel, its dropdown menus included. Dialogs set
-   it themselves (modal.css); the tour, welcome page and splash below.
+   everything in the edit panel, its dropdown menus included. Dialogs and the
+   tour set it themselves (modal.css, tour.css); welcome page and splash below.
    Redefining the face tokens here
    leaves monospace fields alone. */
 .slide-nav-tools, #editor-panel, .editor-dd-menu {
@@ -41,16 +41,6 @@
     font-weight: 400 !important;
 }
 .welcome-title { letter-spacing: 0 !important; }
-
-/* The tour, like the dialogs: the slides' face in one weight. */
-#tour-popover {
-    --font-sans:  'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', system-ui, sans-serif;
-    --font-serif: var(--font-sans);
-    font-family: var(--font-sans);
-}
-#tour-popover, #tour-popover * { font-weight: 400 !important; }
-#tour-popover .tour-title { font-size: 24px; }
-#tour-popover .tour-body { font-size: 16px; }
 
 /* A highlighter stroke drawn under "Beamer+": the deck's yellow, uneven
    edges and a slight tilt, as if marked by hand, not a box. */

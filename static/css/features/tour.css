@@ -30,16 +30,19 @@
         height  280ms var(--ease-out),
         opacity 150ms ease;
 }
-/* ── Popover card ── */
+/* ── Popover card — outlined like the slides' nodes, in the slides' face ── */
 #tour-popover {
+    --font-sans:  'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', system-ui, sans-serif;
+    --font-serif: var(--font-sans);
     position: fixed;
     z-index: 9002;
     width: 300px;
-    background: var(--surface-paper);
-    border: var(--line-hairline);
-    border-radius: var(--r-lg);
-    box-shadow: var(--shadow-pop);
+    background: #fff;
+    border: 2px solid var(--ink-1);
+    border-radius: 7px;
+    box-shadow: 0 12px 36px rgb(0 0 0 / .18);
     padding: var(--sp-5);
+    font-family: var(--font-sans);
 
     /* Smooth step-to-step movement */
     transition:
@@ -48,55 +51,12 @@
 
     animation: _tour-pop-in 0.22s var(--ease-out) both;
 }
+/* CM bold reads as another typeface: one weight throughout. */
+#tour-popover, #tour-popover * { font-weight: 400 !important; }
 
 @keyframes _tour-pop-in {
     from { opacity: 0; transform: scale(0.94) translateY(4px); }
     to   { opacity: 1; transform: scale(1)    translateY(0);   }
-}
-
-/* ── Directional arrow ── */
-#tour-popover::after {
-    content: '';
-    position: absolute;
-    border: 7px solid transparent;
-    pointer-events: none;
-}
-
-#tour-popover[data-placement="right"]::after {
-    /* Popover is right of element → arrow on left side pointing left */
-    left: -14px;
-    top: 50%;
-    transform: translateY(-50%);
-    border-right-color: var(--surface-paper);
-}
-
-#tour-popover[data-placement="left"]::after {
-    /* Popover is left of element → arrow on right side pointing right */
-    right: -14px;
-    top: 50%;
-    transform: translateY(-50%);
-    border-left-color: var(--surface-paper);
-}
-
-#tour-popover[data-placement="bottom"]::after {
-    /* Popover is below element → arrow on top pointing up */
-    top: -14px;
-    left: 50%;
-    transform: translateX(-50%);
-    border-bottom-color: var(--surface-paper);
-}
-
-#tour-popover[data-placement="top"]::after {
-    /* Popover is above element → arrow on bottom pointing down */
-    bottom: -14px;
-    left: 50%;
-    transform: translateX(-50%);
-    border-top-color: var(--surface-paper);
-}
-
-/* No arrow for centered welcome card */
-#tour-popover[data-placement="center"]::after {
-    display: none;
 }
 
 /* ── Popover internals ── */
@@ -117,16 +77,17 @@
 .tour-skip-btn { font-size: var(--fs-xs); }
 
 .tour-title {
-    font-family: var(--font-serif);
-    font-size: var(--fs-base);
-    font-weight: 600;
+    display: inline-block;
+    font-size: 24px;
     color: var(--ink-1);
-    margin: 0 0 var(--sp-2) 0;
+    background: #f7c548;
+    padding: 0 .18em;
+    margin: 0 0 10px 0;
     line-height: 1.3;
 }
 
 .tour-body {
-    font-size: var(--fs-sm);
+    font-size: 16px;
     color: var(--ink-2);
     line-height: 1.6;
     margin: 0 0 var(--sp-5) 0;
@@ -140,19 +101,3 @@
 }
 
 .tour-next-btn { flex: 1; }
-
-/* ── Outlined like the slides' nodes; type in the app's own faces ───────── */
-#tour-popover {
-    background: #fff;
-    border: 2px solid var(--ink-1);
-    border-radius: 7px;
-    box-shadow: 0 12px 36px rgb(0 0 0 / .18);
-}
-#tour-popover::after { display: none; }
-.tour-title {
-    font-size: var(--fs-xl);
-    display: inline-block;
-    background: #f7c548;
-    padding: 0 .18em;
-    margin-bottom: 10px;
-}
