@@ -47,15 +47,17 @@
 
     <!-- Slide navigator -->
     <aside id="slide-navigator">
-        <!-- Edit (once a presentation is open; app/session-buttons.js) at the
-             top of the slides, Record (app/recorder.js) at the foot. -->
+        <!-- Record (app/recorder.js) at the top of the slides; Edit (once a
+             presentation is open) and Close session (app/session-buttons.js)
+             at the foot. -->
         <div class="slide-nav-tools" id="slide-nav-top">
-            <button class="btn btn--sm slide-nav-tool" id="session-edit-btn" type="button" title="Edit Presentation" aria-label="Edit Presentation" hidden><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg><span>Edit</span></button>
+            <button class="btn btn--sm slide-nav-tool" id="record-btn" type="button" title="Record This Tab"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/></svg><span>Record</span></button>
         </div>
         <div id="bookmark-pins"></div>
         <div id="slide-nav-slides"></div>
         <div class="slide-nav-tools" id="slide-nav-foot">
-            <button class="btn btn--sm slide-nav-tool" id="record-btn" type="button" title="Record This Tab"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/></svg><span>Record</span></button>
+            <button class="btn btn--sm slide-nav-tool" id="session-edit-btn" type="button" title="Edit Presentation" aria-label="Edit Presentation" hidden><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg><span>Edit</span></button>
+            <button class="btn btn--sm slide-nav-tool" id="session-close-btn" type="button" title="Close Session" aria-label="Close Session"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 17l5-5-5-5M15 12H4"/></svg><span>Close</span></button>
         </div>
     </aside>
 
@@ -120,14 +122,6 @@
                 <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
             </svg>
         </button>
-    </div>
-
-    <!-- Top-right: Close session (Edit is at the top of the slide navigator)
-         (app/session-buttons.js). A session opens its presentation from the
-         Open window it starts with (library/ui.js), or a file dropped on the
-         window. -->
-    <div id="top-right-controls">
-        <button class="btn" id="session-close-btn" title="Close Session" aria-label="Close Session"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 17l5-5-5-5M15 12H4"/></svg></button>
     </div>
 
     <!-- The recording bar — bottom-right corner (top-left in split view).

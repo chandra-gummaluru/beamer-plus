@@ -295,9 +295,10 @@ model-viewer { pointer-events: auto !important; }
     scrollbar-width: none;
     -ms-overflow-style: none;
 }
-#slide-navigator::-webkit-scrollbar { display: none; }
+#slide-navigator::-webkit-scrollbar,
+#slide-nav-slides::-webkit-scrollbar { display: none; }
 
-/* Edit at the top of the slides, Record at the foot: full-width buttons in
+/* Record at the top of the slides, Edit and Close at the foot: full-width buttons in
    the column; icons alone at the ends of the row when the navigator runs
    along the bottom (split view, small screens). */
 .slide-nav-tools {
@@ -315,7 +316,7 @@ model-viewer { pointer-events: auto !important; }
 /* Neither while editing (the editor has its own Done), nor Record while a
    take is in progress (the recording bar stands in for it). */
 body.edit-mode .slide-nav-tools,
-body.is-recording #slide-nav-foot { display: none; }
+body.is-recording #record-btn { display: none; }
 body.split-view-active .slide-nav-tools {
     justify-content: center;
     padding: 0 var(--sp-2);
@@ -334,7 +335,7 @@ body.split-view-active .slide-nav-tool span { display: none; }
     align-items: center;
     overflow-y: auto;
     overflow-x: hidden;
-    scrollbar-width: thin;
+    scrollbar-width: none;
     padding: var(--sp-3) 0;
     gap: var(--sp-2);
 }

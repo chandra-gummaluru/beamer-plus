@@ -18,8 +18,8 @@ const STEPS = [
         body:  'Beamer+ is an interactive presentation tool that turns a PDF slide deck into a live lecture: draw on your slides, and drop in videos, 3D models, live polls and interactive widgets.',
     },
     {
-        sel:   '#top-right-controls',
-        place: 'auto',
+        sel:   null,
+        place: 'center',
         title: 'Your Session',
         body:  'Edit the presentation, and close the session when you are done (it asks whether to save first). A new session starts by opening a presentation: a plain PDF, or a saved Beamer+ ZIP with its widgets and annotations, from a folder on this computer or dropped on the window.',
     },
@@ -91,7 +91,7 @@ const STEPS = [
     },
     {
         sel:   '#session-close-btn',
-        place: 'auto',
+        place: 'right',
         title: 'Save and Close',
         body:  'When you are done, Close session asks whether to save first: pick the folder and file name, and what to save: the deck (it reopens where you left off), the notes PDF (annotations, widgets, media and poll results drawn in) and any recordings.',
     },
