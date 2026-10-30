@@ -62,8 +62,12 @@ function initRecordButton() {
     const btn = document.getElementById('record-btn');
     if (!btn) return;
     let holdTimer = null, held = false;
+    // A press that began during a take must not also count as a click on
+    // plain Record once the take has stopped (that reopened the dialog).
+    let swallowClick = false;
     const startHold = () => {
         if (!active || active.stopping) return;
+        swallowClick = true;
         held = false;
         btn.classList.add('is-holding');
         clearTimeout(holdTimer);
@@ -79,6 +83,7 @@ function initRecordButton() {
         btn.classList.remove('is-holding');
         if (!held && fire) togglePause();
         held = false;
+        setTimeout(() => { swallowClick = false; }, 400);   // the click, if any, comes before this
     };
     btn.addEventListener('pointerdown', (e) => {
         if (!active || e.button !== 0) return;
@@ -101,7 +106,7 @@ function initRecordButton() {
     });
     // Not recording: Record opens the start dialog.
     btn.addEventListener('click', (e) => {
-        if (active) { e.preventDefault(); return; }
+        if (active || swallowClick) { swallowClick = false; e.preventDefault(); return; }
         openRecorder();
     });
 }
