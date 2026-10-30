@@ -2780,6 +2780,17 @@ body.is-viewer .bw-sep:not(:first-of-type) { display: none !important; }
 .pe-num { width: 58px; text-align: center; font-family: var(--font-mono); }
 #pdf-edit .bw-input { height: 28px; border: 1.5px solid var(--sn-faint); border-radius: var(--sn-r); background: var(--bg); color: var(--sn-ink); }
 #pdf-edit .bw-input:focus { border-color: var(--sn-ink); outline: none; }
+
+/* Fit and zoom float on the page area, bottom right, like the plotter's. */
+#pdf-float {
+  position: absolute; right: 12px; bottom: 12px; z-index: 20;
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px; border-radius: var(--sn-r);
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  border: 1.5px solid var(--sn-faint);
+}
+#pdf-float .page-nav { display: inline-flex; align-items: center; gap: 4px; }
+body.bw-editing #pdf-float, body.is-viewer #pdf-float { display: none; }
 </style>
 </head>
 <body>
@@ -2800,22 +2811,7 @@ body.is-viewer .bw-sep:not(:first-of-type) { display: none !important; }
       </button>
     </div>
     <span class="bw-status bw-run-only" id="page-readout"></span>
-    <div class="bw-sep bw-run-only"></div>
-    <div class="seg bw-run-only">
-      <button class="bw-btn" id="btn-fit-page">Fit page</button>
-      <button class="bw-btn" id="btn-fit-width">Fit width</button>
-    </div>
     <div class="bw-spacer"></div>
-    <span id="zoom-group" class="page-nav bw-run-only">
-      <button class="bw-btn bw-btn--icon" id="btn-zoom-out" title="Zoom out (−)">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.4"/><path d="M4.6 7h4.8M10.3 10.3l3 3"/></svg>
-      </button>
-      <span id="zoom-val">100%</span>
-      <button class="bw-btn bw-btn--icon" id="btn-zoom-in" title="Zoom in (+)">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.4"/><path d="M4.6 7h4.8M7 4.6v4.8M10.3 10.3l3 3"/></svg>
-      </button>
-    </span>
-    <div class="bw-sep bw-run-only"></div>
     <button class="bw-btn bw-run-only" id="btn-download" disabled title="Download this PDF">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       <span id="btn-download-label">Download</span>
@@ -2829,6 +2825,22 @@ body.is-viewer .bw-sep:not(:first-of-type) { display: none !important; }
     </div>
     <div id="page-wrap">
       <canvas id="pdf-canvas"></canvas>
+    </div>
+    <!-- Fit and zoom, on the page area itself (bottom right). -->
+    <div id="pdf-float" class="bw-run-only">
+    <div class="seg">
+      <button class="bw-btn" id="btn-fit-page">Fit page</button>
+      <button class="bw-btn" id="btn-fit-width">Fit width</button>
+    </div>
+    <span id="zoom-group" class="page-nav">
+      <button class="bw-btn bw-btn--icon" id="btn-zoom-out" title="Zoom out (−)">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.4"/><path d="M4.6 7h4.8M10.3 10.3l3 3"/></svg>
+      </button>
+      <span id="zoom-val">100%</span>
+      <button class="bw-btn bw-btn--icon" id="btn-zoom-in" title="Zoom in (+)">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.4"/><path d="M4.6 7h4.8M7 4.6v4.8M10.3 10.3l3 3"/></svg>
+      </button>
+    </span>
     </div>
     <!-- Edit mode (BeamerWidget.edit): the file, and its pages to pick from. -->
     <div id="pdf-edit" class="bw-edit-only">
