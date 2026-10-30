@@ -692,6 +692,10 @@ export function renderWidgets(slideConfig, container, zipFile, viewerMode = fals
 
 // ── Widget source ──────────────────────────────────────────────────────────
 
+// Built-in widgets that have been removed, and what a deck that still has
+// one shows in its place.
+const RETIRED_WIDGETS = { 'python-shell': 'python-workspace' };
+
 /**
  * Fetch a widget's HTML (built-in, custom blob, or from the deck) plus its
  * pre-loaded notebook, if it names one. Resolves `{ missing: path }` when a
@@ -701,7 +705,9 @@ async function _loadWidgetSource(w, zipFile) {
     let htmlContent;
 
     if (w.builtin) {
-        const res = await fetch(`/widgets/${encodeURIComponent(w.type)}.html`);
+        // A retired built-in opens as the one that replaced it.
+        const type = RETIRED_WIDGETS[w.type] || w.type;
+        const res = await fetch(`/widgets/${encodeURIComponent(type)}.html`);
         if (!res.ok) throw new Error(`Built-in widget not found: ${w.type} (${res.status})`);
         htmlContent = await res.text();
     } else if (w.src && /^blob:/i.test(w.src)) {

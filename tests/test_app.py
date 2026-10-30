@@ -121,8 +121,7 @@ def test_widget_catalog_lists_every_widget_with_its_schema(client):
     on_disk = sorted(f for f in os.listdir(WIDGETS_DIR) if f.lower().endswith('.html'))
     assert [w['file'] for w in catalog] == on_disk
     by_type = {w['type']: w for w in catalog}
-    assert by_type['python-shell']['label'] == 'Python Shell'
-    assert by_type['python-shell']['category'] == 'Computer Science'
+    assert by_type['python-workspace']['category'] == 'Computer Science'
     assert all(w['label'] and w['category'] for w in catalog)
 
 
@@ -147,7 +146,6 @@ def test_widget_schemas_declare_valid_modes():
             return json.loads(rx.search(f.read()).group(1)).get('modes')
     assert modes_of('timer.html') == ['full', 'overlay']
     assert modes_of('calculator.html') == ['full', 'overlay']
-    assert modes_of('python-shell.html')[0] == 'overlay'
 
 
 def test_vendored_libraries_served(client):
