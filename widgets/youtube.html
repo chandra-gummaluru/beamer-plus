@@ -7,6 +7,7 @@
   "label": "YouTube Video",
   "category": "Tools",
   "liveSettings": true,
+  "inlineEdit": true,
   "fields": [
     { "key": "videoId",        "label": "YouTube URL or Video ID", "type": "text",     "placeholder": "https://youtube.com/watch?v=…" },
     { "key": "startTime",      "label": "Clip start",              "type": "duration", "min": 0,
@@ -2965,6 +2966,41 @@ html, body {
 .trim-btn--primary { background: var(--sn-ink); color: var(--bg); border-color: var(--sn-ink); }
 .trim-btn--primary:hover { background: var(--sn-ink); opacity: 0.85; }
 #trim-msg { color: var(--sn-cap); font-family: var(--font-ui); }
+
+/* ── Edit mode: set up on the widget itself ──────────────────────────────────
+   Edit (top right) turns the video into a card of sentences you can change,
+   like the timer and the poll: the link, the clip, how it starts and what
+   shows around it. Changes save as they're made (BeamerWidget.edit.set). */
+#yt-edit {
+  position: absolute; inset: 0; z-index: 40;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  font-family: var(--font-chrome);
+  font-size: var(--fs-chrome);
+  color: var(--sn-ink);
+  overflow: auto;
+}
+.ye-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px 16px;
+  width: min(560px, 100%);
+}
+.ye-lbl { color: var(--sn-cap); white-space: nowrap; text-align: right; }
+.ye-val { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.ye-val > span { color: var(--sn-cap); }
+#ye-url { width: 100%; min-width: 0; }
+.ye-time { width: 72px; text-align: center; font-family: var(--font-mono); }
+#yt-edit .bw-input { height: 28px; border: 1.5px solid var(--sn-faint); border-radius: var(--sn-r); background: var(--bg); color: var(--sn-ink); }
+#yt-edit .bw-input:focus { border-color: var(--sn-ink); outline: none; }
+#yt-edit .bw-input.is-bad { border-color: #d93a2b; }
+#yt-edit .bw-seg > .bw-btn { height: 26px; padding: 0 10px; }
+.ye-hint { grid-column: 2; margin-top: -4px; }
+#ye-msg { color: #d93a2b; }
+body.bw-editing #controls, body.bw-editing #cover, body.bw-editing #click-layer,
+body.bw-editing #placeholder { visibility: hidden; }
 </style>
 </head>
 <body>
@@ -3031,6 +3067,36 @@ html, body {
     <div id="url-row">
       <input type="text" id="url-input" placeholder="YouTube URL or video ID…">
       <button id="load-btn">Load</button>
+    </div>
+  </div>
+  <!-- Edit mode (BeamerWidget.edit): the settings, as sentences to change. -->
+  <div id="yt-edit" class="bw-edit-only">
+    <div class="ye-card">
+      <span class="ye-lbl">Video</span>
+      <div class="ye-val"><input class="bw-input" id="ye-url" type="text" placeholder="Paste a YouTube link or video ID" spellcheck="false" autocomplete="off"></div>
+      <span class="ye-hint bw-edit-hint" id="ye-msg" hidden></span>
+      <span class="ye-lbl">Clip</span>
+      <div class="ye-val"><span>from</span><input class="bw-input ye-time" id="ye-start" type="text" placeholder="0:00" inputmode="numeric"><span>to</span><input class="bw-input ye-time" id="ye-end" type="text" placeholder="the end" inputmode="numeric"></div>
+      <span class="ye-lbl">Starts</span>
+      <div class="ye-val"><div class="bw-seg" id="ye-auto">
+        <button class="bw-btn" type="button" data-v="0">when you press play</button>
+        <button class="bw-btn" type="button" data-v="1">as soon as its slide opens</button>
+      </div></div>
+      <span class="ye-lbl">YouTube's title &amp; suggestions</span>
+      <div class="ye-val"><div class="bw-seg" id="ye-ui">
+        <button class="bw-btn" type="button" data-v="1">Hidden</button>
+        <button class="bw-btn" type="button" data-v="0">Shown</button>
+      </div></div>
+      <span class="ye-lbl">Playback controls</span>
+      <div class="ye-val"><div class="bw-seg" id="ye-ctrl">
+        <button class="bw-btn" type="button" data-v="1">Shown</button>
+        <button class="bw-btn" type="button" data-v="0">Hidden</button>
+      </div></div>
+      <span class="ye-lbl">Link box on the slide</span>
+      <div class="ye-val"><div class="bw-seg" id="ye-box">
+        <button class="bw-btn" type="button" data-v="0">Off</button>
+        <button class="bw-btn" type="button" data-v="1">On</button>
+      </div></div>
     </div>
   </div>
 </div>
@@ -3717,6 +3783,88 @@ document.addEventListener('keydown', (e) => {
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
 if (window.WIDGET_CONFIG) updateConfig(window.WIDGET_CONFIG);
+
+// ── Edit mode ────────────────────────────────────────────────────────────────
+// The kit puts the widget into edit mode (body.bw-editing) from its Edit
+// button; #yt-edit is the form. Each change is saved straight away.
+(function () {
+  const $e = id => document.getElementById(id);
+  const urlEl = $e('ye-url'), startEl = $e('ye-start'), endEl = $e('ye-end'), msgEl = $e('ye-msg');
+  const SEGS = { 'ye-auto': 'autoplay', 'ye-ui': 'hideYouTubeUI', 'ye-ctrl': 'showControls', 'ye-box': 'allowManualUrl' };
+  const DEF  = { autoplay: false, hideYouTubeUI: true, showControls: true, allowManualUrl: false };
+  const editing = () => !!(window.BeamerWidget && BeamerWidget.edit && BeamerWidget.edit.active);
+  const set = (patch, remove) => { if (window.BeamerWidget && BeamerWidget.edit) BeamerWidget.edit.set(patch, remove || []); };
+
+  // "1:30", "90", "1:02:03" → seconds; '' → null; nonsense → NaN.
+  function parseTime(v) {
+    v = String(v || '').trim();
+    if (!v) return null;
+    if (!/^\d+(:\d{1,2}){0,2}$/.test(v)) return NaN;
+    return v.split(':').reduce((t, p) => t * 60 + Number(p), 0);
+  }
+  const showTime = n => (Number(n) > 0 ? fmtTime(Number(n)) : '');
+
+  function fill() {
+    const a = document.activeElement;
+    if (a !== urlEl) urlEl.value = cfg.videoId || cfg.url || '';
+    if (a !== startEl) startEl.value = showTime(cfg.startTime);
+    if (a !== endEl) endEl.value = showTime(cfg.endTime);
+    Object.entries(SEGS).forEach(([id, key]) => {
+      const on = key in cfg ? cfg[key] === true : DEF[key];
+      $e(id).querySelectorAll('.bw-btn').forEach(b => {
+        const act = (b.dataset.v === '1') === on;
+        b.classList.toggle('is-active', act);
+        b.setAttribute('aria-pressed', String(act));
+      });
+    });
+  }
+
+  function say(text) { msgEl.textContent = text || ''; msgEl.hidden = !text; }
+
+  function commitUrl() {
+    const v = urlEl.value.trim();
+    if (!v) { urlEl.classList.remove('is-bad'); say(''); if (cfg.videoId) set({}, ['videoId']); return; }
+    if (!extractVideoId(v)) { urlEl.classList.add('is-bad'); say('That isn’t a YouTube link or video ID.'); return; }
+    urlEl.classList.remove('is-bad'); say('');
+    if (v !== cfg.videoId) set({ videoId: v });
+  }
+  function commitTime(el, key) {
+    const t = parseTime(el.value);
+    if (Number.isNaN(t)) { el.classList.add('is-bad'); return; }
+    el.classList.remove('is-bad');
+    if (t == null || t === 0) { if (key in cfg) set({}, [key]); }
+    else if (t !== Number(cfg[key])) set({ [key]: t });
+    el.value = showTime(t);
+  }
+
+  urlEl.addEventListener('change', commitUrl);
+  urlEl.addEventListener('paste', () => setTimeout(commitUrl, 0));
+  startEl.addEventListener('change', () => commitTime(startEl, 'startTime'));
+  endEl.addEventListener('change', () => commitTime(endEl, 'endTime'));
+  [urlEl, startEl, endEl].forEach(el => el.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
+    e.stopPropagation();   // not the player's shortcuts
+  }));
+  Object.entries(SEGS).forEach(([id, key]) => {
+    $e(id).addEventListener('click', e => {
+      const b = e.target.closest('.bw-btn[data-v]');
+      if (b) set({ [key]: b.dataset.v === '1' });
+    });
+  });
+
+  window.addEventListener('bw-edit', e => {
+    if (e.detail.editing) {
+      pause();
+      if (trimMode) setTrimMode(false);
+      say(''); [urlEl, startEl, endEl].forEach(el => el.classList.remove('is-bad'));
+      fill();
+      if (!cfg.videoId) requestAnimationFrame(() => urlEl.focus());
+    }
+  });
+  window.addEventListener('message', e => {
+    if (e.data && e.data.type === 'widget-config' && editing()) setTimeout(fill, 0);
+  });
+})();
 </script>
 </body>
 </html>
