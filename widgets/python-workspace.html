@@ -8022,7 +8022,9 @@ print(shopping)
     showTraceOutput();
   };
   function showTraceOutput() {
-    const inShell = isShown('shell') && isShown('memory');
+    // Split across two slides, the shell is a tab away on the right half, so
+    // the output always goes there — the console — never under the diagram.
+    const inShell = !!S.split || (isShown('shell') && isShown('memory'));
     mmPaneEl.classList.toggle('output-in-shell', inShell);
     const { text, before, stale } = traceText;
     traceOut.hidden = !inShell || stale || !text;
