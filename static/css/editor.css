@@ -409,6 +409,25 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 .editor-switch:checked { background: var(--ink-1); }
 .editor-switch:checked::after { transform: translateX(14px); }
 .editor-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Drawn like the slides' toggles: an ink outline on paper, an ink knob;
+   on, it fills with the deck's highlighter yellow. */
+.editor-switch {
+    box-sizing: border-box;
+    width: 36px;
+    border: 1.5px solid var(--ink-1);
+    background: #fff;
+}
+.editor-switch::after {
+    top: 2.5px;
+    left: 2.5px;
+    width: 12px;
+    height: 12px;
+    background: var(--ink-1);
+    box-shadow: none;
+}
+.editor-switch:checked { background: #f7c548; }
+.editor-switch:checked::after { transform: translateX(16px); }
+.editor-switch:focus-visible { outline: 2px solid var(--ink-1); }
 
 /* Everything on the slide, each with Edit and Delete. */
 #editor-slide-items { display: flex; flex-direction: column; gap: var(--sp-2); }
