@@ -5,6 +5,7 @@
 <script id="widget-schema" type="application/json">
 {
   "label": "Terminal",
+  "inlineEdit": true,
   "category": "Computer Science",
   "fields": []
 }
@@ -2694,18 +2695,106 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
       min-width: 0;
     }
     #cmd-input::selection { background: var(--selection); }
+
+    /* ── Edit mode: the file editor ──────────────────────────────────────── */
+    /* One node like the terminal's: an ink outline round a tree on the left
+       and the selected file on the right. */
+    .fe-sep { flex: 0 0 auto; width: 1px; height: 16px; background: var(--border-med); }
+    #fe {
+      flex: 1; min-height: 0;
+      margin: calc(10px * var(--u)) calc(14px * var(--u)) calc(12px * var(--u));
+      display: flex;
+      background: var(--sn-node);
+      border: var(--sn-line) solid var(--sn-ink);
+      border-radius: var(--sn-r);
+      overflow: hidden;
+      color: var(--sn-ink);
+    }
+    body.bw-editing #fe { display: flex; }
+    #fe-tree {
+      flex: 0 0 34%; max-width: 320px; min-width: 160px;
+      overflow: auto;
+      padding: calc(8px * var(--u)) 0;
+      border-right: var(--sn-line) solid var(--sn-ink);
+      font-size: calc(13px * var(--u));
+    }
+    .fe-row {
+      display: flex; align-items: center; gap: 6px;
+      height: calc(26px * var(--u));
+      padding-right: 6px;
+      cursor: pointer; white-space: nowrap; user-select: none;
+    }
+    .fe-row:hover { background: color-mix(in srgb, var(--sn-ink) 6%, transparent); }
+    .fe-row.is-sel { background: var(--sn-hl); }
+    .fe-row svg { flex: 0 0 auto; width: calc(14px * var(--u)); height: calc(14px * var(--u)); }
+    .fe-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .fe-row.is-dir .fe-name { font-weight: 700; }
+    .fe-row.is-start .fe-name::after { content: '  ← starts here'; font-weight: 400; color: var(--sn-cap); }
+    .fe-row.is-sel.is-start .fe-name::after { color: var(--sn-ink); }
+    .fe-ren {
+      flex: 1; min-width: 0; height: calc(22px * var(--u));
+      font: inherit; color: var(--sn-ink); background: var(--bg);
+      border: 1.5px solid var(--sn-ink); border-radius: 4px; padding: 0 5px; outline: none;
+    }
+    .fe-del {
+      flex: 0 0 auto; display: none; align-items: center; justify-content: center;
+      width: calc(22px * var(--u)); height: calc(22px * var(--u));
+      border: 1.5px solid transparent; border-radius: 4px; background: none;
+      color: var(--sn-ink); cursor: pointer; padding: 0;
+    }
+    .fe-del svg { width: calc(12px * var(--u)); height: calc(12px * var(--u)); }
+    .fe-row:hover .fe-del, .fe-row.is-sel .fe-del { display: inline-flex; }
+    .fe-del:hover { border-color: var(--sn-ink); background: var(--bg); }
+    .fe-row.is-root .fe-del { display: none; }
+    #fe-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    #fe-path {
+      flex: 0 0 auto; padding: calc(8px * var(--u)) calc(14px * var(--u)) calc(6px * var(--u));
+      color: var(--sn-cap); font-size: calc(12px * var(--u));
+      border-bottom: 1px solid color-mix(in srgb, var(--sn-ink) 18%, transparent);
+    }
+    #fe-text {
+      flex: 1; min-height: 0; resize: none;
+      padding: calc(10px * var(--u)) calc(14px * var(--u));
+      font-family: var(--font-mono); font-size: calc(13px * var(--u)); line-height: 1.55;
+      color: var(--sn-ink); background: transparent; border: none; outline: none;
+      tab-size: 4;
+    }
+    #fe-text[hidden] { display: none; }
+    #fe-note {
+      flex: 1; display: none; align-items: center; justify-content: center; text-align: center;
+      padding: 16px; color: var(--sn-cap); font-family: var(--font-ui);
+    }
+    #fe-note.shown { display: flex; }
   </style>
 </head>
 <body>
 
 <div id="toolbar" data-bw-topbar>
   <span id="toolbar-title">Terminal</span>
-  <span id="toolbar-sub">bash</span>
+  <span id="toolbar-sub" class="bw-run-only">bash</span>
+  <!-- Edit mode: what's on the pretend disk when the terminal opens. -->
+  <span class="bw-edit-only" style="display:contents">
+    <button class="bw-btn" type="button" id="fe-add-file" title="New file in the selected folder">+ File</button>
+    <button class="bw-btn" type="button" id="fe-add-dir" title="New folder in the selected folder">+ Folder</button>
+    <span class="fe-sep" aria-hidden="true"></span>
+    <button class="bw-btn" type="button" id="fe-start" title="Open the terminal in the selected folder">Start Here</button>
+  </span>
 </div>
 
-<div id="output"></div>
+<!-- Edit mode (BeamerWidget.edit): the files and folders, and the selected
+     file's contents. Saved as config.filesystem, { "~/path": {type, content} }. -->
+<div id="fe" class="bw-edit-only">
+  <div id="fe-tree" role="tree" aria-label="Files"></div>
+  <div id="fe-body">
+    <div id="fe-path"></div>
+    <textarea id="fe-text" spellcheck="false" autocomplete="off" placeholder="The file is empty"></textarea>
+    <div id="fe-note"></div>
+  </div>
+</div>
 
-<div id="input-row">
+<div id="output" class="bw-run-only"></div>
+
+<div id="input-row" class="bw-run-only">
   <span id="prompt-prefix"></span>
   <input id="cmd-input" type="text"
          autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
@@ -3454,7 +3543,9 @@ $output.addEventListener('click', () => $input.focus());
 // ═══════════════════════════════════════════════════════════════════════════
 //  Widget config
 // ═══════════════════════════════════════════════════════════════════════════
+let CFG = {};
 function updateConfig(cfg) {
+  CFG = cfg || {};
   S.widgetId = cfg.id    ?? cfg.widgetId ?? S.widgetId;
   S.role     = cfg.role  ?? S.role;
 
@@ -3482,8 +3573,252 @@ function updateConfig(cfg) {
 }
 
 window.addEventListener('message', e => {
-  if (e.data?.type === 'widget-config')  updateConfig(e.data.config);
+  if (e.data?.type === 'widget-config')  { if (!FE.on) updateConfig(e.data.config); else CFG = e.data.config || CFG; }
   if (e.data?.type === 'widget-cleanup') { /* nothing persistent */ }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Edit mode: set the files and folders the terminal starts with
+// ═══════════════════════════════════════════════════════════════════════════
+// The list is config.filesystem: { "~/notes.txt": { type: "file", content },
+// "~/src": { type: "dir" } }. Paths in the home folder are kept as ~/…, so
+// they follow the home folder if the user name changes. The terminal itself
+// is rebuilt from the list when editing ends.
+const FE = { on: false, files: {}, sel: '~', renaming: null };
+const $fe = {
+  tree: document.getElementById('fe-tree'),
+  path: document.getElementById('fe-path'),
+  text: document.getElementById('fe-text'),
+  note: document.getElementById('fe-note'),
+};
+const FE_ICON = {
+  dir:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v8.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
+  file: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg>',
+  del:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+};
+
+/** A configured path in the stored form: "~", "~/a/b" or "/abs/path". */
+function feKey(raw) {
+  raw = String(raw || '').trim();
+  if (!raw || raw === '~') return '~';
+  let p = raw.startsWith('~/') ? raw : raw.startsWith('/') ? raw : '~/' + raw;
+  const home = S.home.replace(/\/$/, '');
+  if (p === home) return '~';
+  if (p.startsWith(home + '/')) p = '~' + p.slice(home.length);
+  const parts = [];
+  for (const seg of p.split('/')) {
+    if (!seg || seg === '.') continue;
+    if (seg === '..') { if (parts.length > 1 || (parts.length && parts[0] !== '~')) parts.pop(); continue; }
+    parts.push(seg);
+  }
+  if (p.startsWith('/')) return '/' + parts.join('/');
+  return parts.join('/') || '~';
+}
+function feParent(k) {
+  if (k === '~' || k === '/') return null;
+  const i = k.lastIndexOf('/');
+  if (i <= 0) return k.startsWith('/') ? '/' : '~';
+  return k.slice(0, i);
+}
+function feName(k) { return k === '~' ? '~' : k.slice(k.lastIndexOf('/') + 1); }
+function feIsDir(k) { return k === '~' || k === '/' || FE.files[k]?.type === 'dir'; }
+
+function feLoad() {
+  FE.files = {};
+  for (const [raw, node] of Object.entries(CFG.filesystem || {})) {
+    const k = feKey(raw);
+    if (k === '~') continue;
+    FE.files[k] = { type: node.type === 'dir' ? 'dir' : 'file', content: node.type === 'dir' ? undefined : (node.content ?? '') };
+    if (node.permissions) FE.files[k].permissions = node.permissions;
+  }
+  // Folders a file sits in exist even if they weren't listed.
+  for (const k of Object.keys(FE.files)) {
+    for (let d = feParent(k); d && d !== '~' && d !== '/'; d = feParent(d)) {
+      if (!FE.files[d]) FE.files[d] = { type: 'dir' };
+    }
+  }
+  if (!(FE.sel in FE.files) && FE.sel !== '~') FE.sel = '~';
+}
+
+function feSave() {
+  const out = {};
+  for (const k of Object.keys(FE.files).sort()) {
+    const n = FE.files[k];
+    out[k] = n.type === 'dir' ? { type: 'dir' } : { type: 'file', content: n.content || '' };
+    if (n.permissions) out[k].permissions = n.permissions;
+  }
+  CFG = Object.assign({}, CFG, { filesystem: out });
+  if (window.BeamerWidget?.edit) BeamerWidget.edit.set({ filesystem: out }, [], { silent: true });
+}
+
+function feStart() { return CFG.cwd ? feKey(CFG.cwd) : '~'; }
+
+/** Rows in tree order: each folder's folders first, then its files. */
+function feRows() {
+  const keys = Object.keys(FE.files);
+  const rows = [];
+  const kids = d => keys.filter(k => feParent(k) === d).sort((a, b) =>
+    (feIsDir(b) - feIsDir(a)) || feName(a).localeCompare(feName(b)));
+  const walk = (d, depth) => { for (const k of kids(d)) { rows.push([k, depth]); if (feIsDir(k)) walk(k, depth + 1); } };
+  rows.push(['~', 0]); walk('~', 1);
+  // Anything outside the home folder, by its full path.
+  const outside = keys.filter(k => k.startsWith('/') && !feParent(k).startsWith('/') || (k.startsWith('/') && feParent(k) === '/'));
+  for (const k of outside.sort()) { rows.push([k, 0]); if (feIsDir(k)) walk(k, 1); }
+  return rows;
+}
+
+function feRender() {
+  const start = feStart();
+  $fe.tree.innerHTML = '';
+  for (const [k, depth] of feRows()) {
+    const row = document.createElement('div');
+    const dir = feIsDir(k);
+    row.className = 'fe-row' + (dir ? ' is-dir' : '') + (k === FE.sel ? ' is-sel' : '')
+                  + (k === '~' ? ' is-root' : '') + (dir && k === start ? ' is-start' : '');
+    row.setAttribute('role', 'treeitem');
+    row.dataset.k = k;
+    row.style.paddingLeft = `calc(${10 + depth * 16}px * var(--u))`;
+    row.innerHTML = (dir ? FE_ICON.dir : FE_ICON.file);
+    if (FE.renaming === k) {
+      const inp = document.createElement('input');
+      inp.className = 'fe-ren'; inp.value = feName(k); inp.spellcheck = false;
+      row.appendChild(inp);
+      setTimeout(() => { inp.focus(); const dot = inp.value.lastIndexOf('.'); inp.setSelectionRange(0, dot > 0 && !dir ? dot : inp.value.length); });
+      inp.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); feRename(k, inp.value); }
+        if (e.key === 'Escape') { e.preventDefault(); FE.renaming = null; feRender(); }
+        e.stopPropagation();
+      });
+      inp.addEventListener('blur', () => { if (FE.renaming === k) feRename(k, inp.value); });
+    } else {
+      const nm = document.createElement('span');
+      nm.className = 'fe-name';
+      nm.textContent = k === '~' ? `~  (${S.home})` : (k.startsWith('/') && depth === 0 ? k : feName(k)) + (dir ? '/' : '');
+      row.appendChild(nm);
+      const del = document.createElement('button');
+      del.type = 'button'; del.className = 'fe-del'; del.title = 'Delete'; del.innerHTML = FE_ICON.del;
+      del.addEventListener('click', e => { e.stopPropagation(); feDelete(k); });
+      row.appendChild(del);
+    }
+    row.addEventListener('click', () => { if (FE.renaming !== k) { FE.sel = k; feRender(); } });
+    row.addEventListener('dblclick', () => { if (k !== '~') { FE.renaming = k; feRender(); } });
+    $fe.tree.appendChild(row);
+  }
+  feShowSel();
+}
+
+function feShowSel() {
+  const k = FE.sel, dir = feIsDir(k);
+  $fe.path.textContent = k === '~' ? S.home : (k.startsWith('~') ? S.home + k.slice(1) : k) + (dir ? '/' : '');
+  $fe.text.hidden = dir;
+  $fe.note.classList.toggle('shown', dir);
+  if (dir) {
+    const n = Object.keys(FE.files).filter(x => feParent(x) === k).length;
+    $fe.note.textContent = (n ? `${n} item${n === 1 ? '' : 's'} in this folder.` : 'This folder is empty.')
+      + ' Add a file or folder to it from the bar; double-click a name to rename it.';
+  } else if ($fe.text.dataset.k !== k || document.activeElement !== $fe.text) {
+    $fe.text.value = FE.files[k]?.content || '';
+    $fe.text.dataset.k = k;
+  }
+}
+
+function feTargetDir() {
+  return feIsDir(FE.sel) ? FE.sel : (feParent(FE.sel) || '~');
+}
+function feFreeName(dir, base, ext) {
+  for (let i = 0; ; i++) {
+    const n = base + (i ? '-' + (i + 1) : '') + ext;
+    const k = dir === '~' ? '~/' + n : dir + '/' + n;
+    if (!FE.files[k]) return k;
+  }
+}
+function feAdd(type) {
+  const k = feFreeName(feTargetDir(), type === 'dir' ? 'folder' : 'untitled', type === 'dir' ? '' : '.txt');
+  FE.files[k] = type === 'dir' ? { type: 'dir' } : { type: 'file', content: '' };
+  FE.sel = k; FE.renaming = k;
+  feSave(); feRender();
+}
+function feRename(k, name) {
+  FE.renaming = null;
+  name = String(name || '').trim().replace(/\//g, '-');
+  const par = feParent(k);
+  const nk = name ? (par === '~' ? '~/' + name : par === '/' ? '/' + name : par + '/' + name) : k;
+  if (nk !== k && !FE.files[nk]) {
+    for (const x of Object.keys(FE.files)) {
+      if (x === k || x.startsWith(k + '/')) {
+        FE.files[nk + x.slice(k.length)] = FE.files[x];
+        delete FE.files[x];
+      }
+    }
+    if (CFG.cwd && (feKey(CFG.cwd) === k || feKey(CFG.cwd).startsWith(k + '/'))) {
+      const c = nk + feKey(CFG.cwd).slice(k.length);
+      CFG = Object.assign({}, CFG, { cwd: c });
+      if (window.BeamerWidget?.edit) BeamerWidget.edit.set({ cwd: c }, [], { silent: true });
+    }
+    FE.sel = nk;
+    feSave();
+  }
+  feRender();
+}
+function feDelete(k) {
+  if (k === '~') return;
+  for (const x of Object.keys(FE.files)) if (x === k || x.startsWith(k + '/')) delete FE.files[x];
+  if (FE.sel === k || FE.sel.startsWith(k + '/')) FE.sel = feParent(k) || '~';
+  if (CFG.cwd && (feKey(CFG.cwd) === k || feKey(CFG.cwd).startsWith(k + '/'))) {
+    CFG = Object.assign({}, CFG); delete CFG.cwd;
+    if (window.BeamerWidget?.edit) BeamerWidget.edit.set({}, ['cwd'], { silent: true });
+  }
+  feSave(); feRender();
+}
+function feStartHere() {
+  const d = feTargetDir();
+  if (d === '~') {
+    CFG = Object.assign({}, CFG); delete CFG.cwd;
+    if (window.BeamerWidget?.edit) BeamerWidget.edit.set({}, ['cwd'], { silent: true });
+  } else {
+    CFG = Object.assign({}, CFG, { cwd: d });
+    if (window.BeamerWidget?.edit) BeamerWidget.edit.set({ cwd: d }, [], { silent: true });
+  }
+  feRender();
+}
+
+$fe.text.addEventListener('input', () => {
+  const k = $fe.text.dataset.k;
+  if (!FE.files[k] || FE.files[k].type !== 'file') return;
+  FE.files[k].content = $fe.text.value;
+  clearTimeout(feSave._t); feSave._t = setTimeout(feSave, 300);
+});
+$fe.text.addEventListener('keydown', e => {
+  if (e.key === 'Tab' && !e.shiftKey) {   // a tab in the file, not a jump out
+    e.preventDefault();
+    const a = $fe.text.selectionStart, b = $fe.text.selectionEnd;
+    $fe.text.setRangeText('    ', a, b, 'end');
+    $fe.text.dispatchEvent(new Event('input'));
+  }
+});
+document.getElementById('fe-add-file').addEventListener('click', () => feAdd('file'));
+document.getElementById('fe-add-dir').addEventListener('click', () => feAdd('dir'));
+document.getElementById('fe-start').addEventListener('click', feStartHere);
+$fe.tree.addEventListener('keydown', e => {
+  if (FE.renaming) return;
+  if (e.key === 'F2' && FE.sel !== '~') { FE.renaming = FE.sel; feRender(); }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && FE.sel !== '~') feDelete(FE.sel);
+});
+$fe.tree.tabIndex = 0;
+
+window.addEventListener('bw-edit', e => {
+  const on = !!e.detail?.editing;
+  if (on === FE.on) return;
+  FE.on = on;
+  if (on) { feLoad(); FE.renaming = null; feRender(); }
+  else {
+    clearTimeout(feSave._t);
+    if (FE.renaming) feRename(FE.renaming, $fe.tree.querySelector('.fe-ren')?.value);
+    feSave();
+    // A fresh terminal on the new files.
+    S.cwd = S.home;
+    updateConfig(Object.assign({}, CFG, { cwd: CFG.cwd || '~' }));
+  }
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
