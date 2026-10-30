@@ -949,6 +949,85 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
   background: var(--sn-hl) !important;
   color: var(--sn-ink) !important;
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   Shared in-widget controls — one look for the same job in every widget.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* View controls floating on the content (zoom, fit, page turning): the PDF,
+   the plotter, the map. A faint node in a corner; icon buttons that get an
+   ink outline when pointed at; a grey readout between them. */
+.bw-float {
+  position: absolute; z-index: 20;
+  display: flex; align-items: center; gap: 4px;
+  padding: 4px;
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  border: 1.5px solid var(--sn-faint);
+  border-radius: var(--sn-r);
+  font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', 'DM Sans', system-ui, sans-serif;   /* in the widget: the slide's face */
+  font-size: 12px;
+  color: var(--sn-ink);
+}
+.bw-float--br { right: 12px; bottom: 12px; }
+.bw-float--bl { left: 12px; bottom: 12px; }
+.bw-float--tr { right: 12px; top: 12px; }
+.bw-float .bw-btn { height: 28px; }
+.bw-float .bw-btn--icon,
+.bw-float > .bw-btn:not(.bw-seg *) {
+  width: 28px; padding: 0;
+  border: 1.5px solid transparent; border-radius: 5px;
+  background: none; color: var(--sn-ink);
+}
+.bw-float .bw-btn--icon:hover:not(:disabled) { border-color: var(--sn-ink); background: var(--sn-node); }
+.bw-float .bw-btn--icon:disabled { color: var(--sn-faint); background: none; border-color: transparent; }
+.bw-float .bw-btn--icon svg { width: 16px; height: 16px; }
+.bw-float-val {
+  min-width: 3.4em; text-align: center;
+  font-variant-numeric: tabular-nums; color: var(--sn-cap); user-select: none;
+}
+.bw-float-sep { flex: 0 0 auto; width: 1px; height: 18px; margin: 0 2px; background: var(--sn-faint); }
+
+/* Where a widget's content comes from (a link, an address, a file): one row
+   at the top of the widget while it's edited. An ink-outlined field with an
+   icon, what's chosen (or a box to type into), and a button. */
+.bw-source {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; max-width: 760px; margin: 0 auto;
+  min-height: 38px; padding: 4px 4px 4px 12px;
+  background: var(--bg);
+  border: 1.5px solid var(--sn-ink);
+  border-radius: var(--sn-r);
+  font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', 'DM Sans', system-ui, sans-serif;   /* in the widget: the slide's face */ font-size: 14px;
+  color: var(--sn-ink);
+}
+.bw-source > svg { flex: 0 0 auto; width: 16px; height: 16px; color: var(--sn-cap); }
+.bw-source:focus-within { box-shadow: 0 0 0 3px color-mix(in srgb, var(--sn-hl) 55%, transparent); }
+.bw-source:has(.is-bad) { border-color: #d93a2b; }
+.bw-source.is-over { border-style: dashed; background: color-mix(in srgb, var(--sn-hl) 22%, var(--bg)); }
+.bw-source-input {
+  flex: 1 1 auto; min-width: 0; height: 28px;
+  border: 0; outline: 0; background: none; padding: 0;
+  font: inherit; color: var(--sn-ink);
+}
+.bw-source-input::placeholder { color: var(--sn-cap); }
+.bw-source-name {
+  flex: 1 1 auto; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bw-source-name:empty::before { content: attr(data-empty); color: var(--sn-cap); }
+.bw-source-hint, .bw-source-msg { flex: 0 1 auto; min-width: 0; color: var(--sn-cap); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bw-source-msg:empty { display: none; }
+.bw-source-msg.is-err, .bw-source-msg.is-bad { color: #d93a2b; }
+/* The source's button, here and in an empty drop zone: an ink outline,
+   highlighter yellow when pointed at. */
+.bw-pick, .bw-source .bw-btn {
+  flex: 0 0 auto; height: 28px; padding: 0 12px;
+  border: 1.5px solid var(--sn-ink); border-radius: 5px;
+  background: var(--bg); color: var(--sn-ink);
+  font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', 'DM Sans', system-ui, sans-serif;   /* in the widget: the slide's face */ font-size: 13px; font-weight: 500;
+  cursor: pointer; white-space: nowrap;
+}
+.bw-pick:hover:not(:disabled), .bw-source .bw-btn:hover:not(:disabled) { background: var(--sn-hl); border-color: var(--sn-ink); }
 </style>
 <script id="bw-kit">
 // Beamer+ widget settings kit — runs INSIDE each widget iframe.
@@ -2786,10 +2865,16 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
       color: var(--sn-cap);
     }
   
-.map-ed { display: inline-flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; }
-.map-ed-l { color: var(--text-3); white-space: nowrap; }
-.map-q-wrap { position: relative; flex: 1 1 auto; min-width: 120px; max-width: 460px; display: flex; }
-#map-q { flex: 1 1 auto; min-width: 0; height: var(--ctl-h); }
+#map-wrap { position: relative; width: 100%; height: 100%; }
+/* The source row floats over the top of the map while it's edited. */
+.map-ed {
+  position: absolute; z-index: 1000; top: 12px; left: 16px; right: 16px;
+  width: auto; box-shadow: 0 4px 14px rgba(0,0,0,0.10);
+}
+.map-q-wrap { position: relative; flex: 1 1 auto; min-width: 120px; display: flex; }
+#map-q { flex: 1 1 auto; min-width: 0; }
+#map-zoom { z-index: 1000; }
+body.is-viewer #map-zoom { display: none; } #map:empty ~ #map-zoom { display: none; }
 /* Places matching what's typed, as it's typed. */
 .map-sugg {
   position: fixed; z-index: 2000;   /* placed under the field (showSugg): the bar clips anything inside it */
@@ -2805,8 +2890,7 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
 }
 .map-sugg button small { color: var(--text-3); margin-left: 6px; }
 .map-sugg button:hover, .map-sugg button.is-on { background: var(--edit-soft, #fdf3d6); }
-.map-ed-msg { color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.map-ed-msg.is-err { color: var(--err); }
+
 </style>
 </head>
 <body>
@@ -2814,17 +2898,26 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
        zoom the map itself; saved with the slide. -->
   <div id="toolbar" class="bw-toolbar" data-bw-topbar>
     <span class="bw-toolbar-title">Map</span>
-    <form class="bw-edit-only map-ed" id="map-search" autocomplete="off">
-      <span class="map-ed-l">Starts at</span>
+  </div>
+  <div id="map-wrap">
+    <div id="map"></div>
+    <!-- Edit mode only: where the map opens. Search an address, or pan and
+         zoom the map itself. The same source row as every widget's. -->
+    <form class="bw-edit-only bw-source map-ed" id="map-search" autocomplete="off">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
       <span class="map-q-wrap">
-        <input class="bw-input" id="map-q" type="text" placeholder="Search an address or place" spellcheck="false" role="combobox" aria-autocomplete="list" aria-controls="map-sugg">
+        <input class="bw-source-input" id="map-q" type="text" placeholder="Where the map starts: search an address or place" spellcheck="false" role="combobox" aria-autocomplete="list" aria-controls="map-sugg">
         <span class="map-sugg" id="map-sugg" role="listbox" hidden></span>
       </span>
+      <span class="map-ed-msg bw-source-msg" id="map-msg"></span>
       <button class="bw-btn" type="submit">Go</button>
-      <span class="map-ed-msg" id="map-msg"></span>
     </form>
+    <!-- Zoom: the kit's floating view controls, as in every widget. -->
+    <div class="bw-float bw-float--br" id="map-zoom">
+      <button class="bw-btn bw-btn--icon" type="button" id="map-zout" title="Zoom out"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.4"/><path d="M4.6 7h4.8M10.3 10.3l3 3"/></svg></button>
+      <button class="bw-btn bw-btn--icon" type="button" id="map-zin" title="Zoom in"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.4"/><path d="M4.6 7h4.8M7 4.6v4.8M10.3 10.3l3 3"/></svg></button>
+    </div>
   </div>
-  <div id="map"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="/static/vendor/socket.io.min.js"></script>
@@ -2850,9 +2943,11 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
       map = L.map('map', {
         center:         center,
         zoom:           zoom,
-        zoomControl:    true,
+        zoomControl:    false,   // our own, in .bw-float (#map-zoom)
         attributionControl: true,
       });
+      document.getElementById('map-zin').onclick  = () => map && map.zoomIn();
+      document.getElementById('map-zout').onclick = () => map && map.zoomOut();
 
       const tile = tileUrl || 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
       L.tileLayer(tile, {
@@ -3001,8 +3096,7 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
         map.boxZoom.disable();
         map.keyboard.disable();
         if (map.tap) map.tap.disable();
-        // Hide zoom control for viewers
-        map.zoomControl.remove();
+        document.body.classList.add('is-viewer');   // hides #map-zoom
       }
     }
 

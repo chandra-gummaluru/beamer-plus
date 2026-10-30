@@ -947,6 +947,85 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
   background: var(--sn-hl) !important;
   color: var(--sn-ink) !important;
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   Shared in-widget controls — one look for the same job in every widget.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* View controls floating on the content (zoom, fit, page turning): the PDF,
+   the plotter, the map. A faint node in a corner; icon buttons that get an
+   ink outline when pointed at; a grey readout between them. */
+.bw-float {
+  position: absolute; z-index: 20;
+  display: flex; align-items: center; gap: 4px;
+  padding: 4px;
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  border: 1.5px solid var(--sn-faint);
+  border-radius: var(--sn-r);
+  font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', 'DM Sans', system-ui, sans-serif;   /* in the widget: the slide's face */
+  font-size: 12px;
+  color: var(--sn-ink);
+}
+.bw-float--br { right: 12px; bottom: 12px; }
+.bw-float--bl { left: 12px; bottom: 12px; }
+.bw-float--tr { right: 12px; top: 12px; }
+.bw-float .bw-btn { height: 28px; }
+.bw-float .bw-btn--icon,
+.bw-float > .bw-btn:not(.bw-seg *) {
+  width: 28px; padding: 0;
+  border: 1.5px solid transparent; border-radius: 5px;
+  background: none; color: var(--sn-ink);
+}
+.bw-float .bw-btn--icon:hover:not(:disabled) { border-color: var(--sn-ink); background: var(--sn-node); }
+.bw-float .bw-btn--icon:disabled { color: var(--sn-faint); background: none; border-color: transparent; }
+.bw-float .bw-btn--icon svg { width: 16px; height: 16px; }
+.bw-float-val {
+  min-width: 3.4em; text-align: center;
+  font-variant-numeric: tabular-nums; color: var(--sn-cap); user-select: none;
+}
+.bw-float-sep { flex: 0 0 auto; width: 1px; height: 18px; margin: 0 2px; background: var(--sn-faint); }
+
+/* Where a widget's content comes from (a link, an address, a file): one row
+   at the top of the widget while it's edited. An ink-outlined field with an
+   icon, what's chosen (or a box to type into), and a button. */
+.bw-source {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; max-width: 760px; margin: 0 auto;
+  min-height: 38px; padding: 4px 4px 4px 12px;
+  background: var(--bg);
+  border: 1.5px solid var(--sn-ink);
+  border-radius: var(--sn-r);
+  font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', 'DM Sans', system-ui, sans-serif;   /* in the widget: the slide's face */ font-size: 14px;
+  color: var(--sn-ink);
+}
+.bw-source > svg { flex: 0 0 auto; width: 16px; height: 16px; color: var(--sn-cap); }
+.bw-source:focus-within { box-shadow: 0 0 0 3px color-mix(in srgb, var(--sn-hl) 55%, transparent); }
+.bw-source:has(.is-bad) { border-color: #d93a2b; }
+.bw-source.is-over { border-style: dashed; background: color-mix(in srgb, var(--sn-hl) 22%, var(--bg)); }
+.bw-source-input {
+  flex: 1 1 auto; min-width: 0; height: 28px;
+  border: 0; outline: 0; background: none; padding: 0;
+  font: inherit; color: var(--sn-ink);
+}
+.bw-source-input::placeholder { color: var(--sn-cap); }
+.bw-source-name {
+  flex: 1 1 auto; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bw-source-name:empty::before { content: attr(data-empty); color: var(--sn-cap); }
+.bw-source-hint, .bw-source-msg { flex: 0 1 auto; min-width: 0; color: var(--sn-cap); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bw-source-msg:empty { display: none; }
+.bw-source-msg.is-err, .bw-source-msg.is-bad { color: #d93a2b; }
+/* The source's button, here and in an empty drop zone: an ink outline,
+   highlighter yellow when pointed at. */
+.bw-pick, .bw-source .bw-btn {
+  flex: 0 0 auto; height: 28px; padding: 0 12px;
+  border: 1.5px solid var(--sn-ink); border-radius: 5px;
+  background: var(--bg); color: var(--sn-ink);
+  font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', 'DM Sans', system-ui, sans-serif;   /* in the widget: the slide's face */ font-size: 13px; font-weight: 500;
+  cursor: pointer; white-space: nowrap;
+}
+.bw-pick:hover:not(:disabled), .bw-source .bw-btn:hover:not(:disabled) { background: var(--sn-hl); border-color: var(--sn-ink); }
 </style>
 <script id="bw-kit">
 // Beamer+ widget settings kit — runs INSIDE each widget iframe.
@@ -2775,8 +2854,8 @@ body.is-viewer .bw-sep:not(:first-of-type) { display: none !important; }
 #pdf-edit.is-over .pe-drop, #pdf-edit.is-over .pe-grid { border-color: var(--sn-ink); background: var(--edit-soft); }
 .pe-msg { color: #d93a2b; }
 .pe-main { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 12px 16px; }
-.pe-head { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
-.pe-name { font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.pe-head { flex: 0 0 auto; }
+.pe-name { }
 .pe-count { color: var(--sn-cap); white-space: nowrap; }
 .pe-grow { flex: 1 1 auto; }
 .pe-grid {
@@ -2820,22 +2899,18 @@ body.is-viewer .bw-sep:not(:first-of-type) { display: none !important; }
 #pdf-edit .bw-input { height: 28px; border: 1.5px solid var(--sn-faint); border-radius: var(--sn-r); background: var(--bg); color: var(--sn-ink); }
 #pdf-edit .bw-input:focus { border-color: var(--sn-ink); outline: none; }
 
-/* Fit and zoom float on the page area, bottom right, like the plotter's. */
-#pdf-float {
-  position: absolute; right: 12px; bottom: 12px; z-index: 20;
-  display: flex; align-items: center; gap: 8px;
-  padding: 5px; border-radius: var(--sn-r);
-  background: color-mix(in srgb, var(--bg) 92%, transparent);
-  border: 1.5px solid var(--sn-faint);
+/* Fit and zoom (bottom right) and page turning (bottom left) float on the
+   page area: the kit's .bw-float, as in every widget with view controls. */
+#pdf-float .page-nav, #pdf-pages { gap: 4px; }
+#pdf-pages #page-input {
+  width: 44px; height: 28px; text-align: center;
+  border: 1.5px solid var(--sn-faint); border-radius: 5px;
+  background: var(--bg); color: var(--sn-ink);
+  font-family: inherit; font-size: 12px; font-variant-numeric: tabular-nums;
 }
-#pdf-float .page-nav { display: inline-flex; align-items: center; gap: 4px; }
-/* Page turning floats bottom left, drawn the same way. */
-#pdf-pages {
-  position: absolute; left: 12px; bottom: 12px; z-index: 20;
-  display: flex; align-items: center; gap: 4px;
-  padding: 5px; border-radius: var(--sn-r);
-  background: color-mix(in srgb, var(--bg) 92%, transparent);
-  border: 1.5px solid var(--sn-faint);
+#pdf-pages #page-input:focus { border-color: var(--sn-ink); }
+#pdf-pages .page-sep, #pdf-pages #page-total, #pdf-float #zoom-val {
+  font-family: inherit; font-size: 12px; color: var(--sn-cap); font-variant-numeric: tabular-nums;
 }
 body.bw-editing #pdf-float, body.is-viewer #pdf-float,
 body.bw-editing #pdf-pages, body.is-viewer #pdf-pages { display: none; }
@@ -2859,7 +2934,7 @@ body.bw-editing #pdf-pages, body.is-viewer #pdf-pages { display: none; }
       <canvas id="pdf-canvas"></canvas>
     </div>
     <!-- Page turning, on the page area itself (bottom left). -->
-    <div id="pdf-pages" class="page-nav bw-run-only">
+    <div id="pdf-pages" class="bw-float bw-float--bl bw-run-only">
       <button class="bw-btn bw-btn--icon" id="btn-prev" disabled title="Previous page (←)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
@@ -2871,16 +2946,17 @@ body.bw-editing #pdf-pages, body.is-viewer #pdf-pages { display: none; }
       </button>
     </div>
     <!-- Fit and zoom, on the page area itself (bottom right). -->
-    <div id="pdf-float" class="bw-run-only">
+    <div id="pdf-float" class="bw-float bw-float--br bw-run-only">
     <div class="seg">
       <button class="bw-btn" id="btn-fit-page">Fit page</button>
       <button class="bw-btn" id="btn-fit-width">Fit width</button>
     </div>
+    <span class="bw-float-sep" aria-hidden="true"></span>
     <span id="zoom-group" class="page-nav">
       <button class="bw-btn bw-btn--icon" id="btn-zoom-out" title="Zoom out (−)">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.4"/><path d="M4.6 7h4.8M10.3 10.3l3 3"/></svg>
       </button>
-      <span id="zoom-val">100%</span>
+      <span id="zoom-val" class="bw-float-val">100%</span>
       <button class="bw-btn bw-btn--icon" id="btn-zoom-in" title="Zoom in (+)">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.4"/><path d="M4.6 7h4.8M7 4.6v4.8M10.3 10.3l3 3"/></svg>
       </button>
@@ -2891,14 +2967,14 @@ body.bw-editing #pdf-pages, body.is-viewer #pdf-pages { display: none; }
       <div class="pe-drop" id="pe-drop">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/></svg>
         <div class="pe-drop-t">Drop a PDF here</div>
-        <button class="bw-btn" type="button" id="pe-choose">Choose a File…</button>
+        <button class="bw-pick" type="button" id="pe-choose">Choose a File…</button>
         <div class="pe-msg" id="pe-msg" hidden></div>
       </div>
       <div class="pe-main" id="pe-main" hidden>
-        <div class="pe-head">
-          <span class="pe-name" id="pe-name"></span>
-          <span class="pe-count" id="pe-count"></span>
-          <span class="pe-grow"></span>
+        <div class="pe-head bw-source">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg>
+          <span class="pe-name bw-source-name" id="pe-name"></span>
+          <span class="pe-count bw-source-hint" id="pe-count"></span>
           <button class="bw-btn" type="button" id="pe-replace">Replace…</button>
         </div>
         <div class="pe-grid" id="pe-grid" role="listbox" aria-label="Pages: click the one it opens on"></div>
