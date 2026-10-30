@@ -95,7 +95,24 @@ export async function addWidget() {
     _catalogReady = _refreshCatalog();   // a widget dropped into widgets/ shows up next time
 }
 
-function _showWidgetModal(widgets) {
+/**
+ * The same picker, for a split widget slide: only the widgets that can be
+ * split, no Custom card. `onPick(entry)` gets the chosen catalog entry.
+ */
+export async function pickSplitWidget(onPick) {
+    if (document.getElementById('widget-modal-overlay')) {
+        document.getElementById('widget-modal-overlay').remove();
+        return;
+    }
+    const widgets = (_catalog || await _catalogReady).filter(w => w.split);
+    _showWidgetModal(widgets, { title: 'Add Split Widget', custom: false, onPick });
+}
+
+function _showWidgetModal(widgets, opts = {}) {
+    const title = opts.title || 'Add Widget';
+    const pick = opts.onPick
+        ? (type) => opts.onPick(widgets.find(w => w.type === type))
+        : (type) => (type === '__custom__' ? _pickCustomWidget() : _doAddWidget(type));
     document.getElementById('widget-modal-overlay')?.remove();
 
     // Determine which categories actually have widgets (so we don't show empty tabs).
@@ -112,7 +129,7 @@ function _showWidgetModal(widgets) {
     overlay.innerHTML = `
         <div class="widget-modal" id="widget-modal">
             <div class="widget-modal-header">
-                <h2 class="widget-modal-title">Add Widget</h2>
+                <h2 class="widget-modal-title">${escHtml(title)}</h2>
                 <button class="btn btn--ghost btn--icon btn--sm widget-modal-close" id="widget-modal-close" title="Close">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
@@ -134,7 +151,7 @@ function _showWidgetModal(widgets) {
     const search = document.getElementById('widget-modal-search');
     let activeCat = 'all';
 
-    const refresh = () => _populateWidgetGrid(grid, widgets, search?.value ?? '', activeCat);
+    const refresh = () => _populateWidgetGrid(grid, widgets, search?.value ?? '', activeCat, pick, opts.custom !== false);
     refresh();
 
     document.getElementById('widget-modal-cats')?.addEventListener('click', e => {
@@ -157,33 +174,32 @@ function _showWidgetModal(widgets) {
     setTimeout(() => search?.focus(), 40);
 }
 
-function _populateWidgetGrid(grid, widgets, filter, category = 'all') {
+function _populateWidgetGrid(grid, widgets, filter, category = 'all', pick, custom = true) {
     grid.innerHTML = '';
     const q = filter.trim().toLowerCase();
 
     // Custom upload card — shown in All and Other only (no category)
-    const showCustom = (category === 'all' || category === 'Other')
+    const showCustom = custom && (category === 'all' || category === 'Other')
         && (!q || 'custom upload html file'.includes(q));
     if (showCustom) {
-        grid.appendChild(_makeWidgetCard('__custom__', 'Custom', WIDGET_ICONS.__custom__, true));
+        grid.appendChild(_makeWidgetCard('__custom__', 'Custom', WIDGET_ICONS.__custom__, pick, true));
     }
 
     widgets.forEach(({ type, label, category: cat = 'Other' }) => {
         if (category !== 'all' && cat !== category) return;
         const q2 = `${label} ${type} ${cat}`.toLowerCase();
         if (q && !q2.includes(q)) return;
-        grid.appendChild(_makeWidgetCard(type, label, WIDGET_ICONS[type] || WIDGET_ICONS.__default__));
+        grid.appendChild(_makeWidgetCard(type, label, WIDGET_ICONS[type] || WIDGET_ICONS.__default__, pick));
     });
 }
 
-function _makeWidgetCard(type, label, iconSvg, isCustom = false) {
+function _makeWidgetCard(type, label, iconSvg, pick, isCustom = false) {
     const card = document.createElement('button');
     card.className = 'widget-card' + (isCustom ? ' widget-card--custom' : '');
     card.innerHTML = `<div class="widget-card-icon">${iconSvg}</div><div class="widget-card-label">${escHtml(label)}</div>`;
     card.addEventListener('click', () => {
         document.getElementById('widget-modal-overlay')?.remove();
-        if (type === '__custom__') _pickCustomWidget();
-        else _doAddWidget(type);
+        pick(type);
     });
     return card;
 }

@@ -8,7 +8,7 @@ import { ctx, escAttr, escHtml, setPanelMode, resolvePanelMode, setTitleEditable
 import { pickPanes } from './pane-picker.js';
 import { splitWidgetsOf, queueSync, loadSplitConfig } from '../slides/split-widgets.js';
 import { removeSplitWidgetSlide, insertSplitWidgetSlide } from '../slides/structure.js';
-import { widgetCatalog, widgetIcon } from './widget-picker.js';
+import { widgetCatalog, widgetIcon, pickSplitWidget } from './widget-picker.js';
 import { getWidgetSchema } from './widget-schema.js';
 import { buildWidgetForm } from './widget-fields.js';
 import { pushWidgetConfig } from '../core/iframe-widget-renderer.js';
@@ -271,20 +271,9 @@ async function openSplitWidgetSlide(i, obj) {
     });
 }
 
-/** The Split Widget button: choose a widget, get a slide of it. */
-export async function chooseSplitWidget() {
-    const catalog = (await widgetCatalog()).filter(w => w.split);
-    if (!catalog.length) return;
-    const add = c => insertSplitWidgetSlide({ type: c.type, split: c.split, label: c.label });
-    if (catalog.length === 1) { add(catalog[0]); return; }
-    window.BeamerModal?.show({
-        title: 'Insert Split Widget',
-        message: 'One widget across a split: a slide of its own, half on the left, half on the right.',
-        buttons: [
-            { label: 'Cancel', kind: 'cancel' },
-            ...catalog.map(c => ({ label: c.label, kind: 'ok', onClick: () => add(c) })),
-        ],
-    });
+/** The Split Widget button: choose a widget (the widget picker), get a slide of it. */
+export function chooseSplitWidget() {
+    pickSplitWidget(c => { if (c) insertSplitWidgetSlide({ type: c.type, split: c.split, label: c.label }); });
 }
 
 async function openSplitWidgetPanel(i, obj, w, label, opts = {}) {
