@@ -2794,11 +2794,21 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
       color: var(--sn-ink);
     }
     body.bw-editing #fe { display: flex; }
+    #fe-left {
+      flex: 0 0 34%; max-width: 340px; min-width: 200px;
+      display: flex; flex-direction: column; min-height: 0;
+      border-right: var(--sn-line) solid var(--sn-ink);
+    }
+    #fe-tools {
+      flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 6px;
+      padding: calc(8px * var(--u)) calc(10px * var(--u));
+      border-bottom: 1px solid color-mix(in srgb, var(--sn-ink) 18%, transparent);
+    }
+    #fe-tools .bw-pick { height: 26px; padding: 0 10px; font-size: 12px; }
     #fe-tree {
-      flex: 0 0 34%; max-width: 320px; min-width: 160px;
+      flex: 1 1 auto; min-height: 0;
       overflow: auto;
       padding: calc(8px * var(--u)) 0;
-      border-right: var(--sn-line) solid var(--sn-ink);
       font-size: calc(13px * var(--u));
     }
     .fe-row {
@@ -2855,19 +2865,20 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
 <div id="toolbar" data-bw-topbar>
   <span id="toolbar-title">Terminal</span>
   <span id="toolbar-sub" class="bw-run-only">bash</span>
-  <!-- Edit mode: what's on the pretend disk when the terminal opens. -->
-  <span class="bw-edit-only" style="display:contents">
-    <button class="bw-btn" type="button" id="fe-add-file" title="New file in the selected folder">+ File</button>
-    <button class="bw-btn" type="button" id="fe-add-dir" title="New folder in the selected folder">+ Folder</button>
-    <span class="fe-sep" aria-hidden="true"></span>
-    <button class="bw-btn" type="button" id="fe-start" title="Open the terminal in the selected folder">Start Here</button>
-  </span>
 </div>
 
 <!-- Edit mode (BeamerWidget.edit): the files and folders, and the selected
      file's contents. Saved as config.filesystem, { "~/path": {type, content} }. -->
 <div id="fe" class="bw-edit-only">
-  <div id="fe-tree" role="tree" aria-label="Files"></div>
+  <div id="fe-left">
+    <!-- On the tree itself: add to, or start in, the selected folder. -->
+    <div id="fe-tools">
+      <button class="bw-pick" type="button" id="fe-add-file" title="New file in the selected folder">+ File</button>
+      <button class="bw-pick" type="button" id="fe-add-dir" title="New folder in the selected folder">+ Folder</button>
+      <button class="bw-pick" type="button" id="fe-start" title="Open the terminal in the selected folder">Start Here</button>
+    </div>
+    <div id="fe-tree" role="tree" aria-label="Files"></div>
+  </div>
   <div id="fe-body">
     <div id="fe-path"></div>
     <textarea id="fe-text" spellcheck="false" autocomplete="off" placeholder="The file is empty"></textarea>
