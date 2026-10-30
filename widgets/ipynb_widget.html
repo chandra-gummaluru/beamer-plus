@@ -4224,7 +4224,7 @@ function addCodeCell(code = '', insertAfterId = null, { focus = true } = {}) {
   }
 
   refreshAddRows();
-  if (!IS_VIEWER && focus) { ta.focus(); selectCell(id); }
+  if (!IS_VIEWER && focus) { ta.focus({ preventScroll: true }); selectCell(id); }
   return id;
 }
 
@@ -4388,7 +4388,7 @@ function enterMarkdownEdit(id) {
   document.getElementById(`md-view-${id}`).style.display = 'none';
   const ta = document.getElementById(`ta-${id}`);
   autoResize(ta);
-  ta.focus();
+  ta.focus({ preventScroll: true });
   selectCell(id);
 }
 
@@ -4614,7 +4614,13 @@ function moveCell(id, dir) {
   if (dir < 0) other.before(b); else other.after(b);
   refreshAddRows();
   selectCell(id);
-  b.scrollIntoView({ block: 'nearest' });
+  // Within the notebook only: scrollIntoView would scroll Beamer+ too.
+  const area = document.getElementById('notebook-area');
+  if (area) {
+    const ar = area.getBoundingClientRect(), br = b.getBoundingClientRect();
+    if (br.top < ar.top) area.scrollTop -= ar.top - br.top;
+    else if (br.bottom > ar.bottom) area.scrollTop += Math.min(br.bottom - ar.bottom, br.top - ar.top);
+  }
 }
 
 function moveCellUp(id)   { moveCell(id, -1); }
@@ -5104,7 +5110,7 @@ if (IS_VIEWER) {
     removeBoot();
     setKernel('busy', 'Kernel error');
     console.warn('[notebook] load failed:', e);
-    addCodeCell('# Python failed to load. Check the network connection, then reload the slide.');
+    addCodeCell('# Python failed to load. Check the network connection, then reload the slide.', null, { focus: false });
     console.error(e);
   });
 }

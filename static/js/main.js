@@ -109,6 +109,31 @@ function deckNameOf(file) {
     return n || 'presentation';
 }
 
+/* ─── the page never scrolls ──────────────────────────────────── */
+// The app is laid out to the window and nothing in it is meant to scroll
+// as a page. But a widget that focuses a field or calls scrollIntoView
+// scrolls every ancestor to bring it into view — the page itself and the
+// clipped boxes round the slide included — which shifts the whole app
+// sideways and leaves the slide's layers out of line with what's under the
+// pointer. Put any such scroll straight back.
+function pinScroll(e) {
+    const root = document.scrollingElement || document.documentElement;
+    const t = (e.target === document || e.target === document.body) ? root : e.target;
+    if (!(t instanceof Element)) return;
+    if (t === root || t === document.body) {
+        if (root.scrollLeft || root.scrollTop) { root.scrollLeft = 0; root.scrollTop = 0; }
+        if (document.body.scrollLeft || document.body.scrollTop) { document.body.scrollLeft = 0; document.body.scrollTop = 0; }
+        return;
+    }
+    // A clipped (overflow: hidden) box holding a widget: scrolled only by
+    // the browser on the widget's behalf, never on purpose.
+    if (!t.querySelector('iframe')) return;
+    const cs = getComputedStyle(t);
+    if (t.scrollLeft && /hidden|clip/.test(cs.overflowX)) t.scrollLeft = 0;
+    if (t.scrollTop && /hidden|clip/.test(cs.overflowY)) t.scrollTop = 0;
+}
+document.addEventListener('scroll', pinScroll, true);
+
 /* ─── bootstrap ───────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
     const sessionId = getSessionId();
