@@ -3,6 +3,7 @@
    Imports tokens, base, components, and feature modules.
    ============================================================ */
 
+@import url('./fonts-cm.css');
 @import url('./tokens.css');
 @import url('./base.css');
 

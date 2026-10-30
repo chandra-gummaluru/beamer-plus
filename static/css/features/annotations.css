@@ -415,7 +415,7 @@ body.text-tool-active #ann-canvas-2 {
     box-shadow: 0 0 0 3px oklch(from var(--accent) l c h / 0.08), 0 6px 20px oklch(from var(--ink-1) l c h / 0.10);
     caret-color: var(--accent-strong);
     color: var(--ink-1);
-    font-family: Arial, Helvetica, sans-serif;
+    font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', Arial, sans-serif;
     line-height: 1.35;
     white-space: pre-wrap;
     text-align: center;

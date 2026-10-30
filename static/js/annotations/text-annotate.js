@@ -9,7 +9,9 @@
 // canvas bitmap alongside the plain text when the box is committed.
 import { bus } from '../core/events.js';
 
-const FONT_FAMILY = 'Arial, Helvetica, sans-serif';
+// The slides' own face (Computer Modern Sans, static/css/fonts-cm.css), so
+// typed text sits with the LaTeX around it.
+const FONT_FAMILY = "'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', Arial, sans-serif";
 const SIZE_PX = { small: 16, regular: 22, large: 32, xlarge: 44 };
 const TEXT_COLOR = '#242424';   // default; each box can pick its own (state.textColor)
 const MATHJAX_SRC = '/static/vendor/mathjax/tex-svg.js';
@@ -225,7 +227,7 @@ function parseInline(text, style, out) {
 const BLOCK_LINE_RE = /^(\s*[-*+]\s+|>)/m;
 function isFlushLeft(text) { return BLOCK_LINE_RE.test(text || ''); }
 
-const CODE_FONT = 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace';
+const CODE_FONT = "'BW CM Typewriter', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
 const CODE_BG = 'rgba(36, 36, 36, 0.07)';
 const QUOTE_COLOR = '#5b5f66';
 
@@ -274,6 +276,9 @@ async function commitTextAnnotation(cvs, x, y, rawText, size, oldBox, boxWidth, 
         if (oldBox) cvs.commitHistory();   // editing down to empty = delete
         return null;
     }
+
+    // A canvas draws in a web font only once it has loaded.
+    try { await Promise.all([document.fonts.load(`22px 'BW CM Sans'`), document.fonts.load(`bold 22px 'BW CM Sans'`), document.fonts.load(`22px 'BW CM Typewriter'`)]); } catch (_) {}
 
     const baseSize = SIZE_PX[size] || SIZE_PX.regular;
     const lines = text.split('\n').map(parseLine);
