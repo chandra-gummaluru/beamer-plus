@@ -1027,6 +1027,18 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
   cursor: pointer; white-space: nowrap;
 }
 .bw-pick:hover:not(:disabled), .bw-source .bw-btn:hover:not(:disabled) { background: var(--sn-hl); border-color: var(--sn-ink); }
+/* In the top bar (where every widget's source now sits while it's edited):
+   the same row, the bar's height, growing to fill the free space. */
+:is(.bw-topbar, .bw-toolbar) .bw-source {
+  flex: 1 1 240px; width: auto; max-width: 560px; margin: 0;
+  min-height: 0; height: var(--ctl-h);
+  padding: 0 2px 0 8px; gap: 6px;
+  font-size: 13px;
+}
+:is(.bw-topbar, .bw-toolbar) .bw-source > svg { width: 14px; height: 14px; }
+:is(.bw-topbar, .bw-toolbar) .bw-source-input { height: 100%; font-size: 13px; }
+:is(.bw-topbar, .bw-toolbar) .bw-source .bw-btn { height: calc(var(--ctl-h) - 7px); padding: 0 10px; font-size: 12px; }
+:is(.bw-topbar, .bw-toolbar) .bw-source:focus-within { box-shadow: none; }
 
 /* One weight in the chrome: Computer Modern's bold is a wide, heavy cut that
    reads as a different typeface beside the regular. */
@@ -3476,8 +3488,7 @@ body:not(.bw-editing) #toolbar .tb-btn.primary:hover:not(:disabled) { border-col
 
 /* No Run All or download in the bar: cells run one by one on the slide. */
 #btn-run-all, #btn-download, #toolbar > .sep { display: none !important; }
-.nb-ed { margin-bottom: 14px; }
-body.bw-editing .nb-ed { display: flex; }
+
 body.bw-editing #notebook-area.is-over { outline: 2px dashed var(--sn-ink, #222); outline-offset: -8px; background: var(--edit-soft); }
 </style>
 </head>
@@ -3490,6 +3501,13 @@ body.bw-editing #notebook-area.is-over { outline: 2px dashed var(--sn-ink, #222)
        next to it. The kit adopts the element itself, so the updates this
        widget writes to it still land. -->
   <span id="notebook-title" data-bw-title>Untitled.ipynb</span>
+  <!-- Edit mode only: which notebook. The source row every widget has in its bar. -->
+  <div class="bw-edit-only bw-source nb-ed">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg>
+    <span class="bw-source-name" id="nb-ed-name" data-empty="Untitled.ipynb — a blank notebook"></span>
+    <span class="bw-source-msg" id="nb-ed-msg"></span>
+    <button class="bw-btn" type="button" id="nb-choose">Choose Notebook…</button>
+  </div>
 
   <button class="tb-btn primary" id="btn-run-all" disabled onclick="runAll()">
     Run All
@@ -3506,14 +3524,6 @@ body.bw-editing #notebook-area.is-over { outline: 2px dashed var(--sn-ink, #222)
 
 <!-- ── Notebook ───────────────────────────────────────────────────────── -->
 <div id="notebook-area">
-  <!-- Edit mode only: which notebook (also dropped on the page). The same
-       source row as every widget's. -->
-  <div class="bw-edit-only bw-source nb-ed">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg>
-    <span class="bw-source-name" id="nb-ed-name" data-empty="Untitled.ipynb — a blank notebook"></span>
-    <span class="bw-source-msg" id="nb-ed-msg"></span>
-    <button class="bw-btn" type="button" id="nb-choose">Choose Notebook…</button>
-  </div>
   <!-- Paper only. Filled in just before printing: see fillPrintHeader(). -->
   <div id="print-header" aria-hidden="true">
     <div class="ph-row">

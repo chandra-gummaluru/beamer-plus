@@ -1028,6 +1028,18 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
   cursor: pointer; white-space: nowrap;
 }
 .bw-pick:hover:not(:disabled), .bw-source .bw-btn:hover:not(:disabled) { background: var(--sn-hl); border-color: var(--sn-ink); }
+/* In the top bar (where every widget's source now sits while it's edited):
+   the same row, the bar's height, growing to fill the free space. */
+:is(.bw-topbar, .bw-toolbar) .bw-source {
+  flex: 1 1 240px; width: auto; max-width: 560px; margin: 0;
+  min-height: 0; height: var(--ctl-h);
+  padding: 0 2px 0 8px; gap: 6px;
+  font-size: 13px;
+}
+:is(.bw-topbar, .bw-toolbar) .bw-source > svg { width: 14px; height: 14px; }
+:is(.bw-topbar, .bw-toolbar) .bw-source-input { height: 100%; font-size: 13px; }
+:is(.bw-topbar, .bw-toolbar) .bw-source .bw-btn { height: calc(var(--ctl-h) - 7px); padding: 0 10px; font-size: 12px; }
+:is(.bw-topbar, .bw-toolbar) .bw-source:focus-within { box-shadow: none; }
 
 /* One weight in the chrome: Computer Modern's bold is a wide, heavy cut that
    reads as a different typeface beside the regular. */
@@ -2875,10 +2887,7 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
   
 #map-wrap { position: relative; width: 100%; height: 100%; }
 /* The source row floats over the top of the map while it's edited. */
-.map-ed {
-  position: absolute; z-index: 1000; top: 12px; left: 16px; right: 16px;
-  width: auto; box-shadow: 0 4px 14px rgba(0,0,0,0.10);
-}
+
 .map-q-wrap { position: relative; flex: 1 1 auto; min-width: 120px; display: flex; }
 #map-q { flex: 1 1 auto; min-width: 0; }
 #map-zoom { z-index: 1000; bottom: 28px; }   /* clear of the map's attribution line */
@@ -2906,20 +2915,20 @@ body.is-viewer #map-zoom { display: none; } #map:empty ~ #map-zoom { display: no
        zoom the map itself; saved with the slide. -->
   <div id="toolbar" class="bw-toolbar" data-bw-topbar>
     <span class="bw-toolbar-title">Map</span>
-  </div>
-  <div id="map-wrap">
-    <div id="map"></div>
     <!-- Edit mode only: where the map opens. Search an address, or pan and
-         zoom the map itself. The same source row as every widget's. -->
+         zoom the map itself. The source row every widget has in its bar. -->
     <form class="bw-edit-only bw-source map-ed" id="map-search" autocomplete="off">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
       <span class="map-q-wrap">
-        <input class="bw-source-input" id="map-q" type="text" placeholder="Where the map starts: search an address or place" spellcheck="false" role="combobox" aria-autocomplete="list" aria-controls="map-sugg">
+        <input class="bw-source-input" id="map-q" type="text" placeholder="Where the map starts: an address or place" spellcheck="false" role="combobox" aria-autocomplete="list" aria-controls="map-sugg">
         <span class="map-sugg" id="map-sugg" role="listbox" hidden></span>
       </span>
       <span class="map-ed-msg bw-source-msg" id="map-msg"></span>
       <button class="bw-btn" type="submit">Go</button>
     </form>
+  </div>
+  <div id="map-wrap">
+    <div id="map"></div>
     <!-- Zoom: the kit's floating view controls, as in every widget. -->
     <div class="bw-float bw-float--br" id="map-zoom">
       <button class="bw-btn bw-btn--icon" type="button" id="map-zout" title="Zoom out"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.4"/><path d="M4.6 7h4.8M10.3 10.3l3 3"/></svg></button>
