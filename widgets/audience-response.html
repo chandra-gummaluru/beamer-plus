@@ -3827,6 +3827,21 @@ body.bw-editing #ed-secs[hidden] { display: none; }
 #ed-ans-tools .ar-sep { display: none; }
 #ed-ans-tools .bw-seg > .bw-btn { height: 24px; padding: 0 9px; font-size: var(--fs-chrome-sm, 12px); }
 #ed-add-wrap { display: none !important; }
+/* The switches placed on the slide are drawn like the slide: the slide's
+   face, an ink outline like the answers', the chosen one in the deck's
+   yellow (as the right answer is). Not the bar's grey buttons. */
+:is(#ed-ans-tools, #join-ed-auto, #timer-ed) .bw-seg {
+  border: 1.5px solid var(--ar-ink); border-radius: var(--ar-r);
+  background: var(--bg); overflow: hidden;
+}
+:is(#ed-ans-tools, #join-ed-auto, #timer-ed) .bw-seg > .bw-btn {
+  height: calc(26px * var(--u)) !important; padding: 0 calc(10px * var(--u)) !important;
+  font-family: inherit; font-size: calc(13px * var(--u)) !important; font-weight: 400 !important;
+  color: var(--ar-ink); background: transparent; border: 0 !important; border-radius: 0;
+}
+:is(#ed-ans-tools, #join-ed-auto, #timer-ed) .bw-seg > .bw-btn + .bw-btn { border-left: 1.5px solid var(--ar-ink) !important; }
+:is(#ed-ans-tools, #join-ed-auto, #timer-ed) .bw-seg > .bw-btn:hover:not(.is-active) { background: var(--ar-node); }
+:is(#ed-ans-tools, #join-ed-auto, #timer-ed) .bw-seg > .bw-btn.is-active { background: var(--ar-hl); color: var(--ar-ink); }
 .ed-add-tile .opt {
   justify-content: center; cursor: pointer !important;
   border-style: dashed; border-color: var(--ar-faint); background: var(--bg);
