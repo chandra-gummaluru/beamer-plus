@@ -5791,7 +5791,7 @@ body.ar-static .ar-split-pane { pointer-events: none; }
   function overflowing() {
     // The question column scrolls as a whole when the banner is up under it.
     const els = [questionEl, choicesEl, fillTpl, promptEl, ...questionEl.querySelectorAll('pre'),
-                 ...document.querySelectorAll('.ar-split-pane')];
+                 ...document.querySelectorAll('.ar-split-pane'), document.getElementById('join')];
     return els.some(el => el.offsetParent !== null && el.clientHeight > 0 &&
       (el.scrollHeight > el.clientHeight + 2 || el.scrollWidth > el.clientWidth + 2));
   }
@@ -5802,8 +5802,11 @@ body.ar-static .ar-split-pane { pointer-events: none; }
     // measuring now would shrink to the floor and stay there.
     const measurable = () => stage.clientHeight >= 120 && stage.clientWidth >= 200;
 
-    shrinkToFit(relayout, measurable);
+    // The banner drops its words first (at full size), then everything
+    // shrinks until the banner's QR, count and timer fit too.
+    stage.style.removeProperty('--u');
     fitJoinText();
+    shrinkToFit(relayout, measurable);
   }
 
   // Largest --u (between FIT_MIN and the presenter's size) at which nothing
