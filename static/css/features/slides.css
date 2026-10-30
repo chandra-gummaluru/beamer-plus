@@ -297,6 +297,33 @@ model-viewer { pointer-events: auto !important; }
 }
 #slide-navigator::-webkit-scrollbar { display: none; }
 
+/* Edit at the top of the slides, Record at the foot: full-width buttons in
+   the column; icons alone at the ends of the row when the navigator runs
+   along the bottom (split view, small screens). */
+.slide-nav-tools {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    padding: var(--sp-3) var(--sp-3);
+}
+#slide-nav-top { padding-bottom: var(--sp-2); }
+#slide-nav-foot { padding-top: var(--sp-2); border-top: var(--line-hairline); }
+#slide-nav-top:not(:has(.btn:not([hidden]))) { display: none; }
+.slide-nav-tool { width: 100%; gap: var(--sp-2); }
+.slide-nav-tool[hidden] { display: none; }
+/* Neither while editing (the editor has its own Done), nor Record while a
+   take is in progress (the recording bar stands in for it). */
+body.edit-mode .slide-nav-tools,
+body.is-recording #slide-nav-foot { display: none; }
+body.split-view-active .slide-nav-tools {
+    justify-content: center;
+    padding: 0 var(--sp-2);
+    border: none;
+}
+body.split-view-active .slide-nav-tool { width: var(--ctl-h); padding: 0; }
+body.split-view-active .slide-nav-tool span { display: none; }
+
 #slide-nav-slides {
     display: flex;
     flex: 1 1 auto;
@@ -564,6 +591,7 @@ body.edit-mode.split-view-active #slide-navigator {
     width: auto;
 }
 
+body.split-view-active #slide-nav-foot { order: 9; }
 body.split-view-active #slide-nav-slides {
     flex-direction: row;
     align-items: center;
@@ -1166,3 +1194,15 @@ body.slide-muted #ann-canvas, body.slide-muted #ann-canvas-2 { z-index: 2 !impor
 /* Editing a slide that holds one half: the half stays in view but faded, so
    the slide's own items (and their edit boxes) show through it. */
 body.edit-mode #split-widget-layer .widget-iframe[data-split-live="false"] { opacity: 0.4 !important; }
+
+/* Small screens: the navigator runs along the bottom (as in split view),
+   except in landscape, where it is a narrow column again. */
+@media (max-width: 1024px) {
+    .slide-nav-tools { justify-content: center; padding: 0 var(--sp-2); border: none; }
+    .slide-nav-tool { width: var(--ctl-h); padding: 0; }
+    .slide-nav-tool span { display: none; }
+}
+@media (max-width: 1024px) and (orientation: landscape) {
+    body:not(.split-view-active) .slide-nav-tools { padding: var(--sp-2); }
+    body:not(.split-view-active) .slide-nav-tool { width: 100%; }
+}

@@ -79,7 +79,7 @@ const STEPS = [
     },
     {
         sel:   '#record-btn',
-        place: 'left',
+        place: 'right',
         title: 'Record the Lecture',
         body:  'Record this tab as a video: slides, ink, widgets, your microphone and the tab\'s sound. Takes are saved every second, so a reload or crash loses nothing, and they are offered when you Save.',
     },
