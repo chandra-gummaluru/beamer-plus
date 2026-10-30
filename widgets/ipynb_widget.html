@@ -3128,8 +3128,7 @@ body {
   opacity: 0;
   transition: opacity 0.15s;
 }
-.add-row:hover { opacity: 1 !important; }
-#notebook:hover .add-row { opacity: 0.35; }
+.add-row { opacity: 1; }
 
 .add-btn {
   border: 1px dashed var(--border);
@@ -4567,8 +4566,10 @@ function moveCellDown(id) { moveCell(id, +1); }
 
 function selectCell(id) {
   if (selectedId) document.getElementById(`card-${selectedId}`)?.classList.remove('focused');
+  const moved = selectedId !== id;
   selectedId = id;
   document.getElementById(`card-${id}`)?.classList.add('focused');
+  if (moved) refreshAddRows();
 }
 
 function onCellKey(e, id) {
@@ -4648,10 +4649,15 @@ function paintCode(ta) {
 // The gap between two cells is where a new one goes, and the only thing left
 // to say is which kind — so the row offers both rather than assuming code and
 // making the presenter convert it afterwards.
+// Only under the selected cell (the last, when none is): one row of + Code /
+// + Markdown rather than one between every pair of cells, which took a line
+// of space each. It follows the selection (selectCell).
 function refreshAddRows() {
   document.querySelectorAll('.add-row').forEach(r => r.remove());
   if (IS_VIEWER) return;
-  document.querySelectorAll('#notebook .cell-block').forEach(b => {
+  const blocks = [...document.querySelectorAll('#notebook .cell-block')];
+  const sel = selectedId && blocks.find(b => b.dataset.id === String(selectedId));
+  [sel || blocks[blocks.length - 1]].filter(Boolean).forEach(b => {
     const row = document.createElement('div');
     row.className = 'add-row';
     for (const [label, add] of [['+ Code', addCodeCell], ['+ Markdown', addMarkdownCell]]) {
