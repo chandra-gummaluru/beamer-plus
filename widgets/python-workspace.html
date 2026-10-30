@@ -5,7 +5,7 @@
 <script id="widget-schema" type="application/json">
 {
   "label": "Python Workspace",
-  "edit": false,
+  "inlineEdit": true,
   "fullSlide": true,
   "category": "Computer Science",
   "liveSettings": true,
@@ -3541,6 +3541,17 @@ body.ws-split .splitter { display: none !important; }
 body.ws-split .split-tabs { display: inline-flex; }
 body.ws-split .pane.has-split-tabs .pane-label { display: none; }
 .split-tabs .bw-btn[aria-pressed="true"] { font-weight: 600; }
+
+/* ── Edit mode ─────────────────────────────────────────── */
+.ws-ed-field { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; color: var(--text-3); white-space: nowrap; }
+.ws-ed-sep { flex: 0 0 auto; width: 1px; height: 16px; background: var(--border-med); }
+/* No Open or Save: the code is set in edit mode and saved with the deck. */
+#open-btn, #save-btn, #toolbar > .bw-sep:first-of-type { display: none !important; }
+/* The start line: a yellow marker in the gutter, and the lines above it
+   (which will already have run when the slide opens) faded a little. */
+#gutter .is-start { color: var(--text); font-weight: 600; background: var(--sn-hl, #f7c548); border-radius: 3px; }
+#gutter .is-before { opacity: .5; }
+body.bw-editing #gutter { cursor: pointer; }
 </style>
 </head>
 <body>
@@ -3548,11 +3559,18 @@ body.ws-split .pane.has-split-tabs .pane-label { display: none; }
 
   <div id="toolbar" class="bw-toolbar" data-bw-topbar>
     <span class="bw-toolbar-title">Python</span>
-    <div class="bw-sep"></div>
-    <button class="bw-btn" id="open-btn" title="Open a .py file" aria-label="Open"><svg class="bi" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M1.8 3.5h4l1.4 1.6h7v8H1.8z"/></svg><span class="bl">Open</span></button>
-    <button class="bw-btn" id="save-btn" title="Download this file (Ctrl+S)" aria-label="Save"><svg class="bi" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8M4.8 7 8 10.2 11.2 7M2.5 13.5h11"/></svg><span class="bl">Save</span></button>
-    <div class="bw-sep presenter-only"></div>
-    <div id="layout-wrap" class="presenter-only">
+    <button class="bw-btn" hidden id="open-btn" title="Open a .py file" aria-label="Open"><svg class="bi" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M1.8 3.5h4l1.4 1.6h7v8H1.8z"/></svg><span class="bl">Open</span></button>
+    <button class="bw-btn" hidden id="save-btn" title="Download this file (Ctrl+S)" aria-label="Save"><svg class="bi" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8M4.8 7 8 10.2 11.2 7M2.5 13.5h11"/></svg><span class="bl">Save</span></button>
+    <!-- Edit mode: what a click on a line number sets, and the layout. The
+         starting code is typed in the editor as usual. -->
+    <span class="bw-edit-only ws-ed-field">Line Numbers Set
+      <span class="bw-seg" id="ed-gutter" title="Click a line number in the editor to set this">
+        <button class="bw-btn" type="button" data-v="bp">Breakpoints</button>
+        <button class="bw-btn" type="button" data-v="start">Start Line</button>
+      </span>
+    </span>
+    <span class="ws-ed-sep bw-edit-only" aria-hidden="true"></span>
+    <div id="layout-wrap" class="presenter-only bw-edit-only">
       <button class="bw-btn" id="layout-btn" title="Choose a layout" aria-haspopup="true" aria-expanded="false">
         <svg viewBox="0 0 16 12" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="0.7" y="0.7" width="14.6" height="10.6" rx="1.5"/><path d="M8 0.7v10.6M8 6h7.3"/></svg>
         <span class="bl">Layout</span>
@@ -3571,7 +3589,7 @@ body.ws-split .pane.has-split-tabs .pane-label { display: none; }
           <span class="pane-label">Editor</span>
           <input class="pane-file" id="filename" value="main.py" spellcheck="false" aria-label="File name">
           <div class="bw-spacer"></div>
-          <span id="mm-tools" class="presenter-only" hidden>
+          <span id="mm-tools" class="presenter-only bw-run-only" hidden>
             <span id="traceTools">
               <button class="bw-btn bw-btn--icon" id="btnReset" type="button" title="Back to the start of the trace (R)" aria-label="Back to the start of the trace">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5v14"/><path d="M19 5 L11 12 L19 19"/></svg>
@@ -3588,7 +3606,7 @@ body.ws-split .pane.has-split-tabs .pane-label { display: none; }
               <div class="bw-sep"></div>
             </span>
           </span>
-          <span id="dbg-tools" class="presenter-only" hidden>
+          <span id="dbg-tools" class="presenter-only bw-run-only" hidden>
             <button class="bw-btn bw-btn--icon" id="dbg-back" type="button" title="Step back" aria-label="Step back"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 11A5.5 5.5 0 0 0 3 8.6"/><path d="M2.5 5v3.8h3.8"/></svg></button>
             <button class="bw-btn bw-btn--icon" id="dbg-cont" type="button" title="Continue to the next breakpoint (F5)" aria-label="Continue"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 3v10"/><path d="M7 3.2 13 8l-6 4.8z"/></svg></button>
             <button class="bw-btn bw-btn--icon" id="dbg-over" type="button" title="Step over (F10)" aria-label="Step over"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 9.5a5.5 5.5 0 0 1 10.6-2"/><path d="M13.6 3.8v3.9H9.7"/><circle cx="8" cy="13" r="1.3"/></svg></button>
@@ -3596,8 +3614,8 @@ body.ws-split .pane.has-split-tabs .pane-label { display: none; }
             <button class="bw-btn bw-btn--icon" id="dbg-out" type="button" title="Step out (Shift+F11)" aria-label="Step out"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 9.5V2"/><path d="M5 4.8 8 1.8l3 3"/><circle cx="8" cy="13.2" r="1.3"/></svg></button>
             <button class="bw-btn bw-btn--icon" id="dbg-stop" type="button" title="Stop debugging (Shift+F5)" aria-label="Stop debugging"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="9" height="9" rx="1.2"/></svg></button>
           </span>
-          <button class="bw-btn" id="debug-btn" title="Debug: run, pausing at breakpoints (F6). Click a line number to set one." aria-label="Debug"><svg class="bi" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.8 5.2a2.2 2.2 0 0 1 4.4 0"/><rect x="4.6" y="5.2" width="6.8" height="8.3" rx="3.4"/><path d="M8 8v5.3M1.8 9.2h2.8M11.4 9.2h2.8M2.4 5.6l2.3 1.4M13.6 5.6l-2.3 1.4M2.4 13.2l2.4-1.6M13.6 13.2l-2.4-1.6"/></svg><span class="bl">Debug</span></button>
-          <button class="bw-btn bw-btn--primary" id="run-btn" title="Run file in the shell (F5 / Ctrl+Enter)">Run</button>
+          <button class="bw-btn bw-run-only" id="debug-btn" title="Debug: run, pausing at breakpoints (F6). Click a line number to set one." aria-label="Debug"><svg class="bi" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.8 5.2a2.2 2.2 0 0 1 4.4 0"/><rect x="4.6" y="5.2" width="6.8" height="8.3" rx="3.4"/><path d="M8 8v5.3M1.8 9.2h2.8M11.4 9.2h2.8M2.4 5.6l2.3 1.4M13.6 5.6l-2.3 1.4M2.4 13.2l2.4-1.6M13.6 13.2l-2.4-1.6"/></svg><span class="bl">Debug</span></button>
+          <button class="bw-btn bw-btn--primary bw-run-only" id="run-btn" title="Run file in the shell (F5 / Ctrl+Enter)">Run</button>
           <button class="bw-btn bw-btn--icon pane-max" data-pane="editor"></button>
         </div>
         <div id="editor-body">
@@ -6626,6 +6644,16 @@ function resetAll(){
   render();
 }
 
+/* Open with everything above `line` already run: the trace waits on the first
+   step that is about to run that line. Only from the start of a trace. */
+function startAt(line){
+  if (MM.readOnly || !line || line <= 1 || app.idx > 0) return;
+  ensureTrace();
+  for (var i = 1; i < app.trace.states.length; i++){
+    if (app.trace.states[i].line === line){ app.revealErrors = true; goTo(i); return; }
+  }
+}
+
 function setCode(code){
   code = String(code).replace(/\r\n?/g, '\n');
   if (window.PWEditor){ PWEditor.setCode(code); return; }
@@ -6922,6 +6950,7 @@ window.PythonVisualizer = {
   setCode: setCode,
   getCode: function(){ return app.code; },
   reset: resetAll,
+  startAt: startAt,
   stepForward: stepForward,
   stepBackward: stepBackward,
   run: runAll,
@@ -7776,7 +7805,9 @@ print(shopping)
                 + (i === cur ? ' is-cur' : '')
                 + (i === dbg ? ' is-dbg' : '')
                 + (bps.has(i) ? ' is-bp' : '')
-                + (i <= locked ? ' is-locked' : '');
+                + (i <= locked ? ' is-locked' : '')
+                + (editing() && i === startLine() ? ' is-start' : '')
+                + (editing() && i < startLine() ? ' is-before' : '');
       g += cls ? `<span class="${cls.trim()}">${i}</span>\n` : i + '\n';
     }
     gutterEl.innerHTML = g;
@@ -7948,6 +7979,15 @@ print(shopping)
     renderEditor();
     PV.codeEdited(S.code);
     emitState();
+    if (editing()) {
+      clearTimeout(codeSaveTimer);
+      codeSaveTimer = setTimeout(() => {
+        lastCfg.code = JSON.stringify(S.code);
+        const n = S.code.split('\n').length;
+        const patch = { code: S.code, breakpoints: S.breakpoints.slice() };
+        if (startLine() > n) editSet(patch, ['startLine']); else editSet(patch);
+      }, 300);
+    }
   }
 
   // ── Shell transcript ────────────────────────────────────────────────────────
@@ -8848,7 +8888,7 @@ def _debug_file(src, fname, limit):
       b.innerHTML = on ? ICON_COLLAPSE : ICON_EXPAND;
       b.title     = on ? 'Back to the layout' : 'Show this pane alone';
       // A pane alone in a single layout has nothing to expand into.
-      b.style.display = (!S.max && kind === 'single') || IS_VIEWER ? 'none' : '';
+      b.style.display = (!S.max && kind === 'single') || IS_VIEWER || !editing() ? 'none' : '';
     });
 
     // The memory model's controls follow its pane into and out of view.
@@ -8861,13 +8901,14 @@ def _debug_file(src, fname, limit):
   }
 
   function setLayout(patch, opts = {}) {
-    if (IS_VIEWER || S.split) return;
+    if (IS_VIEWER || S.split || !editing()) return;
     const L = { ...S.layout, ...patch };
     if (!LAYOUTS.includes(L.kind)) L.kind = 'grid-left';
     S.layout = L;
     if (!opts.keepMax) S.max = null;
     renderLayout();
     emitState();
+    saveLayout();
   }
 
   // Putting a pane into a slot swaps it with whatever held that pane before,
@@ -8881,17 +8922,18 @@ def _debug_file(src, fname, limit):
   }
 
   function toggleMax(name) {
-    if (IS_VIEWER || S.split) return;
+    if (IS_VIEWER || S.split || !editing()) return;
     S.max = S.max === name ? null : name;
     renderLayout();
     emitState();
+    saveLayout();
     if (S.max === 'shell') focusInput();
     else if (S.max === 'editor') codeEl.focus({ preventScroll: true });
   }
 
   // Splitters: the pointer's position becomes the fraction directly.
   function startSplit(which, e) {
-    if (IS_VIEWER) return;
+    if (IS_VIEWER || !editing()) return;
     const d = splitDefs[which];
     if (!d) return;
     e.preventDefault();
@@ -8917,6 +8959,7 @@ def _debug_file(src, fname, limit):
       el.removeEventListener('pointerup', up);
       el.removeEventListener('pointercancel', up);
       PV.render();
+      saveLayout();
     };
     el.addEventListener('pointermove', move);
     el.addEventListener('pointerup', up);
@@ -9045,7 +9088,7 @@ def _debug_file(src, fname, limit):
     runBtn.textContent     = phase === 'running' ? 'Running…' : 'Run';
     $('restart-label').textContent = phase === 'running' ? 'Stop' : 'Restart';
 
-    [restartBtn, openBtn, clearBtn, layoutBtn].forEach(b => { b.style.display = IS_VIEWER ? 'none' : ''; });
+    [restartBtn, clearBtn].forEach(b => { b.style.display = IS_VIEWER ? 'none' : ''; });
     renderDebugChrome();
     codeEl.readOnly  = IS_VIEWER || !!cfg.readOnly;
     fileEl.disabled  = IS_VIEWER || !!cfg.readOnly;
@@ -9064,12 +9107,14 @@ def _debug_file(src, fname, limit):
 
   function toggleBreakpoint(line) {
     if (IS_VIEWER || !line) return;
+    if (editing() && gutterMode === 'start') { setStartLine(line); return; }
     const i = S.breakpoints.indexOf(line);
     if (i >= 0) S.breakpoints.splice(i, 1);
     else S.breakpoints.push(line);
     S.breakpoints.sort((a, b) => a - b);
     renderGutter();
     emitState();
+    if (editing()) editSet({ breakpoints: S.breakpoints.slice() });
   }
 
   // Edits move the lines under the dots, so the dots move with them: lines
@@ -9466,6 +9511,7 @@ def _debug_file(src, fname, limit):
       renderLayout();
       renderDebug();
       if (s.mm && typeof s.mm === 'object') PV.setWidgetState({ ...s.mm, code: S.code });
+      if (!IS_VIEWER && !(s.mm && s.mm.step > 0)) applyStartLine();
     } finally {
       applying = false;
     }
@@ -9524,6 +9570,16 @@ def _debug_file(src, fname, limit):
       L.slots = [first, second, ...PANES.filter(p => p !== first && p !== second)];
       S.layout = L;
       S.max = null;
+      synced = true;
+    }
+
+    if (changed('layoutState') && cfg.layoutState && typeof cfg.layoutState === 'object') {
+      S.layout = cleanLayout(cfg.layoutState);
+      S.max = PANES.includes(cfg.layoutState.max) ? cfg.layoutState.max : null;
+      synced = true;
+    }
+    if (changed('breakpoints') && Array.isArray(cfg.breakpoints)) {
+      S.breakpoints = [...new Set(cfg.breakpoints.filter(n => Number.isInteger(n) && n > 0))].sort((a, b) => a - b);
       synced = true;
     }
 
@@ -9784,6 +9840,69 @@ def _debug_file(src, fname, limit):
       .replace(/"/g, '&quot;');
   }
 
+  // ── Edit mode ───────────────────────────────────────────────────────────────
+  // The kit's Edit button puts the workspace into edit mode (body.bw-editing):
+  // the editor's code becomes the starting code, a click on a line number sets
+  // a breakpoint or the start line (the bar says which), and the layout can
+  // be changed — only then. Each change is saved with the slide.
+  //   code        the starting code
+  //   breakpoints line numbers
+  //   startLine   the line the trace opens on, everything above it run
+  //   layoutState the layout ({ kind, slots, a, b, max })
+  let gutterMode = 'bp', codeSaveTimer = null;
+  function editing() { return !!(window.BeamerWidget && BeamerWidget.edit && BeamerWidget.edit.active); }
+  function editSet(patch, remove) {
+    if (window.BeamerWidget && BeamerWidget.edit) BeamerWidget.edit.set(patch, remove || [], { silent: true });
+    Object.keys(patch || {}).forEach(k => { lastCfg[k] = JSON.stringify(patch[k] ?? null); cfg[k] = patch[k]; });
+    (remove || []).forEach(k => { delete cfg[k]; lastCfg[k] = JSON.stringify(null); });
+  }
+  function startLine() { const n = Number(cfg.startLine); return Number.isInteger(n) && n > 1 ? n : 1; }
+  function setStartLine(line) {
+    if (line <= 1 || line === startLine()) editSet({}, ['startLine']);
+    else editSet({ startLine: line });
+    renderGutter();
+    paintEditBar();
+  }
+  function saveLayout() {
+    if (!editing() || S.split) return;
+    editSet({ layoutState: { ...S.layout, slots: S.layout.slots.slice(), max: S.max },
+              layout: S.layout.kind, primary: S.layout.slots[0], secondary: S.layout.slots[1] });
+  }
+  function applyStartLine() {
+    if (IS_VIEWER || editing() || startLine() <= 1) return;
+    PV.startAt(startLine());
+  }
+  function paintEditBar() {
+    document.querySelectorAll('#ed-gutter [data-v]').forEach(b => {
+      const on = b.dataset.v === gutterMode;
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+  }
+  document.getElementById('ed-gutter')?.addEventListener('click', e => {
+    const b = e.target.closest('[data-v]');
+    if (!b) return;
+    gutterMode = b.dataset.v;
+    paintEditBar();
+  });
+  window.addEventListener('bw-edit', e => {
+    if (e.detail.editing) {
+      // The starting code as it will open: no run, trace or debug session in
+      // the way of typing into it.
+      if (DBG.session || DBG.recording) stopDebug({ keepLayout: true });
+      PV.reset();
+      gutterMode = 'bp';
+      paintEditBar();
+    } else {
+      clearTimeout(codeSaveTimer);
+      if (S.code !== cfg.code) editSet({ code: S.code, breakpoints: S.breakpoints.slice() });
+      applyStartLine();
+    }
+    renderEditor();
+    renderLayout();
+    fitToolbar();
+  });
+
   // ── Boot ────────────────────────────────────────────────────────────────────
   codeEl.value = S.code;
   PV.syncCode(S.code);
@@ -9791,6 +9910,7 @@ def _debug_file(src, fname, limit):
   initSocket(CFG0.socketUrl);
   applyConfig(CFG0);
   renderDebug();
+  applyStartLine();
   if (IS_VIEWER) {
     setPhase('viewer');
   } else {
