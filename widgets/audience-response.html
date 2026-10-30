@@ -3690,7 +3690,10 @@ body.bw-editing #ed-qr {
 }
 #ed-qr svg { width: 30px; height: 30px; }
 #join-text { display: flex; flex-direction: column; gap: calc(4px * var(--u)); min-width: 0; }
-.join-h { font-size: var(--fs-head); line-height: 1.15; color: var(--ar-ink); }
+.join-h { font-size: var(--fs-head); line-height: 1.15; color: var(--ar-ink); white-space: nowrap; overflow: hidden; }
+/* Too narrow for the words (fitJoinText): the QR and the figures stay, the
+   text goes, rather than breaking one word to a line. */
+#join.is-tight #join-text { display: none; }
 #join-sub-closed[hidden], #join-sub-open[hidden] { display: none; }
 /* Closed: the QR stays where it was, faded, so the slide doesn't jump. */
 #join.is-closed #qr-wrap { opacity: 0.18; filter: grayscale(1); }
@@ -3790,7 +3793,12 @@ body.bw-editing #join-n { color: var(--ar-faint); }
 #fill-tpl::-webkit-scrollbar, #question pre::-webkit-scrollbar { display: none; }
 /* …unless it genuinely can't fit: then a hairline bar, so the room can tell
    there's more rather than missing the end of the question. */
-#stage.is-overflow :is(#question, #choices, #prompt, #fill-tpl, #question pre) { scrollbar-width: thin; }
+/* Still too wide at the smallest size: long lines wrap under their own
+   text (the gutter keeps the numbering) instead of running off the panel. */
+#stage.is-overflow #question pre code { white-space: pre-wrap; overflow-wrap: anywhere; }
+/* Vertical bars never show on the slide; what doesn't fit scrolls by wheel. */
+.ar-split-pane { scrollbar-width: none; }
+.ar-split-pane::-webkit-scrollbar { display: none; }
 
 /* Scrollbars: hairline, never louder than the content. */
 #wall::-webkit-scrollbar, #spot-card::-webkit-scrollbar { width: 6px; }
@@ -4055,7 +4063,7 @@ body.ar-split.ar-no-left #bw-topbar { display: none !important; }
 body.ar-split #stage { position: absolute; inset: 0; display: block; padding: 0; }
 .ar-split-pane { position: absolute; box-sizing: border-box; min-height: 0; overflow: hidden; }
 #ar-split-left {
-  display: flex; flex-direction: column; justify-content: center; gap: calc(16px * var(--u));
+  display: flex; flex-direction: column; justify-content: safe center; gap: calc(16px * var(--u));
   padding: calc(14px * var(--u)) calc(36px * var(--u)) calc(18px * var(--u));
   overflow-y: auto;
 }
@@ -5721,11 +5729,13 @@ body.ar-static .ar-split-pane { pointer-events: none; }
   // wall) are left alone — they have their own layouts and a wall that shrank
   // with every response would end up unreadable.
   const FIT_MIN = 0.8;
+  const FIT_MIN_SPLIT = 0.5;
   let lastShowData = false;
 
   function overflowing() {
     // The question column scrolls as a whole when the banner is up under it.
-    const els = [questionEl, choicesEl, fillTpl, promptEl, ...questionEl.querySelectorAll('pre')];
+    const els = [questionEl, choicesEl, fillTpl, promptEl, ...questionEl.querySelectorAll('pre'),
+                 ...document.querySelectorAll('.ar-split-pane')];
     return els.some(el => el.offsetParent !== null && el.clientHeight > 0 &&
       (el.scrollHeight > el.clientHeight + 2 || el.scrollWidth > el.clientWidth + 2));
   }
@@ -5737,6 +5747,7 @@ body.ar-static .ar-split-pane { pointer-events: none; }
     const measurable = () => stage.clientHeight >= 120 && stage.clientWidth >= 200;
 
     shrinkToFit(relayout, measurable);
+    fitJoinText();
   }
 
   // Largest --u (between FIT_MIN and the presenter's size) at which nothing
@@ -5749,7 +5760,8 @@ body.ar-static .ar-split-pane { pointer-events: none; }
     if (!measurable() || !overflowing()) return true;
     const base = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--u')) || 1.4;
     const tryAt = f => { stage.style.setProperty('--u', String(base * f)); relayout(); return !overflowing(); };
-    let lo = FIT_MIN, hi = 1;
+    // A split pane holds the question alone, so it may go smaller before scrolling.
+    let lo = document.body.classList.contains("ar-split") ? FIT_MIN_SPLIT : FIT_MIN, hi = 1;
     // Can't fit even at the floor: stop there and let it scroll — with a
     // visible bar, so nothing is silently cut off the slide.
     if (!tryAt(lo)) { stage.classList.add('is-overflow'); return false; }
@@ -5785,6 +5797,25 @@ body.ar-static .ar-split-pane { pointer-events: none; }
       cancelAnimationFrame(fitRaf);
       fitRaf = requestAnimationFrame(fitStage);
     }).observe(stage);
+  }
+
+  // The banner's words only when they fit on their lines; else just the QR
+  // and the figures. Re-checked whenever the banner changes width.
+  function fitJoinText() {
+    const join = $('join'), text = $('join-text');
+    if (!join || !text) return;
+    join.classList.remove('is-tight');
+    if (!join.offsetParent) return;
+    const tight = [...text.children].some(el => el.offsetParent !== null && el.scrollWidth > el.clientWidth + 1)
+               || text.clientWidth < 90;
+    join.classList.toggle('is-tight', tight);
+  }
+  if (window.ResizeObserver) {
+    let joinW = -1;
+    new ResizeObserver(() => {
+      const w = $('join').clientWidth;
+      if (w !== joinW) { joinW = w; requestAnimationFrame(fitJoinText); }
+    }).observe($('side'));
   }
 
   // ── Timer ───────────────────────────────────────────────────────────────────
@@ -7030,6 +7061,7 @@ body.ar-static .ar-split-pane { pointer-events: none; }
     };
     at(splitPanes.left, SPLIT.left, barH);
     at(splitPanes.right, SPLIT.right, 0);
+    fitStage();   // the panes have their size only now
   }
   function setSplit(d) {
     const rect = r => r && [r.x, r.y, r.w, r.h].every(Number.isFinite) && r.w > 0 && r.h > 0 ? { x: r.x, y: r.y, w: r.w, h: r.h } : null;
