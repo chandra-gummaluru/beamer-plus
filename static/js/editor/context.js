@@ -7,6 +7,9 @@ export const ctx = {
     state: null,            // shared presenter state (set by initEditor)
     selectedOverlay: null,  // { div, arrKey, index } or null
     selectedViewIdx: null,  // structure index of the view slide being configured, or null
+    // A view's split widget, opened in the widget panel from the view's panel
+    // (view-config.js): { item, remove(), back() } or null.
+    selectedSplit: null,
 };
 
 export function getSlideEl() { return document.getElementById('pdf-canvas'); }
@@ -110,6 +113,7 @@ export function setPanelTitle(title, kicker) {
 // The mode implied by the current selection, used whenever a section
 // dismisses itself and control returns to whatever is still selected.
 export function resolvePanelMode() {
+    if (ctx.selectedSplit)             return 'widget';
     if (ctx.selectedViewIdx !== null)  return 'view';
     if (ctx.selectedOverlay)           return ctx.selectedOverlay.arrKey === 'widgets' ? 'widget' : 'item';
     return 'slide';

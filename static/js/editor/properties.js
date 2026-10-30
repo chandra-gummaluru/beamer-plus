@@ -278,12 +278,14 @@ async function showWidgetPanel(index) {
 
 /** What kind of thing is selected ("Widget", "Video"…), or null. */
 export function selectedItemKind() {
+    if (ctx.selectedSplit) return 'Widget';
     const sel = ctx.selectedOverlay;
     return sel ? KIND_LABELS[sel.arrKey] || 'Element' : null;
 }
 
 /** Delete the selected element (no-op without one). */
 export function deleteSelectedItem() {
+    if (ctx.selectedSplit) { ctx.selectedSplit.remove(); return; }
     const sel = ctx.selectedOverlay;
     if (sel) deleteItem(sel.arrKey, sel.index);
 }

@@ -279,14 +279,16 @@ async function exitEditMode() {
 // An item's properties replace the slide's, so there has to be a way back:
 // the panel's back link, Escape, or a click on empty space on the slide.
 function wireDeselect() {
-    document.getElementById('editor-props-back')?.addEventListener('click', deselectOverlay);
+    // A split widget's panel goes back to its view's panel.
+    const back = () => (ctx.selectedSplit ? ctx.selectedSplit.back() : deselectOverlay());
+    document.getElementById('editor-props-back')?.addEventListener('click', back);
 
     bus.on('ui:escape', () => {
         if (!ctx.state?.editMode) return;
         // Escape belongs to whatever is layered on top — a modal or the widget
         // picker gets it first, and only a bare Escape clears the selection.
         if (document.querySelector('.custom-modal-overlay, #widget-modal-overlay')) return;
-        deselectOverlay();
+        back();
     });
 
     // Pointerdown rather than click: overlays capture the pointer on
