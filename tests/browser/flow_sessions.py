@@ -125,11 +125,17 @@ def run():
         if not os.environ.get("SKIPREC"):
             menu("record"); page.wait_for_timeout(400)
             page.locator(".custom-modal-buttons .btn", has_text="Start Recording").click(); page.wait_for_timeout(2500)
-            check("recording: the bar shows", page.locator("#recorder-bar").is_visible())
+            rec = page.locator("#record-btn")
+            check("recording: the Record button is the timer", ":" in rec.inner_text() and "is-live" in rec.get_attribute("class"))
             shot("s07-recording")
-            check("…in the record button's place", page.locator("#record-btn").is_hidden())
-            page.click("#recorder-stop-btn"); page.wait_for_timeout(2000)
-            check("…stopped", page.locator("#recorder-bar").is_hidden())
+            rec.click(); page.wait_for_timeout(400)
+            check("…a click pauses", "is-paused" in rec.get_attribute("class"))
+            rec.click(); page.wait_for_timeout(400)
+            check("…and resumes", "is-live" in rec.get_attribute("class"))
+            rb = rec.bounding_box()
+            page.mouse.move(rb["x"] + rb["width"] / 2, rb["y"] + rb["height"] / 2)
+            page.mouse.down(); page.wait_for_timeout(1000); page.mouse.up(); page.wait_for_timeout(2000)
+            check("…holding it stops", rec.inner_text().strip() == "Record")
 
         # 8. Close session: asks whether to save first (a deck is open).
         menu("end"); page.wait_for_timeout(300); shot("s08-close")

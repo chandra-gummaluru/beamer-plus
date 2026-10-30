@@ -30,7 +30,7 @@ let active = null;              // the take in progress, or null
 
 export function initRecorder(state) {
     appState = state;
-    document.getElementById('record-btn')?.addEventListener('click', () => openRecorder());
+    initRecordButton();
     if (!recordingSupported()) {
         const btn = document.getElementById('record-btn');
         if (btn) btn.title = 'Recording is not supported in this browser';
@@ -52,6 +52,82 @@ export function initRecorder(state) {
 
 /** Can this browser record the tab? */
 const recordingSupported = () => !!navigator.mediaDevices?.getDisplayMedia && typeof MediaRecorder !== 'undefined';
+
+/* While a take is going, the Record button is its timer: it shows the
+   time; a click pauses or resumes; holding it (HOLD_MS) stops the take.
+   The hold fills the button with yellow as it counts. Keyboard: Enter or
+   Space pauses; holding either key stops, the same way. */
+const HOLD_MS = 800;
+function initRecordButton() {
+    const btn = document.getElementById('record-btn');
+    if (!btn) return;
+    let holdTimer = null, held = false;
+    const startHold = () => {
+        if (!active || active.stopping) return;
+        held = false;
+        btn.classList.add('is-holding');
+        clearTimeout(holdTimer);
+        holdTimer = setTimeout(() => {
+            held = true;
+            btn.classList.remove('is-holding');
+            stopRecording();
+        }, HOLD_MS);
+    };
+    const endHold = (fire) => {
+        if (!btn.classList.contains('is-holding') && !held) return;
+        clearTimeout(holdTimer);
+        btn.classList.remove('is-holding');
+        if (!held && fire) togglePause();
+        held = false;
+    };
+    btn.addEventListener('pointerdown', (e) => {
+        if (!active || e.button !== 0) return;
+        e.preventDefault();
+        btn.setPointerCapture?.(e.pointerId);
+        startHold();
+    });
+    btn.addEventListener('pointerup', () => endHold(true));
+    btn.addEventListener('pointercancel', () => endHold(false));
+    btn.addEventListener('lostpointercapture', () => endHold(false));
+    btn.addEventListener('keydown', (e) => {
+        if (!active || (e.key !== 'Enter' && e.key !== ' ')) return;
+        e.preventDefault();
+        if (!e.repeat) startHold();
+    });
+    btn.addEventListener('keyup', (e) => {
+        if (!active || (e.key !== 'Enter' && e.key !== ' ')) return;
+        e.preventDefault();
+        endHold(true);
+    });
+    // Not recording: Record opens the start dialog.
+    btn.addEventListener('click', (e) => {
+        if (active) { e.preventDefault(); return; }
+        openRecorder();
+    });
+}
+
+function paintRecordButton() {
+    const btn = document.getElementById('record-btn');
+    if (!btn) return;
+    const label = btn.querySelector('span');
+    const a = active;
+    btn.classList.toggle('is-live', !!a && !a.paused && !a.stopping);
+    btn.classList.toggle('is-paused', !!a && a.paused && !a.stopping);
+    btn.classList.toggle('is-stopping', !!a?.stopping);
+    if (!a) {
+        if (label) label.textContent = 'Record';
+        // Back to plain Record: disabled again if the editor is open.
+        btn.disabled = document.body.classList.contains('edit-mode');
+        btn.title = recordingSupported() ? 'Record This Tab' : 'Recording is not supported in this browser';
+        btn.removeAttribute('aria-pressed');
+        return;
+    }
+    if (label) label.textContent = a.stopping ? 'Saving' : formatDuration(elapsed(a));
+    btn.title = a.stopping ? 'Saving the recording'
+        : a.paused ? 'Paused — click to resume, hold to stop'
+        : 'Recording — click to pause, hold to stop';
+    btn.setAttribute('aria-pressed', String(!a.paused));
+}
 
 /** The record button: the recorder's start dialog. */
 function openRecorder() {
@@ -476,6 +552,7 @@ function hideBar() {
     const bar = document.getElementById('recorder-bar');
     if (bar) { bar.hidden = true; bar.classList.remove('is-paused', 'is-stopping'); }
     document.body.classList.remove('is-recording');
+    paintRecordButton();
 }
 
 function renderBar() {
@@ -498,6 +575,7 @@ function renderBar() {
     }
     const stop = document.getElementById('recorder-stop-btn');
     if (stop) stop.disabled = !!a.stopping;
+    paintRecordButton();
 }
 
 let toastTimer = null;

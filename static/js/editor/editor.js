@@ -207,7 +207,8 @@ function toggleEditMode() {
 function syncNavTools(editing) {
     ['record-btn', 'session-close-btn'].forEach(id => {
         const b = document.getElementById(id);
-        if (b) b.disabled = editing;
+        // A take in progress keeps its timer (the Record button) usable.
+        if (b) b.disabled = editing && !(id === 'record-btn' && document.body.classList.contains('is-recording'));
     });
     const e = document.getElementById('session-edit-btn');
     if (!e) return;

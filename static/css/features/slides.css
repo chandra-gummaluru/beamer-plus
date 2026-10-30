@@ -321,10 +321,8 @@ model-viewer { pointer-events: auto !important; }
     --_bd: #1a1a1a;
 }
 /* While editing they stay, Record and Close disabled and Edit pressed
-   (clicking it again leaves the editor; editor.js). Record hides while a
-   take is in progress: the recording bar stands in for it. */
-body.is-recording #record-btn,
-body.is-recording #slide-nav-top { display: none; }
+   (clicking it again leaves the editor; editor.js). While a take is in
+   progress Record stays: it is the take's timer (recorder.css). */
 body.split-view-active .slide-nav-tools {
     justify-content: center;
     padding: 0 var(--sp-2);

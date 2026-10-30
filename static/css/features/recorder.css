@@ -6,8 +6,27 @@
 /* Record button: the inner dot is red. */
 #record-btn svg circle[fill] { color: var(--recording); }
 
-/* ── Recording bar — bottom-right, in the record button's place ─ */
-body.is-recording #record-btn { display: none; }
+/* ── While recording, the Record button is the timer ──────────
+   It shows the time (the dot red while recording, grey while paused);
+   a click pauses, a hold stops — the hold fills it with the deck's yellow.
+   The old floating recording bar isn't shown. */
+#recorder-bar { display: none !important; }
+#record-btn { position: relative; isolation: isolate; overflow: hidden; }
+#record-btn > span { font-variant-numeric: tabular-nums; }
+#record-btn.is-live { --_bd: var(--recording); }
+#record-btn.is-live svg circle[fill] { animation: rec-pulse 1.4s ease-in-out infinite; }
+#record-btn.is-paused svg circle[fill],
+#record-btn.is-stopping svg circle[fill] { color: var(--ink-3); }
+#record-btn.is-paused > span { color: var(--ink-3); }
+@keyframes rec-pulse { 50% { opacity: 0.35; } }
+#record-btn::after {
+    content: ''; position: absolute; inset: 0; z-index: -1;
+    background: #f7c548;
+    transform: scaleX(0); transform-origin: left center;
+}
+#record-btn.is-holding::after { transform: scaleX(1); transition: transform 0.8s linear; }
+/* While recording, hovering doesn't fill it: the yellow means "stopping". */
+body.is-recording #record-btn:hover { --_bg: #fff; }
 
 #recorder-bar {
     display: flex;

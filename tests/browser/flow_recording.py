@@ -135,7 +135,11 @@ def run():
         menu("record"); page.wait_for_timeout(300)
         page.locator(".custom-modal-buttons .btn", has_text="Start Recording").click()
         page.wait_for_timeout(12000)
-        page.click("#recorder-stop-btn"); page.wait_for_timeout(2500); shot("r02-stopped")
+        # Stop: hold the Record button (it is the take's timer; a click pauses).
+        rb = page.locator("#record-btn").bounding_box()
+        page.mouse.move(rb["x"] + rb["width"] / 2, rb["y"] + rb["height"] / 2)
+        page.mouse.down(); page.wait_for_timeout(1000); page.mouse.up()
+        page.wait_for_timeout(2500); shot("r02-stopped")
         metas = page.evaluate(METAS)
         for m in metas:
             print(f"   {m['label']:<28} {m['size']:>8} B  {m['durationMs']:>5} ms  {m['status']}  {m['fileName']}")
