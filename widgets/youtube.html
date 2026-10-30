@@ -2968,39 +2968,63 @@ html, body {
 #trim-msg { color: var(--sn-cap); font-family: var(--font-ui); }
 
 /* ── Edit mode: set up on the widget itself ──────────────────────────────────
-   Edit (top right) turns the video into a card of sentences you can change,
-   like the timer and the poll: the link, the clip, how it starts and what
-   shows around it. Changes save as they're made (BeamerWidget.edit.set). */
+   Edit (top right) turns the widget into its own editor: the link on top,
+   the video itself under it, a rail to drag the clip's start and end along
+   (with the times to type, for precision), and how it plays as a row of
+   choices. Changes save as they're made (BeamerWidget.edit.set). */
 #yt-edit {
   position: absolute; inset: 0; z-index: 40;
-  display: flex; align-items: center; justify-content: center;
-  padding: 16px;
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  display: flex; justify-content: center;
+  padding: 14px 18px;
+  background: var(--bg);
   font-family: var(--font-chrome);
   font-size: var(--fs-chrome);
   color: var(--sn-ink);
-  overflow: auto;
 }
-.ye-card {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 12px 16px;
-  width: min(560px, 100%);
+.ye-wrap { display: flex; flex-direction: column; gap: 12px; width: min(820px, 100%); min-height: 0; }
+.ye-link { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+#ye-url { flex: 1 1 auto; min-width: 0; }
+#ye-msg { color: #d93a2b; white-space: nowrap; }
+.ye-stage {
+  position: relative; flex: 1 1 auto; min-height: 80px;
+  border: 1.5px solid var(--sn-ink); border-radius: var(--sn-r);
+  background: #111; overflow: hidden;
 }
-.ye-lbl { color: var(--sn-cap); white-space: nowrap; text-align: right; }
-.ye-val { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
-.ye-val > span { color: var(--sn-cap); }
-#ye-url { width: 100%; min-width: 0; }
-.ye-time { width: 72px; text-align: center; font-family: var(--font-mono); }
-#yt-edit .bw-input { height: 28px; border: 1.5px solid var(--sn-faint); border-radius: var(--sn-r); background: var(--bg); color: var(--sn-ink); }
+.ye-empty {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: var(--sn-node); color: var(--sn-cap); text-align: center; padding: 12px;
+}
+.ye-empty[hidden] { display: none; }
+.ye-trim { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
+.ye-trim.is-off { opacity: 0.45; pointer-events: none; }
+#ye-play svg { width: 14px; height: 14px; }
+.ye-rail {
+  position: relative; flex: 1 1 auto; height: 12px; margin: 10px 8px;
+  border: 1.5px solid var(--sn-ink); border-radius: 4px; background: var(--bg);
+  cursor: pointer; touch-action: none;
+}
+.ye-sel { position: absolute; top: 0; bottom: 0; background: var(--sn-hl); }
+.ye-head { position: absolute; top: -6px; bottom: -6px; width: 2px; margin-left: -1px; background: var(--sn-ink); pointer-events: none; }
+.ye-knob {
+  position: absolute; top: 50%; width: 12px; height: 26px;
+  transform: translate(-50%, -50%);
+  background: var(--bg); border: 1.5px solid var(--sn-ink); border-radius: 3px;
+  cursor: ew-resize; touch-action: none;
+}
+.ye-knob::after { content: ''; position: absolute; left: 50%; top: 6px; bottom: 6px; width: 1.5px; margin-left: -0.75px; background: var(--sn-ink); }
+.ye-knob:hover, .ye-knob.is-drag { background: var(--sn-hl); }
+.ye-times { display: inline-flex; align-items: center; gap: 6px; color: var(--sn-cap); white-space: nowrap; }
+.ye-time { width: 70px; text-align: center; font-family: var(--font-mono); }
+.ye-opts { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 22px; flex: 0 0 auto; }
+.ye-opt { display: inline-flex; align-items: center; gap: 8px; color: var(--sn-cap); white-space: nowrap; }
+#yt-edit .bw-input { height: 30px; border: 1.5px solid var(--sn-faint); border-radius: var(--sn-r); background: var(--bg); color: var(--sn-ink); }
 #yt-edit .bw-input:focus { border-color: var(--sn-ink); outline: none; }
 #yt-edit .bw-input.is-bad { border-color: #d93a2b; }
 #yt-edit .bw-seg > .bw-btn { height: 26px; padding: 0 10px; }
-.ye-hint { grid-column: 2; margin-top: -4px; }
-#ye-msg { color: #d93a2b; }
 body.bw-editing #controls, body.bw-editing #cover, body.bw-editing #click-layer,
 body.bw-editing #placeholder { visibility: hidden; }
+/* The video plays in the stage while it's edited, above the editor. */
+body.bw-editing #player-wrap { z-index: 41; }
 </style>
 </head>
 <body>
@@ -3069,34 +3093,34 @@ body.bw-editing #placeholder { visibility: hidden; }
       <button id="load-btn">Load</button>
     </div>
   </div>
-  <!-- Edit mode (BeamerWidget.edit): the settings, as sentences to change. -->
+  <!-- Edit mode (BeamerWidget.edit): the link, the video, the clip, how it plays. -->
   <div id="yt-edit" class="bw-edit-only">
-    <div class="ye-card">
-      <span class="ye-lbl">Video</span>
-      <div class="ye-val"><input class="bw-input" id="ye-url" type="text" placeholder="Paste a YouTube link or video ID" spellcheck="false" autocomplete="off"></div>
-      <span class="ye-hint bw-edit-hint" id="ye-msg" hidden></span>
-      <span class="ye-lbl">Clip</span>
-      <div class="ye-val"><span>from</span><input class="bw-input ye-time" id="ye-start" type="text" placeholder="0:00" inputmode="numeric"><span>to</span><input class="bw-input ye-time" id="ye-end" type="text" placeholder="the end" inputmode="numeric"></div>
-      <span class="ye-lbl">Starts</span>
-      <div class="ye-val"><div class="bw-seg" id="ye-auto">
-        <button class="bw-btn" type="button" data-v="0">when you press play</button>
-        <button class="bw-btn" type="button" data-v="1">as soon as its slide opens</button>
-      </div></div>
-      <span class="ye-lbl">YouTube's title &amp; suggestions</span>
-      <div class="ye-val"><div class="bw-seg" id="ye-ui">
-        <button class="bw-btn" type="button" data-v="1">Hidden</button>
-        <button class="bw-btn" type="button" data-v="0">Shown</button>
-      </div></div>
-      <span class="ye-lbl">Playback controls</span>
-      <div class="ye-val"><div class="bw-seg" id="ye-ctrl">
-        <button class="bw-btn" type="button" data-v="1">Shown</button>
-        <button class="bw-btn" type="button" data-v="0">Hidden</button>
-      </div></div>
-      <span class="ye-lbl">Link box on the slide</span>
-      <div class="ye-val"><div class="bw-seg" id="ye-box">
-        <button class="bw-btn" type="button" data-v="0">Off</button>
-        <button class="bw-btn" type="button" data-v="1">On</button>
-      </div></div>
+    <div class="ye-wrap">
+      <div class="ye-link">
+        <input class="bw-input" id="ye-url" type="text" placeholder="Paste a YouTube link or video ID" spellcheck="false" autocomplete="off">
+        <span id="ye-msg" hidden></span>
+      </div>
+      <div class="ye-stage" id="ye-stage"><div class="ye-empty" id="ye-empty">The video shows here once you paste its link</div></div>
+      <div class="ye-trim" id="ye-trim">
+        <button class="bw-btn bw-btn--icon" id="ye-play" type="button" title="Play the clip" aria-label="Play the clip"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button>
+        <div class="ye-rail" id="ye-rail" title="Drag the handles to set where the clip starts and ends">
+          <div class="ye-sel" id="ye-sel"></div>
+          <div class="ye-head" id="ye-head"></div>
+          <div class="ye-knob" id="ye-k0" data-k="startTime" title="Clip start"></div>
+          <div class="ye-knob" id="ye-k1" data-k="endTime" title="Clip end"></div>
+        </div>
+        <span class="ye-times"><input class="bw-input ye-time" id="ye-start" type="text" placeholder="0:00" aria-label="Clip start"> – <input class="bw-input ye-time" id="ye-end" type="text" placeholder="end" aria-label="Clip end"></span>
+      </div>
+      <div class="ye-opts">
+        <span class="ye-opt">Starting Mode <span class="bw-seg" id="ye-auto">
+          <button class="bw-btn" type="button" data-v="0">Manual</button><button class="bw-btn" type="button" data-v="1">Automatic</button></span></span>
+        <span class="ye-opt">Playback Controls <span class="bw-seg" id="ye-ctrl">
+          <button class="bw-btn" type="button" data-v="1">Shown</button><button class="bw-btn" type="button" data-v="0">Hidden</button></span></span>
+        <span class="ye-opt">YouTube Title &amp; Suggestions <span class="bw-seg" id="ye-ui">
+          <button class="bw-btn" type="button" data-v="1">Hidden</button><button class="bw-btn" type="button" data-v="0">Shown</button></span></span>
+        <span class="ye-opt">Link Box <span class="bw-seg" id="ye-box">
+          <button class="bw-btn" type="button" data-v="0">Off</button><button class="bw-btn" type="button" data-v="1">On</button></span></span>
+      </div>
     </div>
   </div>
 </div>
@@ -3216,6 +3240,23 @@ function scrubRange() {
 
 // ── Layout: crop away YouTube's chrome ───────────────────────────────────────
 function layoutPlayer() {
+  // Being edited, the video sits in the editor's stage, letterboxed, whole.
+  if (document.body.classList.contains('bw-editing')) {
+    const st = document.getElementById('ye-stage');
+    if (st) {
+      const c = container.getBoundingClientRect(), r = st.getBoundingClientRect();
+      const bw = 1.5, iw = r.width - 2 * bw, ih = r.height - 2 * bw;
+      let vw = iw, vh = iw * 9 / 16;
+      if (vh > ih) { vh = ih; vw = ih * 16 / 9; }
+      Object.assign(wrap.style, {
+        left:   Math.round(r.left - c.left + bw + (iw - vw) / 2) + 'px',
+        top:    Math.round(r.top - c.top + bw + (ih - vh) / 2) + 'px',
+        width:  Math.round(vw) + 'px',
+        height: Math.round(vh) + 'px',
+      });
+      return;
+    }
+  }
   const W = container.clientWidth, H = container.clientHeight;
   if (!hideUI() || !W || !H) {
     Object.assign(wrap.style, { left: '0px', top: '0px', width: '100%', height: '100%' });
@@ -3784,14 +3825,21 @@ document.addEventListener('keydown', (e) => {
 // ── Boot ─────────────────────────────────────────────────────────────────────
 if (window.WIDGET_CONFIG) updateConfig(window.WIDGET_CONFIG);
 
+
 // ── Edit mode ────────────────────────────────────────────────────────────────
 // The kit puts the widget into edit mode (body.bw-editing) from its Edit
-// button; #yt-edit is the form. Each change is saved straight away.
+// button; #yt-edit is the editor: the link, the video in its stage, the clip
+// on a rail, and how it plays. Each change is saved straight away.
 (function () {
   const $e = id => document.getElementById(id);
   const urlEl = $e('ye-url'), startEl = $e('ye-start'), endEl = $e('ye-end'), msgEl = $e('ye-msg');
+  const stage = $e('ye-stage'), empty = $e('ye-empty'), trimEl = $e('ye-trim');
+  const rail = $e('ye-rail'), selEl = $e('ye-sel'), headEl = $e('ye-head');
+  const k0 = $e('ye-k0'), k1 = $e('ye-k1'), playBtn = $e('ye-play');
   const SEGS = { 'ye-auto': 'autoplay', 'ye-ui': 'hideYouTubeUI', 'ye-ctrl': 'showControls', 'ye-box': 'allowManualUrl' };
   const DEF  = { autoplay: false, hideYouTubeUI: true, showControls: true, allowManualUrl: false };
+  const ICON_PLAY  = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
+  const ICON_PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
   const editing = () => !!(window.BeamerWidget && BeamerWidget.edit && BeamerWidget.edit.active);
   const set = (patch, remove) => { if (window.BeamerWidget && BeamerWidget.edit) BeamerWidget.edit.set(patch, remove || []); };
 
@@ -3804,8 +3852,32 @@ if (window.WIDGET_CONFIG) updateConfig(window.WIDGET_CONFIG);
   }
   const showTime = n => (Number(n) > 0 ? fmtTime(Number(n)) : '');
 
+  // The clip being dragged, before it's saved.
+  let drag = null;   // { key, t }
+  const startT = () => drag && drag.key === 'startTime' ? drag.t : clipStart();
+  const endT   = () => {
+    if (drag && drag.key === 'endTime') return drag.t;
+    return clipEndSet() || duration();
+  };
+
+  function paintRail() {
+    const D = duration();
+    const ok = !!(playerReady && D > 0);
+    trimEl.classList.toggle('is-off', !ok);
+    if (!ok) { selEl.style.left = '0%'; selEl.style.width = '0%'; return; }
+    const a = Math.max(0, Math.min(1, startT() / D)), b = Math.max(a, Math.min(1, endT() / D));
+    selEl.style.left = (a * 100) + '%';
+    selEl.style.width = ((b - a) * 100) + '%';
+    k0.style.left = (a * 100) + '%';
+    k1.style.left = (b * 100) + '%';
+    headEl.style.left = (Math.max(0, Math.min(1, curTime() / D)) * 100) + '%';
+    playBtn.innerHTML = isPlaying ? ICON_PAUSE : ICON_PLAY;
+  }
+
   function fill() {
     const a = document.activeElement;
+    const has = !!extractVideoId(cfg.videoId || cfg.url || '');
+    empty.hidden = has;
     if (a !== urlEl) urlEl.value = cfg.videoId || cfg.url || '';
     if (a !== startEl) startEl.value = showTime(cfg.startTime);
     if (a !== endEl) endEl.value = showTime(cfg.endTime);
@@ -3817,34 +3889,116 @@ if (window.WIDGET_CONFIG) updateConfig(window.WIDGET_CONFIG);
         b.setAttribute('aria-pressed', String(act));
       });
     });
+    paintRail();
+    layoutPlayer();
   }
 
   function say(text) { msgEl.textContent = text || ''; msgEl.hidden = !text; }
 
+  // A still of the video at t. Before it has ever played YouTube shows only
+  // its poster, so it is played for a moment, muted, to reach the frame.
+  let peekTimer = null;
+  function showFrame(t) {
+    if (!player || !playerReady) return;
+    try {
+      if (isPlaying) { player.seekTo(t, true); return; }
+      const st = ytState();
+      if (st === YT.PlayerState.PAUSED || st === YT.PlayerState.ENDED) { player.seekTo(t, true); return; }
+      const wasMuted = player.isMuted();
+      player.mute();
+      player.seekTo(t, true);
+      player.playVideo();
+      clearTimeout(peekTimer);
+      peekTimer = setTimeout(() => {
+        try { player.pauseVideo(); player.seekTo(t, true); if (!wasMuted) player.unMute(); } catch (_) {}
+        setPlayIcon(false);
+        paintRail();
+      }, 450);
+    } catch (_) {}
+  }
+
+  // ── The link ──
   function commitUrl() {
     const v = urlEl.value.trim();
-    if (!v) { urlEl.classList.remove('is-bad'); say(''); if (cfg.videoId) set({}, ['videoId']); return; }
-    if (!extractVideoId(v)) { urlEl.classList.add('is-bad'); say('That isn’t a YouTube link or video ID.'); return; }
+    if (!v) { urlEl.classList.remove('is-bad'); say(''); if (cfg.videoId) set({}, ['videoId', 'startTime', 'endTime']); return; }
+    if (!extractVideoId(v)) { urlEl.classList.add('is-bad'); say('That isn’t a YouTube link'); return; }
     urlEl.classList.remove('is-bad'); say('');
-    if (v !== cfg.videoId) set({ videoId: v });
+    // A different video: its clip starts over.
+    if (extractVideoId(v) !== extractVideoId(cfg.videoId || '')) set({ videoId: v }, ['startTime', 'endTime']);
   }
+  urlEl.addEventListener('change', commitUrl);
+  urlEl.addEventListener('paste', () => setTimeout(commitUrl, 0));
+
+  // ── The clip, typed ──
   function commitTime(el, key) {
     const t = parseTime(el.value);
     if (Number.isNaN(t)) { el.classList.add('is-bad'); return; }
     el.classList.remove('is-bad');
-    if (t == null || t === 0) { if (key in cfg) set({}, [key]); }
-    else if (t !== Number(cfg[key])) set({ [key]: t });
+    saveClip(key, t);
     el.value = showTime(t);
   }
-
-  urlEl.addEventListener('change', commitUrl);
-  urlEl.addEventListener('paste', () => setTimeout(commitUrl, 0));
+  function saveClip(key, t) {
+    const D = duration();
+    t = t == null ? null : Math.round(t);
+    const none = t == null || (key === 'startTime' && t <= 0) || (key === 'endTime' && D && t >= Math.floor(D));
+    if (none) { if (key in cfg) set({}, [key]); }
+    else if (t !== Number(cfg[key])) set({ [key]: t });
+  }
   startEl.addEventListener('change', () => commitTime(startEl, 'startTime'));
   endEl.addEventListener('change', () => commitTime(endEl, 'endTime'));
   [urlEl, startEl, endEl].forEach(el => el.addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
     e.stopPropagation();   // not the player's shortcuts
   }));
+
+  // ── The clip, dragged ──
+  const railT = e => {
+    const r = rail.getBoundingClientRect();
+    return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * duration();
+  };
+  [k0, k1].forEach(k => k.addEventListener('pointerdown', e => {
+    if (!playerReady || !duration()) return;
+    e.preventDefault(); e.stopPropagation();
+    k.setPointerCapture(e.pointerId);
+    k.classList.add('is-drag');
+    drag = { key: k.dataset.k, t: k === k0 ? clipStart() : endT() };
+    if (isPlaying) pause();
+  }));
+  [k0, k1].forEach(k => k.addEventListener('pointermove', e => {
+    if (!drag || !k.hasPointerCapture(e.pointerId)) return;
+    let t = railT(e);
+    if (drag.key === 'startTime') t = Math.min(t, endT() - 1);
+    else t = Math.max(t, clipStart() + 1);
+    drag.t = Math.max(0, Math.min(duration(), t));
+    (drag.key === 'startTime' ? startEl : endEl).value = fmtTime(drag.t);
+    paintRail();
+    clearTimeout(k.__seek);
+    k.__seek = setTimeout(() => showFrame(drag ? drag.t : 0), 60);
+  }));
+  [k0, k1].forEach(k => k.addEventListener('pointerup', () => {
+    if (!drag) return;
+    const d = drag; drag = null;
+    k.classList.remove('is-drag');
+    saveClip(d.key, d.t);
+    showFrame(d.t);
+    setTimeout(fill, 0);
+  }));
+  rail.addEventListener('pointerdown', e => {
+    if (e.target.closest('.ye-knob') || !playerReady || !duration()) return;
+    const t = Math.max(clipStart(), Math.min(endT(), railT(e)));
+    showFrame(t);
+    headEl.style.left = (t / duration() * 100) + '%';
+  });
+
+  // ── Play the clip ──
+  playBtn.addEventListener('click', () => {
+    if (isPlaying) { pause(); return; }
+    const t = curTime();
+    if (t < clipStart() || t >= endT() - 0.3) seekQuiet(clipStart());
+    play();
+  });
+
+  // ── How it plays ──
   Object.entries(SEGS).forEach(([id, key]) => {
     $e(id).addEventListener('click', e => {
       const b = e.target.closest('.bw-btn[data-v]');
@@ -3852,15 +4006,27 @@ if (window.WIDGET_CONFIG) updateConfig(window.WIDGET_CONFIG);
     });
   });
 
+  // The playhead follows the video while editing.
+  let raf = null;
+  function loop() {
+    if (!editing()) { raf = null; return; }
+    if (!drag) paintRail();
+    raf = requestAnimationFrame(loop);
+  }
+
   window.addEventListener('bw-edit', e => {
     if (e.detail.editing) {
       pause();
       if (trimMode) setTrimMode(false);
       say(''); [urlEl, startEl, endEl].forEach(el => el.classList.remove('is-bad'));
-      fill();
+      requestAnimationFrame(() => { fill(); if (!raf) loop(); });
       if (!cfg.videoId) requestAnimationFrame(() => urlEl.focus());
+    } else {
+      pause();
+      requestAnimationFrame(layoutPlayer);
     }
   });
+  if (window.ResizeObserver) new ResizeObserver(() => { if (editing()) layoutPlayer(); }).observe(stage);
   window.addEventListener('message', e => {
     if (e.data && e.data.type === 'widget-config' && editing()) setTimeout(fill, 0);
   });
