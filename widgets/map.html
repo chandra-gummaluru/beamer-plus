@@ -652,21 +652,11 @@ body.bw-editing .bw-topbar {
 body:not(.bw-editing) .bw-edit-only { display: none !important; }
 body.bw-editing .bw-run-only { display: none !important; }
 
-/* The Name: hidden in the bar normally, typed into at its left while editing. */
-body.bw-editing .bw-topbar-title {
-  display: block !important;
-  min-width: 90px;
-  max-width: 34%;
-  padding: 4px 8px;
-  border-radius: var(--radius);
-  outline: 1px dashed var(--edit-line);
-  outline-offset: -1px;
-  cursor: text;
-  text-overflow: clip;
-}
-body.bw-editing .bw-topbar-title:focus { outline-style: solid; background: var(--edit-soft); }
+/* The Name is never on the bar, not even while editing: it is set in the
+   editor's panel. */
+body.bw-editing .bw-topbar-title,
 body.bw-editing .bw-topbar-title + .bw-sep,
-body.bw-editing .bw-adopted-bar > .bw-topbar-title + .bw-sep { display: block !important; }
+body.bw-editing .bw-adopted-bar > .bw-topbar-title + .bw-sep { display: none !important; }
 
 /* Anything set by clicking or typing on it. */
 body.bw-editing .bw-editable {
@@ -2749,7 +2739,23 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
   
 .map-ed { display: inline-flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; }
 .map-ed-l { color: var(--text-3); white-space: nowrap; }
-#map-q { flex: 1 1 auto; min-width: 120px; max-width: 420px; height: var(--ctl-h); }
+.map-q-wrap { position: relative; flex: 1 1 auto; min-width: 120px; max-width: 460px; display: flex; }
+#map-q { flex: 1 1 auto; min-width: 0; height: var(--ctl-h); }
+/* Places matching what's typed, as it's typed. */
+.map-sugg {
+  position: fixed; z-index: 2000;   /* placed under the field (showSugg): the bar clips anything inside it */
+  display: flex; flex-direction: column; padding: 4px;
+  background: var(--bg); border: 1px solid var(--border-med); border-radius: var(--radius);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+}
+.map-sugg[hidden] { display: none; }
+.map-sugg button {
+  display: block; width: 100%; text-align: left; padding: 6px 8px; border: 0; border-radius: 5px;
+  background: none; font: inherit; color: var(--text); cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.map-sugg button small { color: var(--text-3); margin-left: 6px; }
+.map-sugg button:hover, .map-sugg button.is-on { background: var(--edit-soft, #fdf3d6); }
 .map-ed-msg { color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .map-ed-msg.is-err { color: var(--err); }
 </style>
@@ -2761,7 +2767,10 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
     <span class="bw-toolbar-title">Map</span>
     <form class="bw-edit-only map-ed" id="map-search" autocomplete="off">
       <span class="map-ed-l">Starts at</span>
-      <input class="bw-input" id="map-q" type="text" placeholder="Search an address or place" spellcheck="false">
+      <span class="map-q-wrap">
+        <input class="bw-input" id="map-q" type="text" placeholder="Search an address or place" spellcheck="false" role="combobox" aria-autocomplete="list" aria-controls="map-sugg">
+        <span class="map-sugg" id="map-sugg" role="listbox" hidden></span>
+      </span>
       <button class="bw-btn" type="submit">Go</button>
       <span class="map-ed-msg" id="map-msg"></span>
     </form>
@@ -3034,24 +3043,78 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
       const editing = () => !!(window.BeamerWidget && BeamerWidget.edit && BeamerWidget.edit.active);
       const save = (patch, remove) => { if (window.BeamerWidget && BeamerWidget.edit) BeamerWidget.edit.set(patch, remove || [], { silent: true }); Object.assign(cfg, patch); (remove || []).forEach(k => delete cfg[k]); };
       const say = (t, err) => { msg.textContent = t || ''; msg.classList.toggle('is-err', !!err); };
-      q.addEventListener('keydown', e => e.stopPropagation());
+      const sugg = document.getElementById('map-sugg');
+      document.body.appendChild(sugg);
+      let hits = [], on = -1, timer = null, seq = 0;
+      async function lookup(text, limit) {
+        const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&addressdetails=0&limit=' + limit + '&q=' + encodeURIComponent(text), { headers: { 'Accept': 'application/json' } });
+        return r.json();
+      }
+      const short = h => (h.display_name || '').split(',').slice(0, 2).join(',').trim();
+      const rest  = h => (h.display_name || '').split(',').slice(2, 4).join(',').trim();
+      function showSugg() {
+        sugg.textContent = '';
+        hits.forEach((h, i) => {
+          const b = document.createElement('button');
+          b.type = 'button'; b.setAttribute('role', 'option');
+          b.className = i === on ? 'is-on' : '';
+          b.innerHTML = '';
+          b.append(short(h));
+          const sm = document.createElement('small'); sm.textContent = rest(h); b.append(sm);
+          b.addEventListener('mousedown', e => { e.preventDefault(); go(h); });
+          sugg.appendChild(b);
+        });
+        sugg.hidden = !hits.length;
+        const r = q.getBoundingClientRect();
+        Object.assign(sugg.style, { left: r.left + 'px', top: (r.bottom + 4) + 'px', width: Math.max(r.width, 280) + 'px' });
+      }
+      function go(h) {
+        const lat = +h.lat, lng = +h.lon;
+        const zoom = Math.max(map.getZoom(), 15);
+        map.setView([lat, lng], zoom, { animate: true });
+        const label = short(h) || q.value.trim();
+        const markers = [{ lat, lng, label }];
+        renderMarkers(markers);
+        if (h.display_name) q.value = short(h);
+        save({ center: [lat, lng], zoom, address: q.value.trim(), markers });
+        hits = []; on = -1; showSugg();
+        say(label);
+      }
+      // Look up as you type (a moment after the last key), so the place is
+      // found before you finish: pick it from the list, or Enter for the first.
+      q.addEventListener('input', () => {
+        clearTimeout(timer);
+        const text = q.value.trim();
+        if (text.length < 3) { hits = []; showSugg(); say(''); return; }
+        timer = setTimeout(async () => {
+          const mine = ++seq;
+          say('Searching…');
+          try {
+            const res = await lookup(text, 5);
+            if (mine !== seq) return;
+            hits = res; on = res.length ? 0 : -1; showSugg();
+            say(res.length ? '' : 'No place found', !res.length);
+          } catch (_) { if (mine === seq) say('Couldn’t search (offline?)', true); }
+        }, 350);
+      });
+      q.addEventListener('keydown', e => {
+        e.stopPropagation();
+        if (e.key === 'ArrowDown' && hits.length) { e.preventDefault(); on = (on + 1) % hits.length; showSugg(); }
+        else if (e.key === 'ArrowUp' && hits.length) { e.preventDefault(); on = (on - 1 + hits.length) % hits.length; showSugg(); }
+        else if (e.key === 'Escape') { hits = []; showSugg(); }
+      });
+      q.addEventListener('blur', () => setTimeout(() => { hits = []; showSugg(); }, 150));
       form.addEventListener('submit', async e => {
         e.preventDefault();
+        if (!map) return;
+        if (hits.length) { go(hits[Math.max(0, on)]); return; }
         const text = q.value.trim();
-        if (!text || !map) return;
+        if (!text) return;
         say('Searching…');
         try {
-          const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(text), { headers: { 'Accept': 'application/json' } });
-          const hits = await r.json();
-          if (!hits.length) { say('No place found', true); return; }
-          const h = hits[0], lat = +h.lat, lng = +h.lon;
-          const zoom = Math.max(map.getZoom(), 15);
-          map.setView([lat, lng], zoom, { animate: true });
-          const label = h.display_name ? h.display_name.split(',').slice(0, 2).join(',') : text;
-          const markers = [{ lat, lng, label }];
-          renderMarkers(markers);
-          save({ center: [lat, lng], zoom, address: text, markers });
-          say(label);
+          const res = await lookup(text, 1);
+          if (!res.length) { say('No place found', true); return; }
+          go(res[0]);
         } catch (_) { say('Couldn’t search (offline?)', true); }
       });
       // Panning and zooming while editing is choosing the view too.

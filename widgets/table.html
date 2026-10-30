@@ -653,21 +653,11 @@ body.bw-editing .bw-topbar {
 body:not(.bw-editing) .bw-edit-only { display: none !important; }
 body.bw-editing .bw-run-only { display: none !important; }
 
-/* The Name: hidden in the bar normally, typed into at its left while editing. */
-body.bw-editing .bw-topbar-title {
-  display: block !important;
-  min-width: 90px;
-  max-width: 34%;
-  padding: 4px 8px;
-  border-radius: var(--radius);
-  outline: 1px dashed var(--edit-line);
-  outline-offset: -1px;
-  cursor: text;
-  text-overflow: clip;
-}
-body.bw-editing .bw-topbar-title:focus { outline-style: solid; background: var(--edit-soft); }
+/* The Name is never on the bar, not even while editing: it is set in the
+   editor's panel. */
+body.bw-editing .bw-topbar-title,
 body.bw-editing .bw-topbar-title + .bw-sep,
-body.bw-editing .bw-adopted-bar > .bw-topbar-title + .bw-sep { display: block !important; }
+body.bw-editing .bw-adopted-bar > .bw-topbar-title + .bw-sep { display: none !important; }
 
 /* Anything set by clicking or typing on it. */
 body.bw-editing .bw-editable {
