@@ -4870,7 +4870,8 @@ body.bw-editing #ed-secs[hidden] { display: none; }
     // While collecting, and once closed, the count lives in the banner, by
     // the QR code. With the results up it moves to a quiet line at the foot
     // of the slide.
-    const countText = results && !ed ? `${plural(D.total, 'response', 'responses')} · poll closed` : '';
+    // The count stays in the banner ("Poll closed") with the results up too.
+    const countText = '';
     if (countText !== kickerEl.textContent) kickerEl.textContent = countText;
 
     // Layout: one column — the question and its answers (or results) — and,
@@ -4884,7 +4885,7 @@ body.bw-editing #ed-secs[hidden] { display: none; }
     // held by a faded stand-in, "Poll not open yet", the count at 0 and a
     // countdown at its full length — so starting the poll changes what's in
     // the strip, not the layout of the slide.
-    const shut = D.phase === 'closed' && !ed && !preview;
+    const shut = (D.phase === 'closed' || results) && !ed && !preview;
     const waiting = D.phase === 'idle' && !ed && !preview;
     const withJoin = collect || ed || shut || waiting;
     joinEl.classList.toggle('is-closed', shut);
@@ -5424,7 +5425,7 @@ body.bw-editing #ed-secs[hidden] { display: none; }
       lastTally = 0;
       return;
     }
-    if (S.phase !== 'collect' && S.phase !== 'closed') return;
+    if (S.phase !== 'collect' && S.phase !== 'closed' && S.phase !== 'results') return;
     // Only marked as drawn once it actually is: the QR library may arrive late.
     if (qrEl.dataset.url !== S.joinUrl && typeof QRCode !== 'undefined') {
       qrEl.textContent = '';
@@ -6080,6 +6081,12 @@ body.bw-editing #ed-secs[hidden] { display: none; }
       }
     } else {
       if (S.phase !== 'idle') recompute();   // e.g. the words-per-response setting changes the tallies
+      // Switched to Manual while it was already collecting, with nobody
+      // answered yet: back to waiting for Start ("Poll not open yet").
+      if (live && prevAuto && cfg.autoStart === false && S.phase === 'collect' && !S.total) {
+        closeOnServer(S.surveyId);
+        resetPoll();
+      }
       // Auto-start just switched on, with nothing collecting yet: start now,
       // as the slide would have on open.
       if (live && !prevAuto && cfg.autoStart !== false && S.phase === 'idle' && ready() && !editing()) startPoll();
