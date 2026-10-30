@@ -51,3 +51,23 @@
 #tour-popover, #tour-popover * { font-weight: 400 !important; }
 #tour-popover .tour-title { font-size: 24px; }
 #tour-popover .tour-body { font-size: 16px; }
+
+/* A highlighter stroke drawn under "Beamer+": the deck's yellow, uneven
+   edges and a slight tilt, as if marked by hand, not a box. */
+.welcome-title {
+    position: relative;
+    display: inline-block;
+    align-self: flex-start;
+    isolation: isolate;
+}
+.welcome-title::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    left: -0.12em;
+    right: -0.16em;
+    top: 0.42em;
+    bottom: -0.06em;
+    transform: rotate(-1.2deg);
+    background: no-repeat center / 100% 100% url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 60' preserveAspectRatio='none'%3E%3Cpath fill='%23f7c548' d='M6 14 C40 6 92 9 140 7 C196 5 252 10 306 6 C340 4 372 7 394 10 C398 22 393 34 397 47 C362 53 318 50 268 54 C214 57 158 52 104 55 C68 56 34 54 5 51 C1 40 8 27 6 14 Z'/%3E%3C/svg%3E");
+}
