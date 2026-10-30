@@ -313,6 +313,13 @@ model-viewer { pointer-events: auto !important; }
 #slide-nav-top:not(:has(.btn:not([hidden]))) { display: none; }
 .slide-nav-tool { width: 100%; gap: var(--sp-2); }
 .slide-nav-tool[hidden] { display: none; }
+/* Edit pressed: the deck's yellow, like the current slide's number. */
+#session-edit-btn.btn_selected,
+#session-edit-btn.btn_selected:hover {
+    --_bg: #f7c548;
+    --_fg: #1a1a1a;
+    --_bd: #1a1a1a;
+}
 /* While editing they stay, Record and Close disabled and Edit pressed
    (clicking it again leaves the editor; editor.js). Record hides while a
    take is in progress: the recording bar stands in for it. */
