@@ -126,4 +126,30 @@
     .custom-modal-buttons .btn { width: 100%; }
 }
 
-
+/* ── Drawn like the slides and widgets ───────────────────────────────────
+   Every dialog is a card the way the deck draws its boxes: white, an ink
+   outline, the slides' face (Computer Modern Sans) throughout, and the title
+   marked with the deck's yellow highlighter, as a slide's title is. */
+.custom-modal-overlay { font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', var(--font-sans); }
+.custom-modal-content {
+    border: 2px solid var(--ink-1);
+    border-radius: 7px;
+    box-shadow: 0 12px 36px rgb(0 0 0 / .18);
+}
+.custom-modal-title {
+    font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', var(--font-sans);
+    font-size: 24px;
+    font-weight: 400;
+    color: var(--ink-1);
+    display: inline;
+    background: #f7c548;
+    padding: 0 .18em;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+    line-height: 1.35;
+}
+.custom-modal-title + .custom-modal-message,
+.custom-modal-title + * { margin-top: 12px; }
+.custom-modal-message { font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', var(--font-sans); font-size: 16px; color: var(--ink-2); }
+.custom-modal-content .btn { font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', var(--font-sans); font-weight: 400; }
+.custom-modal-content .btn--primary, .custom-modal-content [data-kind="ok"] { font-weight: 700; }

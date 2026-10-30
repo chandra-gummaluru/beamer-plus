@@ -140,3 +140,26 @@
 }
 
 .tour-next-btn { flex: 1; }
+
+/* ── Drawn like the slides and widgets (as the dialogs are) ─────────────── */
+#tour-popover {
+    background: #fff;
+    border: 2px solid var(--ink-1);
+    border-radius: 7px;
+    box-shadow: 0 12px 36px rgb(0 0 0 / .18);
+    font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', var(--font-sans);
+}
+#tour-popover::after { display: none; }
+.tour-title {
+    font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', var(--font-sans);
+    font-size: 22px;
+    font-weight: 400;
+    display: inline-block;
+    background: #f7c548;
+    padding: 0 .18em;
+    margin-bottom: 10px;
+}
+.tour-body { font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', var(--font-sans); font-size: 16px; }
+.tour-count, .tour-skip-btn, #tour-popover .btn { font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', var(--font-sans); }
+#tour-popover .btn { font-weight: 400; }
+#tour-popover .tour-next-btn { font-weight: 700; }
