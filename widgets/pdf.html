@@ -7,6 +7,7 @@
   "label": "PDF",
   "category": "Tools",
   "liveSettings": true,
+  "inlineEdit": true,
   "fields": [
     { "key": "pdf", "label": "PDF file", "type": "file", "accept": ".pdf", "folder": "assets" }
   ]
@@ -2710,6 +2711,75 @@ body.is-viewer .bw-sep:not(:first-of-type) { display: none !important; }
   border: var(--sn-line) solid var(--sn-node);
   border-top-color: var(--sn-ink);
 }
+
+/* ── Edit mode: set up on the widget itself ──────────────────────────────────
+   No file yet: a place to drop one. With one: its pages as thumbnails —
+   click the page it opens on (outlined in yellow) — and a rail to keep only
+   some of them (the rest fade). Changes save as they're made. */
+#pdf-edit {
+  position: absolute; inset: 0; z-index: 30;
+  display: flex; flex-direction: column;
+  background: var(--bg);
+  font-family: var(--font-chrome);
+  font-size: var(--fs-chrome);
+  color: var(--sn-ink);
+}
+.pe-drop {
+  flex: 1 1 auto; margin: 16px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  border: 1.5px dashed var(--sn-faint); border-radius: var(--sn-r);
+  color: var(--sn-cap); text-align: center;
+}
+.pe-drop svg { width: 40px; height: 40px; color: var(--sn-ink); }
+.pe-drop-t { font-size: calc(var(--fs-chrome) * 1.2); color: var(--sn-ink); }
+.pe-drop[hidden], .pe-main[hidden] { display: none; }
+#pdf-edit.is-over .pe-drop, #pdf-edit.is-over .pe-grid { border-color: var(--sn-ink); background: var(--edit-soft); }
+.pe-msg { color: #d93a2b; }
+.pe-main { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 12px 16px; }
+.pe-head { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.pe-name { font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.pe-count { color: var(--sn-cap); white-space: nowrap; }
+.pe-grow { flex: 1 1 auto; }
+.pe-grid {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 14px 12px; align-content: start;
+  padding: 10px; border: 1.5px solid var(--sn-faint); border-radius: var(--sn-r);
+  scrollbar-width: thin;
+}
+.pe-th {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 0; border: 0; background: none; cursor: pointer; font: inherit; color: var(--sn-cap);
+}
+.pe-th canvas, .pe-th .pe-ph {
+  display: block; width: 100%; aspect-ratio: var(--ar, 0.77); height: auto;
+  border: 1.5px solid var(--sn-faint); border-radius: 3px; background: #fff;
+}
+.pe-th:hover canvas, .pe-th:hover .pe-ph { border-color: var(--sn-ink); }
+.pe-th.is-out { opacity: 0.32; }
+.pe-th.is-start canvas, .pe-th.is-start .pe-ph { border-color: var(--sn-ink); box-shadow: 0 0 0 3px var(--sn-hl); }
+.pe-th.is-start .pe-n { color: var(--sn-ink); font-weight: 600; }
+.pe-badge {
+  position: absolute; top: -8px; left: 50%; transform: translateX(-50%);
+  padding: 1px 7px; border: 1.5px solid var(--sn-ink); border-radius: 999px;
+  background: var(--sn-hl); color: var(--sn-ink); font-size: 11px; white-space: nowrap;
+}
+.pe-range { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; color: var(--sn-cap); }
+.pe-lbl { white-space: nowrap; }
+.pe-rail {
+  position: relative; flex: 1 1 auto; height: 12px; margin: 10px 8px;
+  border: 1.5px solid var(--sn-ink); border-radius: 4px; background: var(--bg); touch-action: none;
+}
+.pe-sel { position: absolute; top: 0; bottom: 0; background: var(--sn-hl); }
+.pe-knob {
+  position: absolute; top: 50%; width: 12px; height: 26px; transform: translate(-50%, -50%);
+  background: var(--bg); border: 1.5px solid var(--sn-ink); border-radius: 3px; cursor: ew-resize; touch-action: none;
+}
+.pe-knob::after { content: ''; position: absolute; left: 50%; top: 6px; bottom: 6px; width: 1.5px; margin-left: -0.75px; background: var(--sn-ink); }
+.pe-knob:hover, .pe-knob.is-drag { background: var(--sn-hl); }
+.pe-num { width: 58px; text-align: center; font-family: var(--font-mono); }
+#pdf-edit .bw-input { height: 28px; border: 1.5px solid var(--sn-faint); border-radius: var(--sn-r); background: var(--bg); color: var(--sn-ink); }
+#pdf-edit .bw-input:focus { border-color: var(--sn-ink); outline: none; }
 </style>
 </head>
 <body>
@@ -2717,8 +2787,8 @@ body.is-viewer .bw-sep:not(:first-of-type) { display: none !important; }
 
   <div id="toolbar" class="bw-toolbar" data-bw-topbar>
     <span class="bw-toolbar-title" id="doc-title">Textbook</span>
-    <div class="bw-sep"></div>
-    <div class="page-nav">
+    <div class="bw-sep bw-run-only"></div>
+    <div class="page-nav bw-run-only">
       <button class="bw-btn bw-btn--icon" id="btn-prev" disabled title="Previous page (←)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
@@ -2729,14 +2799,14 @@ body.is-viewer .bw-sep:not(:first-of-type) { display: none !important; }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
       </button>
     </div>
-    <span class="bw-status" id="page-readout"></span>
-    <div class="bw-sep"></div>
-    <div class="seg">
+    <span class="bw-status bw-run-only" id="page-readout"></span>
+    <div class="bw-sep bw-run-only"></div>
+    <div class="seg bw-run-only">
       <button class="bw-btn" id="btn-fit-page">Fit page</button>
       <button class="bw-btn" id="btn-fit-width">Fit width</button>
     </div>
     <div class="bw-spacer"></div>
-    <span id="zoom-group" class="page-nav">
+    <span id="zoom-group" class="page-nav bw-run-only">
       <button class="bw-btn bw-btn--icon" id="btn-zoom-out" title="Zoom out (−)">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.4"/><path d="M4.6 7h4.8M10.3 10.3l3 3"/></svg>
       </button>
@@ -2745,8 +2815,8 @@ body.is-viewer .bw-sep:not(:first-of-type) { display: none !important; }
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.4"/><path d="M4.6 7h4.8M7 4.6v4.8M10.3 10.3l3 3"/></svg>
       </button>
     </span>
-    <div class="bw-sep"></div>
-    <button class="bw-btn" id="btn-download" disabled title="Download this PDF">
+    <div class="bw-sep bw-run-only"></div>
+    <button class="bw-btn bw-run-only" id="btn-download" disabled title="Download this PDF">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       <span id="btn-download-label">Download</span>
     </button>
@@ -2759,6 +2829,34 @@ body.is-viewer .bw-sep:not(:first-of-type) { display: none !important; }
     </div>
     <div id="page-wrap">
       <canvas id="pdf-canvas"></canvas>
+    </div>
+    <!-- Edit mode (BeamerWidget.edit): the file, and its pages to pick from. -->
+    <div id="pdf-edit" class="bw-edit-only">
+      <div class="pe-drop" id="pe-drop">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/></svg>
+        <div class="pe-drop-t">Drop a PDF here</div>
+        <button class="bw-btn" type="button" id="pe-choose">Choose a File…</button>
+        <div class="pe-msg" id="pe-msg" hidden></div>
+      </div>
+      <div class="pe-main" id="pe-main" hidden>
+        <div class="pe-head">
+          <span class="pe-name" id="pe-name"></span>
+          <span class="pe-count" id="pe-count"></span>
+          <span class="pe-grow"></span>
+          <button class="bw-btn" type="button" id="pe-replace">Replace…</button>
+        </div>
+        <div class="pe-grid" id="pe-grid" role="listbox" aria-label="Pages: click the one it opens on"></div>
+        <div class="pe-range">
+          <span class="pe-lbl">Pages</span>
+          <div class="pe-rail" id="pe-rail" title="Drag the handles to show only some of the pages">
+            <div class="pe-sel" id="pe-sel"></div>
+            <div class="pe-knob" id="pe-k0" title="First page shown"></div>
+            <div class="pe-knob" id="pe-k1" title="Last page shown"></div>
+          </div>
+          <input class="bw-input pe-num" id="pe-from" type="text" inputmode="numeric" aria-label="First page"> –
+          <input class="bw-input pe-num" id="pe-to" type="text" inputmode="numeric" aria-label="Last page">
+        </div>
+      </div>
     </div>
   </div>
 
@@ -2995,6 +3093,7 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
 
       updateToolbar();
       await renderPage(currentPage);
+      window.dispatchEvent(new Event('pdf-loaded'));
     } catch (e) {
       console.error('PDF load error:', e);
       showOverlay(
@@ -3041,9 +3140,11 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
   // every edit — so each part is redone only when its own value changed: an
   // edited Name must not reload the file or throw the reader back to the
   // start page.
+  let curCfg = {};
   let lastRange = null, lastStart = null, lastSocket = null, lastUrl = null, configured = false;
   function applyConfig(cfg) {
     cfg = cfg || {};
+    curCfg = cfg;
     widgetId = cfg.id || cfg.widgetId || widgetId;
     isViewer = cfg.role === 'viewer';
 
@@ -3227,7 +3328,8 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
   // Keyboard page navigation when not in the page input
   document.addEventListener('keydown', e => {
     if (isViewer || !pdfDoc) return;
-    if (document.activeElement === pageInput) return;
+    if (document.activeElement === pageInput || document.activeElement?.tagName === 'INPUT') return;
+    if (document.body.classList.contains('bw-editing')) return;
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
       e.preventDefault(); e.stopPropagation();
       goToPage(currentPage + 1);
@@ -3252,6 +3354,184 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
       ro.disconnect();
     }
   });
+
+  // ── Edit mode ─────────────────────────────────────────────────────────────────
+  // The kit puts the widget into edit mode (body.bw-editing) from its Edit
+  // button; #pdf-edit is the editor. Settings: pdf (the file in the deck),
+  // range [first, last] (absent = every page), page (absent = the first).
+  (function () {
+    const $e = id => document.getElementById(id);
+    const ed = $e('pdf-edit'), drop = $e('pe-drop'), main = $e('pe-main'), msg = $e('pe-msg');
+    const grid = $e('pe-grid'), rail = $e('pe-rail'), selEl = $e('pe-sel');
+    const k0 = $e('pe-k0'), k1 = $e('pe-k1'), fromEl = $e('pe-from'), toEl = $e('pe-to');
+    const editing = () => !!(window.BeamerWidget && BeamerWidget.edit && BeamerWidget.edit.active);
+    const set = (patch, remove) => { if (window.BeamerWidget && BeamerWidget.edit) BeamerWidget.edit.set(patch, remove || []); };
+    const N = () => (pdfDoc ? pdfDoc.numPages : 0);
+    const first = () => (drag && drag.k === 0 ? drag.v : rangeStart);
+    const last  = () => (drag && drag.k === 1 ? drag.v : (isFinite(rangeEnd) ? rangeEnd : N()));
+    const opens = () => {
+      const p = typeof curCfg.page === 'number' ? curCfg.page : first();
+      return Math.max(first(), Math.min(last(), p));
+    };
+    let drag = null, builtFor = null, io = null;
+
+    function say(t) { msg.textContent = t || ''; msg.hidden = !t; }
+
+    // ── The file ──
+    const picker = document.createElement('input');
+    picker.type = 'file'; picker.accept = '.pdf,application/pdf';
+    picker.addEventListener('change', () => { if (picker.files[0]) useFile(picker.files[0]); picker.value = ''; });
+    $e('pe-choose').addEventListener('click', () => picker.click());
+    $e('pe-replace').addEventListener('click', () => picker.click());
+
+    async function useFile(file) {
+      if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') { say('That isn’t a PDF'); return; }
+      say('');
+      const hosted = window.parent !== window && curCfg.id != null;
+      if (!hosted) { set({ pdf: URL.createObjectURL(file) }, ['range', 'page']); return; }
+      $e('pe-name').textContent = 'Uploading ' + file.name + '…';
+      try {
+        const buffer = await file.arrayBuffer();
+        const path = await BeamerWidget.saveFile({ key: 'pdf', name: file.name, folder: 'assets', buffer });
+        set({ pdf: path }, ['range', 'page']);
+      } catch (e) { say('Couldn’t add that file'); fill(); }
+    }
+    ed.addEventListener('dragover', e => { if (!editing()) return; e.preventDefault(); ed.classList.add('is-over'); });
+    ed.addEventListener('dragleave', e => { if (!ed.contains(e.relatedTarget)) ed.classList.remove('is-over'); });
+    ed.addEventListener('drop', e => {
+      ed.classList.remove('is-over');
+      if (!editing()) return;
+      e.preventDefault();
+      const f = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) useFile(f);
+    });
+
+    // ── The pages ──
+    function buildGrid() {
+      if (!pdfDoc || builtFor === pdfDoc) return;
+      builtFor = pdfDoc;
+      if (io) io.disconnect();
+      grid.textContent = '';
+      const doc = pdfDoc, n = Math.min(doc.numPages, 500);
+      io = new IntersectionObserver(entries => entries.forEach(en => {
+        if (!en.isIntersecting) return;
+        io.unobserve(en.target);
+        drawThumb(doc, en.target);
+      }), { root: grid, rootMargin: '200px' });
+      for (let i = 1; i <= n; i++) {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'pe-th'; b.dataset.p = i;
+        b.setAttribute('role', 'option');
+        b.innerHTML = `<span class="pe-ph"></span><span class="pe-n">${i}</span>`;
+        grid.appendChild(b);
+        io.observe(b);
+      }
+      paint();
+    }
+    async function drawThumb(doc, b) {
+      try {
+        const page = await doc.getPage(Number(b.dataset.p));
+        if (doc !== pdfDoc) return;
+        const vp0 = page.getViewport({ scale: 1 });
+        const w = 200, scale = w / vp0.width, vp = page.getViewport({ scale });
+        const c = document.createElement('canvas');
+        c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+        b.style.setProperty('--ar', (vp.width / vp.height).toFixed(4));
+        await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+        b.querySelector('.pe-ph')?.replaceWith(c);
+      } catch (_) {}
+    }
+
+    function paint() {
+      const n = N();
+      if (!n) return;
+      const a = first(), z = last(), o = opens();
+      grid.querySelectorAll('.pe-th').forEach(b => {
+        const p = Number(b.dataset.p);
+        b.classList.toggle('is-out', p < a || p > z);
+        b.classList.toggle('is-start', p === o);
+        b.setAttribute('aria-selected', String(p === o));
+        b.title = p === o ? 'Opens on this page' : (p < a || p > z) ? 'Not shown — drag the handles to include it' : 'Open on this page';
+        const badge = b.querySelector('.pe-badge');
+        if (p === o && !badge) b.insertAdjacentHTML('afterbegin', '<span class="pe-badge">opens here</span>');
+        if (p !== o && badge) badge.remove();
+      });
+      const pos = v => (n > 1 ? (v - 1) / (n - 1) : 0) * 100;
+      selEl.style.left = pos(a) + '%';
+      selEl.style.width = (pos(z) - pos(a)) + '%';
+      k0.style.left = pos(a) + '%';
+      k1.style.left = pos(z) + '%';
+      if (document.activeElement !== fromEl) fromEl.value = a;
+      if (document.activeElement !== toEl) toEl.value = z;
+    }
+
+    function fill() {
+      const has = !!curCfg.pdf;
+      drop.hidden = has;
+      main.hidden = !has;
+      if (!has) return;
+      const name = String(curCfg.pdf).startsWith('blob:') ? 'PDF' : String(curCfg.pdf).split(/[\\/]/).pop();
+      $e('pe-name').textContent = name;
+      $e('pe-count').textContent = N() ? `· ${N()} page${N() === 1 ? '' : 's'}` : '· loading…';
+      buildGrid();
+      paint();
+    }
+
+    grid.addEventListener('click', e => {
+      const b = e.target.closest('.pe-th');
+      if (!b) return;
+      const p = Number(b.dataset.p);
+      // A page outside the ones shown brings the nearer end out to it.
+      if (p < first() || p > last()) saveRange(Math.min(first(), p), Math.max(last(), p));
+      if (p === rangeStart || (p < first())) set({}, ['page']); else set({ page: p });
+    });
+
+    function saveRange(a, z) {
+      const n = N();
+      a = Math.max(1, Math.min(n, Math.round(a))); z = Math.max(a, Math.min(n, Math.round(z)));
+      if (a === 1 && z === n) set({}, ['range']); else set({ range: [a, z] });
+      if (typeof curCfg.page === 'number' && (curCfg.page < a || curCfg.page > z)) set({}, ['page']);
+    }
+
+    // ── The range, dragged or typed ──
+    const railV = e => {
+      const r = rail.getBoundingClientRect();
+      return 1 + Math.round(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * (N() - 1));
+    };
+    [k0, k1].forEach((k, ki) => {
+      k.addEventListener('pointerdown', e => {
+        if (!N()) return;
+        e.preventDefault();
+        k.setPointerCapture(e.pointerId); k.classList.add('is-drag');
+        drag = { k: ki, v: ki ? last() : first() };
+      });
+      k.addEventListener('pointermove', e => {
+        if (!drag || !k.hasPointerCapture(e.pointerId)) return;
+        let v = railV(e);
+        v = ki ? Math.max(v, rangeStart) : Math.min(v, isFinite(rangeEnd) ? rangeEnd : N());
+        if (v !== drag.v) { drag.v = v; paint(); }
+      });
+      k.addEventListener('pointerup', () => {
+        if (!drag) return;
+        const d = drag; drag = null; k.classList.remove('is-drag');
+        saveRange(d.k ? first() : d.v, d.k ? d.v : last());
+      });
+    });
+    [fromEl, toEl].forEach(el => {
+      el.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); el.blur(); } });
+      el.addEventListener('change', () => {
+        const a = parseInt(fromEl.value, 10), z = parseInt(toEl.value, 10);
+        if (!(a >= 1) || !(z >= 1)) { paint(); return; }
+        saveRange(Math.min(a, z), Math.max(a, z));
+      });
+    });
+
+    window.addEventListener('bw-edit', e => { if (e.detail.editing) { say(''); fill(); } });
+    window.addEventListener('pdf-loaded', () => { if (editing()) fill(); });
+    window.addEventListener('message', e => {
+      if (e.data && e.data.type === 'widget-config' && editing()) setTimeout(fill, 0);
+    });
+  })();
 
   updateToolbar();
 })();
