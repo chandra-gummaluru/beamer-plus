@@ -3124,15 +3124,20 @@ body.bw-overlay .cbtn { font-size: clamp(12px, min(5.4cqw, 6cqh), 30px); }
   // The keys' labels, typeset.
   const KEY_TEX = { 'sin(': '\\sin', 'cos(': '\\cos', 'tan(': '\\tan', 'ln(': '\\ln', 'log(': '\\log',
                     'exp(': '\\exp', '√(': '\\sqrt{\\square}', '^': 'x^{y}', 'π': '\\pi', 'e': 'e',
-                    '×': '\\times', '÷': '\\div', '+': '+', '−': '-', '%': '\\%' };
+                    '×': '\\times', '÷': '\\div', '+': '+', '−': '-', '%': '\\%',
+                    '(': '(\\;)', ')': ')' };
   function typesetKeys() {
     if (!window.katex) return;
     document.querySelectorAll('.cbtn[data-insert]').forEach(b => {
-      const t = KEY_TEX[b.dataset.insert];
+      // Digits and the point are set in LaTeX too, like everything else.
+      const t = KEY_TEX[b.dataset.insert] ?? (/^[0-9.]$/.test(b.dataset.insert) ? b.dataset.insert : null);
       if (t) b.innerHTML = katex.renderToString(t, { throwOnError: false });
     });
     const fr = document.getElementById('btn-frac');
     if (fr) fr.innerHTML = katex.renderToString('a/b', { throwOnError: false });
+    const tx = (id, t) => { const el = document.getElementById(id); if (el) el.innerHTML = katex.renderToString(t, { throwOnError: false }); };
+    tx('btn-ans', '\\mathrm{ans}');
+    tx('btn-clear', '\\mathrm{C}');
   }
   function typesetAll() {
     typesetKeys();
