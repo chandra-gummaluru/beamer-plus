@@ -849,6 +849,9 @@
         syncLayoutMode();
         paintEditButtons();
         document.addEventListener('keydown', onEditKey, true);
+        // The host stops taking dropped files (as a new deck) while a widget
+        // is edited, so a file dropped on the widget reaches the widget.
+        post({ type: 'widget-editing', widgetId: cfg().id, on: true });
         fire(true);
     }
 
@@ -869,6 +872,7 @@
         syncTitle();
         syncLayoutMode();
         paintEditButtons();
+        post({ type: 'widget-editing', widgetId: cfg().id, on: false });
         fire(false);
     }
 

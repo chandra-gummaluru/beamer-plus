@@ -999,7 +999,7 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
   color: var(--sn-ink);
 }
 .bw-source > svg { flex: 0 0 auto; width: 16px; height: 16px; color: var(--sn-cap); }
-.bw-source:focus-within { box-shadow: 0 0 0 3px color-mix(in srgb, var(--sn-hl) 55%, transparent); }
+.bw-source:focus-within { box-shadow: 0 0 0 1px var(--sn-ink); }
 .bw-source:has(.is-bad) { border-color: #d93a2b; }
 .bw-source.is-over { border-style: dashed; background: color-mix(in srgb, var(--sn-hl) 22%, var(--bg)); }
 .bw-source-input {
@@ -1883,6 +1883,9 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
         syncLayoutMode();
         paintEditButtons();
         document.addEventListener('keydown', onEditKey, true);
+        // The host stops taking dropped files (as a new deck) while a widget
+        // is edited, so a file dropped on the widget reaches the widget.
+        post({ type: 'widget-editing', widgetId: cfg().id, on: true });
         fire(true);
     }
 
@@ -1903,6 +1906,7 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
         syncTitle();
         syncLayoutMode();
         paintEditButtons();
+        post({ type: 'widget-editing', widgetId: cfg().id, on: false });
         fire(false);
     }
 
@@ -2987,8 +2991,8 @@ body.bw-editing #pdf-pages, body.is-viewer #pdf-pages { display: none; }
         </div>
       </div>
       <div class="pe-drop" id="pe-drop">
-        <svg class="ph-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2.5h8.5L19 7v14.5H6z"/><path d="M14.5 2.5V7H19"/><path d="M12.5 18v-6M9.8 14.6l2.7-2.7 2.7 2.7"/></svg>
-        <div class="pe-drop-t">Drop a PDF anywhere here</div>
+        <svg class="ph-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2.5h8.5L19 7v14.5H6z"/><path d="M14.5 2.5V7H19"/><path d="M9 12h7M9 15h7M9 18h4"/></svg>
+        <div class="pe-drop-t">No PDF chosen</div>
       </div>
       <div class="pe-main" id="pe-main" hidden>
         <div class="pe-grid" id="pe-grid" role="listbox" aria-label="Pages: click the one it opens on"></div>
@@ -3541,15 +3545,10 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
         set({ pdf: path }, ['range', 'page']);
       } catch (e) { say('Couldn’t add that file'); fill(); }
     }
-    ed.addEventListener('dragover', e => { if (!editing()) return; e.preventDefault(); ed.classList.add('is-over'); });
-    ed.addEventListener('dragleave', e => { if (!ed.contains(e.relatedTarget)) ed.classList.remove('is-over'); });
-    ed.addEventListener('drop', e => {
-      ed.classList.remove('is-over');
-      if (!editing()) return;
-      e.preventDefault();
-      const f = e.dataTransfer.files && e.dataTransfer.files[0];
-      if (f) useFile(f);
-    });
+    // No dropping files: Choose a File… is the one way in. A file dropped here
+    // is swallowed, so the browser doesn't open it in place of the widget.
+    ed.addEventListener('dragover', e => e.preventDefault());
+    ed.addEventListener('drop', e => e.preventDefault());
 
     // ── The pages ──
     function buildGrid() {
@@ -3617,7 +3616,7 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
       $e('pe-choose').textContent = has ? 'Replace…' : 'Choose a File…';
       if (!has) {
         $e('pe-name').textContent = '';
-        $e('pe-count').textContent = 'or drop a .pdf anywhere here';
+        $e('pe-count').textContent = '';
         return;
       }
       const name = String(curCfg.pdf).startsWith('blob:') ? 'PDF' : String(curCfg.pdf).split(/[\\/]/).pop();

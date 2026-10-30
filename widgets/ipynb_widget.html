@@ -1000,7 +1000,7 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
   color: var(--sn-ink);
 }
 .bw-source > svg { flex: 0 0 auto; width: 16px; height: 16px; color: var(--sn-cap); }
-.bw-source:focus-within { box-shadow: 0 0 0 3px color-mix(in srgb, var(--sn-hl) 55%, transparent); }
+.bw-source:focus-within { box-shadow: 0 0 0 1px var(--sn-ink); }
 .bw-source:has(.is-bad) { border-color: #d93a2b; }
 .bw-source.is-over { border-style: dashed; background: color-mix(in srgb, var(--sn-hl) 22%, var(--bg)); }
 .bw-source-input {
@@ -1884,6 +1884,9 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
         syncLayoutMode();
         paintEditButtons();
         document.addEventListener('keydown', onEditKey, true);
+        // The host stops taking dropped files (as a new deck) while a widget
+        // is edited, so a file dropped on the widget reaches the widget.
+        post({ type: 'widget-editing', widgetId: cfg().id, on: true });
         fire(true);
     }
 
@@ -1904,6 +1907,7 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
         syncTitle();
         syncLayoutMode();
         paintEditButtons();
+        post({ type: 'widget-editing', widgetId: cfg().id, on: false });
         fire(false);
     }
 
@@ -5115,18 +5119,13 @@ window.addEventListener('message', function(e) {
     try { window.parent.postMessage({ type: 'widget-state', widgetId: WIDGET_ID, state: _nbGetState() }, '*'); } catch (_) {}
   }
 
-  area.addEventListener('dragover', e => { if (!editing()) return; e.preventDefault(); area.classList.add('is-over'); });
-  area.addEventListener('dragleave', e => { if (!area.contains(e.relatedTarget)) area.classList.remove('is-over'); });
-  area.addEventListener('drop', e => {
-    area.classList.remove('is-over');
-    if (!editing()) return;
-    e.preventDefault();
-    const f = e.dataTransfer.files && e.dataTransfer.files[0];
-    if (f) useFile(f);
-  });
+  // No dropping files: Choose Notebook… is the one way in. A dropped file is
+  // swallowed, so the browser doesn't open it in place of the widget.
+  area.addEventListener('dragover', e => e.preventDefault());
+  area.addEventListener('drop', e => e.preventDefault());
   const nameEl = document.getElementById('nb-ed-name');
   const showName = () => { nameEl.textContent = notebookTitleSet ? (document.getElementById('notebook-title')?.textContent || '') : ''; };
-  window.addEventListener('bw-edit', e => { if (e.detail.editing) { showName(); say('or drop a .ipynb anywhere here'); } });
+  window.addEventListener('bw-edit', e => { if (e.detail.editing) { showName(); say(''); } });
 })();
 </script>
 </body>

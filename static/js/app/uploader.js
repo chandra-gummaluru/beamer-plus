@@ -49,8 +49,23 @@ export function openPresentationFile(file) {
 // not while editing. Drops onto a widget never reach here: they land in the
 // widget's own iframe.
 
+// Widgets being edited in place (they choose their own files: a PDF, a
+// notebook), told by the widget kit's 'widget-editing' message.
+const editingWidgets = new Map();   // widget id → its iframe's window
+window.addEventListener('message', (e) => {
+    const d = e.data;
+    if (!d || d.type !== 'widget-editing') return;
+    if (d.on) editingWidgets.set(String(d.widgetId), e.source); else editingWidgets.delete(String(d.widgetId));
+});
+// A widget can go (its slide left) without saying it stopped editing.
+function anyWidgetEditing() {
+    const frames = Array.from(document.querySelectorAll('iframe'), (f) => f.contentWindow);
+    for (const [id, win] of editingWidgets) if (!frames.includes(win)) editingWidgets.delete(id);
+    return editingWidgets.size > 0;
+}
+
 function uploadAllowed() {
-    return !document.body.classList.contains('edit-mode');
+    return !document.body.classList.contains('edit-mode') && !anyWidgetEditing();
 }
 
 function hasFiles(e) {
