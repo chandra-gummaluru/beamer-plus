@@ -44,8 +44,8 @@
     --guide:            oklch(62% 0.21 350);   /* snap guides while dragging */
 
     /* ---------- Buttons (Lectern's: static/css/shell.css there) ---------- */
-    --btn-gold:         #a67c00;   /* hover outline, Add buttons */
-    --btn-gold-soft:    #fdf3d6;   /* hover fill */
+    --btn-gold:         #1f2329;   /* hover outline, Add buttons: ink */
+    --btn-gold-soft:    #f7c548;   /* hover fill: the deck's highlighter yellow */
     --btn-line:         #cfd0d3;   /* a plain button's outline */
     --btn-ink:          #1f2329;   /* the main button's outline */
     --btn-danger:       #b42318;

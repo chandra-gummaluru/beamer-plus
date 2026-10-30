@@ -785,7 +785,7 @@ body.bw-editing .bw-editable[role="button"] { cursor: pointer; }
   font: inherit;
   cursor: pointer;
 }
-.bw-add:hover { border-color: var(--edit-line); background: var(--edit-soft); }
+.bw-add:hover { border-color: var(--sn-ink); background: var(--sn-hl); }
 
 /* Font size stepper — drives --u, which every content-sized token is built on. */
 .bw-fontsize {
@@ -3760,7 +3760,7 @@ body.bw-editing #question { min-height: 1.25em; cursor: text; }
 }
 .fence-mark { color: var(--ar-faint); }
 .md-tok[contenteditable="false"] { cursor: text; }
-body.bw-editing .md-tok[contenteditable="false"]:hover { background: var(--edit-soft); border-radius: 3px; }
+body.bw-editing .md-tok[contenteditable="false"]:hover { background: var(--sn-hl); border-radius: 3px; }
 
 /* The type, as a compact picker in the bar (eight types don't fit a seg). */
 #ed-type { gap: 6px; font-weight: 700; }
@@ -3795,19 +3795,19 @@ body.bw-editing .md-tok[contenteditable="false"]:hover { background: var(--edit-
   cursor: pointer;
 }
 .ed-menu button small { font-size: var(--fs-chrome-sm); color: var(--ar-cap); }
-.ed-menu button:hover, .ed-menu button:focus-visible { background: var(--edit-soft); outline: none; }
+.ed-menu button:hover, .ed-menu button:focus-visible { background: var(--sn-hl); outline: none; }
 .ed-menu button.is-active { font-weight: 700; }
 
 /* Answers typed in their nodes; the letter marks the right one. */
 body.bw-editing .badge.ed-mark { cursor: pointer; padding: 3px 5px; margin: -3px -5px; border-radius: 4px; }
-body.bw-editing .badge.ed-mark:hover, body.bw-editing .badge.ed-mark:focus-visible { background: var(--edit-soft); color: var(--ar-ink); outline: none; }
+body.bw-editing .badge.ed-mark:hover, body.bw-editing .badge.ed-mark:focus-visible { background: var(--sn-hl); color: var(--ar-ink); outline: none; }
 /* Clicking an answer's node (anywhere but its text) marks it right. */
 /* An answer's box is for typing in (anywhere in it puts the caret in its
    text); the letter marks it as the right one. True/false has nothing to
    type, so its whole box marks it. */
 body.bw-editing #choices .opt { cursor: text; }
 body.bw-editing #choices.is-tf .opt { cursor: pointer; }
-body.bw-editing #choices.is-tf .choice:not(.is-correct) .opt:hover { background: var(--edit-soft); }
+body.bw-editing #choices.is-tf .choice:not(.is-correct) .opt:hover { background: var(--sn-hl); }
 body.bw-editing .choice-label { cursor: text; }
 .choice-label[contenteditable] { min-width: 6ch; min-height: 1.3em; outline-offset: 3px !important; }
 .opt { position: relative; }
