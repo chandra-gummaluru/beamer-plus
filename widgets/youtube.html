@@ -3058,8 +3058,8 @@ html, body {
 .ye-knob:hover, .ye-knob.is-drag { background: var(--sn-hl); }
 .ye-times { display: inline-flex; align-items: center; gap: 6px; color: var(--sn-cap); white-space: nowrap; }
 .ye-time { width: 70px; text-align: center; font-family: var(--font-mono); }
-.ye-opts { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 22px; flex: 0 0 auto; }
-.ye-opt { display: inline-flex; align-items: center; gap: 8px; color: var(--sn-cap); white-space: nowrap; }
+.yt-field { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; color: var(--text-3); white-space: nowrap; }
+.yt-sep { flex: 0 0 auto; width: 1px; height: 16px; background: var(--border-med); }
 #yt-edit .bw-input { height: 30px; border: 1.5px solid var(--sn-faint); border-radius: var(--sn-r); background: var(--bg); color: var(--sn-ink); }
 #yt-edit .bw-input:focus { border-color: var(--sn-ink); outline: none; }
 #yt-edit .bw-input.is-bad { border-color: #d93a2b; }
@@ -3071,6 +3071,33 @@ body.bw-editing #player-wrap { z-index: 41; }
 </style>
 </head>
 <body>
+  <div id="toolbar" class="bw-toolbar" data-bw-topbar>
+    <span class="bw-toolbar-title">YouTube</span>
+    <!-- Edit mode: how the clip plays. The link and the trim are on the video. -->
+    <span class="bw-edit-only" style="display:contents">
+      <span class="yt-field">Starting Mode
+        <span class="bw-seg" id="ye-auto">
+          <button class="bw-btn" type="button" data-v="0">Manual</button><button class="bw-btn" type="button" data-v="1">Automatic</button></span>
+      </span>
+      <span class="yt-sep" aria-hidden="true"></span>
+      <span class="yt-field">Playback Controls
+        <span class="bw-seg" id="ye-ctrl">
+          <button class="bw-btn" type="button" data-v="1">Shown</button><button class="bw-btn" type="button" data-v="0">Hidden</button></span>
+      </span>
+      <span class="yt-sep" aria-hidden="true"></span>
+      <span class="yt-field">YouTube Title &amp; Suggestions
+        <span class="bw-seg" id="ye-ui">
+          <button class="bw-btn" type="button" data-v="1">Hidden</button><button class="bw-btn" type="button" data-v="0">Shown</button></span>
+      </span>
+      <span class="yt-sep" aria-hidden="true"></span>
+      <span class="yt-field">Link Box
+        <span class="bw-seg" id="ye-box">
+          <button class="bw-btn" type="button" data-v="0">Off</button><button class="bw-btn" type="button" data-v="1">On</button></span>
+      </span>
+    </span>
+    <div class="bw-spacer"></div>
+  </div>
+
 <div id="container">
   <div id="player-wrap">
     <div id="yt-player"></div>
@@ -3153,16 +3180,6 @@ body.bw-editing #player-wrap { z-index: 41; }
           <div class="ye-knob" id="ye-k1" data-k="endTime" title="Clip end"></div>
         </div>
         <span class="ye-times"><input class="bw-input ye-time" id="ye-start" type="text" placeholder="0:00" aria-label="Clip start"> – <input class="bw-input ye-time" id="ye-end" type="text" placeholder="end" aria-label="Clip end"></span>
-      </div>
-      <div class="ye-opts">
-        <span class="ye-opt">Starting Mode <span class="bw-seg" id="ye-auto">
-          <button class="bw-btn" type="button" data-v="0">Manual</button><button class="bw-btn" type="button" data-v="1">Automatic</button></span></span>
-        <span class="ye-opt">Playback Controls <span class="bw-seg" id="ye-ctrl">
-          <button class="bw-btn" type="button" data-v="1">Shown</button><button class="bw-btn" type="button" data-v="0">Hidden</button></span></span>
-        <span class="ye-opt">YouTube Title &amp; Suggestions <span class="bw-seg" id="ye-ui">
-          <button class="bw-btn" type="button" data-v="1">Hidden</button><button class="bw-btn" type="button" data-v="0">Shown</button></span></span>
-        <span class="ye-opt">Link Box <span class="bw-seg" id="ye-box">
-          <button class="bw-btn" type="button" data-v="0">Off</button><button class="bw-btn" type="button" data-v="1">On</button></span></span>
       </div>
     </div>
   </div>
