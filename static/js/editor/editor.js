@@ -61,7 +61,8 @@ export function initEditor(state) {
     // The panel's footer: Hide During Presentation (a slide or split view)
     // and Delete — whatever the panel shows: the selected element, else the
     // slide, or on a split view the split view (not its slides). Delete
-    // takes two clicks, the first arms it, since there's no undo.
+    // asks first, in a dialog like every other confirmation, since there's
+    // no undo.
     document.getElementById('panel-hide')?.addEventListener('change', (e) => {
         const obj = ctx.state?.slideStructure?.[panelSlideIndex()];
         if (!obj) return;
@@ -70,8 +71,18 @@ export function initEditor(state) {
     });
     const delBtn = document.getElementById('panel-delete');
     delBtn?.addEventListener('click', () => {
-        if (!delBtn.classList.contains('is-armed')) { armDelete(true); return; }
-        armDelete(false);
+        const what = delBtn.querySelector('span')?.textContent?.replace(/^Delete\s+/, '') || 'Slide';
+        window.BeamerModal?.show({
+            kind: 'warning',
+            title: `Delete ${what}?`,
+            message: 'This can’t be undone.',
+            buttons: [
+                { label: 'Cancel', kind: 'cancel' },
+                { label: 'Delete', kind: 'ok', onClick: deleteFromPanel },
+            ],
+        });
+    });
+    function deleteFromPanel() {
         if (selectedItemKind()) { deleteSelectedItem(); return; }
         const i = panelSlideIndex();
         const obj = i == null ? null : ctx.state?.slideStructure?.[i];
@@ -88,7 +99,7 @@ export function initEditor(state) {
             return;
         }
         bus.emit('slide:delete', i);
-    });
+    }
     // Selecting something (or nothing) changes what the footer acts on.
     bus.on('editor:panel-mode', () => { armDelete(false); updatePanelFooter(); });
 

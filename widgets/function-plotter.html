@@ -2985,6 +2985,7 @@ body.is-viewer #trace-tip { display: none !important; }
 
 /* Readouts and zoom: small TikZ nodes on the figure. */
 #coord-display { color: var(--sn-cap); border: 1.5px solid var(--sn-faint); border-radius: var(--sn-r); }
+#coord-display .katex { font-size: calc(13px * var(--u)); color: var(--sn-ink); }
 #trace-tip { color: var(--sn-ink); border: 1.5px solid var(--sn-ink); border-radius: var(--sn-r); box-shadow: none; }
 .zoom-btn { border: 1.5px solid var(--sn-faint); border-radius: var(--sn-r); color: var(--sn-ink); }
 .zoom-btn:hover { background: var(--sn-node); border-color: var(--sn-ink); color: var(--sn-ink); }
@@ -3327,6 +3328,13 @@ function exprTex(src) {
     return tex(s);
   } catch (_) { return null; }
 }
+// The cursor readout, set as maths: (x, y) = (1.25, -0.50).
+function setCoord(gx, gy) {
+  const html = katexHtml(`x = ${fmtCoord(gx)},\\; y = ${fmtCoord(gy)}`);
+  if (html) coordDisp.innerHTML = html;
+  else coordDisp.textContent = `x: ${fmtCoord(gx)}\u2002 y: ${fmtCoord(gy)}`;
+}
+
 function katexHtml(tex) {
   if (tex == null || !window.katex) return null;
   try { return katex.renderToString(tex, { throwOnError: false, output: 'html' }); }
@@ -3355,7 +3363,14 @@ function paintRowTex(row) {
     out.style.width = Math.max(0, inp.offsetWidth - pad) + 'px';
   }
 }
-window.addEventListener('fp-katex', () => { renderList(); });
+window.addEventListener('fp-katex', () => {
+  renderList();
+  if (mode !== '3d') setCoord(0, 0);
+  // The canvas only draws a font once it has loaded; fetch the math italic, then redraw.
+  if (document.fonts && document.fonts.load) {
+    document.fonts.load(`italic 16px KaTeX_Math`, 'xyz').then(() => { if (typeof plot === 'function') plot(); }).catch(() => {});
+  }
+});
 
 // ── Overlay view: legend + sliders ───────────────────────
 // Rebuilt whenever the expression list is; a slider moved here drives the
@@ -3623,6 +3638,8 @@ function readStyle() {
     bg:    v('--bg', '#ffffff'),
     mono:  v('--font-mono', 'monospace'),
     ui:    v('--font-ui', 'sans-serif'),
+    // Axis names are maths: KaTeX's italic, as $x$ and $y$ set in LaTeX.
+    math:  "KaTeX_Math, 'Latin Modern Math', 'CMU Serif', serif",
     tickFs: Math.max(9, Math.round(11 * u)),
     nameFs: Math.max(10, Math.round(14 * u)),
     hair:  Math.max(1, 0.9 * u),
@@ -3740,7 +3757,7 @@ function drawAxes(Wc, Hc) {
   ctx.fillText('0', ox, oy);
 
   // Axis name labels
-  ctx.font      = `italic ${ST.nameFs}px ${ST.ui}`;
+  ctx.font      = `italic ${Math.round(ST.nameFs * 1.15)}px ${ST.math}`;
   ctx.fillStyle = ST.text;
   ctx.textAlign    = 'right';
   ctx.textBaseline = 'middle';
@@ -4137,7 +4154,7 @@ function drawLabels3D(P, nx, ny, Wc, Hc) {
   const ySide = near.c[1];     // the y edge the x numbers sit on
   const xSide = near.c[0];
 
-  ctx.font = `italic ${ST.nameFs}px ${ST.ui}`;
+  ctx.font = `italic ${Math.round(ST.nameFs * 1.15)}px ${ST.math}`;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   const xn = P(-xSide * 1.34, ySide * 1.1, -1);
   const yn = P(xSide * 1.1, -ySide * 1.34, -1);
@@ -4227,7 +4244,7 @@ canvas.addEventListener('mousemove', (e) => {
     return;
   }
 
-  coordDisp.textContent = `x: ${fmtCoord(gx)}\u2002 y: ${fmtCoord(gy)}`;
+  setCoord(gx, gy);
 
   if (isDragging) {
     const dx = mx - dragStart.mx;
@@ -4385,7 +4402,7 @@ function setMode(next, quiet) {
   document.getElementById('btn-3d').classList.toggle('is-active', m === '3d');
   traceInfo = null;
   traceTip.style.display = 'none';
-  coordDisp.textContent = m === '3d' ? 'drag to rotate' : 'x: 0.00\u2002 y: 0.00';
+  if (m === '3d') coordDisp.textContent = 'drag to rotate'; else setCoord(0, 0);
   renderList();
   plot();
   if (!quiet) emitState();

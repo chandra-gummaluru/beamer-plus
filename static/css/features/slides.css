@@ -443,11 +443,8 @@ model-viewer { pointer-events: auto !important; }
     background: var(--surface-cream-2);
     align-self: stretch;
 }
-body.edit-mode .slide-nav-item.type-view { border-style: dashed; border-color: var(--edit-tint); }
-body.edit-mode .slide-nav-item.type-view:hover { border-color: var(--edit-tint); box-shadow: 0 2px 8px oklch(from var(--edit-tint) l c h / 0.2); }
-body.edit-mode .slide-preview-view { background: var(--edit-tint-soft); }
-body.edit-mode .view-preview-pane { background: transparent; color: var(--edit-tint-ink); }
-body.edit-mode .view-preview-sep { background: oklch(from var(--edit-tint) l c h / 0.5); }
+/* Split views look the same in the editor as when presenting: the deck's
+   neutral greys, no tint of their own. */
 /* Slide number — a tab in the top-left corner of each preview, set into
    the card's corner rather than floating over the slide, so it reads as the
    card's label and not as part of the slide behind it. White by default; the

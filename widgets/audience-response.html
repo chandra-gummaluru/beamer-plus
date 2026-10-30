@@ -2926,6 +2926,10 @@ html.ar-dark {
   overflow-y: auto;
   scrollbar-width: thin;
 }
+/* Every answer box the same size: the rows share the tallest answer's height
+   and each box fills its cell, so one long answer doesn't stand out. */
+#choices:not(.show-results) { grid-auto-rows: 1fr; }
+#choices:not(.show-results) .choice { align-items: stretch; }
 .choice {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
