@@ -75,7 +75,7 @@ const STEPS = [
         sel:   '#session-edit-btn',
         place: 'auto',
         title: 'Edit Mode',
-        body:  'Edit presentation lets you add videos, audio, 3D models, and interactive widgets to any slide from the toolbar along the top. The panel on the right shows the slide and everything on it; click anything to open its settings there. Drag and resize overlays freely.',
+        body:  'Edit presentation lets you add videos, audio, 3D models, and interactive widgets to any slide from the toolbar along the top, or insert a split widget: one widget across a split, as a slide of its own. The panel on the right shows the slide and everything on it; click anything to open its settings there. Drag and resize overlays freely.',
     },
     {
         sel:   '#record-btn',
@@ -99,7 +99,7 @@ const STEPS = [
         sel:   null,
         place: 'center',
         title: 'Now Explore the Demo',
-        body:  'Press → to step through the demo deck. Every slide is live: uncover a proof step by step, play a video that grows to fill the slide, rotate a 3D heart, drag a slider on a 3D surface, flip switches on an SR latch, run Python (and split one workspace across a split view: code on one slide, memory model on the other), and answer a live poll from your phone.',
+        body:  'Press → to step through the demo deck. Every slide is live: uncover a proof step by step, play a video that grows to fill the slide, rotate a 3D heart, drag a slider on a 3D surface, flip switches on an SR latch, run Python (and a split widget slide: one workspace across the screen, code on the left, memory model on the right), and answer a live poll from your phone.',
     },
 ];
 

@@ -17,7 +17,7 @@
       "filename": "recursion.py",
       "memoryMode": "trace",
       "banner": false,
-      "code": "# One widget across both slides: the code here,\n# the memory model (or the shell) on the right.\ndef countdown(n):\n    if n == 0:\n        return ['liftoff']\n    return [n] + countdown(n - 1)\n\nsteps = countdown(3)\nprint(steps)\n"
+      "code": "# A split widget slide: the code here,\n# the memory model (or the shell) on the right.\ndef countdown(n):\n    if n == 0:\n        return ['liftoff']\n    return [n] + countdown(n - 1)\n\nsteps = countdown(3)\nprint(steps)\n"
     }
   ]
 }
