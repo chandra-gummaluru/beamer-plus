@@ -14,6 +14,7 @@
 {
   "label": "Camera",
   "category": "Tools",
+  "inlineEdit": true,
   "fields": []
 }
 </script>
@@ -2786,6 +2787,11 @@ html, body { width: 100%; height: 100%; overflow: hidden; }
 .bw-topbar .bar-btn { width: var(--ctl-h); height: var(--ctl-h); background: var(--bg); border: 1px solid var(--border-med); color: var(--text); backdrop-filter: none; }
 .bw-topbar .bar-btn:hover { background: var(--sn-node); border-color: var(--text); }
 .bw-topbar .bar-btn.active { background: var(--sn-node); border-color: var(--text); }
+
+/* Just the picture: no snapshot or mirror buttons. The source is picked in
+   edit mode. */
+#snapshot-btn, #mirror-btn { display: none !important; }
+.cam-ed { display: inline-flex; align-items: center; gap: 8px; color: var(--text-3); white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -2810,9 +2816,10 @@ html, body { width: 100%; height: 100%; overflow: hidden; }
 
     <!-- Bottom control bar -->
     <div id="bar" data-bw-topbar>
-      <select id="device-select" title="Camera device"></select>
+      <!-- Edit mode only: which camera. Saved with the slide. -->
+      <span class="bw-edit-only cam-ed">Source <select id="device-select" title="Camera"></select></span>
 
-      <button class="bar-btn" id="snapshot-btn" title="Snapshot">
+      <button class="bar-btn" id="snapshot-btn" title="Snapshot" hidden>
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <rect x="1" y="4" width="16" height="12" rx="2"/>
           <circle cx="9" cy="10" r="3"/>
@@ -2820,7 +2827,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; }
         </svg>
       </button>
 
-      <button class="bar-btn" id="mirror-btn" title="Mirror">
+      <button class="bar-btn" id="mirror-btn" title="Mirror" hidden>
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M9 2v14"/>
           <path d="M3 5l4 4-4 4"/>
@@ -3019,7 +3026,28 @@ function wFile(fallback, ext){
     document.getElementById('bar').addEventListener('click', e => e.stopPropagation());
 
     deviceSel.addEventListener('change', () => {
+      // Picked in edit mode: it is this slide's camera from now on, and the
+      // picture switches to it so you can see what you picked.
+      if (window.BeamerWidget?.edit?.active) {
+        BeamerWidget.edit.set({ deviceId: deviceSel.value }, [], { silent: true });
+        cfg.deviceId = deviceSel.value;
+        startCamera(deviceSel.value);
+        return;
+      }
       if (cameraOn) startCamera(deviceSel.value);
+    });
+    // Into edit mode: list the cameras (asking once for permission, so they
+    // have names), the slide's own one chosen.
+    window.addEventListener('bw-edit', async e => {
+      if (!e.detail.editing) return;
+      devicesListed = false;
+      await listDevices();
+      if ([...deviceSel.options].some(o => !o.textContent.startsWith('Camera ')) === false && !cameraOn) {
+        try { (await navigator.mediaDevices.getUserMedia({ video: true })).getTracks().forEach(t => t.stop()); } catch (_) {}
+        devicesListed = false;
+        await listDevices();
+      }
+      if (cfg.deviceId && [...deviceSel.options].some(o => o.value === cfg.deviceId)) deviceSel.value = cfg.deviceId;
     });
     snapshotBtn.addEventListener('click', doSnapshot);
     mirrorBtn.addEventListener('click', () => setMirror(!mirrored));
