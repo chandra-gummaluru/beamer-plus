@@ -2853,17 +2853,18 @@ body.is-viewer .bw-sep:not(:first-of-type) { display: none !important; }
   color: var(--sn-ink);
 }
 .pe-drop {
-  flex: 1 1 auto; margin: 16px;
+  flex: 1 1 auto; margin: 10px 16px 16px;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
   border: 1.5px dashed var(--sn-faint); border-radius: var(--sn-r);
   color: var(--sn-cap); text-align: center;
 }
-.pe-drop svg { width: 40px; height: 40px; color: var(--sn-ink); }
-.pe-drop-t { font-size: calc(var(--fs-chrome) * 1.2); color: var(--sn-ink); }
+.pe-drop svg { width: 52px; height: 52px; color: var(--sn-cap); opacity: 0.7; }
+.pe-drop-t { font-size: calc(15px * var(--u)); color: var(--sn-cap); }
 .pe-drop[hidden], .pe-main[hidden] { display: none; }
-#pdf-edit.is-over .pe-drop, #pdf-edit.is-over .pe-grid { border-color: var(--sn-ink); background: var(--edit-soft); }
+#pdf-edit.is-over .pe-drop, #pdf-edit.is-over .pe-grid { border-color: var(--sn-ink); border-style: dashed; }
 .pe-msg { color: #d93a2b; }
-.pe-main { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 12px 16px; }
+.pe-top { flex: 0 0 auto; padding: 12px 16px 0; }
+.pe-main { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 10px 16px 12px; }
 .pe-head { flex: 0 0 auto; }
 .pe-name { }
 .pe-count { color: var(--sn-cap); white-space: nowrap; }
@@ -2975,19 +2976,21 @@ body.bw-editing #pdf-pages, body.is-viewer #pdf-pages { display: none; }
     </div>
     <!-- Edit mode (BeamerWidget.edit): the file, and its pages to pick from. -->
     <div id="pdf-edit" class="bw-edit-only">
-      <div class="pe-drop" id="pe-drop">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/></svg>
-        <div class="pe-drop-t">Drop a PDF here</div>
-        <button class="bw-pick" type="button" id="pe-choose">Choose a File…</button>
-        <div class="pe-msg" id="pe-msg" hidden></div>
-      </div>
-      <div class="pe-main" id="pe-main" hidden>
+      <!-- Which PDF: the source row every widget uses (as the notebook's). -->
+      <div class="pe-top">
         <div class="pe-head bw-source">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg>
-          <span class="pe-name bw-source-name" id="pe-name"></span>
+          <span class="pe-name bw-source-name" id="pe-name" data-empty="No PDF chosen"></span>
           <span class="pe-count bw-source-hint" id="pe-count"></span>
-          <button class="bw-btn" type="button" id="pe-replace">Replace…</button>
+          <span class="pe-msg bw-source-msg is-err" id="pe-msg" hidden></span>
+          <button class="bw-btn" type="button" id="pe-choose">Choose a File…</button>
         </div>
+      </div>
+      <div class="pe-drop" id="pe-drop">
+        <svg class="ph-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2.5h8.5L19 7v14.5H6z"/><path d="M14.5 2.5V7H19"/><path d="M12.5 18v-6M9.8 14.6l2.7-2.7 2.7 2.7"/></svg>
+        <div class="pe-drop-t">Drop a PDF anywhere here</div>
+      </div>
+      <div class="pe-main" id="pe-main" hidden>
         <div class="pe-grid" id="pe-grid" role="listbox" aria-label="Pages: click the one it opens on"></div>
         <div class="pe-range">
           <span class="pe-lbl">Pages</span>
@@ -3525,7 +3528,6 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
     picker.type = 'file'; picker.accept = '.pdf,application/pdf';
     picker.addEventListener('change', () => { if (picker.files[0]) useFile(picker.files[0]); picker.value = ''; });
     $e('pe-choose').addEventListener('click', () => picker.click());
-    $e('pe-replace').addEventListener('click', () => picker.click());
 
     async function useFile(file) {
       if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') { say('That isn’t a PDF'); return; }
@@ -3612,7 +3614,12 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
       const has = !!curCfg.pdf;
       drop.hidden = has;
       main.hidden = !has;
-      if (!has) return;
+      $e('pe-choose').textContent = has ? 'Replace…' : 'Choose a File…';
+      if (!has) {
+        $e('pe-name').textContent = '';
+        $e('pe-count').textContent = 'or drop a .pdf anywhere here';
+        return;
+      }
       const name = String(curCfg.pdf).startsWith('blob:') ? 'PDF' : String(curCfg.pdf).split(/[\\/]/).pop();
       $e('pe-name').textContent = name;
       $e('pe-count').textContent = N() ? `· ${N()} page${N() === 1 ? '' : 's'}` : '· loading…';
