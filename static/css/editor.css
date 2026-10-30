@@ -1712,3 +1712,12 @@ body.picking-panes #slide-nav-slides .slide-nav-item:hover .slide-preview { outl
 .slide-item.is-empty { cursor: default; border-style: dashed; background: transparent; }
 .slide-item.is-empty .slide-item-name { color: var(--ink-3); }
 
+
+/* The split view's panel: its split widget (view-config.js). */
+.view-split-add { display: flex; flex-direction: column; gap: 6px; }
+.view-split-add .btn { justify-content: flex-start; gap: 8px; }
+.view-split-add-icon { display: inline-flex; }
+.view-split-add-icon svg,
+.view-split-item .slide-item-icon svg { width: 16px; height: 16px; }
+.view-split-item { cursor: default; padding-right: 6px; }
+.view-split-item .btn.is-armed { --_bg: var(--btn-danger); --_fg: var(--ink-on-accent); }

@@ -413,7 +413,7 @@ const _pendingAssetUrls = new Map();   // deck-relative path → blob: URL
 // already carries a blob URL for a custom widget's own HTML.
 const _NOT_ASSET_KEYS = new Set([
     'id', 'type', 'x', 'y', 'width', 'height', 'zIndex', 'display',
-    'builtin', 'src', 'interactive', 'role',
+    'builtin', 'src', 'interactive', 'role', 'split',
     'sessionId', 'socketUrl', 'serverUrl', 'publicBaseUrl',
 ]);
 
@@ -451,6 +451,11 @@ function _configSignature(w) {
         if (!_LAYOUT_KEYS.has(key)) out[key] = w[key];
     }
     try { return JSON.stringify(out); } catch (_) { return String(Math.random()); }
+}
+
+/** The signature an iframe built from `w` carries (split-widgets.js compares). */
+export function widgetConfigSignature(w) {
+    return _configSignature(w);
 }
 
 /**

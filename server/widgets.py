@@ -57,6 +57,9 @@ def widget_catalog():
             'type': wtype,
             'label': (label or '').strip() or _default_label(wtype),
             'category': (category or '').strip() or 'Other',
+            # Can be added to a split view, one half on each of its slides:
+            # which panes may go on each side ({left: [...], right: [...]}).
+            'split': schema.get('split') if isinstance(schema.get('split'), dict) else None,
         })
     return jsonify(out)
 

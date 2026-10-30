@@ -19,6 +19,7 @@ import { initNavigator } from './slides/navigator.js';
 import { initThumbnails } from './slides/thumbnails.js';
 import { initSlideStructure, getSlideLabels, slideUid, configKeyOf, realSlideCount } from './slides/structure.js';
 import { initNavDrawer, isNavCollapsed, setNavCollapsed } from './slides/drawer.js';
+import { initSplitWidgets } from './slides/split-widgets.js';
 import { initReveals, renderReveals, resetRevealsOnArrival, stepReveal, updateStepBadge } from './slides/reveals.js';
 import { applyPaper } from './slides/paper.js';
 import { initSpotlight, hideSpotlight, renderSpotlight,
@@ -152,6 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initSlideStructure(state);
     initNavDrawer();
     initReveals(state);
+    initSplitWidgets(state);
     initMedia(state);
     initToolbar(state);
     initPenSlots(state);

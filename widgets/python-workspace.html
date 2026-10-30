@@ -8,6 +8,8 @@
   "fullSlide": true,
   "category": "Computer Science",
   "liveSettings": true,
+  "split": { "left": ["editor"], "right": ["shell", "memory", "debug"],
+             "hide": ["layout", "primary", "secondary"] },
   "fields": [
     { "key": "layout", "label": "Layout", "type": "select", "default": "grid-left",
       "options": [ { "v": "single",      "l": "Single pane" },
@@ -3476,6 +3478,27 @@ html[data-theme="dark"]{
 .hd-text.dim { fill: var(--sn-cap); }
 .splitter::after { background: var(--sn-faint); }
 .splitter:hover::after, .splitter.is-dragging::after { background: var(--sn-ink); }
+
+/* ── Split across a split view ───────────────────────────────
+   Beamer+ lays this one widget over both slides of a split view and tells
+   it where each half is (widget-split, rects in this frame's px). The bar
+   and the editor take the left slide, one pane (picked with its tabs) the
+   right; everything between them is clipped away by the host. renderLayout
+   places the panes; this lets the bar sit on the left half. */
+body.ws-split { background: var(--bg); }
+body.ws-split #bw-topbar-body { position: absolute; inset: 0; }
+body.ws-split #panes { inset: 0; }
+body.ws-split #bw-topbar { position: absolute; box-sizing: border-box; z-index: 5; }
+body.ws-split.ws-no-left #bw-topbar,
+body.ws-split.ws-no-left .bw-edit-float { display: none !important; }
+body.ws-split #layout-wrap,
+body.ws-split #layout-wrap + .bw-sep,
+body.ws-split .pane-max,
+body.ws-split .splitter { display: none !important; }
+.split-tabs { display: none; }
+body.ws-split .split-tabs { display: inline-flex; }
+body.ws-split .pane.has-split-tabs .pane-label { display: none; }
+.split-tabs .bw-btn[aria-pressed="true"] { font-weight: 600; }
 </style>
 </head>
 <body>
@@ -7626,6 +7649,10 @@ print(shopping)
     // (the big pane). b: the split inside the remaining side.
     layout:   { kind: 'grid-left', slots: ['editor', 'memory', 'shell', 'debug'], a: 0.5, b: 0.55 },
     max:      null,          // a pane shown alone for now, without losing the layout
+    // Split across a split view's two slides (Beamer+ says where, see
+    // setSplit): null, or { live, left, right } with each half's rect.
+    split:    null,
+    splitRight: 'shell',     // the pane on the right half (its tabs switch it)
     breakpoints: [],         // line numbers, sorted
   };
   // The debugger. `session` is the presenter's recording and position in it;
@@ -8590,6 +8617,7 @@ def _debug_file(src, fname, limit):
 
   // The panes on screen right now, in slot order.
   function visiblePanes() {
+    if (S.split) return [S.split.left && 'editor', S.split.right && S.splitRight].filter(Boolean);
     if (S.max) return [S.max];
     return S.layout.slots.slice(0, slotCount(S.layout.kind));
   }
@@ -8597,7 +8625,116 @@ def _debug_file(src, fname, limit):
 
   let splitDefs = [null, null];
 
+  // ── Split across two slides ─────────────────────────────────────────────────
+  // The editor (under the bar) on the left half, one pane on the right; the
+  // panes are placed in px from the halves' rects, inset like the usual 8px.
+  const SPLIT_PANES = ['shell', 'memory', 'debug'];
+  let splitTabs = null;
+
+  function buildSplitTabs() {
+    splitTabs = document.createElement('div');
+    splitTabs.className = 'modeswitch split-tabs';
+    splitTabs.setAttribute('role', 'group');
+    splitTabs.setAttribute('aria-label', 'Right-hand pane');
+    splitTabs.innerHTML = SPLIT_PANES.map(n =>
+      `<button class="bw-btn" type="button" data-pane="${n}" aria-pressed="false">${escHtml(n === 'memory' ? 'Memory' : NAMES[n])}</button>`
+    ).join('');
+    splitTabs.addEventListener('click', e => {
+      const b = e.target.closest('button[data-pane]');
+      if (b) setSplitRight(b.dataset.pane);
+    });
+  }
+
+  function setSplitRight(name) {
+    if (!SPLIT_PANES.includes(name) || name === S.splitRight) return;
+    S.splitRight = name;
+    renderLayout();
+    emitState();
+    PV.render();
+    if (name === 'shell') focusInput();
+  }
+
+  function setSplit(d) {
+    const rect = r => r && [r.x, r.y, r.w, r.h].every(Number.isFinite) && r.w > 0 && r.h > 0
+      ? { x: r.x, y: r.y, w: r.w, h: r.h } : null;
+    const next = d && (d.left || d.right)
+      ? { live: !!d.live, left: rect(d.left), right: rect(d.right) } : null;
+    const was = S.split;
+    S.split = next && (next.left || next.right) ? next : null;
+    document.body.classList.toggle('ws-split', !!S.split);
+    document.body.classList.toggle('ws-static', !!S.split && !S.split.live);
+    document.body.classList.toggle('ws-no-left', !!S.split && !S.split.left);
+    // A static half is a picture: nothing in it keeps the keyboard.
+    if (S.split && !S.split.live && document.activeElement && document.activeElement !== document.body) {
+      document.activeElement.blur();
+    }
+    if (!S.split && was) {
+      const bar = $('bw-topbar');
+      if (bar) ['left', 'top', 'width'].forEach(k => bar.style.removeProperty(k));
+    }
+    renderLayout();
+    // The memory model draws for its pane's size.
+    if (isShown('memory')) PV.render();
+  }
+
+  function renderSplitLayout() {
+    const sp   = S.split;
+    const base = panesEl.getBoundingClientRect();
+    const bar  = $('bw-topbar');
+    let barH = 0;
+    if (bar && sp.left) {
+      bar.style.left  = sp.left.x + 'px';
+      bar.style.top   = sp.left.y + 'px';
+      bar.style.width = sp.left.w + 'px';
+      barH = bar.offsetHeight;
+    }
+    const at = (el, x, y, w, h) => {
+      el.style.left   = (x - base.left) + 'px';
+      el.style.top    = (y - base.top) + 'px';
+      el.style.width  = Math.max(0, w) + 'px';
+      el.style.height = Math.max(0, h) + 'px';
+    };
+    const shown = visiblePanes();
+    PANES.forEach(name => {
+      const el = paneEls[name];
+      const on = shown.includes(name);
+      el.classList.toggle('is-off', !on);
+      if (!on) return;
+      const r = name === 'editor' ? sp.left : sp.right;
+      const top = name === 'editor' ? barH : 0;
+      at(el, r.x + GAP, r.y + top + GAP, r.w - 2 * GAP, r.h - top - 2 * GAP);
+    });
+    [splitA, splitB].forEach(el => el.classList.add('is-off'));
+    splitDefs = [null, null];
+
+    // The right half's tabs go in the head of the pane it shows.
+    if (!splitTabs) buildSplitTabs();
+    PANES.forEach(n => paneEls[n].classList.remove('has-split-tabs'));
+    if (sp.right) {
+      const head = paneEls[S.splitRight].querySelector('.pane-head');
+      const label = head.querySelector('.pane-label');
+      if (splitTabs.parentNode !== head) head.insertBefore(splitTabs, label ? label.nextSibling : head.firstChild);
+      paneEls[S.splitRight].classList.add('has-split-tabs');
+      splitTabs.querySelectorAll('button').forEach(b => {
+        const on = b.dataset.pane === S.splitRight;
+        b.setAttribute('aria-pressed', String(on));
+        b.classList.toggle('is-active', on);
+        b.disabled = IS_VIEWER;
+      });
+    } else if (splitTabs.parentNode) {
+      splitTabs.remove();
+    }
+
+    mmTools.hidden = IS_VIEWER || !!DBG.session || !shown.includes('memory');
+    fitToolbar();
+    PV.setVisible(shown.includes('memory'));
+    syncScroll();
+  }
+
   function renderLayout() {
+    if (S.split) { renderSplitLayout(); return; }
+    if (splitTabs?.parentNode) splitTabs.remove();
+    PANES.forEach(n => paneEls[n].classList.remove('has-split-tabs'));
     const L    = S.layout;
     const kind = S.max ? 'single' : L.kind;
     const g    = geometry(kind, L.a, L.b);
@@ -8638,7 +8775,7 @@ def _debug_file(src, fname, limit):
   }
 
   function setLayout(patch, opts = {}) {
-    if (IS_VIEWER) return;
+    if (IS_VIEWER || S.split) return;
     const L = { ...S.layout, ...patch };
     if (!LAYOUTS.includes(L.kind)) L.kind = 'grid-left';
     S.layout = L;
@@ -8658,7 +8795,7 @@ def _debug_file(src, fname, limit):
   }
 
   function toggleMax(name) {
-    if (IS_VIEWER) return;
+    if (IS_VIEWER || S.split) return;
     S.max = S.max === name ? null : name;
     renderLayout();
     emitState();
@@ -8925,7 +9062,9 @@ def _debug_file(src, fname, limit):
     const back = DBG.layoutBefore;
     DBG.layoutBefore = null;
     // Put the layout back only if it is still the one Debug arranged.
-    if (!opts.keepLayout && back && JSON.stringify(S.layout) === back.set) {
+    if (!opts.keepLayout && back?.set === 'split') {
+      if (S.splitRight === 'debug') { S.splitRight = back.splitRight; renderLayout(); }
+    } else if (!opts.keepLayout && back && JSON.stringify(S.layout) === back.set) {
       S.layout = back.layout;
       S.max = back.max;
       renderLayout();
@@ -8938,6 +9077,12 @@ def _debug_file(src, fname, limit):
   // place if that is showing, otherwise the last slot that isn't the editor.
   function revealDebugPane() {
     if (isShown('debug')) return;
+    if (S.split) {
+      DBG.layoutBefore = { splitRight: S.splitRight, set: 'split' };
+      S.splitRight = 'debug';
+      renderLayout();
+      return;
+    }
     const before = { layout: { ...S.layout, slots: S.layout.slots.slice() }, max: S.max };
     const L = { ...S.layout, slots: S.layout.slots.slice() };
     S.max = null;
@@ -9185,6 +9330,7 @@ def _debug_file(src, fname, limit):
       entries:  S.entries.slice(-MAX_ENTRIES),
       layout:   { ...S.layout, slots: S.layout.slots.slice() },
       max:      S.max,
+      splitRight: S.splitRight,
       breakpoints: S.breakpoints.slice(),
       // Live sync only: a saved deck restores no debug session.
       debug:    DBG.view,
@@ -9225,6 +9371,7 @@ def _debug_file(src, fname, limit):
       if (s.layout) S.layout = cleanLayout(s.layout);
       // States saved by the Python IDE used `max: 'editor' | 'shell'` too.
       if ('max' in s) S.max = PANES.includes(s.max) ? s.max : null;
+      if (SPLIT_PANES.includes(s.splitRight)) S.splitRight = s.splitRight;
       if (Array.isArray(s.breakpoints)) {
         S.breakpoints = [...new Set(s.breakpoints.filter(n => Number.isInteger(n) && n > 0))].sort((a, b) => a - b);
       }
@@ -9291,6 +9438,11 @@ def _debug_file(src, fname, limit):
       L.slots = [first, second, ...PANES.filter(p => p !== first && p !== second)];
       S.layout = L;
       S.max = null;
+      synced = true;
+    }
+
+    if (changed('split') && cfg.split && SPLIT_PANES.includes(cfg.split.right)) {
+      S.splitRight = cfg.split.right;
       synced = true;
     }
 
@@ -9409,6 +9561,7 @@ def _debug_file(src, fname, limit):
   window.addEventListener('message', e => {
     const d = e.data || {};
     if (d.type === 'widget-config')  applyConfig(d.config);
+    if (d.type === 'widget-split')   setSplit(d);
     if (d.type === 'widget-cleanup') destroy();
     if (d.type === 'widget-get-state') {
       window.parent.postMessage(

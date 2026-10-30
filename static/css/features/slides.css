@@ -1145,3 +1145,22 @@ body.slide-muted #ann-canvas, body.slide-muted #ann-canvas-2 { z-index: 2 !impor
 .paper-dot:hover { transform: scale(1.1); }
 .paper-dot.is-selected { box-shadow: 0 0 0 2px var(--surface-paper), 0 0 0 4px var(--ink-1); }
 .paper-dot:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+
+/* ============================================================
+   Split widgets (slides/split-widgets.js)
+   ============================================================ */
+/* One iframe per split widget, laid over the stage and clipped to the
+   slide(s) its halves are on. After both panes in the DOM and at their
+   slides' z-index, so it sits above each slide and its widgets and below
+   the ink. The layer itself never takes the pointer; a live widget does. */
+#split-widget-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+}
+/* Built over the whole stage, then placed: hidden until it has been. */
+#split-widget-layer .widget-iframe:not([data-split-placed]) { visibility: hidden; }
+/* Editing a slide that holds one half: the half stays in view but faded, so
+   the slide's own items (and their edit boxes) show through it. */
+body.edit-mode #split-widget-layer .widget-iframe[data-split-live="false"] { opacity: 0.4 !important; }

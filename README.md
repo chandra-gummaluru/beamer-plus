@@ -173,6 +173,24 @@ settings kit (`static/js/widget-settings-kit.js`) gives every widget the
 say how it appears in the notes PDF by registering a print handler
 (`BeamerWidget.print.register`).
 
+### Split widgets
+
+A split view can hold one widget that spans both of its slides: the Python
+workspace puts its editor on the left slide and its shell, memory model or
+debugger on the right (tabs on the right half switch between them during the
+lecture). Add one from the split view's panel in the editor (**Split Widget**).
+It is one widget with one iframe, saved in the view's own config
+(`config/sv<viewId>.json`): it works only while both slides are on screen,
+each in its own pane; a slide shown on its own shows its half as it was left,
+not clickable. Deleting it removes both halves.
+
+A widget opts in with `"split": { "left": [...], "right": [...], "hide": [...] }`
+in its schema (which panes may go on each side, and which settings don't
+apply when split). The host lays the iframe over both slides, clipped to them,
+and tells the widget where each half is:
+`{ type: 'widget-split', live, left: {x, y, w, h} | null, right: … }` in the
+iframe's own pixels (`static/js/slides/split-widgets.js`).
+
 A widget that declares `"inlineEdit": true` (Timer, Table and Audience
 Response so far) is set up on itself: Edit puts it into edit mode, where its
 own content is the form — the timer's digits are its duration, the poll's

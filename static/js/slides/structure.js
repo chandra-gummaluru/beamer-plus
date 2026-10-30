@@ -67,6 +67,9 @@ export function configKeyOf(obj) {
     if (obj.cfgId) return obj.cfgId;
     if (obj.type === 'pdf') return obj.pdfIndex;
     if (obj.type === 'blank') return obj.blankId ?? null;
+    // A split view's config holds only its split widgets (slides/split-widgets.js):
+    // the one widget that spans both of its slides.
+    if (obj.type === 'view') return obj.viewId ?? null;
     return null;
 }
 

@@ -6,6 +6,10 @@ import { bus } from '../core/events.js';
 import { getSlideLabels } from '../slides/structure.js';
 import { ctx, escAttr, escHtml, setPanelMode, resolvePanelMode } from './context.js';
 import { pickPanes } from './pane-picker.js';
+import { splitWidgetsOf, queueSync, loadSplitConfig } from '../slides/split-widgets.js';
+import { widgetCatalog, widgetIcon } from './widget-picker.js';
+import { openWidgetSettings } from './widget-settings-dialog.js';
+import { pushWidgetConfig } from '../core/iframe-widget-renderer.js';
 
 export function showViewConfig(i) {
     const obj = ctx.state?.slideStructure?.[i];
@@ -21,6 +25,7 @@ export function showViewConfig(i) {
     setPanelMode('view');
     body.innerHTML = buildViewConfigHTML(obj, i);
     wireViewConfigHandlers(i, obj);
+    fillSplitWidgetSection(i, obj);
 }
 
 export function hideViewConfig() {
@@ -72,6 +77,9 @@ function buildViewConfigHTML(obj, viewIdx) {
                 </button>`).join('')}
             </div>
         </div>
+        <!-- One widget across both slides (slides/split-widgets.js): filled
+             in once the view's config is read. -->
+        <section class="wf-group" id="view-split-widget" aria-label="Split widget"></section>
     `;
 }
 
@@ -209,3 +217,117 @@ function wireSplitPicker(box, obj, commit) {
     presets.forEach(p => p.addEventListener('click', () => set(Number(p.dataset.ratio))));
 }
 
+
+/* ─── the split widget ───────────────────────────────────────────
+   A view can carry one widget that spans both of its slides — the Python
+   workspace's code on the left slide and a pane of it on the right. It is
+   kept in the view's own config and works only while the split is on
+   screen; each slide alone shows its half as it was left. */
+const PANE_NAMES = { editor: 'Editor', shell: 'Shell', memory: 'Memory', debug: 'Debugger' };
+const SETTINGS_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>';
+const TRASH_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>';
+
+let _fillToken = 0;
+async function fillSplitWidgetSection(i, obj) {
+    const token = ++_fillToken;
+    const host = document.getElementById('view-split-widget');
+    if (!host) return;
+    // An older deck's view may have no id yet; the config needs one.
+    if (!obj.viewId) obj.viewId = `v${Date.now()}`;
+    await loadSplitConfig(obj.viewId);
+    const catalog = (await widgetCatalog()).filter(w => w.split);
+    if (token !== _fillToken || !host.isConnected) return;
+
+    const w = splitWidgetsOf(obj)[0] || null;
+    const title = '<div class="wf-group-title">Split Widget</div>';
+    if (!w) {
+        host.innerHTML = `${title}
+            <p class="slide-items-empty">One widget across both slides: half on the left slide, half on the right. It works while the split is on screen; each slide alone shows its half as it was left.</p>
+            <div class="view-split-add" role="list">
+                ${catalog.map(c => `
+                <button type="button" class="btn btn--sm editor-secondary-btn" data-add-split="${escAttr(c.type)}">
+                    <span class="view-split-add-icon">${widgetIcon(c.type)}</span>
+                    <span>Add ${escHtml(c.label)}</span>
+                </button>`).join('') || '<p class="slide-items-empty">No widget can be split yet.</p>'}
+            </div>`;
+        host.querySelectorAll('[data-add-split]').forEach(b =>
+            b.addEventListener('click', () => addSplitWidget(i, obj, b.dataset.addSplit)));
+        return;
+    }
+
+    const entry = catalog.find(c => c.type === w.type);
+    const label = w.title || entry?.label || w.type;
+    const spec = entry?.split || { left: ['editor'], right: ['shell', 'memory', 'debug'] };
+    const right = w.split?.right || spec.right?.[0];
+    host.innerHTML = `${title}
+        <div class="slide-items" role="list">
+            <div class="slide-item view-split-item" role="listitem">
+                <span class="slide-item-icon">${widgetIcon(w.type)}</span>
+                <span class="slide-item-text">
+                    <span class="slide-item-name">${escHtml(label)}</span>
+                    <span class="slide-item-kind">${escHtml(PANE_NAMES[w.split?.left] || 'Editor')} left · ${escHtml(PANE_NAMES[right] || right)} right</span>
+                </span>
+                <button type="button" class="btn btn--ghost btn--icon btn--sm" id="view-split-settings" title="Settings" aria-label="Settings">${SETTINGS_ICON}</button>
+                <button type="button" class="btn btn--ghost btn--icon btn--sm btn--danger" id="view-split-delete" title="Delete" aria-label="Delete">${TRASH_ICON}</button>
+            </div>
+        </div>
+        ${(spec.right || []).length > 1 ? `
+        <div class="editor-prop-row">
+            <span class="editor-prop-label">Right Slide Starts On</span>
+            <div class="wf-seg" role="group" id="view-split-right">
+                ${spec.right.map(p => `<button type="button" class="wf-seg-btn${p === right ? ' is-active' : ''}" data-v="${escAttr(p)}" aria-pressed="${p === right}">${escHtml(PANE_NAMES[p] || p)}</button>`).join('')}
+            </div>
+        </div>` : ''}`;
+
+    host.querySelector('#view-split-settings')?.addEventListener('click', () => openWidgetSettings(w.id));
+    const del = host.querySelector('#view-split-delete');
+    del?.addEventListener('click', () => {
+        // Armed first, like the panel's own Delete: a second click deletes.
+        if (!del.classList.contains('is-armed')) {
+            del.classList.add('is-armed');
+            del.title = 'Click Again to Delete';
+            clearTimeout(del._t);
+            del._t = setTimeout(() => { del.classList.remove('is-armed'); del.title = 'Delete'; }, 3000);
+            return;
+        }
+        removeSplitWidget(obj, w);
+        fillSplitWidgetSection(i, obj);
+    });
+    host.querySelectorAll('#view-split-right [data-v]').forEach(b => b.addEventListener('click', () => {
+        w.split = { ...(w.split || {}), right: b.dataset.v };
+        // The running widget switches over too (it takes settings live).
+        pushWidgetConfig(w.id, w);
+        fillSplitWidgetSection(i, obj);
+    }));
+}
+
+function addSplitWidget(i, obj, type) {
+    const s = ctx.state;
+    const key = obj.viewId;
+    if (!s.slideConfigs[key]) s.slideConfigs[key] = {};
+    const cfg = s.slideConfigs[key];
+    if (!Array.isArray(cfg.widgets)) cfg.widgets = [];
+    // One per split view: it fills both slides.
+    if (cfg.widgets.some(w => w?.split)) return;
+    cfg.widgets.push({
+        id: `widget_${Date.now()}`,
+        type,
+        src: '',
+        builtin: true,
+        x: 0, y: 0, width: 1, height: 1,
+        zIndex: 10,
+        split: { left: 'editor', right: 'shell' },
+    });
+    queueSync();
+    fillSplitWidgetSection(i, obj);
+    // Show the pair on stage, if it isn't already.
+    if (!(s.splitView && s.currentViewIndex === i)) bus.emit('slide:goto', i);
+}
+
+function removeSplitWidget(obj, w) {
+    const cfg = ctx.state.slideConfigs[obj.viewId];
+    if (!cfg?.widgets) return;
+    cfg.widgets = cfg.widgets.filter(x => x !== w);
+    // Both halves go: they are one widget, and its iframe goes with it.
+    bus.emit('split-widgets:changed');
+}

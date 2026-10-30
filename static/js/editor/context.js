@@ -99,7 +99,9 @@ export function resolvePanelMode() {
 
 export function getOrCreateConfig() {
     const obj = ctx.state.slideStructure[ctx.state.currentSlide];
-    if (!obj) return null;
+    // A view slide's config is its split widgets', edited in the view panel
+    // (view-config.js), never as items on a slide.
+    if (!obj || obj.type === 'view') return null;
     // PDF slides use their stable pdfIndex (a duplicated page its own cfgId);
     // blank slides use their stable blankId.
     const key = configKeyOf(obj);
@@ -114,7 +116,7 @@ export function getOrCreateConfig() {
    rewrite its own src or geometry could move or re-point itself. */
 export const WIDGET_RESERVED = new Set([
     'id', 'type', 'x', 'y', 'width', 'height', 'zIndex', 'step', 'display',
-    'builtin', 'src', 'interactive',
+    'builtin', 'src', 'interactive', 'split',
     'notebookContent', 'role', 'socketUrl',
     'sessionId', 'serverUrl', 'publicBaseUrl',
 ]);

@@ -91,6 +91,8 @@ async function loadSchema(item) {
         modes: widgetModes(schema),
         modesDeclared: !schema?.fullSlide && Array.isArray(schema?.modes) && widgetModes(schema).length > 0,
         overlaySize: overlaySize(schema),
+        // Can span a split view's two slides: { left: [panes], right: [panes], hide: [keys] }.
+        split: schema?.split && typeof schema.split === 'object' ? schema.split : null,
         fields,
     };
 }

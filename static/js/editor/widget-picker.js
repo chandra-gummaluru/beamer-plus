@@ -73,6 +73,16 @@ function _refreshCatalog() {
 }
 let _catalogReady = _refreshCatalog();
 
+/** Every widget the server offers: { type, label, category, split }. */
+export async function widgetCatalog() {
+    return _catalog || await _catalogReady;
+}
+
+/** The picker's icon for a widget type. */
+export function widgetIcon(type) {
+    return WIDGET_ICONS[type] || WIDGET_ICONS.__default__;
+}
+
 /* ─── picker modal ──────────────────────────────────────────── */
 
 export async function addWidget() {

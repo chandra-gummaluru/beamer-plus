@@ -61,7 +61,7 @@ export function initWidgetSettingsDialog() {
     for (const ev of ['deck:loaded', 'session:ending']) bus.on(ev, () => closeWidgetSettings());
 }
 
-async function openWidgetSettings(widgetId) {
+export async function openWidgetSettings(widgetId) {
     const id = String(widgetId);
     // The same pencil again: the sheet is already there — bring focus back.
     if (_open?.id === id) { _open.form.focusFirst?.(); return; }
@@ -73,7 +73,12 @@ async function openWidgetSettings(widgetId) {
     if (token !== _token) return;
     closeWidgetSettings();
 
-    const fields = ownFields(schema);
+    let fields = ownFields(schema);
+    // A split widget's layout is the split itself: the fields that arrange
+    // it on one slide don't apply (its schema lists them under split.hide).
+    if (item.split && Array.isArray(schema?.split?.hide)) {
+        fields = fields.filter(f => !schema.split.hide.includes(f.key));
+    }
     const name = item.title || schema?.label || 'Widget';
     if (!fields.length) {
         window.BeamerModal?.show({ kind: 'info', title: `${name} Settings`, message: 'This widget has no settings of its own.' });
