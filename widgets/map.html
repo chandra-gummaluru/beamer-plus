@@ -2881,7 +2881,7 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
 }
 .map-q-wrap { position: relative; flex: 1 1 auto; min-width: 120px; display: flex; }
 #map-q { flex: 1 1 auto; min-width: 0; }
-#map-zoom { z-index: 1000; }
+#map-zoom { z-index: 1000; bottom: 28px; }   /* clear of the map's attribution line */
 body.is-viewer #map-zoom { display: none; } #map:empty ~ #map-zoom { display: none; }
 /* Places matching what's typed, as it's typed. */
 .map-sugg {
@@ -2923,6 +2923,7 @@ body.is-viewer #map-zoom { display: none; } #map:empty ~ #map-zoom { display: no
     <!-- Zoom: the kit's floating view controls, as in every widget. -->
     <div class="bw-float bw-float--br" id="map-zoom">
       <button class="bw-btn bw-btn--icon" type="button" id="map-zout" title="Zoom out"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.4"/><path d="M4.6 7h4.8M10.3 10.3l3 3"/></svg></button>
+      <span id="map-zval" class="bw-float-val">100%</span>
       <button class="bw-btn bw-btn--icon" type="button" id="map-zin" title="Zoom in"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.4"/><path d="M4.6 7h4.8M7 4.6v4.8M10.3 10.3l3 3"/></svg></button>
     </div>
   </div>
@@ -2956,6 +2957,14 @@ body.is-viewer #map-zoom { display: none; } #map:empty ~ #map-zoom { display: no
       });
       document.getElementById('map-zin').onclick  = () => map && map.zoomIn();
       document.getElementById('map-zout').onclick = () => map && map.zoomOut();
+      // The readout, as the PDF's: 100% is the zoom the map opens at.
+      const zval = document.getElementById('map-zval');
+      const showZoom = () => {
+        const base = cfg.zoom != null ? cfg.zoom : zoom;
+        zval.textContent = Math.round(100 * Math.pow(2, map.getZoom() - base)) + '%';
+      };
+      map.on('zoomend', showZoom);
+      showZoom();
 
       const tile = tileUrl || 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
       L.tileLayer(tile, {
