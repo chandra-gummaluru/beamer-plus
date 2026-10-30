@@ -3843,51 +3843,6 @@ body.bw-editing #ed-secs[hidden] { display: none; }
   #ed-type { max-width: 140px; }
   #ed-type-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
-
-/* ── Edit mode: the settings on the slide ─────────────────────────────── */
-/* The type as a tag above the question, the answer layout just above the
-   answers, "+ Add answer" as a tile after them, and in the banner when the
-   poll opens and its timer. The bar keeps only the per-type extras. */
-#ed-type-slot { margin-bottom: calc(6px * var(--u)); }
-#ed-type-slot #ed-type {
-  height: auto; padding: 3px 10px 3px 12px; gap: 4px;
-  border: 1.5px dashed var(--edit-line); border-radius: 999px;
-  background: var(--edit-soft); color: var(--edit-ink);
-  font-size: var(--fs-chrome); font-weight: 500;
-}
-#ed-type-slot #ed-type svg { width: 13px; height: 13px; }
-#ed-ans-tools { display: flex; justify-content: flex-end; margin: calc(-4px * var(--u)) 0 calc(6px * var(--u)); }
-#ed-ans-tools .ar-sep, #ed-ans-tools .ar-field { font-size: 0; }
-#ed-ans-tools .ar-sep { display: none; }
-#ed-ans-tools .bw-seg > .bw-btn { height: 24px; padding: 0 9px; font-size: var(--fs-chrome-sm, 12px); }
-#ed-add-wrap { display: none !important; }
-/* The switches placed on the slide are drawn like the slide: the slide's
-   face, an ink outline like the answers', the chosen one in the deck's
-   yellow (as the right answer is). Not the bar's grey buttons. */
-:is(#ed-ans-tools, #join-ed-auto, #timer-ed) .bw-seg {
-  border: 1.5px solid var(--ar-ink); border-radius: var(--ar-r);
-  background: var(--bg); overflow: hidden;
-}
-:is(#ed-ans-tools, #join-ed-auto, #timer-ed) .bw-seg > .bw-btn {
-  height: calc(26px * var(--u)) !important; padding: 0 calc(10px * var(--u)) !important;
-  font-family: inherit; font-size: calc(13px * var(--u)) !important; font-weight: 400 !important;
-  color: var(--ar-ink); background: transparent; border: 0 !important; border-radius: 0;
-}
-:is(#ed-ans-tools, #join-ed-auto, #timer-ed) .bw-seg > .bw-btn + .bw-btn { border-left: 1.5px solid var(--ar-ink) !important; }
-:is(#ed-ans-tools, #join-ed-auto, #timer-ed) .bw-seg > .bw-btn:hover:not(.is-active) { background: var(--ar-node); }
-:is(#ed-ans-tools, #join-ed-auto, #timer-ed) .bw-seg > .bw-btn.is-active { background: var(--ar-hl); color: var(--ar-ink); }
-.ed-add-tile .opt {
-  justify-content: center; cursor: pointer !important;
-  border-style: dashed; border-color: var(--ar-faint); background: var(--bg);
-  color: var(--ar-cap); font-size: var(--fs-body);
-}
-.ed-add-tile .opt:hover { border-color: var(--ar-ink); color: var(--ar-ink); background: var(--edit-soft); }
-#join-ed-auto { display: inline-flex; align-items: center; gap: 8px; margin-top: calc(6px * var(--u)); }
-body.bw-editing #join-sub-open { display: none; }
-#join-ed-auto .bw-seg > .bw-btn, #timer-ed .bw-seg > .bw-btn { height: 24px; padding: 0 9px; font-size: var(--fs-chrome-sm, 12px); }
-body.bw-editing #timer { display: flex !important; }
-#timer-ed { display: flex; justify-content: center; }
-body:not(.bw-editing) #timer-ed, body:not(.bw-editing) #join-ed-auto { display: none !important; }
 </style>
 </head>
 <body>
@@ -3901,15 +3856,15 @@ body:not(.bw-editing) #timer-ed, body:not(.bw-editing) #join-ed-auto { display: 
       <span class="ar-sep" aria-hidden="true"></span>
       <span class="ar-field">Collecting Mode
         <span class="bw-seg" id="ed-auto" title="Manual: open the poll with the button in the bar. Automatic: it opens when the slide does.">
-          <button class="bw-btn" type="button" data-v="0">when I click Start</button>
-          <button class="bw-btn" type="button" data-v="1">with the slide</button>
+          <button class="bw-btn" type="button" data-v="0">Manual</button>
+          <button class="bw-btn" type="button" data-v="1">Automatic</button>
         </span>
       </span>
       <span class="ar-sep" aria-hidden="true"></span>
       <span class="ar-field">Timer
         <span class="bw-seg" id="ed-timer">
-          <button class="bw-btn" type="button" data-v="none">No timer</button>
-          <button class="bw-btn" type="button" data-v="down">Timer</button>
+          <button class="bw-btn" type="button" data-v="none">Off</button>
+          <button class="bw-btn" type="button" data-v="down">On</button>
         </span>
       </span>
       <span class="ar-group" id="ed-add-wrap" hidden>
@@ -3920,8 +3875,8 @@ body:not(.bw-editing) #timer-ed, body:not(.bw-editing) #join-ed-auto { display: 
         <span class="ar-sep" aria-hidden="true"></span>
         <span class="ar-field">Answers
           <span class="bw-seg" id="ed-layout">
-            <button class="bw-btn" type="button" data-v="horizontal" title="Answers side by side">Side by side</button>
-            <button class="bw-btn" type="button" data-v="vertical" title="Answers one under another">Stacked</button>
+            <button class="bw-btn" type="button" data-v="horizontal">Horizontal</button>
+            <button class="bw-btn" type="button" data-v="vertical">Vertical</button>
           </span>
         </span>
       </span>
@@ -3978,8 +3933,6 @@ body:not(.bw-editing) #timer-ed, body:not(.bw-editing) #join-ed-auto { display: 
     <section id="prompt">
       <div id="banner" class="bw-banner bw-banner--error"></div>
       <div id="kicker"></div>
-      <!-- Edit mode: the question type, as a tag above the question. -->
-      <div id="ed-type-slot" class="bw-edit-only"></div>
       <div id="question" class="bw-md"></div>
 
       <!-- Edit mode, per type: set up where that type's results will show. -->
@@ -4017,8 +3970,6 @@ body:not(.bw-editing) #timer-ed, body:not(.bw-editing) #join-ed-auto { display: 
       </div>
 
       <div id="stats"></div>
-      <!-- Edit mode: how the answers are laid out, just above them. -->
-      <div id="ed-ans-tools" class="bw-edit-only"></div>
       <ol id="choices"></ol>
       <div id="chart">
         <div class="hist-plot" id="hist-plot"><div class="marker" id="marker"><span id="marker-label"></span></div></div>
@@ -4078,8 +4029,6 @@ body:not(.bw-editing) #timer-ed, body:not(.bw-editing) #join-ed-auto { display: 
           <span class="join-sub" id="join-sub-open">or go to <span id="join-link">[join link]</span></span>
           <span class="join-sub" id="join-sub-closed" hidden>No more answers are being taken</span>
           <span class="join-sub" id="join-sub-waiting" hidden>Answers open when it starts</span>
-          <!-- Edit mode: when the poll opens. -->
-          <span class="join-sub bw-edit-only" id="join-ed-auto">Opens</span>
         </div>
         <span class="bw-spacer"></span>
         <div class="join-fig" id="join-count">
@@ -4090,8 +4039,6 @@ body:not(.bw-editing) #timer-ed, body:not(.bw-editing) #join-ed-auto { display: 
           <span class="fig-v" id="timer-text"></span>
           <input id="ed-secs" class="bw-editable" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" aria-label="Countdown length, minutes:seconds" hidden>
           <span class="fig-l" id="timer-cap"></span>
-          <!-- Edit mode: timer or not (its length is typed on the digits). -->
-          <span class="bw-edit-only" id="timer-ed"></span>
           <div id="timer-track"><div id="timer-fill"></div></div>
         </div>
       </div>
@@ -4971,8 +4918,7 @@ body:not(.bw-editing) #timer-ed, body:not(.bw-editing) #join-ed-auto { display: 
     const withJoin = collect || ed || shut || waiting;
     joinEl.classList.toggle('is-closed', shut);
     joinEl.classList.toggle('is-waiting', waiting);
-    $('join-h').textContent = shut ? 'Poll closed' : waiting ? 'Poll not open yet'
-      : ed && cfg.autoStart === false ? 'Poll not open yet' : 'Scan to answer';
+    $('join-h').textContent = shut ? 'Poll closed' : waiting ? 'Poll not open yet' : 'Scan to answer';
     $('join-sub-open').hidden = shut || waiting;
     $('join-sub-closed').hidden = !shut;
     $('join-sub-waiting').hidden = !waiting;
@@ -5119,8 +5065,7 @@ body:not(.bw-editing) #timer-ed, body:not(.bw-editing) #join-ed-auto { display: 
   // How many columns the answers run in: the presenter's choice. With the
   // results up there is always one, each answer with its bar beside it.
   function layoutChoices(showData) {
-    // In edit mode the "+ Add answer" tile is laid out as one more answer.
-    const n = choiceRows.length + (!showData && choicesEl.querySelector('.ed-add-tile') ? 1 : 0);
+    const n = choiceRows.length;
     if (!n) return;
     const set = c => { choicesEl.style.gridTemplateColumns = `repeat(${c}, minmax(0, 1fr))`; };
     set(1);
@@ -6237,20 +6182,6 @@ body:not(.bw-editing) #timer-ed, body:not(.bw-editing) #join-ed-auto { display: 
   const edLayout    = $('ed-layout');
   const edLayoutWrap = $('ed-layout-wrap');
   const edAddWrap   = $('ed-add-wrap');
-  // The settings that have a place on the slide are moved there from the bar,
-  // their labels and separators in the bar going with them.
-  [edAuto, edTimer].forEach(seg => {
-    const field = seg.closest('.ar-field');
-    const sep = field && field.previousElementSibling;
-    if (sep && sep.classList.contains('ar-sep')) sep.remove();
-    if (field) { field.parentNode.insertBefore(seg, field); field.remove(); }
-  });
-  { const sep = edType.nextElementSibling; if (sep && sep.classList.contains('ar-sep')) sep.remove(); }
-  $('ed-type-slot').appendChild(edType);
-  $('ed-ans-tools').appendChild(edLayoutWrap);
-  $('join-ed-auto').appendChild(edAuto);
-  $('timer-ed').appendChild(edTimer);
-  edAuto.title = 'When I click Start, or as soon as the slide opens';
   const edAdd       = $('ed-add');
   const edModel     = $('ed-model');
   const edNsum      = $('ed-nsum');
@@ -6356,11 +6287,7 @@ body:not(.bw-editing) #timer-ed, body:not(.bw-editing) #join-ed-auto { display: 
     timerEl.classList.toggle('is-down', mode === 'down');
     timerEl.classList.remove('is-urgent');
     edSecs.hidden = mode !== 'down';
-    // Off, the column still holds its place (with the switch), the time faded.
-    timerEl.classList.add('is-on');
-    timerText.hidden = mode === 'down';
-    timerText.textContent = '–:––';
-    timerText.classList.add('is-ghost');
+    timerText.hidden = true;
     timerCap.textContent = '';
     timerFill.style.transform = 'scaleX(0)';
     setVal(edSecs, fmtClock(S.timer.secs));
@@ -6445,16 +6372,6 @@ body:not(.bw-editing) #timer-ed, body:not(.bw-editing) #join-ed-auto { display: 
         choicesEl.appendChild(li);
         return { li, badge, label, i };
       });
-      // "+ Add answer": a tile after the last answer, the size of the others.
-      if (!tf && opts.length < 10) {
-        const li = document.createElement('li'); li.className = 'choice ed-add-tile';
-        const node = document.createElement('div'); node.className = 'opt';
-        node.setAttribute('role', 'button'); node.tabIndex = 0;
-        node.title = 'Add an answer (or press Enter at the end of the last one)';
-        node.textContent = '+ Add answer';
-        li.appendChild(node);
-        choicesEl.appendChild(li);
-      }
     }
     choicesEl.classList.remove('show-results');
     const correct = editCorrect();
@@ -6523,7 +6440,6 @@ body:not(.bw-editing) #timer-ed, body:not(.bw-editing) #join-ed-auto { display: 
 
   choicesEl.addEventListener('click', e => {
     if (!editing()) return;
-    if (e.target.closest('.ed-add-tile')) { addOption(); return; }
     const li = e.target.closest('.choice');
     if (!li) return;
     const i = Number(li.dataset.i);
