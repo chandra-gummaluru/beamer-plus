@@ -19,7 +19,7 @@ import { initNavigator } from './slides/navigator.js';
 import { initThumbnails } from './slides/thumbnails.js';
 import { initSlideStructure, getSlideLabels, slideUid, configKeyOf, realSlideCount } from './slides/structure.js';
 import { initNavDrawer, isNavCollapsed, setNavCollapsed } from './slides/drawer.js';
-import { initSplitWidgets } from './slides/split-widgets.js';
+import { initSplitWidgets, splitHalves } from './slides/split-widgets.js';
 import { initReveals, renderReveals, resetRevealsOnArrival, stepReveal, updateStepBadge } from './slides/reveals.js';
 import { applyPaper } from './slides/paper.js';
 import { initSpotlight, hideSpotlight, renderSpotlight,
@@ -1135,7 +1135,9 @@ function updateSlideNavigator() {
     const viewIdx = state.splitView && state.currentViewIndex != null &&
                     state.slideStructure[state.currentViewIndex]?.type === 'view' ? state.currentViewIndex : null;
     const here = viewIdx ?? state.currentSlide;
+    const halves = splitHalves();
     document.querySelectorAll('#slide-nav-slides .slide-nav-item').forEach((el, idx) => {
+        el.classList.toggle('is-split-half',   halves.has(idx));
         el.classList.toggle('active',          idx === here);
         el.classList.toggle('current-slide',   idx === here);
         el.classList.toggle('bookmarked',      !!state.bookmarks[idx]);

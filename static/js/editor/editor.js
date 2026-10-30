@@ -13,6 +13,7 @@
 // - notes-export.js  the notes version: one flat PDF with everything drawn in
 import { bus } from '../core/events.js';
 import { ctx, setPanelMode } from './context.js';
+import { splitHalves } from '../slides/split-widgets.js';
 import { renderEditOverlays, cleanupEditOverlays, deselectOverlay, pickMediaFile, onMediaFileSelected, addReveal, repositionEditOverlays } from './overlays.js';
 import { updatePropertiesPanel, refreshSlideItems, selectedItemKind, deleteSelectedItem } from './properties.js';
 import { addWidget } from './widget-picker.js';
@@ -341,7 +342,13 @@ function updatePanelFooter() {
     const row = document.getElementById('panel-hide-row');
     if (row) row.hidden = !!kind || !obj;
     const hide = document.getElementById('panel-hide');
-    if (hide) hide.checked = !!obj?.hidden;
+    if (hide) {
+        hide.checked = !!obj?.hidden;
+        // Half of a split widget: hidden with its view, and stays so.
+        const half = i != null && splitHalves().has(i);
+        hide.disabled = half;
+        hide.closest('label, .editor-prop-checkbox-row')?.setAttribute('title', half ? 'Part of a split widget: shown only in its split view' : '');
+    }
 }
 
 /* ─── blank-slide paper ─────────────────────────────────────── */

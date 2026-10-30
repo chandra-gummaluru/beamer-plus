@@ -46,6 +46,34 @@ export function splitWidgetsOf(view) {
     return (Array.isArray(cfg?.widgets) ? cfg.widgets : []).filter(w => w && w.split);
 }
 
+/**
+ * The slides that hold a split widget's halves (structure indices). They
+ * belong to their view: hidden while presenting, kept hidden, and not
+ * clickable in the navigator (main.js, editor.js).
+ */
+export function splitHalves() {
+    const out = new Set();
+    for (const v of _state?.slideStructure || []) {
+        if (v?.type !== 'view' || !splitWidgetsOf(v).length) continue;
+        if (Number.isInteger(v.left))  out.add(v.left);
+        if (Number.isInteger(v.right)) out.add(v.right);
+    }
+    return out;
+}
+
+// Hide the halves (marked hiddenBySplit, so a half that stops being one —
+// its widget deleted, the view's slides re-picked — comes back as it was).
+function hideHalves() {
+    const halves = splitHalves();
+    let changed = false;
+    (_state?.slideStructure || []).forEach((o, i) => {
+        if (!o || o.type === 'view') return;
+        if (halves.has(i) && !o.hidden) { o.hidden = true; o.hiddenBySplit = true; changed = true; }
+        else if (!halves.has(i) && o.hiddenBySplit) { delete o.hidden; delete o.hiddenBySplit; changed = true; }
+    });
+    if (changed) bus.emit('nav:refresh');
+}
+
 export function initSplitWidgets(state) {
     _state = state;
     const main = document.getElementById('main-content');
@@ -131,6 +159,7 @@ async function sync() {
     if (!_layer || !_state) return;
     if (!_state.zipFile) { splitIframes().forEach(hide); return; }
 
+    hideHalves();
     const panes = paneSlides();
     const want = new Map();   // widget id → { w, halves: { left?, right? }, live }
 
