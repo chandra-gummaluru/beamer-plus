@@ -901,6 +901,40 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
 :is(.bw-topbar, .bw-toolbar) .bw-seg > .bw-btn { border: 0; }
 :is(.bw-topbar, .bw-toolbar) .bw-seg > .bw-btn + .bw-btn { border-left: 1px solid var(--border-med); }
 :is(.bw-topbar, .bw-toolbar) .bw-seg > .bw-btn:hover:not(:disabled) { border-color: var(--border-med); }
+
+/* ── Toggles: one style everywhere ────────────────────────────────────────────
+   Every one-of-a-few switch (.bw-seg, and the widgets' own .seg and
+   .modeswitch), on the bar or on the slide, is drawn like the slide: the
+   slide's face, an ink outline like an answer box's, the chosen one in the
+   deck's yellow. Last in the file, and firm, so it wins over each widget's
+   own older rules. */
+:is(.bw-seg, .seg, .modeswitch) {
+  display: inline-flex !important;
+  border: 1.5px solid var(--sn-ink) !important;
+  border-radius: var(--sn-r) !important;
+  background: var(--bg) !important;
+  overflow: hidden;
+  box-shadow: none !important;
+}
+:is(.bw-seg, .seg, .modeswitch) > :is(.bw-btn, button) {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--sn-ink) !important;
+  font-family: var(--font-ui) !important;
+  font-weight: 400 !important;
+}
+:is(.bw-seg, .seg, .modeswitch) > :is(.bw-btn, button) + :is(.bw-btn, button) {
+  border-left: 1.5px solid var(--sn-ink) !important;
+}
+:is(.bw-seg, .seg, .modeswitch) > :is(.bw-btn, button):hover:not(:disabled):not(.is-active):not([aria-pressed="true"]) {
+  background: var(--sn-node) !important;
+}
+:is(.bw-seg, .seg, .modeswitch) > :is(.bw-btn, button):is(.is-active, [aria-pressed="true"]) {
+  background: var(--sn-hl) !important;
+  color: var(--sn-ink) !important;
+}
 </style>
 <script id="bw-kit">
 // Beamer+ widget settings kit — runs INSIDE each widget iframe.
