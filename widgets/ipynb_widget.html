@@ -3434,8 +3434,37 @@ body {
   color: var(--sn-cap);
 }
 #notebook-area:not(.paper) .add-btn:hover { border-color: var(--sn-ink); color: var(--sn-ink); background: var(--sn-node); }
-#notebook-area:not(.paper) #boot-state { color: var(--sn-cap); }
-#notebook-area:not(.paper) .boot-spinner { border-color: var(--sn-node); border-top-color: var(--sn-ink); }
+/* Loading Python: the same card as Beamer+'s loading dialog — white, an ink
+   outline, the drawn squiggle, a highlighted title and a grey line — in the
+   middle of the widget, over the (already usable) blank notebook. */
+#notebook-area:not(.paper) #boot-state {
+  position: fixed; left: 50%; top: 50%; z-index: 50;
+  transform: translate(-50%, -50%);
+  min-width: 260px; padding: 20px 28px 18px; gap: 8px;
+  background: #fff; color: var(--sn-cap);
+  border: 2px solid var(--sn-ink); border-radius: 7px;
+  box-shadow: 0 12px 36px rgb(0 0 0 / .18);
+  font-family: var(--font-ui);
+  pointer-events: none;
+  text-align: center;
+}
+.boot-squiggle { width: 96px; height: 32px; display: block; }
+.boot-squiggle path {
+  fill: none; stroke: var(--sn-ink); stroke-width: 2.5;
+  stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 150; stroke-dashoffset: 150;
+  animation: boot-squiggle 1.6s ease-in-out infinite;
+}
+@keyframes boot-squiggle {
+  0% { stroke-dashoffset: 150; opacity: 0.6; }
+  40% { stroke-dashoffset: 0; opacity: 1; }
+  100% { stroke-dashoffset: -150; opacity: 0.6; }
+}
+#boot-title {
+  font-size: calc(20px * var(--u)); color: var(--sn-ink);
+  background: var(--sn-hl); padding: 0 .18em; line-height: 1.35;
+}
+#notebook-area:not(.paper) #boot-msg { font-size: calc(14px * var(--u)); color: var(--sn-cap); }
 #notebook-area:not(.paper) #pkg-warning { border-radius: var(--sn-r); }
 
 /* The top bar, live: its own buttons drawn like the kit's live bar buttons,
@@ -3500,9 +3529,10 @@ body.bw-editing #notebook-area.is-over { outline: 2px dashed var(--sn-ink, #222)
     <div class="ph-section">Cells</div>
   </div>
   <div id="notebook">
-    <div id="boot-state">
-      <div class="boot-spinner"></div>
-      <span id="boot-msg">Loading Python…</span>
+    <div id="boot-state" role="status">
+      <svg class="boot-squiggle" viewBox="0 0 120 40" aria-hidden="true"><path d="M5 20 Q 15 5, 25 20 T 45 20 T 65 20 T 85 20 T 105 20"/></svg>
+      <span id="boot-title">Loading Python</span>
+      <span id="boot-msg">Cells run once it’s ready</span>
     </div>
   </div>
 </div>
@@ -4585,7 +4615,7 @@ function setKernel(state, label) {
 
 function setBoot(msg) {
   const el = document.getElementById('boot-msg');
-  if (el) el.textContent = msg;
+  if (el) el.textContent = String(msg || '').replace(/\s*(…|\.\.\.)\s*$/, '');
 }
 
 function removeBoot() {
