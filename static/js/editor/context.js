@@ -37,11 +37,29 @@ const PANEL_TITLES = {
 export function setPanelMode(mode, title, kicker = '') {
     const panel = document.getElementById('editor-panel');
     if (panel) panel.dataset.mode = mode;
-    // Only a widget's name is edited in the header; widget mode turns it on
-    // (properties.js), every other mode turns it off again.
+    // A widget's name is edited in the header (widget mode, properties.js),
+    // and so is a slide's: its title, shown on its thumbnail. Every other
+    // mode makes the header read-only again.
     if (mode !== 'widget') setTitleEditable(null);
-    // The slide names itself: "Slide 10", over what it is.
-    if (mode === 'slide' && title === undefined) { title = slideName(); kicker = slideKind(); }
+    // The slide names itself — "Slide 10", over what it is — unless it has
+    // a title, which then leads and the number moves to the line above.
+    if (mode === 'slide' && title === undefined) {
+        const obj = ctx.state?.slideStructure?.[ctx.state.currentSlide];
+        if (obj && obj.type !== 'view') {
+            title = obj.title || slideName();
+            kicker = obj.title ? `${slideName()} · ${slideKind()}` : slideKind();
+            setTitleEditable(obj, {
+                placeholder: slideName(),
+                onRename: name => {
+                    const v = name.replace(/\s+/g, ' ').trim();
+                    if (v) obj.title = v; else delete obj.title;
+                    const k = document.getElementById('editor-panel-kicker');
+                    if (k) { k.textContent = v ? `${slideName()} · ${slideKind()}` : slideKind(); k.hidden = false; }
+                    bus.emit('nav:refresh');
+                },
+            });
+        } else { title = slideName(); kicker = slideKind(); }
+    }
     setPanelTitle(title ?? PANEL_TITLES[mode] ?? 'Edit Presentation', kicker);
     // The panel's footer follows what the panel shows (editor.js).
     bus.emit('editor:panel-mode', mode);
