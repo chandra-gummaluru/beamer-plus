@@ -388,22 +388,37 @@ body {
 /* ── Banner ───────────────────────────────────────────────────────────── */
 
 .bw-banner {
+  /* Drawn as a slide node, like the app's toasts: white, ink outline, the
+     chrome face. A warning or error is marked by its yellow "!" badge. */
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 8px 10px 8px 12px;
-  border: 1px solid var(--border-med);
-  border-left: 3px solid var(--text-3);
-  border-radius: var(--radius);
-  background: var(--bg-subtle);
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px 7px 10px;
+  border: var(--sn-line) solid var(--sn-ink);
+  border-radius: var(--sn-r);
+  background: var(--bg);
+  font-family: var(--font-chrome);
   font-size: var(--fs-chrome);
-  line-height: 1.5;
-  color: var(--text-2);
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--sn-ink);
 }
-.bw-banner--warn  { border-left-color: var(--warn); }
-.bw-banner--error { border-left-color: var(--err); background: var(--err-bg); }
-.bw-banner strong { color: var(--text); font-weight: 600; }
-.bw-banner code   { font-family: var(--font-mono); font-size: 0.92em; color: var(--text); }
+.bw-banner:is(.bw-banner--warn, .bw-banner--error)::before {
+  content: '!';
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 1.4em;
+  height: 1.4em;
+  border: 1.5px solid var(--sn-ink);
+  border-radius: 50%;
+  background: var(--sn-hl);
+  color: #1a1a18;
+  font-size: 0.95em;
+  line-height: 1;
+}
+.bw-banner strong { color: var(--sn-ink); font-weight: 400; }
+.bw-banner code   { font-family: var(--font-mono); font-size: 0.92em; color: var(--sn-ink); }
 
 /* ── Loading & empty states ───────────────────────────────────────────── */
 
@@ -855,7 +870,6 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
 .bw-select:focus,
 .bw-textarea:focus { border-color: var(--sn-ink); }
 .bw-spinner { border-color: var(--sn-node); border-top-color: var(--sn-ink); }
-.bw-banner { border-radius: var(--sn-r); }
 .bw-hint { color: var(--sn-cap); }
 .bw-empty, .bw-boot { color: var(--sn-cap); }
 
