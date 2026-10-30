@@ -118,14 +118,14 @@
      white, hence five tokens rather than three:
        --edit       fill (the chosen segment, Done)
        --on-edit    ink on that fill — dark, never white
-       --edit-line  outlines and borders, a deeper yellow that still shows
+       --edit-line  outlines and borders (the same yellow)
        --edit-soft  wash behind something being typed into
        --edit-ink   text: hints, "+ Add", the type picker */
   --edit:      #f7c548;   /* the deck's highlighter yellow */
-  --on-edit:   oklch(28% 0.05 80);
-  --edit-line: oklch(74% 0.16 80);
-  --edit-soft: oklch(97% 0.05 98);
-  --edit-ink:  oklch(48% 0.11 70);
+  --on-edit:   #1a1a18;
+  --edit-line: #f7c548;   /* one yellow: outlines are the deck's too */
+  --edit-soft: #ffffff;   /* no cream wash: white, the outline marks it */
+  --edit-ink:  #1a1a18;   /* hints and "+ Add" in ink, not gold */
 
   /* Slide-native drawing — widgets are drawn the way the deck's own figures
      are: TikZ-style nodes (an ink outline round a pale fill), grey captions,
@@ -677,7 +677,7 @@ body.bw-editing .bw-adopted-bar > .bw-topbar-title + .bw-sep { display: none !im
 
 /* Anything set by clicking or typing on it. */
 body.bw-editing .bw-editable {
-  outline: 1.5px dashed color-mix(in oklab, var(--edit-line) 75%, transparent);
+  outline: 1.5px dashed var(--edit-line);
   outline-offset: 4px;
   border-radius: 4px;
   cursor: text;
@@ -758,7 +758,7 @@ body.bw-editing .bw-editable[role="button"] { cursor: pointer; }
 .bw-add {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 6px 12px;
-  border: 1.5px dashed color-mix(in oklab, var(--edit-line) 75%, transparent);
+  border: 1.5px dashed var(--edit-line);
   border-radius: var(--radius);
   background: none;
   color: var(--edit-ink);
@@ -867,22 +867,44 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
 .bw-hint { color: var(--sn-cap); }
 .bw-empty, .bw-boot { color: var(--sn-cap); }
 
-/* The settings sheet (the kit's panel, for widgets not yet edited in
-   place): a highlighter strip on top and plain, quiet fields under it. */
-.bws-root .bws-head { background: var(--edit-soft); border-bottom: 2px solid var(--sn-hl); }
-.bws-root .bws-title { font-weight: 700; letter-spacing: 0; }
-.bws-root .bws-label { text-transform: none; letter-spacing: 0; font-size: 12px; font-weight: 400; color: var(--sn-cap); }
-.bws-root :is(.bws-input, .bws-select, .bws-area, .bws-check, .bws-btn) {
-  background: var(--bg);
+/* The settings form — the sheet, or drawn on the widget in edit mode
+   (.bws-inline) — in Beamer+'s style: white, the title on the highlighter,
+   fields with a faint outline that inks when in use, switches and buttons
+   like the app's (ink outline; yellow when on or pointed at). */
+.bws-root { font-family: var(--font-chrome); background: #fff; }
+.bws-root .bws-head { background: #fff; border-bottom: 1px solid var(--border); }
+.bws-root .bws-title { font-size: 18px; letter-spacing: 0; background: var(--sn-hl); padding: 0 .18em; color: var(--sn-ink); }
+.bws-root .bws-label { text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--sn-cap); }
+.bws-root :is(.bws-input, .bws-select, .bws-area, .bws-check) {
+  background: #fff;
   border: 1.5px solid var(--sn-faint);
   border-radius: var(--sn-r);
+  color: var(--sn-ink);
+  font-size: 14px;
 }
 .bws-root :is(.bws-input, .bws-select, .bws-area):focus { border-color: var(--sn-ink); }
-.bws-root .bws-btn:hover { background: var(--sn-node); }
-.bws-root .bws-switch { background: var(--sn-faint); }
+.bws-root .bws-btn {
+  background: #fff; color: var(--sn-ink);
+  border: 1.5px solid var(--sn-ink); border-radius: 5px;
+}
+.bws-root .bws-btn:hover:not([disabled]) { background: var(--sn-hl); }
+.bws-root .bws-x:hover { background: var(--sn-hl); color: var(--sn-ink); }
+.bws-root .bws-switch {
+  box-sizing: border-box; width: 36px;
+  background: #fff; border: 1.5px solid var(--sn-ink);
+}
+.bws-root .bws-switch::after { top: 2.5px; left: 2.5px; width: 12px; height: 12px; background: var(--sn-ink); box-shadow: none; }
 .bws-root .bws-switch:checked { background: var(--sn-hl); }
-.bws-root .bws-switch::after { box-shadow: 0 0 0 1px rgba(0, 0, 0, .25); }
-.bws-root { font-family: var(--font-chrome); }
+.bws-root .bws-switch:checked::after { transform: translateX(16px); }
+/* Drawn on the widget itself, under the bar, while it's in edit mode. */
+.bws-root.bws-inline {
+  position: absolute; inset: 0; z-index: 30; opacity: 1;
+  overflow-y: auto;
+}
+.bws-inline .bws-body {
+  width: min(560px, 100%); margin: 0 auto; box-sizing: border-box;
+  padding: 20px 16px 28px; gap: 16px; overflow: visible;
+}
 :is(.bw-topbar, .bw-toolbar) :is(.bw-input, .bw-select, .bw-textarea) {
   background: var(--bg-subtle);
   border: 1px solid var(--border-med);
@@ -1797,6 +1819,38 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
         if (!silent) post({ type: 'widget-settings-close', widgetId: cfg().id });
     }
 
+    // "inlineForm": true (with "inlineEdit": true): a widget whose settings are
+    // a form rather than its own content is still edited on itself — the same
+    // fields as the sheet, drawn over the widget while it is in edit mode.
+    var inlineRoot = null;
+    function openInlineForm() {
+        if (inlineRoot) return;
+        readSchema();
+        injectStyles();
+        rows = [];
+        inlineRoot = el('div', 'bws-root bws-inline');
+        var body = el('div', 'bws-body');
+        var onFieldChange = function () { syncVisibility(); scheduleCommit(); };
+        fields.forEach(function (f) {
+            if (f.key === 'scale') return;          // the bar's A / A does that
+            var row = buildRow(f, onFieldChange);
+            row.field = f;
+            rows.push(row);
+            body.appendChild(row.node);
+        });
+        inlineRoot.appendChild(body);
+        (document.getElementById('bw-topbar-body') || document.body).appendChild(inlineRoot);
+        syncVisibility();
+        inlineRoot.classList.add('is-open');
+    }
+    function closeInlineForm() {
+        if (!inlineRoot) return;
+        if (commitTimer) { clearTimeout(commitTimer); commitTimer = null; commit(); }
+        if (inlineRoot.parentNode) inlineRoot.parentNode.removeChild(inlineRoot);
+        inlineRoot = null;
+        rows = [];
+    }
+
     /* ─── edit mode (editing on the widget itself) ──────────────── */
     // A widget that declares "inlineEdit": true in its schema is set up on the
     // widget itself: the Edit button (top right of the bar, or the corner
@@ -1902,6 +1956,7 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
         syncLayoutMode();
         paintEditButtons();
         document.addEventListener('keydown', onEditKey, true);
+        if (schema && schema.inlineForm) openInlineForm();
         // The host stops taking dropped files (as a new deck) while a widget
         // is edited, so a file dropped on the widget reaches the widget.
         post({ type: 'widget-editing', widgetId: cfg().id, on: true });
@@ -1920,6 +1975,7 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
             titleEl.removeAttribute('title');
         }
         document.removeEventListener('keydown', onEditKey, true);
+        closeInlineForm();
         if (editGrew) post({ type: 'widget-collapse', widgetId: cfg().id });
         editGrew = false;
         syncTitle();
@@ -2921,6 +2977,20 @@ html, body { width: 100%; height: 100%; overflow: hidden; }
    live bar buttons rather than as controls floating over video. */
 .bw-topbar #device-select { background: var(--bg); border: 1px solid var(--border-med); color: var(--text); backdrop-filter: none; height: var(--ctl-h); padding: 0 9px; font-size: var(--fs-chrome); }
 .bw-topbar #device-select:focus { border-color: var(--text); }
+/* The source picker drawn like the bar's other menus (AR's question type):
+   a plain bar button with a chevron, in the bar's face. */
+.bw-topbar #device-select {
+  appearance: none; -webkit-appearance: none;
+  min-width: 180px; max-width: 320px;
+  padding: 0 28px 0 10px;
+  border: 1px solid var(--border-med); border-radius: var(--radius);
+  font-family: var(--font-chrome); font-size: var(--fs-chrome);
+  background: var(--bg) no-repeat right 9px center / 12px 12px
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231a1a18' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  cursor: pointer;
+}
+.bw-topbar #device-select:hover:not(:disabled) { border-color: var(--sn-ink); background-color: var(--sn-hl); }
+.bw-topbar #device-select:disabled { color: var(--text-3); cursor: default; }
 .bw-topbar #device-select option { background: var(--bg); color: var(--text); }
 .bw-topbar .bar-btn { width: var(--ctl-h); height: var(--ctl-h); background: var(--bg); border: 1px solid var(--border-med); color: var(--text); backdrop-filter: none; }
 .bw-topbar .bar-btn:hover { background: var(--sn-node); border-color: var(--text); }
@@ -3071,6 +3141,12 @@ function wFile(fallback, ext){
           opt.textContent = d.label || `Camera ${i + 1}`;
           deviceSel.appendChild(opt);
         });
+        if (!inputs.length) {
+          const opt = document.createElement('option');
+          opt.value = ''; opt.textContent = 'No camera found'; opt.disabled = true; opt.selected = true;
+          deviceSel.appendChild(opt);
+        }
+        deviceSel.disabled = !inputs.length;
         devicesListed = true;
       } catch (_) {}
     }

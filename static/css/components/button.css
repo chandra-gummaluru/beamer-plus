@@ -95,16 +95,14 @@
 }
 .btn--add:hover { --_bs: solid; --_fg: var(--btn-gold); }
 
-/* A toggle that is on (tools, split view, bookmark): filled graphite. */
+/* A toggle that is on (tools, split view, bookmark): the deck's yellow with
+   an ink outline, as every chosen toggle in Beamer+ is. */
 .btn_selected,
-.btn.btn_selected {
-    --_bg: var(--accent);
-    --_fg: var(--ink-on-accent);
-    --_bd: var(--accent-strong);
-}
+.btn.btn_selected,
 .btn_selected:hover {
-    --_bg: var(--accent-strong);
-    --_bd: var(--accent-strong);
+    --_bg: #f7c548;
+    --_fg: var(--btn-ink);
+    --_bd: var(--btn-ink);
 }
 
 .btn--ghost {

@@ -714,9 +714,9 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 }
 .wf-seg-btn:hover { color: var(--ink-1); }
 .wf-seg-btn.is-active {
-    background: var(--surface-paper);
+    background: #f7c548;
     color: var(--ink-1);
-    box-shadow: 0 1px 2px oklch(from var(--ink-1) l c h / 0.12), 0 0 0 1px oklch(from var(--ink-1) l c h / 0.06);
+    box-shadow: inset 0 0 0 1.5px var(--ink-1);
 }
 
 /* Text size: A, A, A … growing — pick the one that looks right. */
@@ -749,8 +749,8 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 .wf-size-btn:hover { color: var(--ink-1); }
 .wf-size-btn.is-active {
     color: var(--ink-1);
-    background: var(--surface-paper);
-    box-shadow: 0 1px 2px oklch(from var(--ink-1) l c h / 0.12), 0 0 0 1px oklch(from var(--ink-1) l c h / 0.06);
+    background: #f7c548;
+    box-shadow: inset 0 0 0 1.5px var(--ink-1);
 }
 
 /* Minutes and seconds share the line evenly. */
@@ -932,6 +932,60 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 }
 .widget-card--custom .widget-card-icon { color: var(--ink-3); }
 .widget-card--custom .widget-card-label { color: var(--ink-3); }
+
+/* ── Add Widget, drawn like Beamer+'s dialogs ──────────────────────
+   A white card with an ink outline, in the slides' face and one weight;
+   the title on the highlighter yellow; categories are toggles (ink
+   outline, yellow when chosen); a card gets an ink outline when pointed
+   at and fills yellow under the pointer. */
+.widget-modal {
+    background: #fff;
+    border: 2px solid var(--ink-1);
+    border-radius: 7px;
+    box-shadow: 0 12px 36px rgb(0 0 0 / .18);
+    font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', var(--font-sans);
+}
+.widget-modal, .widget-modal * { font-weight: 400 !important; }
+.widget-modal-header { border-bottom: 0; padding-bottom: var(--sp-2); }
+.widget-modal-title {
+    flex: 0 1 auto; margin-right: auto;
+    font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', var(--font-sans);
+    font-size: 24px; letter-spacing: 0; line-height: 1.35;
+    background: #f7c548; padding: 0 .18em;
+}
+.widget-modal-cats { border-bottom: 0; gap: 6px; padding: var(--sp-2) var(--sp-4); }
+.widget-cat-btn {
+    font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', var(--font-sans);
+    padding: 3px 11px;
+    border: 1.5px solid var(--ink-1);
+    border-radius: 5px;
+    background: #fff;
+    color: var(--ink-1);
+}
+.widget-cat-btn:hover { background: #f7c548; border-color: var(--ink-1); color: var(--ink-1); }
+.widget-cat-btn.is-active { background: #f7c548; border-color: var(--ink-1); color: var(--ink-1); }
+.widget-modal-search-row { border-bottom: 0; padding-top: var(--sp-2); }
+.widget-modal-search {
+    font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', var(--font-sans);
+    border: 1.5px solid var(--ink-1); border-radius: 7px; background: #fff;
+}
+.widget-modal-search:focus { outline: none; box-shadow: 0 0 0 1px var(--ink-1); }
+.widget-card {
+    background: #fff;
+    border: 1.5px solid var(--line-2);
+    border-radius: 7px;
+    transition: none;
+}
+.widget-card:hover, .widget-card:focus-visible {
+    background: #f7c548;
+    border-color: var(--ink-1);
+    box-shadow: none;
+    outline: none;
+}
+.widget-card-icon, .widget-card-label { color: var(--ink-1); }
+.widget-card-label { font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', var(--font-sans); }
+.widget-card--custom { border-style: dashed; border-color: var(--line-3); }
+.widget-card--custom:hover { border-color: var(--ink-1); }
 
 /* ─── View slide config section ───────────────────────────────── */
 
@@ -1566,7 +1620,7 @@ body.wsheet-open #main-content { padding-right: var(--editor-panel-width); }
     color: var(--ink-1);
     cursor: pointer;
 }
-.editor-dd-opt.is-active { background: var(--surface-cream-2); }
+.editor-dd-opt.is-active { background: #f7c548; }
 .editor-dd-opt[aria-selected="true"]:not(.is-active) { background: var(--surface-stage); }
 .editor-dd-opt[aria-disabled="true"] { color: var(--ink-4); cursor: default; }
 .editor-dd-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }

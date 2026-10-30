@@ -744,6 +744,38 @@
         if (!silent) post({ type: 'widget-settings-close', widgetId: cfg().id });
     }
 
+    // "inlineForm": true (with "inlineEdit": true): a widget whose settings are
+    // a form rather than its own content is still edited on itself — the same
+    // fields as the sheet, drawn over the widget while it is in edit mode.
+    var inlineRoot = null;
+    function openInlineForm() {
+        if (inlineRoot) return;
+        readSchema();
+        injectStyles();
+        rows = [];
+        inlineRoot = el('div', 'bws-root bws-inline');
+        var body = el('div', 'bws-body');
+        var onFieldChange = function () { syncVisibility(); scheduleCommit(); };
+        fields.forEach(function (f) {
+            if (f.key === 'scale') return;          // the bar's A / A does that
+            var row = buildRow(f, onFieldChange);
+            row.field = f;
+            rows.push(row);
+            body.appendChild(row.node);
+        });
+        inlineRoot.appendChild(body);
+        (document.getElementById('bw-topbar-body') || document.body).appendChild(inlineRoot);
+        syncVisibility();
+        inlineRoot.classList.add('is-open');
+    }
+    function closeInlineForm() {
+        if (!inlineRoot) return;
+        if (commitTimer) { clearTimeout(commitTimer); commitTimer = null; commit(); }
+        if (inlineRoot.parentNode) inlineRoot.parentNode.removeChild(inlineRoot);
+        inlineRoot = null;
+        rows = [];
+    }
+
     /* ─── edit mode (editing on the widget itself) ──────────────── */
     // A widget that declares "inlineEdit": true in its schema is set up on the
     // widget itself: the Edit button (top right of the bar, or the corner
@@ -849,6 +881,7 @@
         syncLayoutMode();
         paintEditButtons();
         document.addEventListener('keydown', onEditKey, true);
+        if (schema && schema.inlineForm) openInlineForm();
         // The host stops taking dropped files (as a new deck) while a widget
         // is edited, so a file dropped on the widget reaches the widget.
         post({ type: 'widget-editing', widgetId: cfg().id, on: true });
@@ -867,6 +900,7 @@
             titleEl.removeAttribute('title');
         }
         document.removeEventListener('keydown', onEditKey, true);
+        closeInlineForm();
         if (editGrew) post({ type: 'widget-collapse', widgetId: cfg().id });
         editGrew = false;
         syncTitle();

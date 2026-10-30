@@ -53,3 +53,15 @@
 .lib-chip input:focus-visible + span { outline: 2px solid var(--ink-1); outline-offset: 2px; }
 .lib-chip input:disabled + span { opacity: 0.45; cursor: default; border-style: dashed; }
 .lib-chip:has(input:disabled) { cursor: default; }
+
+/* Drawn like the dialog it sits in (and the rest of Beamer+): fields and
+   chips with a faint outline that inks when in use; a chosen chip is the
+   deck's yellow with an ink outline. In the slides' face, one weight. */
+.lib, .lib * { font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', var(--font-sans); font-weight: 400 !important; }
+.lib .field { background: #fff; border: 1.5px solid var(--line-2); border-radius: 7px; }
+.lib .field:hover { border-color: var(--ink-3); }
+.lib .field:focus { border-color: var(--ink-1); box-shadow: none; }
+.lib-chip > span { border: 1.5px solid var(--line-2); border-radius: 7px; background: #fff; color: var(--ink-2); }
+.lib-chip:hover > span { border-color: var(--ink-1); color: var(--ink-1); }
+.lib-chip input:checked + span { background: #f7c548; border-color: var(--ink-1); color: var(--ink-1); }
+.lib-chip > span small, .lib-chip input:checked + span small { background: transparent; color: inherit; padding: 0; }

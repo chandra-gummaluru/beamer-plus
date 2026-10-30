@@ -142,9 +142,9 @@ body.split-view-active #annotation-stage-actions {
 }
 
 #floating-annotation-toolbar .btn.btn_selected {
-    background: var(--accent);
-    color: var(--ink-on-accent);
-    border-color: var(--accent-strong);
+    background: #f7c548;
+    color: var(--ink-1);
+    border-color: var(--ink-1);
 }
 
 #tool-container .pen-slot-btn {
@@ -196,13 +196,13 @@ body.split-view-active #annotation-stage-actions {
 }
 
 #text-size-sidebar .btn:hover {
-    background: var(--surface-cream-2);
-    border-color: var(--line-2);
+    background: #f7c548;
+    border-color: var(--ink-1);
 }
 
 #text-size-sidebar .btn.btn_selected {
-    background: var(--accent);
-    border-color: var(--accent-strong);
+    background: #f7c548;
+    border-color: var(--ink-1);
 }
 
 .text-size-dot {
@@ -210,7 +210,7 @@ body.split-view-active #annotation-stage-actions {
     border-radius: 50%;
     background: var(--ink-1);
 }
-#text-size-sidebar .btn.btn_selected .text-size-dot { background: var(--ink-on-accent); }
+#text-size-sidebar .btn.btn_selected .text-size-dot { background: var(--ink-1); }
 .text-size-dot--small   { width: 6px;  height: 6px; }
 .text-size-dot--regular { width: 11px; height: 11px; }
 .text-size-dot--large   { width: 17px; height: 17px; }
@@ -265,7 +265,7 @@ body.split-view-active #text-size-sidebar {
 #pen-flyout [hidden] { display: none; }
 /* The eraser's sizes are rings: it takes ink away rather than adding it. */
 #pen-flyout.is-eraser .pen-size-dot { background: transparent; border: 1.5px solid var(--ink-1); }
-#pen-flyout.is-eraser .btn.btn_selected .pen-size-dot { background: transparent; border-color: var(--ink-on-accent); }
+#pen-flyout.is-eraser .btn.btn_selected .pen-size-dot { background: transparent; border-color: var(--ink-1); }
 #pen-flyout {
     display: none;
     flex-direction: column;
@@ -298,9 +298,9 @@ body.split-view-active #text-size-sidebar {
 }
 #pen-flyout .btn svg { width: 16px; height: 16px; }
 #pen-flyout .btn:hover { background: var(--btn-gold-soft); border-color: var(--btn-gold); }
-#pen-flyout .btn.btn_selected { background: var(--accent); border-color: var(--accent-strong); color: var(--ink-on-accent); }
+#pen-flyout .btn.btn_selected { background: #f7c548; border-color: var(--ink-1); color: var(--ink-1); }
 .pen-size-dot { display: block; border-radius: 50%; background: var(--ink-1); }
-#pen-flyout .btn.btn_selected .pen-size-dot { background: var(--ink-on-accent); }
+#pen-flyout .btn.btn_selected .pen-size-dot { background: var(--ink-1); }
 body.split-view-active #pen-flyout {
     top: calc(var(--sp-3) + var(--hit-min) + var(--sp-3));
     right: auto;

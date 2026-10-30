@@ -1,0 +1,64 @@
+/* ============================================================
+   The audience's answer pages (mcq_response, survey_response,
+   survey_not_found): drawn like the slides and the Audience Response
+   widget they belong to — white page, Computer Modern (one weight), the
+   question on the highlighter yellow, ink-outlined boxes, yellow for the
+   chosen answer. Loaded after each page's own styles.
+   ============================================================ */
+:root {
+  --bg: #fff;
+  --font-ui: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', system-ui, sans-serif;
+  --font-mono: 'BW CM Typewriter', 'CMU Typewriter Text', 'Latin Modern Mono', ui-monospace, monospace;
+  --rs-ink: #1a1a18;
+  --rs-cap: #8a8a85;
+  --rs-hl: #f7c548;
+}
+body, body * { font-weight: 400 !important; }
+body { background: #fff; color: var(--rs-ink); font-family: var(--font-ui); }
+
+#question-block { border-bottom: 0; }
+.question-text { color: var(--rs-ink); font-size: 1.5rem; }
+.question-text:not(.has-block) {
+  display: inline; background: var(--rs-hl); padding: 0 .18em;
+  box-decoration-break: clone; -webkit-box-decoration-break: clone; line-height: 1.5;
+}
+
+/* Answers: ink-outlined boxes, the chosen one yellow. */
+.option-btn {
+  background: #fff; border: 2px solid var(--rs-ink); border-radius: 7px;
+  font-size: 17px; color: var(--rs-ink);
+}
+.option-btn:active:not(:disabled), .option-btn:hover:not(:disabled) { background: #fff; border-color: var(--rs-ink); }
+.option-btn.selected, .option-btn.selected:hover { background: var(--rs-hl); border-color: var(--rs-ink); }
+.option-letter, .option-btn.selected .option-letter {
+  width: auto; height: auto; border: 0; border-radius: 0; background: none;
+  font-family: var(--font-mono); font-size: 15px; color: var(--rs-cap);
+}
+.option-btn.selected .option-letter { color: var(--rs-ink); }
+
+/* Typing in: white, ink outline. */
+textarea, .line-input, .blank-input {
+  background: #fff; border: 2px solid var(--rs-ink); border-radius: 7px; color: var(--rs-ink);
+}
+textarea:focus, .line-input:focus, .blank-input:focus { background: #fff; border-color: var(--rs-ink); box-shadow: 0 0 0 1px var(--rs-ink); }
+textarea::placeholder, .line-input::placeholder { color: var(--rs-cap); }
+
+/* Submit: like every Beamer+ button — ink outline, yellow when pressed on. */
+.submit-btn {
+  background: #fff; color: var(--rs-ink);
+  border: 2px solid var(--rs-ink); border-radius: 7px; font-size: 17px;
+}
+.submit-btn:hover:not(:disabled), .submit-btn:active:not(:disabled) { background: var(--rs-hl); }
+.submit-btn:disabled { opacity: 0.4; }
+
+.scale-btn { background: #fff; border: 2px solid var(--rs-ink); border-radius: 7px; color: var(--rs-ink); }
+.scale-btn.selected { background: var(--rs-hl); border-color: var(--rs-ink); color: var(--rs-ink); }
+.plot-box { border: 2px solid var(--rs-ink); border-radius: 7px; background: #fff; }
+
+.hint-text, .status-sub, .loading-text { color: var(--rs-cap); }
+.spinner { border-color: #e6e6e3; border-top-color: var(--rs-ink); }
+
+/* Status: the title on the highlighter, in ink (thanks, closed, not found). */
+.status-title, .status-card.ok .status-title, .status-card.err .status-title {
+  color: var(--rs-ink); background: var(--rs-hl); padding: 0 .18em; font-size: 1.5rem;
+}
