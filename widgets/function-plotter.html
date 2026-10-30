@@ -2817,9 +2817,10 @@ body { display: flex; flex-direction: column; }
 .expr-input.hidden-expr { opacity: 0.4; }
 
 /* Row action buttons */
-.expr-actions { display: none; gap: 2px; flex-shrink: 0; }
+/* Always laid out, only hidden: showing them on hover mustn't move the row. */
+.expr-actions { display: flex; visibility: hidden; gap: 2px; flex-shrink: 0; }
 .expr-row:hover .expr-actions,
-.expr-row:focus-within .expr-actions { display: flex; }
+.expr-row:focus-within .expr-actions { visibility: visible; }
 
 .expr-actions { gap: calc(4px * var(--u)); }
 /* Drawn like the slide: ink line icons; pointed at, an ink outline on a
