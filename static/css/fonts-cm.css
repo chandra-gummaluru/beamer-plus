@@ -29,3 +29,25 @@
 :is(.slide-nav-tools, #recorder-bar, #editor-panel, .editor-dd-menu) * {
     font-weight: 400 !important;
 }
+
+/* The welcome page and the loading splash: the slides' face throughout, in
+   one weight (the deck's title page is set the same way). */
+.welcome-screen, #splash-screen {
+    --font-sans:  'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', system-ui, sans-serif;
+    --font-serif: var(--font-sans);
+    font-family: var(--font-sans);
+}
+.welcome-screen, .welcome-screen *, #splash-screen, #splash-screen * {
+    font-weight: 400 !important;
+}
+.welcome-title { letter-spacing: 0 !important; }
+
+/* The tour, like the dialogs: the slides' face in one weight. */
+#tour-popover {
+    --font-sans:  'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', system-ui, sans-serif;
+    --font-serif: var(--font-sans);
+    font-family: var(--font-sans);
+}
+#tour-popover, #tour-popover * { font-weight: 400 !important; }
+#tour-popover .tour-title { font-size: 24px; }
+#tour-popover .tour-body { font-size: 16px; }
