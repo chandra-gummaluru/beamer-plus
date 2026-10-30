@@ -5791,9 +5791,19 @@ body.ar-static .ar-split-pane { pointer-events: none; }
   function overflowing() {
     // The question column scrolls as a whole when the banner is up under it.
     const els = [questionEl, choicesEl, fillTpl, promptEl, ...questionEl.querySelectorAll('pre'),
-                 ...document.querySelectorAll('.ar-split-pane'), document.getElementById('join')];
+                 ...document.querySelectorAll('.ar-split-pane')];
     return els.some(el => el.offsetParent !== null && el.clientHeight > 0 &&
-      (el.scrollHeight > el.clientHeight + 2 || el.scrollWidth > el.clientWidth + 2));
+      (el.scrollHeight > el.clientHeight + 2 || el.scrollWidth > el.clientWidth + 2)) || joinOverflows();
+  }
+  // The banner overflows when anything in it runs into its right padding
+  // (scrollWidth doesn't count a visible box's padding).
+  function joinOverflows() {
+    const join = document.getElementById('join');
+    if (!join || join.offsetParent === null) return false;
+    const r = join.getBoundingClientRect();
+    const edge = r.right - parseFloat(getComputedStyle(join).paddingRight) - parseFloat(getComputedStyle(join).borderRightWidth) + 1;
+    return [...join.querySelectorAll('.join-fig, #timer-track, #qr-slot')]
+      .some(el => el.offsetParent !== null && el.getBoundingClientRect().right > edge);
   }
 
   function fitStage() {
@@ -5866,7 +5876,7 @@ body.ar-static .ar-split-pane { pointer-events: none; }
     join.classList.remove('is-tight');
     if (!join.offsetParent) return;
     const tight = [...text.children].some(el => el.offsetParent !== null && el.scrollWidth > el.clientWidth + 1)
-               || text.clientWidth < 90;
+               || text.clientWidth < 90 || joinOverflows();
     join.classList.toggle('is-tight', tight);
   }
   if (window.ResizeObserver) {
