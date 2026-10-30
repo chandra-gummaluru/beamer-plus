@@ -3869,7 +3869,7 @@ body.bw-editing #ed-secs[hidden] { display: none; }
 #qr-slot { position: relative; flex: 0 0 auto; display: flex; border-radius: 5px; outline: none; }
 #qr-slot.is-go { cursor: pointer; }
 /* Pointed at: an ink outline round the square, like a node on the slide,
-   and what the click will do in a small node on its lower edge. */
+   and what the click will do in a small node in its middle. */
 #qr-slot.is-go:hover, #qr-slot.is-go:focus-visible {
   outline: var(--ar-line) solid var(--ar-ink);
   outline-offset: calc(4px * var(--u));
@@ -3877,7 +3877,7 @@ body.bw-editing #ed-secs[hidden] { display: none; }
 }
 #qr-slot.is-go:hover #ed-qr, #qr-slot.is-go:focus-visible #ed-qr { border-color: var(--ar-ink) !important; color: var(--ar-ink) !important; }
 #qr-cue {
-  position: absolute; left: 50%; bottom: calc(-10px * var(--u)); transform: translateX(-50%);
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
   padding: calc(1px * var(--u)) calc(7px * var(--u));
   background: var(--bg); color: var(--ar-ink);
   border: 1.5px solid var(--ar-ink); border-radius: 4px;
