@@ -2791,6 +2791,8 @@ html, body { width: 100%; height: 100%; overflow: hidden; }
 /* Just the picture: no snapshot or mirror buttons. The source is picked in
    edit mode. */
 #snapshot-btn, #mirror-btn { display: none !important; }
+/* No name on the bar while editing: it is set in the editor's panel. */
+body.bw-editing .bw-topbar-title { display: none !important; }
 .cam-ed { display: inline-flex; align-items: center; gap: 8px; color: var(--text-3); white-space: nowrap; }
 </style>
 </head>
