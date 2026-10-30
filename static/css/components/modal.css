@@ -152,3 +152,7 @@
 .custom-modal-overlay, .custom-modal-message, .custom-modal-content .btn { font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', var(--font-sans); }
 .custom-modal-content, .custom-modal-content * { font-weight: 400 !important; }
 .custom-modal-message { font-size: 16px; }
+/* Loading: no x to clear, so the title sits exactly in the middle, and the
+   message starts on its own line under it. */
+.modal-loading .custom-modal-title { margin: 0; }
+.modal-loading .custom-modal-message { display: block; margin: 12px 0 0; }
