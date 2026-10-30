@@ -448,27 +448,32 @@ body.edit-mode .slide-nav-item.type-view:hover { border-color: var(--edit-tint);
 body.edit-mode .slide-preview-view { background: var(--edit-tint-soft); }
 body.edit-mode .view-preview-pane { background: transparent; color: var(--edit-tint-ink); }
 body.edit-mode .view-preview-sep { background: oklch(from var(--edit-tint) l c h / 0.5); }
-/* Slide number — a small frosted pill in the top-left of each preview.
-   Light by default; dark for the slide on stage; amber for bookmarks. */
+/* Slide number — a tab in the top-left corner of each preview, set into
+   the card's corner rather than floating over the slide, so it reads as the
+   card's label and not as part of the slide behind it. White by default; the
+   highlighter yellow for the slide on stage (and the one selected); amber
+   for bookmarks. */
 .slide-preview::before {
     content: attr(data-slide-number);
     position: absolute;
-    top: 5px;
-    left: 5px;
-    min-width: 10px;
+    top: 0;
+    left: 0;
+    min-width: 12px;
     text-align: center;
     background: var(--surface-paper);   /* no blur: one per thumbnail made the rail costly to scroll */
     color: var(--ink-1);
-    border: 1px solid oklch(from var(--ink-1) l c h / 0.22);
-    box-shadow: 0 1px 3px oklch(from var(--ink-1) l c h / 0.16);
-    padding: 2px 7px;
+    border: 0;
+    border-right: 1px solid oklch(from var(--ink-1) l c h / 0.28);
+    border-bottom: 1px solid oklch(from var(--ink-1) l c h / 0.28);
+    border-radius: calc(var(--r-md) - 1px) 0 var(--r-md) 0;
+    box-shadow: none;
+    padding: 3px 8px 3px 7px;
     font-size: var(--fs-sm);
     font-weight: 700;
     line-height: 15px;
     font-family: var(--font-sans);
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.01em;
-    border-radius: var(--r-pill);
     z-index: 10;
     pointer-events: none;
     transition: background var(--dur-fast), color var(--dur-fast);
@@ -476,9 +481,9 @@ body.edit-mode .view-preview-sep { background: oklch(from var(--edit-tint) l c h
 .slide-nav-item:hover .slide-preview::before { color: var(--ink-1); }
 .slide-nav-item.current-slide .slide-preview::before,
 .slide-nav-item.active .slide-preview::before {
-    background: oklch(from var(--ink-1) l c h / 0.88);
-    color: var(--ink-on-accent);
-    border-color: transparent;
+    background: #f7c548;
+    color: #1a1a1a;
+    border-color: oklch(from var(--ink-1) l c h / 0.45);
 }
 #bookmark-pins .slide-preview::before,
 .slide-preview.bookmark-preview::before {
