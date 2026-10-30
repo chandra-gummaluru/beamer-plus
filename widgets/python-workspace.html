@@ -2799,6 +2799,29 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
         display:       function () { readSchema(); return displayMode(); },
     };
 
+    // A widget's page never scrolls as a page, and its clipped boxes never
+    // scroll to follow focus: focusing a field (the browser bringing it into
+    // view) would otherwise shift the whole widget, or one pane of it, so it
+    // no longer lines up with its slide. Boxes a widget scrolls on purpose
+    // (overflow: auto, or a hidden one it syncs itself) are left alone.
+    document.addEventListener('scroll', function (e) {
+        var root = document.scrollingElement || document.documentElement;
+        var t = (e.target === document || e.target === document.body) ? root : e.target;
+        if (!t || !t.nodeType || t.nodeType !== 1) return;
+        if (t === root || t === document.body) {
+            if (root.scrollLeft || root.scrollTop) { root.scrollLeft = 0; root.scrollTop = 0; }
+            if (document.body && (document.body.scrollLeft || document.body.scrollTop)) {
+                document.body.scrollLeft = 0; document.body.scrollTop = 0;
+            }
+            return;
+        }
+        var a = document.activeElement;
+        if (!a || a === t || !t.contains(a)) return;
+        var cs = getComputedStyle(t);
+        if (t.scrollLeft && /hidden|clip/.test(cs.overflowX)) t.scrollLeft = 0;
+        if (t.scrollTop && /hidden|clip/.test(cs.overflowY)) t.scrollTop = 0;
+    }, true);
+
     function init() {
         applyScale(); announce(); buildTopbar(); syncScaleButtons();
         watchBarControls(); syncLayoutMode();
