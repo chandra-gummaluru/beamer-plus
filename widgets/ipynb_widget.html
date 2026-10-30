@@ -3394,7 +3394,36 @@ body {
   border-radius: var(--sn-r);
 }
 
-#notebook-area:not(.paper) .cc-btn { border-radius: var(--radius); }
+/* Cell controls drawn like every Beamer+ icon button: ink icons, and an
+   ink outline on the highlighter yellow when pointed at. */
+#notebook-area:not(.paper) .cc-btn {
+  border: 1.5px solid transparent; border-radius: 5px;
+  background: transparent; color: var(--sn-ink);
+}
+#notebook-area:not(.paper) .cc-btn:hover,
+#notebook-area:not(.paper) .cc-btn.danger:hover { border-color: var(--sn-ink); background: var(--sn-hl); color: var(--sn-ink); }
+.cc-btn svg { width: 12px; height: 12px; }
+
+/* Line numbers: a grey gutter at the left of each code cell, set in the
+   same face, size and leading as the code so each number sits on its line.
+   (A line long enough to wrap takes one number.) */
+.code-ln {
+  flex: 0 0 auto;
+  margin: 0;
+  width: calc(var(--ln-ch, 1) * 1ch + 22px);
+  box-sizing: border-box;
+  padding: 9px 8px 9px 12px;
+  font-family: var(--font-mono);
+  font-size: calc(12.5px * var(--u));
+  line-height: 1.7;
+  text-align: right;
+  white-space: pre;
+  color: var(--sn-faint, #b5b5b0);
+  user-select: none;
+  pointer-events: none;
+  border-right: 1px solid color-mix(in srgb, var(--sn-ink, #222) 12%, transparent);
+}
+#notebook-area:not(.paper) .code-area.has-hl .code-hl { left: calc(var(--ln-ch, 1) * 1ch + 22px); }
 #notebook-area:not(.paper) .add-btn {
   border: 1.5px dashed var(--sn-faint);
   border-radius: var(--sn-r);
@@ -3999,7 +4028,7 @@ function addCodeCell(code = '', insertAfterId = null, { focus = true } = {}) {
       <button class="cc-btn"        title="Run (Shift+Enter)"  onclick="runCell('${id}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button>
       <button class="cc-btn"        title="Move up"            onclick="moveCellUp('${id}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="18 15 12 9 6 15"/></svg></button>
       <button class="cc-btn"        title="Move down"          onclick="moveCellDown('${id}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></button>
-      <button class="cc-btn danger" title="Delete cell"        onclick="deleteCell('${id}')">✕</button>
+      <button class="cc-btn danger" title="Delete cell"        onclick="deleteCell('${id}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>`;
 
   block.innerHTML = `
@@ -4010,6 +4039,7 @@ function addCodeCell(code = '', insertAfterId = null, { focus = true } = {}) {
       <div class="cell-card" id="card-${id}">
         ${ctrlsHtml}
         <div class="code-area has-hl">
+          <pre class="code-ln" aria-hidden="true">1</pre>
           <pre class="code-hl" aria-hidden="true"></pre>
           <textarea
             class="code-ta"
@@ -4057,7 +4087,7 @@ function addMarkdownCell(src = '', insertAfterId = null) {
     <div class="cell-controls">
       <button class="cc-btn"        title="Move up"   onclick="moveCellUp('${id}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="18 15 12 9 6 15"/></svg></button>
       <button class="cc-btn"        title="Move down" onclick="moveCellDown('${id}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></button>
-      <button class="cc-btn danger" title="Delete"    onclick="deleteCell('${id}')">✕</button>
+      <button class="cc-btn danger" title="Delete"    onclick="deleteCell('${id}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>`;
 
   block.innerHTML = `
@@ -4494,6 +4524,16 @@ function autoResize(ta) {
 // text ends in autoResize, so it is repainted from there). A trailing newline
 // gets a space after it, or the copy would drop the textarea's last line.
 function paintCode(ta) {
+  // Line numbers in the gutter, one per line of source.
+  const ln = ta.parentElement?.querySelector('.code-ln');
+  if (ln) {
+    const n = ta.value.split('\n').length;
+    if (ln.dataset.n !== String(n)) {
+      ln.dataset.n = String(n);
+      ln.textContent = Array.from({ length: n }, (_, i) => i + 1).join('\n');
+    }
+    ta.parentElement.style.setProperty('--ln-ch', String(String(n).length));
+  }
   const pre = ta.parentElement?.classList.contains('has-hl') ? ta.previousElementSibling : null;
   if (!pre || !pre.classList.contains('code-hl')) return;
   const src = ta.value;
