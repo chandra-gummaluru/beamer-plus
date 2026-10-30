@@ -3195,8 +3195,6 @@ html, body {
 }
 .ye-empty .ph-icon { width: 52px; height: 52px; color: var(--sn-cap); opacity: 0.7; }
 .ye-empty p { font-size: calc(15px * var(--u)); color: var(--sn-cap); }
-/* No scrubber: the clip is set by its start and end in the bar. */
-.ye-trim { display: none !important; }
 /* The clip's times, in the bar. */
 :is(.bw-topbar, .bw-toolbar) .ye-link { flex: 0 0 300px; }   /* room for a link; the bar scrolls */
 :is(.bw-topbar, .bw-toolbar) .ye-times { display: inline-flex; align-items: center; gap: 6px; color: var(--sn-cap); }
@@ -3208,32 +3206,8 @@ html, body {
 :is(.bw-topbar, .bw-toolbar) .ye-time:focus { border-color: var(--sn-ink); outline: none; }
 :is(.bw-topbar, .bw-toolbar) .ye-time.is-bad { border-color: #d93a2b; }
 .ye-empty[hidden] { display: none; }
-.ye-trim { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
-.ye-trim.is-off { opacity: 0.45; pointer-events: none; }
-#ye-play svg { width: 14px; height: 14px; }
-.ye-rail {
-  position: relative; flex: 1 1 auto; height: 12px; margin: 10px 8px;
-  border: 1.5px solid var(--sn-ink); border-radius: 4px; background: var(--bg);
-  cursor: pointer; touch-action: none;
-}
-.ye-sel { position: absolute; top: 0; bottom: 0; background: var(--sn-hl); }
-.ye-head { position: absolute; top: -6px; bottom: -6px; width: 2px; margin-left: -1px; background: var(--sn-ink); pointer-events: none; }
-.ye-knob {
-  position: absolute; top: 50%; width: 12px; height: 26px;
-  transform: translate(-50%, -50%);
-  background: var(--bg); border: 1.5px solid var(--sn-ink); border-radius: 3px;
-  cursor: ew-resize; touch-action: none;
-}
-.ye-knob::after { content: ''; position: absolute; left: 50%; top: 6px; bottom: 6px; width: 1.5px; margin-left: -0.75px; background: var(--sn-ink); }
-.ye-knob:hover, .ye-knob.is-drag { background: var(--sn-hl); }
-.ye-times { display: inline-flex; align-items: center; gap: 6px; color: var(--sn-cap); white-space: nowrap; }
-.ye-time { width: 70px; text-align: center; font-family: var(--font-mono); }
 .yt-field { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; color: var(--text-3); white-space: nowrap; }
 .yt-sep { flex: 0 0 auto; width: 1px; height: 16px; background: var(--border-med); }
-#yt-edit .bw-input { height: 30px; border: 1.5px solid var(--sn-faint); border-radius: var(--sn-r); background: var(--bg); color: var(--sn-ink); }
-#yt-edit .bw-input:focus { border-color: var(--sn-ink); outline: none; }
-#yt-edit .bw-input.is-bad { border-color: #d93a2b; }
-#yt-edit .bw-seg > .bw-btn { height: 26px; padding: 0 10px; }
 body.bw-editing #controls, body.bw-editing #cover, body.bw-editing #click-layer,
 body.bw-editing #placeholder { visibility: hidden; }
 /* The video plays in the stage while it's edited, above the editor. */
@@ -3347,14 +3321,6 @@ body.bw-editing #player-wrap { z-index: 41; }
   <div id="yt-edit" class="bw-edit-only">
     <div class="ye-wrap">
       <div class="ye-stage" id="ye-stage"><div class="ye-empty" id="ye-empty"><svg class="ph-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3.5"/><path d="M10 9.2v5.6l4.8-2.8z"/></svg><p>No video chosen</p></div></div>
-      <div class="ye-trim" id="ye-trim">
-        <button class="bw-btn bw-btn--icon" id="ye-play" type="button" title="Play the clip" aria-label="Play the clip"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button>
-        <div class="ye-rail" id="ye-rail" title="Drag the handles to set where the clip starts and ends">
-          <div class="ye-sel" id="ye-sel"></div>
-          <div class="ye-head" id="ye-head"></div>
-          <div class="ye-knob" id="ye-k0" data-k="startTime" title="Clip start"></div>
-          <div class="ye-knob" id="ye-k1" data-k="endTime" title="Clip end"></div>
-        </div>
       </div>
     </div>
   </div>
@@ -4063,18 +4029,15 @@ if (window.WIDGET_CONFIG) updateConfig(window.WIDGET_CONFIG);
 
 // ── Edit mode ────────────────────────────────────────────────────────────────
 // The kit puts the widget into edit mode (body.bw-editing) from its Edit
-// button; #yt-edit is the editor: the link, the video in its stage, the clip
-// on a rail, and how it plays. Each change is saved straight away.
+// button. The link, the clip's start and end, and how it plays are in the
+// bar; #yt-edit shows the video (or the empty placeholder). Each change is
+// saved straight away.
 (function () {
   const $e = id => document.getElementById(id);
   const urlEl = $e('ye-url'), startEl = $e('ye-start'), endEl = $e('ye-end'), msgEl = $e('ye-msg');
-  const stage = $e('ye-stage'), empty = $e('ye-empty'), trimEl = $e('ye-trim');
-  const rail = $e('ye-rail'), selEl = $e('ye-sel'), headEl = $e('ye-head');
-  const k0 = $e('ye-k0'), k1 = $e('ye-k1'), playBtn = $e('ye-play');
+  const stage = $e('ye-stage'), empty = $e('ye-empty');
   const SEGS = { 'ye-auto': 'autoplay', 'ye-ui': 'hideYouTubeUI', 'ye-ctrl': 'showControls', 'ye-box': 'allowManualUrl' };
   const DEF  = { autoplay: false, hideYouTubeUI: true, showControls: true, allowManualUrl: false };
-  const ICON_PLAY  = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
-  const ICON_PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
   const editing = () => !!(window.BeamerWidget && BeamerWidget.edit && BeamerWidget.edit.active);
   const set = (patch, remove) => { if (window.BeamerWidget && BeamerWidget.edit) BeamerWidget.edit.set(patch, remove || []); };
 
@@ -4086,28 +4049,6 @@ if (window.WIDGET_CONFIG) updateConfig(window.WIDGET_CONFIG);
     return v.split(':').reduce((t, p) => t * 60 + Number(p), 0);
   }
   const showTime = n => (Number(n) > 0 ? fmtTime(Number(n)) : '');
-
-  // The clip being dragged, before it's saved.
-  let drag = null;   // { key, t }
-  const startT = () => drag && drag.key === 'startTime' ? drag.t : clipStart();
-  const endT   = () => {
-    if (drag && drag.key === 'endTime') return drag.t;
-    return clipEndSet() || duration();
-  };
-
-  function paintRail() {
-    const D = duration();
-    const ok = !!(playerReady && D > 0);
-    trimEl.classList.toggle('is-off', !ok);
-    if (!ok) { selEl.style.left = '0%'; selEl.style.width = '0%'; return; }
-    const a = Math.max(0, Math.min(1, startT() / D)), b = Math.max(a, Math.min(1, endT() / D));
-    selEl.style.left = (a * 100) + '%';
-    selEl.style.width = ((b - a) * 100) + '%';
-    k0.style.left = (a * 100) + '%';
-    k1.style.left = (b * 100) + '%';
-    headEl.style.left = (Math.max(0, Math.min(1, curTime() / D)) * 100) + '%';
-    playBtn.innerHTML = isPlaying ? ICON_PAUSE : ICON_PLAY;
-  }
 
   function fill() {
     const a = document.activeElement;
@@ -4124,33 +4065,10 @@ if (window.WIDGET_CONFIG) updateConfig(window.WIDGET_CONFIG);
         b.setAttribute('aria-pressed', String(act));
       });
     });
-    paintRail();
     layoutPlayer();
   }
 
   function say(text) { msgEl.textContent = text || ''; msgEl.hidden = !text; }
-
-  // A still of the video at t. Before it has ever played YouTube shows only
-  // its poster, so it is played for a moment, muted, to reach the frame.
-  let peekTimer = null;
-  function showFrame(t) {
-    if (!player || !playerReady) return;
-    try {
-      if (isPlaying) { player.seekTo(t, true); return; }
-      const st = ytState();
-      if (st === YT.PlayerState.PAUSED || st === YT.PlayerState.ENDED) { player.seekTo(t, true); return; }
-      const wasMuted = player.isMuted();
-      player.mute();
-      player.seekTo(t, true);
-      player.playVideo();
-      clearTimeout(peekTimer);
-      peekTimer = setTimeout(() => {
-        try { player.pauseVideo(); player.seekTo(t, true); if (!wasMuted) player.unMute(); } catch (_) {}
-        setPlayIcon(false);
-        paintRail();
-      }, 450);
-    } catch (_) {}
-  }
 
   // ── The link ──
   function commitUrl() {
@@ -4186,53 +4104,6 @@ if (window.WIDGET_CONFIG) updateConfig(window.WIDGET_CONFIG);
     e.stopPropagation();   // not the player's shortcuts
   }));
 
-  // ── The clip, dragged ──
-  const railT = e => {
-    const r = rail.getBoundingClientRect();
-    return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * duration();
-  };
-  [k0, k1].forEach(k => k.addEventListener('pointerdown', e => {
-    if (!playerReady || !duration()) return;
-    e.preventDefault(); e.stopPropagation();
-    k.setPointerCapture(e.pointerId);
-    k.classList.add('is-drag');
-    drag = { key: k.dataset.k, t: k === k0 ? clipStart() : endT() };
-    if (isPlaying) pause();
-  }));
-  [k0, k1].forEach(k => k.addEventListener('pointermove', e => {
-    if (!drag || !k.hasPointerCapture(e.pointerId)) return;
-    let t = railT(e);
-    if (drag.key === 'startTime') t = Math.min(t, endT() - 1);
-    else t = Math.max(t, clipStart() + 1);
-    drag.t = Math.max(0, Math.min(duration(), t));
-    (drag.key === 'startTime' ? startEl : endEl).value = fmtTime(drag.t);
-    paintRail();
-    clearTimeout(k.__seek);
-    k.__seek = setTimeout(() => showFrame(drag ? drag.t : 0), 60);
-  }));
-  [k0, k1].forEach(k => k.addEventListener('pointerup', () => {
-    if (!drag) return;
-    const d = drag; drag = null;
-    k.classList.remove('is-drag');
-    saveClip(d.key, d.t);
-    showFrame(d.t);
-    setTimeout(fill, 0);
-  }));
-  rail.addEventListener('pointerdown', e => {
-    if (e.target.closest('.ye-knob') || !playerReady || !duration()) return;
-    const t = Math.max(clipStart(), Math.min(endT(), railT(e)));
-    showFrame(t);
-    headEl.style.left = (t / duration() * 100) + '%';
-  });
-
-  // ── Play the clip ──
-  playBtn.addEventListener('click', () => {
-    if (isPlaying) { pause(); return; }
-    const t = curTime();
-    if (t < clipStart() || t >= endT() - 0.3) seekQuiet(clipStart());
-    play();
-  });
-
   // ── How it plays ──
   Object.entries(SEGS).forEach(([id, key]) => {
     $e(id).addEventListener('click', e => {
@@ -4241,20 +4112,12 @@ if (window.WIDGET_CONFIG) updateConfig(window.WIDGET_CONFIG);
     });
   });
 
-  // The playhead follows the video while editing.
-  let raf = null;
-  function loop() {
-    if (!editing()) { raf = null; return; }
-    if (!drag) paintRail();
-    raf = requestAnimationFrame(loop);
-  }
-
   window.addEventListener('bw-edit', e => {
     if (e.detail.editing) {
       pause();
       if (trimMode) setTrimMode(false);
       say(''); [urlEl, startEl, endEl].forEach(el => el.classList.remove('is-bad'));
-      requestAnimationFrame(() => { fill(); if (!raf) loop(); });
+      requestAnimationFrame(fill);
       if (!cfg.videoId) requestAnimationFrame(() => urlEl.focus());
     } else {
       pause();

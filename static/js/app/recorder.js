@@ -35,8 +35,6 @@ export function initRecorder(state) {
         const btn = document.getElementById('record-btn');
         if (btn) btn.title = 'Recording is not supported in this browser';
     }
-    document.getElementById('recorder-pause-btn')?.addEventListener('click', togglePause);
-    document.getElementById('recorder-stop-btn')?.addEventListener('click', () => stopRecording());
 
     window.addEventListener('beforeunload', (e) => {
         if (!active) return;
@@ -64,9 +62,10 @@ function initRecordButton() {
     let holdTimer = null, held = false;
     // A press that began during a take must not also count as a click on
     // plain Record once the take has stopped (that reopened the dialog).
-    let swallowClick = false;
+    let swallowClick = false, swallowReset = null;
     const startHold = () => {
         if (!active || active.stopping) return;
+        clearTimeout(swallowReset);   // an earlier press's reset mustn't land mid-hold
         swallowClick = true;
         held = false;
         btn.classList.add('is-holding');
@@ -83,7 +82,7 @@ function initRecordButton() {
         btn.classList.remove('is-holding');
         if (!held && fire) togglePause();
         held = false;
-        setTimeout(() => { swallowClick = false; }, 400);   // the click, if any, comes before this
+        swallowReset = setTimeout(() => { swallowClick = false; }, 400);   // the click, if any, comes before this
     };
     btn.addEventListener('pointerdown', (e) => {
         if (!active || e.button !== 0) return;
@@ -541,12 +540,9 @@ function elapsed(a) {
     return a.doneMs + partElapsed(a, a.part);
 }
 
-/* ─── recording bar ───────────────────────────────────────────── */
+/* ─── the take's timer (the Record button) ───────────────────────── */
 
 function showBar() {
-    const bar = document.getElementById('recorder-bar');
-    if (!bar) return;
-    bar.hidden = false;
     document.body.classList.add('is-recording');
     renderBar();
     clearInterval(active?.timer);
@@ -554,32 +550,14 @@ function showBar() {
 }
 
 function hideBar() {
-    const bar = document.getElementById('recorder-bar');
-    if (bar) { bar.hidden = true; bar.classList.remove('is-paused', 'is-stopping'); }
     document.body.classList.remove('is-recording');
     paintRecordButton();
 }
 
 function renderBar() {
     const a = active;
-    const bar = document.getElementById('recorder-bar');
-    if (!a || !bar) return;
+    if (!a) return;
     if (a.stopping) clearInterval(a.timer);
-    bar.classList.toggle('is-paused', a.paused && !a.stopping);
-    bar.classList.toggle('is-stopping', !!a.stopping);
-    const label = a.stopping ? 'Saving recording' : a.paused ? 'Recording paused' : 'Recording';
-    bar.querySelector('.recorder-state').textContent = label;
-    bar.title = label;
-    bar.querySelector('.recorder-time').textContent = formatDuration(elapsed(a));
-    const pause = document.getElementById('recorder-pause-btn');
-    if (pause) {
-        pause.title = a.paused ? 'Resume recording' : 'Pause recording';
-        pause.setAttribute('aria-label', pause.title);
-        pause.classList.toggle('is-resume', a.paused);
-        pause.disabled = !!a.stopping;
-    }
-    const stop = document.getElementById('recorder-stop-btn');
-    if (stop) stop.disabled = !!a.stopping;
     paintRecordButton();
 }
 

@@ -2740,9 +2740,6 @@ html, body { height: 100%; overflow: hidden; }
 /* ── Toolbar ─────────────────────────────────────────────── */
 /* Fit Page / Fit Width as one segmented control, and the page box in
    figures big enough to read on a lectern. */
-.seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; flex: 0 0 auto; }
-.seg .bw-btn { border: 0; border-radius: 0; height: calc(var(--ctl-h) - 2px); }
-.seg .bw-btn + .bw-btn { border-left: 1px solid var(--border); }
 
 .page-nav { display: flex; align-items: center; gap: 5px; flex: 0 0 auto; }
 
@@ -2851,17 +2848,13 @@ html, body { height: 100%; overflow: hidden; }
 }
 body:not(.is-viewer) #page-readout { display: none; }
 body.is-viewer .page-nav,
-body.is-viewer .seg,
 body.is-viewer #zoom-group,
-body.is-viewer #btn-download,
 body.is-viewer .bw-sep:not(:first-of-type) { display: none !important; }
 
 /* A narrow slide region keeps the page turning and drops the rest. */
-@media (max-width: 720px) { #btn-download { display: none !important; } }
 @media (max-width: 600px) { #zoom-group { display: none !important; } }
 @media (max-width: 480px) {
   .bw-toolbar-title, .bw-toolbar-title + .bw-sep { display: none !important; }
-  .seg { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2s; } }
@@ -2933,14 +2926,11 @@ body.is-viewer .bw-sep:not(:first-of-type) { display: none !important; }
 .pe-drop svg { width: 52px; height: 52px; color: var(--sn-cap); opacity: 0.7; }
 .pe-drop-t { font-size: calc(15px * var(--u)); color: var(--sn-cap); }
 .pe-drop[hidden], .pe-main[hidden] { display: none; }
-#pdf-edit.is-over .pe-drop, #pdf-edit.is-over .pe-grid { border-color: var(--sn-ink); border-style: dashed; }
 .pe-msg { color: #d93a2b; }
-.pe-top { flex: 0 0 auto; padding: 12px 16px 0; }
 .pe-main { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 12px 16px; }
 .pe-head { flex: 0 0 auto; }
 .pe-name { }
 .pe-count { color: var(--sn-cap); white-space: nowrap; }
-.pe-grow { flex: 1 1 auto; }
 .pe-grid {
   flex: 1 1 auto; min-height: 0; overflow-y: auto;
   display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
@@ -3094,25 +3084,17 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
   let currentPage = 1;
   let rangeStart  = 1;
   let rangeEnd    = Infinity;
-  const fitMode   = 'width';  // the page always fills the width
   let renderTask  = null;
   let resizeTimer = null;
   let isViewer    = false;
   let widgetId    = 'textbook';
   let socket      = null;
 
-  // The PDF this widget is showing, kept for the download button.
-  let sourceUrl   = '';
   /* The widget's Name setting (every widget has one — the settings kit adds it)
-     is its title everywhere: the bar, the heading inside an exported PDF, and
-     the downloaded file's name. Blank falls back to the widget's own default. */
+     is its title in the bar. Blank falls back to the widget's own default. */
   function wName(fallback){
     return (window.BeamerWidget && BeamerWidget.name) ? BeamerWidget.name(fallback) : fallback;
   }
-  function wFile(fallback, ext){
-    return (window.BeamerWidget && BeamerWidget.fileName) ? BeamerWidget.fileName(fallback, ext) : fallback + ext;
-  }
-  let sourceName  = 'document.pdf';
 
   // Pan / zoom
   let zoom = 1.0, panX = 0, panY = 0;
@@ -3150,8 +3132,6 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
   const pageTotalEl = document.getElementById('page-total');
   const btnPrev    = document.getElementById('btn-prev');
   const btnNext    = document.getElementById('btn-next');
-  const btnDownload = document.getElementById('btn-download');
-  const zoomGroup  = document.getElementById('zoom-group');
   const zoomVal    = document.getElementById('zoom-val');
   const btnZoomIn  = document.getElementById('btn-zoom-in');
   const btnZoomOut = document.getElementById('btn-zoom-out');
@@ -3224,12 +3204,9 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
 
     const areaRect = canvasArea.getBoundingClientRect();
     const aW = Math.max(areaRect.width, 100);
-    const aH = Math.max(areaRect.height, 100);
     const vp0 = page.getViewport({ scale: 1 });
 
-    const scale = fitMode === 'width'
-      ? aW / vp0.width
-      : Math.min(aW / vp0.width, aH / vp0.height);
+    const scale = aW / vp0.width;   // the page always fills the width
 
     const dpr = window.devicePixelRatio || 1;
     const vp  = page.getViewport({ scale });
@@ -3274,9 +3251,9 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
     emitState();
   }
 
-  // ── Fit mode ─────────────────────────────────────────────────────────────────
+  // ── Back to the width (key 0) ────────────────────────────────────────────────
 
-  function setFitMode() {
+  function fitView() {
     if (pdfDoc) { resetTransform(); renderPage(currentPage); }
     updateToolbar();
   }
@@ -3416,46 +3393,7 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
       if (base) url = base + '/api/zip-asset/' + url.replace(/^\//, '');
     }
 
-    // Keep the resolved URL and a sensible filename for the download button —
-    // the viewer is reading a real file, and being able to take it away is
-    // most of the point of putting a textbook on a slide.
-    sourceUrl  = url;
-    sourceName = String(cfg.pdf || 'document.pdf').split(/[\\/]/).pop() || 'document.pdf';
-    if (!/\.pdf$/i.test(sourceName)) sourceName += '.pdf';
-    if (btnDownload) btnDownload.disabled = !url;
-
     if (url && url !== lastUrl) { lastUrl = url; loadPDF(url); }
-  }
-
-  // ── Download ──────────────────────────────────────────────────────────────────
-  // Fetched rather than linked: the file is served from the session's
-  // zip-asset route, and a plain <a href> to it would open the browser's PDF
-  // viewer in place of saving. Blob in hand, `download` does what it says.
-  async function downloadSource() {
-    if (!sourceUrl) return;
-    const label = document.getElementById('btn-download-label');
-    const was = label.textContent;
-    try {
-      btnDownload.disabled = true;
-      label.textContent = 'Saving…';
-      const resp = await fetch(sourceUrl);
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      const blob = await resp.blob();
-      const href = URL.createObjectURL(blob);
-      const a = Object.assign(document.createElement('a'), { href, download: wFile(sourceName.replace(/\.pdf$/i, ''), '.pdf') });
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(href), 1000);
-    } catch (e) {
-      console.warn('PDF download failed:', e);
-      label.textContent = 'Failed';
-      setTimeout(() => { label.textContent = was; }, 1600);
-      return;
-    } finally {
-      btnDownload.disabled = false;
-    }
-    label.textContent = was;
   }
 
   // ── Event handlers ────────────────────────────────────────────────────────────
@@ -3476,7 +3414,6 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
   // Restore display value if user abandons edit
   pageInput.addEventListener('blur', () => updateToolbar());
 
-  if (btnDownload) btnDownload.addEventListener('click', downloadSource);
 
   // Zoom about the centre of the stage, so the slide does not wander.
   function nudgeZoom(factor) {
@@ -3552,7 +3489,7 @@ import * as pdfjsLib from '/static/vendor/pdfjs/pdf.min.mjs';
     } else if (e.key === '-' || e.key === '_') {
       e.preventDefault(); nudgeZoom(1 / 1.25);
     } else if (e.key === '0') {
-      e.preventDefault(); setFitMode(fitMode);
+      e.preventDefault(); fitView();
     }
   });
 

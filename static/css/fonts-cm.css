@@ -12,12 +12,12 @@
 
 /* ── Where the app's own UI is in the slides' face ──────────────────
    Most of the app's chrome keeps the system face, but these speak in
-   the slides' voice: the slide navigator's Record / Edit / Close (and
-   the recording bar that takes Record's place), and everything in the
-   edit panel, its dropdown menus included. Dialogs and the tour set it
-   themselves (modal.css, tour.css). Redefining the face tokens here
+   the slides' voice: the slide navigator's Record / Edit / Close, and
+   everything in the edit panel, its dropdown menus included. Dialogs set
+   it themselves (modal.css); the tour, welcome page and splash below.
+   Redefining the face tokens here
    leaves monospace fields alone. */
-.slide-nav-tools, #recorder-bar, #editor-panel, .editor-dd-menu {
+.slide-nav-tools, #editor-panel, .editor-dd-menu {
     --font-sans:  'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', system-ui, sans-serif;
     --font-serif: var(--font-sans);
     font-family: var(--font-sans);
@@ -25,8 +25,8 @@
 /* One weight there. Computer Modern's bold is a wide, heavy cut that reads
    as a different typeface beside the regular, so these areas don't use it:
    emphasis comes from ink colour and size instead. */
-:is(.slide-nav-tools, #recorder-bar, #editor-panel, .editor-dd-menu),
-:is(.slide-nav-tools, #recorder-bar, #editor-panel, .editor-dd-menu) * {
+:is(.slide-nav-tools, #editor-panel, .editor-dd-menu),
+:is(.slide-nav-tools, #editor-panel, .editor-dd-menu) * {
     font-weight: 400 !important;
 }
 

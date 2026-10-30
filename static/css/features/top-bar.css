@@ -33,7 +33,6 @@ body.split-view-active #top-right-controls {
 body.focus-mode #slide-navigator,
 body.focus-mode #floating-annotation-toolbar,
 body.focus-mode #edit-mode-container,
-body.focus-mode #mute-container,
 body.focus-mode #top-right-controls {
     display: none !important;
 }
@@ -60,27 +59,4 @@ body.focus-mode #main-content {
     }
 }
 
-/* ── Record, Mute — bottom-right corner ─────────────────────────── */
-#mute-container {
-    position: fixed;
-    right: var(--sp-3);
-    bottom: var(--sp-3);
-    z-index: 230;
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-}
-#mute-container .btn {
-    width: var(--hit-min);
-    min-width: var(--hit-min);
-    min-height: var(--hit-min);
-    padding: 0;
-}
-body.edit-mode #mute-container { display: none; }
-/* Split view: the right pane's slide reaches the bottom-right corner, so
-   these move to the top-left, in the strip above the slides, level with
-   the session buttons on the right. */
-body.split-view-active #mute-container { top: var(--sp-2); bottom: auto; left: var(--sp-3); right: auto; }
-@media (max-width: 1024px) {
-    #mute-container { bottom: calc(100px + var(--sp-3)); right: var(--sp-2); }
 }
