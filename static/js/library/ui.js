@@ -59,7 +59,7 @@ const showError = (title, err) => window.BeamerModal?.show({ kind: 'error', titl
 const loading = (title, message = '') => window.BeamerModal?.show({ kind: 'loading', title, message });
 function setLoading(message) {
     const el = window.BeamerModal?.open?.querySelector('.custom-modal-message');
-    if (el) el.textContent = message;
+    if (el) el.textContent = String(message || '').replace(/\s*(…|\.\.\.)\s*$/, '');
 }
 
 /** What recordings of this presentation are matched by (its title). */

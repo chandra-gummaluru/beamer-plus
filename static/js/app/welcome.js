@@ -29,7 +29,7 @@ async function start({ demo = false } = {}) {
         if (!got) return;                                 // cancelled
         await Folder.stashOpen(got);
     }
-    setStatus(demo ? 'Setting up the demo…' : 'Opening…');
+    setStatus(demo ? 'Setting up the demo' : 'Opening');
     setBusy(true);
     try {
         const data = await createSession();

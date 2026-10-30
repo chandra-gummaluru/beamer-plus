@@ -1,5 +1,8 @@
 // Modal manager — paper card with backdrop blur.
 // Public API: BeamerModal.show({ kind, title, message, buttons, body })
+// A loading message's trailing "…" / "...", dropped (the animation says it).
+export const noEllipsis = (t) => String(t || '').replace(/\s*(…|\.\.\.)\s*$/, '');
+
 const Modal = {
     open: null,
     show({ kind = 'info', title = '', message = '', body = null, buttons = [{ label: 'OK', kind: 'ok' }], canClose = null, onClose = null } = {}) {
@@ -21,8 +24,9 @@ const Modal = {
                 <h3 class="custom-modal-title"></h3>
                 <p class="custom-modal-message"></p>
             `;
-            content.querySelector('.custom-modal-title').textContent = title || 'Loading…';
-            content.querySelector('.custom-modal-message').textContent = message;
+            // The squiggle already says "still going": no trailing "…".
+            content.querySelector('.custom-modal-title').textContent = noEllipsis(title) || 'Loading';
+            content.querySelector('.custom-modal-message').textContent = noEllipsis(message);
         } else {
             const icon = { error: '✕', success: '✓', warning: '!' }[kind] || '';
             content.innerHTML = `

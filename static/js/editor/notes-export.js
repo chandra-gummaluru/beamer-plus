@@ -55,7 +55,7 @@ function loadPdfLib() {
 function showProgress(message) {
     const modal = window.BeamerModal;
     const msgEl = modal?.open?.querySelector('.custom-modal-message');
-    if (modal?.open?.classList.contains('modal-loading') && msgEl) { msgEl.textContent = message; return; }
+    if (modal?.open?.classList.contains('modal-loading') && msgEl) { msgEl.textContent = String(message || '').replace(/\s*(…|\.\.\.)\s*$/, ''); return; }
     modal?.show({ kind: 'loading', title: 'Building Notes…', message });
 }
 
