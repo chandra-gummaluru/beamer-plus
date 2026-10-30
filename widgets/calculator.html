@@ -2899,7 +2899,7 @@ body.bw-overlay .cbtn { font-size: clamp(12px, min(5.4cqw, 6cqh), 30px); }
 #expr-tex {
   font-size: clamp(15px, min(4.4cqw, 9cqh), 42px);
   line-height: 1.35;
-  min-height: 1.35em;
+  height: 1.35em;   /* the input's line, exactly: typesetting never moves it */
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;
@@ -2913,7 +2913,10 @@ body.bw-overlay .cbtn { font-size: clamp(12px, min(5.4cqw, 6cqh), 30px); }
 #expr-tex .tx-caret { display: inline-block; width: 2px; height: 1em; margin-left: 2px; vertical-align: -0.1em; background: var(--sn-ink); animation: tx-blink 1s steps(1) infinite; }
 @keyframes tx-blink { 50% { opacity: 0; } }
 #expr-tex .tx-raw { font-family: var(--font-mono); }
-#result .katex, .hist-result .katex { font-size: 1.05em; }
+/* KaTeX sets itself 1.21em by default; at 1em its Computer Modern is the
+   same size as the typewriter text it replaces, so nothing grows or shifts
+   when a line is typeset. */
+#expr-tex .katex, #result .katex, .hist-result .katex { font-size: 1em; }
 .hist-expr .katex { font-size: 1.05em; color: var(--sn-cap); }
 .cbtn .katex { font-size: 1.1em; }
 /* Every key in the typewriter face. */
