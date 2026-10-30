@@ -62,8 +62,7 @@
 
     /* ---------- Type ---------- */
     /* Same stacks as Lectern (static/css/shell.css there), so the two apps match. */
-    /* Every button and control is in the slides' LaTeX face (fonts-cm.css). */
-    --font-sans: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     --font-serif: "EB Garamond", Garamond, Georgia, serif;
     --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 

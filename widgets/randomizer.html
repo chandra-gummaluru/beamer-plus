@@ -405,9 +405,9 @@
   /* Type */
   /* Computer Modern, as on the slides (see "Slide-native look" below). */
   --font-ui:   'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', 'DM Sans', system-ui, -apple-system, sans-serif;
-  /* Chrome — the bar's buttons, the settings sheet — is in the same LaTeX
-     face as the slide, like every button in Beamer+. */
-  --font-chrome: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', 'DM Sans', system-ui, -apple-system, sans-serif;
+  /* Chrome — the bar's buttons, the settings sheet — keeps the app's UI
+     face: it is furniture, not part of the slide. */
+  --font-chrome: 'DM Sans', system-ui, -apple-system, sans-serif;
   --font-chrome-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
   --font-mono: 'BW CM Typewriter', 'CMU Typewriter Text', 'Latin Modern Mono', 'JetBrains Mono', ui-monospace, monospace;
 
@@ -4123,7 +4123,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       const s = String(text);
       const fs = s.length <= 2 ? 150 : s.length === 3 ? 112 : Math.max(46, 340 / s.length);
       ctx.fillStyle = '#18181b';
-      ctx.font = `700 ${fs}px "BW CM Sans", "DM Sans", "Segoe UI", system-ui, sans-serif`;
+      ctx.font = `800 ${fs}px "DM Sans", "Segoe UI", system-ui, sans-serif`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(s, cx, 262);
       if (s === '6' || s === '9') ctx.fillRect(cx - 28, 262 + fs * 0.42, 56, 9);
@@ -4872,7 +4872,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
         const flip = mid > Math.PI;
         let label = s.label.length > 16 ? s.label.slice(0, 15) + '…' : s.label;
         let fs = Math.min(150, R * span * 0.42, 1300 / Math.max(3, label.length + 1));
-        ctx.font = `700 ${fs}px "BW CM Sans", "DM Sans", "Segoe UI", system-ui, sans-serif`;
+        ctx.font = `800 ${fs}px "DM Sans", "Segoe UI", system-ui, sans-serif`;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillStyle = '#ffffff';
         ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 3;
@@ -5443,7 +5443,7 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
       });
     } else {
       const s = String(text), fs = s.length > 1 ? 118 : 150;
-      ctx.font = `700 ${fs}px "BW CM Sans", "DM Sans", "Segoe UI", system-ui, sans-serif`;
+      ctx.font = `700 ${fs}px "DM Sans", "Segoe UI", system-ui, sans-serif`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillStyle = ink; ctx.fillText(s, 128, 136);
       if ((text === 6 || text === 9) && sides >= 8) { ctx.fillRect(128 - 30, 136 + fs * 0.42, 60, 10); }
