@@ -2767,6 +2767,35 @@ body.bw-overlay .cbtn { font-size: clamp(12px, min(5.4cqw, 6cqh), 30px); }
 /* A narrow slide region keeps the keypad and drops the rest. */
 @media (max-width: 620px) { #history-panel, .split-handle { display: none; } }
 @media (max-width: 460px) { .bw-toolbar-title, .bw-toolbar-title + .bw-sep { display: none !important; } }
+
+/* ── Typeset ─────────────────────────────────────────── */
+/* The expression is set in LaTeX (KaTeX) as it's typed: the text field sits
+   on top, transparent, and takes the typing and the caret; the typeset line
+   under it is what the room reads. Unfinished brackets are closed for the
+   typesetting only. */
+#expr-line { position: relative; }
+#expr-tex {
+  font-size: clamp(15px, min(4.4cqw, 9cqh), 42px);
+  line-height: 1.35;
+  min-height: 1.35em;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  pointer-events: none;
+}
+#expr-tex:empty { display: none; }
+#expr-tex:not(:empty) + #expr-input {
+  position: absolute; inset: 0;
+  color: transparent; caret-color: transparent;
+}
+#expr-tex .tx-caret { display: inline-block; width: 2px; height: 1em; margin-left: 2px; vertical-align: -0.1em; background: var(--sn-ink); animation: tx-blink 1s steps(1) infinite; }
+@keyframes tx-blink { 50% { opacity: 0; } }
+#expr-tex .tx-raw { font-family: var(--font-mono); }
+#result .katex, .hist-result .katex { font-size: 1.05em; }
+.hist-expr .katex { font-size: 1.05em; color: var(--sn-cap); }
+.cbtn .katex { font-size: 1.1em; }
+/* No history button: the history panel is always there (not as an overlay). */
+#btn-history { display: none !important; }
 </style>
 </head>
 <body>
@@ -2775,8 +2804,7 @@ body.bw-overlay .cbtn { font-size: clamp(12px, min(5.4cqw, 6cqh), 30px); }
   <div id="toolbar" class="bw-toolbar" data-bw-topbar>
     <span class="bw-toolbar-title">Calculator</span>
     <div class="bw-sep"></div>
-    <button class="bw-btn" id="btn-history" aria-pressed="true" title="Show or hide the history">History</button>
-    <button class="bw-btn" id="btn-clear-hist" title="Empty the history">Clear history</button>
+    <button class="bw-btn" id="btn-history" hidden></button>
     <div class="bw-spacer"></div>
     <span class="bw-status" id="viewer-badge">view only</span>
   </div>
@@ -2785,8 +2813,11 @@ body.bw-overlay .cbtn { font-size: clamp(12px, min(5.4cqw, 6cqh), 30px); }
 
     <div id="calc-panel">
       <div id="display">
-        <input id="expr-input" type="text" spellcheck="false"
-               autocomplete="off" autocorrect="off" placeholder="Type or tap an expression" />
+        <div id="expr-line">
+          <div id="expr-tex" aria-hidden="true"></div>
+          <input id="expr-input" type="text" spellcheck="false"
+                 autocomplete="off" autocorrect="off" placeholder="Type or tap an expression" />
+        </div>
         <div id="display-sep"></div>
         <div id="result"></div>
       </div>
@@ -2832,6 +2863,7 @@ body.bw-overlay .cbtn { font-size: clamp(12px, min(5.4cqw, 6cqh), 30px); }
         <button class="cbtn back" id="btn-back">⌫</button>
 
         <!-- 0 sits under 2, like any keypad -->
+        <button class="cbtn fn" id="btn-clear-hist" title="Clear the history" aria-label="Clear the history"><svg viewBox="0 0 24 24" width="1.1em" height="1.1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
         <button class="cbtn" data-insert="0" style="grid-column: 2">0</button>
         <button class="cbtn" data-insert=".">.</button>
         <button class="cbtn primary" id="btn-eq" style="grid-column: span 2">=</button>
@@ -2850,6 +2882,27 @@ body.bw-overlay .cbtn { font-size: clamp(12px, min(5.4cqw, 6cqh), 30px); }
 </div>
 
 <script src="/static/vendor/socket.io.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
+<!-- KaTeX typesets the expression, the keys and the history: Beamer+'s own
+     copy first, the CDN when opened alone. -->
+<script>
+(function () {
+  var CDN = 'https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/';
+  var l = document.createElement('link');
+  l.rel = 'stylesheet'; l.href = '/static/vendor/katex/katex.min.css';
+  l.onerror = function () { l.onerror = null; l.href = CDN + 'katex.min.css'; };
+  document.head.appendChild(l);
+  var done = function () { window.dispatchEvent(new Event('calc-katex')); };
+  var s = document.createElement('script');
+  s.src = '/static/vendor/katex/katex.min.js'; s.async = false; s.onload = done;
+  s.onerror = function () {
+    var t = document.createElement('script');
+    t.src = CDN + 'katex.min.js'; t.async = false; t.onload = done;
+    document.head.appendChild(t);
+  };
+  document.head.appendChild(s);
+})();
+</script>
 
 <script>
 // ── Split handle — drag to resize the history panel ───────────────────────────
@@ -2939,7 +2992,7 @@ body.bw-overlay .cbtn { font-size: clamp(12px, min(5.4cqw, 6cqh), 30px); }
         type: 'state',
         payload: {
           expression: exprEl.value,
-          result:     resultEl.textContent,
+          result:     resultEl.dataset.raw || '',
           resultOk:   resultEl.classList.contains('ok'),
           history,
         }
@@ -3004,9 +3057,72 @@ body.bw-overlay .cbtn { font-size: clamp(12px, min(5.4cqw, 6cqh), 30px); }
   }
 
   function showResult(value, isErr) {
-    resultEl.textContent = value;
+    const tex = !isErr && value ? texHtml(value) : null;
+    resultEl.dataset.raw = value || '';
+    if (tex) resultEl.innerHTML = tex; else resultEl.textContent = value;
     resultEl.className   = !value ? '' : isErr ? 'err' : 'ok';
+    renderExprTex();
   }
+
+  // ── LaTeX ────────────────────────────────────────────────────────────────────
+  // The calculator's notation (×, ÷, √, π, ln for the natural log, log for
+  // base 10, %) handed to math.js, whose toTex() KaTeX then sets.
+  function toTex(raw) {
+    let src = String(raw || '').trim();
+    if (!src || !window.math) return null;
+    const open = (src.match(/\(/g) || []).length - (src.match(/\)/g) || []).length;
+    if (open > 0) src += ')'.repeat(open);
+    src = src.replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-')
+      .replace(/√/g, 'sqrt').replace(/π/g, 'pi')
+      .replace(/\blog\(/g, 'log10(').replace(/\bln\(/g, 'log(')
+      .replace(/%/g, '*PCTSIGN');
+    try {
+      return math.parse(src).toTex({ parenthesis: 'auto', implicit: 'hide' })
+        .replace(/\\log_\{10\}/g, '\\log')
+        .replace(/\\cdot\s*PCTSIGN/g, '\\%')
+        .replace(/\\cdot/g, '\\times')
+        .replace(/~/g, '\\,');
+    } catch (_) { return null; }
+  }
+  function texHtml(raw, before) {
+    const tex = toTex(raw);
+    if (tex == null || !window.katex) return null;
+    try { return katex.renderToString((before ? '=\\ ' : '') + tex, { throwOnError: false }); }
+    catch (_) { return null; }
+  }
+  const exprTexEl = document.getElementById('expr-tex');
+  function renderExprTex() {
+    const v = exprEl.value;
+    if (!v.trim() || !window.katex) { exprTexEl.innerHTML = ''; return; }
+    const html = texHtml(v);
+    exprTexEl.innerHTML = (html || `<span class="tx-raw">${escHtml(v)}</span>`)
+      + (document.activeElement === exprEl ? '<span class="tx-caret"></span>' : '');
+  }
+  exprEl.addEventListener('input', renderExprTex);
+  exprEl.addEventListener('focus', renderExprTex);
+  exprEl.addEventListener('blur', renderExprTex);
+
+  // The keys' labels, typeset.
+  const KEY_TEX = { 'sin(': '\\sin', 'cos(': '\\cos', 'tan(': '\\tan', 'ln(': '\\ln', 'log(': '\\log',
+                    'exp(': '\\exp', '√(': '\\sqrt{\\square}', '^': 'x^{y}', 'π': '\\pi', 'e': 'e',
+                    '×': '\\times', '÷': '\\div', '+': '+', '−': '-', '%': '\\%' };
+  function typesetKeys() {
+    if (!window.katex) return;
+    document.querySelectorAll('.cbtn[data-insert]').forEach(b => {
+      const t = KEY_TEX[b.dataset.insert];
+      if (t) b.innerHTML = katex.renderToString(t, { throwOnError: false });
+    });
+    const fr = document.getElementById('btn-frac');
+    if (fr) fr.innerHTML = katex.renderToString('\\tfrac{a}{b}', { throwOnError: false });
+  }
+  function typesetAll() {
+    typesetKeys();
+    renderExprTex();
+    if (resultEl.classList.contains('ok')) showResult(resultEl.dataset.raw || '', false);
+    renderHistory();
+  }
+  if (window.katex) setTimeout(typesetAll, 0);
+  window.addEventListener('calc-katex', typesetAll);
 
   // ── UI actions ───────────────────────────────────────────────────────────────
   function insert(text) {
@@ -3077,8 +3193,8 @@ body.bw-overlay .cbtn { font-size: clamp(12px, min(5.4cqw, 6cqh), 30px); }
     }
     list.innerHTML = history.map(h => `
       <div class="hist-item" data-id="${h.id}">
-        <div class="hist-expr">${escHtml(h.expr)}</div>
-        <div class="hist-result">= ${escHtml(h.result)}</div>
+        <div class="hist-expr">${texHtml(h.expr) || escHtml(h.expr)}</div>
+        <div class="hist-result">${texHtml(h.result, '= ') || '= ' + escHtml(h.result)}</div>
       </div>
     `).join('');
 
@@ -3126,12 +3242,8 @@ body.bw-overlay .cbtn { font-size: clamp(12px, min(5.4cqw, 6cqh), 30px); }
   // History on the slide or not: some lectures want the running record, some
   // want the keypad as wide as the region allows.
   const histBtn = document.getElementById('btn-history');
-  histBtn.addEventListener('click', () => {
-    const off = document.body.classList.toggle('no-history');
-    histBtn.setAttribute('aria-pressed', String(!off));
-    histBtn.classList.toggle('is-active', !off);
-  });
-  histBtn.classList.add('is-active');
+  // The history is always on the slide (no button to hide it).
+  document.body.classList.remove('no-history');
   document.getElementById('history-clear').addEventListener('click', clearHistory);
 
   exprEl.addEventListener('input', onInput);
@@ -3168,7 +3280,7 @@ body.bw-overlay .cbtn { font-size: clamp(12px, min(5.4cqw, 6cqh), 30px); }
     // Beamer+ state persistence protocol
     if (e.data?.type === 'widget-get-state') {
       window.parent.postMessage({ type: 'widget-state', widgetId: WIDGET_ID,
-        state: { expression: exprEl.value, result: resultEl.textContent,
+        state: { expression: exprEl.value, result: resultEl.dataset.raw || '',
                  resultOk: resultEl.classList.contains('ok'), history, lastAnswer } }, '*');
     }
     if (e.data?.type === 'widget-set-state' && e.data.state) {
