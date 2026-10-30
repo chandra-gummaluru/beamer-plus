@@ -16,6 +16,8 @@ function render(slides, state) {
         const item = document.createElement('div');
         item.className = 'slide-nav-item';
         item.dataset.index = String(i);
+        // A split widget slide's halves are part of it, not slides to show.
+        if (s.splitHalf) item.classList.add('is-owned');
 
         // ── View slides ────────────────────────────────────────────
         // The number shown under the card (see .slide-nav-item::after).

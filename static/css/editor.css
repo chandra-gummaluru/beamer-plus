@@ -640,6 +640,8 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 
 #editor-panel[data-mode="widget"] #editor-widget { display: flex; }
 #editor-panel[data-mode="widget"] .editor-props-back { display: flex; }
+/* A split widget slide is its widget: no slide panel to go back to. */
+#editor-panel.is-split-slide .editor-props-back { display: none !important; }
 #editor-widget { display: none; flex-direction: column; gap: var(--sp-4); }
 #editor-widget-body { display: flex; flex-direction: column; gap: var(--sp-4); }
 

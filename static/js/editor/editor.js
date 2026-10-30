@@ -17,7 +17,7 @@ import { splitHalves } from '../slides/split-widgets.js';
 import { renderEditOverlays, cleanupEditOverlays, deselectOverlay, pickMediaFile, onMediaFileSelected, addReveal, repositionEditOverlays } from './overlays.js';
 import { updatePropertiesPanel, refreshSlideItems, selectedItemKind, deleteSelectedItem } from './properties.js';
 import { addWidget } from './widget-picker.js';
-import { showViewConfig, hideViewConfig } from './view-config.js';
+import { showViewConfig, hideViewConfig, chooseSplitWidget } from './view-config.js';
 import { applySlideReorder, removeSlideReorder } from './reorder.js';
 import { initWidgetSettings } from './widget-settings.js';
 import { initWidgetSettingsDialog, closeWidgetSettings } from './widget-settings-dialog.js';
@@ -178,6 +178,8 @@ export function initEditor(state) {
         updateSlideSettingsPanel();
         _updateAddMediaButtons();
     });
+
+    document.getElementById('add-split-widget-btn')?.addEventListener('click', () => chooseSplitWidget());
 
     // A new split view: click its two slides, then it's made and shown.
     bus.on('view:insert-pick', () => {
@@ -402,5 +404,6 @@ function _updateAddMediaButtons() {
                       'edit-add-reveal-btn', 'edit-add-page-btn', 'edit-duplicate-btn', 'bookmark-btn']) set(id, split);
     // A split view pairs two real slides — none to pair until there are two.
     set('add-view-btn', split || realSlideCount(s?.slideStructure) < 2);
+    set('add-split-widget-btn', split);
     updatePanelFooter();
 }

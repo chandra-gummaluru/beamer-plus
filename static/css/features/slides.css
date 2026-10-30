@@ -715,6 +715,9 @@ body.split-view-active .slide-nav-item.is-right-slide {
 }
 /* ── Hidden slide indicator ─────────────────────────────────── */
 .slide-nav-item.is-hidden-slide:not(.active) { opacity: 0.38; }
+/* A split widget slide's own halves: kept in the list (indices line up)
+   but never shown. */
+.slide-nav-item.is-owned { display: none !important; }
 /* A split widget's halves are shown only in their split view: not
    clickable while presenting (still editable in edit mode). */
 body:not(.edit-mode) .slide-nav-item.is-split-half { pointer-events: none; }

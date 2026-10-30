@@ -1465,7 +1465,9 @@ function populateSlideNavigator() {
             kind:     obj.type,
             label:    labels[i],
             title:    obj.type === 'blank' ? labels[i] : `Slide ${labels[i]}`,
-            customTitle: typeof obj.title === 'string' ? obj.title : '',
+            // A split widget slide shows its widget's name on its card.
+            customTitle: typeof obj.title === 'string' ? obj.title : (obj.widgetLabel || ''),
+            splitHalf: !!obj.splitHalf,
             paper:    obj.type === 'blank' ? (obj.paper || null) : null,
             thumbUrl: obj.type === 'pdf'   ? (state.slideThumbnailCache[obj.pdfIndex] ?? null) : null,
         };

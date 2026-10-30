@@ -7,6 +7,7 @@ import { getSlideLabels } from '../slides/structure.js';
 import { ctx, escAttr, escHtml, setPanelMode, resolvePanelMode, setTitleEditable, setPanelTitle, slideName } from './context.js';
 import { pickPanes } from './pane-picker.js';
 import { splitWidgetsOf, queueSync, loadSplitConfig } from '../slides/split-widgets.js';
+import { removeSplitWidgetSlide, insertSplitWidgetSlide } from '../slides/structure.js';
 import { widgetCatalog, widgetIcon } from './widget-picker.js';
 import { getWidgetSchema } from './widget-schema.js';
 import { buildWidgetForm } from './widget-fields.js';
@@ -17,6 +18,11 @@ export function showViewConfig(i) {
     if (!obj || obj.type !== 'view') return;
     ctx.selectedViewIdx = i;
     ctx.selectedSplit = null;
+    document.getElementById('editor-panel')?.classList.remove('is-split-slide');
+
+    // A split widget slide is its widget: selecting it opens the widget's
+    // panel straight away, with no split view settings behind it.
+    if (obj.widgetLabel) { openSplitWidgetSlide(i, obj); return; }
 
     const body = document.getElementById('editor-view-body');
     if (!body) return;
@@ -33,6 +39,7 @@ export function showViewConfig(i) {
 export function hideViewConfig() {
     ctx.selectedViewIdx = null;
     ctx.selectedSplit = null;
+    document.getElementById('editor-panel')?.classList.remove('is-split-slide');
     // Hand the panel back to whatever is still selected — normally the slide.
     setPanelMode(resolvePanelMode());
 }
@@ -48,20 +55,9 @@ const RATIO_PRESETS = [
     { v: 67, l: '2 : 1' },
 ];
 
-function buildViewConfigHTML(obj, viewIdx) {
-    const ratio = obj.ratio !== undefined ? obj.ratio : 50;
-
+// The split picker's markup (wireSplitPicker): the panes to scale, presets.
+function ratioHTML(ratio) {
     return `
-        <section class="wf-group" aria-label="Slides">
-            <div class="slide-items" role="list">
-                ${paneRow('left', obj.left)}
-                ${paneRow('right', obj.right)}
-            </div>
-            <button type="button" class="btn btn--sm editor-secondary-btn" id="view-pick">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="7" height="14" rx="1"/><rect x="14" y="5" width="7" height="14" rx="1"/></svg>
-                <span>Choose Slides</span>
-            </button>
-        </section>
         <div class="editor-prop-row" aria-label="Split">
             <!-- The two panes, drawn to scale: drag the line between them, or
                  pick a preset below. The divider on the slide itself can be
@@ -79,7 +75,24 @@ function buildViewConfigHTML(obj, viewIdx) {
                     <span>${p.l}</span>
                 </button>`).join('')}
             </div>
-        </div>
+        </div>`;
+}
+
+function buildViewConfigHTML(obj, viewIdx) {
+    const ratio = obj.ratio !== undefined ? obj.ratio : 50;
+
+    return `
+        <section class="wf-group" aria-label="Slides">
+            <div class="slide-items" role="list">
+                ${paneRow('left', obj.left)}
+                ${paneRow('right', obj.right)}
+            </div>
+            <button type="button" class="btn btn--sm editor-secondary-btn" id="view-pick">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="7" height="14" rx="1"/><rect x="14" y="5" width="7" height="14" rx="1"/></svg>
+                <span>Choose Slides</span>
+            </button>
+        </section>
+        ${ratioHTML(ratio)}
         <!-- One widget across both slides (slides/split-widgets.js): filled
              in once the view's config is read. -->
         <section class="wf-group" id="view-split-widget" aria-label="Split widget"></section>
@@ -238,11 +251,48 @@ let _fillToken = 0;
 // Clicked in the view's panel, a split widget opens the widget panel, as a
 // widget on a slide does: Name in the header, Text size, Delete in the
 // footer, and back to the view. Its own settings are edited on the widget.
-async function openSplitWidgetPanel(i, obj, w, label) {
+async function openSplitWidgetSlide(i, obj) {
+    await loadSplitConfig(obj.viewId);
+    if (ctx.selectedViewIdx !== i) return;
+    const w = splitWidgetsOf(obj)[0];
+    if (!w) return;
+    document.getElementById('editor-panel')?.classList.add('is-split-slide');
+    openSplitWidgetPanel(i, obj, w, obj.widgetLabel, {
+        kind: 'Slide',
+        remove: () => {
+            hideViewConfig();
+            if (ctx.state.splitView) document.getElementById('split-toggle')?.click();
+            removeSplitWidgetSlide(i);
+            bus.emit('nav:refresh');
+            if (ctx.state.slideStructure.length) bus.emit('slide:goto', Math.min(i, ctx.state.slideStructure.length - 1));
+        },
+        back: () => {},
+        ratio: true,
+    });
+}
+
+/** The Split Widget button: choose a widget, get a slide of it. */
+export async function chooseSplitWidget() {
+    const catalog = (await widgetCatalog()).filter(w => w.split);
+    if (!catalog.length) return;
+    const add = c => insertSplitWidgetSlide({ type: c.type, split: c.split, label: c.label });
+    if (catalog.length === 1) { add(catalog[0]); return; }
+    window.BeamerModal?.show({
+        title: 'Insert Split Widget',
+        message: 'One widget across a split: a slide of its own, half on the left, half on the right.',
+        buttons: [
+            { label: 'Cancel', kind: 'cancel' },
+            ...catalog.map(c => ({ label: c.label, kind: 'ok', onClick: () => add(c) })),
+        ],
+    });
+}
+
+async function openSplitWidgetPanel(i, obj, w, label, opts = {}) {
     ctx.selectedSplit = {
         item: w,
-        remove: () => { removeSplitWidget(obj, w); showViewConfig(i); },
-        back: () => showViewConfig(i),
+        kind: opts.kind || 'Widget',
+        remove: opts.remove || (() => { removeSplitWidget(obj, w); showViewConfig(i); }),
+        back: opts.back || (() => showViewConfig(i)),
     };
     setPanelMode('widget', w.title || label, `${slideName(i)} · ${label}`);
     setTitleEditable(w, {
@@ -260,12 +310,26 @@ async function openSplitWidgetPanel(i, obj, w, label) {
     const schema = await getWidgetSchema(w);
     if (ctx.selectedSplit !== sel) return;
     const scale = (schema?.fields || []).filter(f => f.key === 'scale');
-    if (!scale.length) return;
-    const form = buildWidgetForm({ ...schema, fields: scale }, w, 'panel');
-    host.appendChild(form.node);
-    const apply = () => { form.apply(w); pushWidgetConfig(w.id, w); };
-    form.node.addEventListener('input', apply);
-    form.node.addEventListener('change', apply);
+    if (scale.length) {
+        const form = buildWidgetForm({ ...schema, fields: scale }, w, 'panel');
+        host.appendChild(form.node);
+        const apply = () => { form.apply(w); pushWidgetConfig(w.id, w); };
+        form.node.addEventListener('input', apply);
+        form.node.addEventListener('change', apply);
+    }
+    // A split widget slide sets its split here too: there is no split view
+    // panel behind it.
+    if (opts.ratio) {
+        const sec = document.createElement('section');
+        sec.className = 'wf-group';
+        sec.innerHTML = `<div class="wf-group-title">Split</div>${ratioHTML(obj.ratio ?? 50)}`;
+        host.appendChild(sec);
+        const box = sec.querySelector('#view-split');
+        wireSplitPicker(box, obj, () => {
+            obj.ratio = parseInt(box.dataset.ratio, 10) || 50;
+            if (ctx.state?.splitView && ctx.state.currentViewIndex === i) bus.emit('view:ratio-commit', obj.ratio);
+        });
+    }
 }
 
 async function fillSplitWidgetSection(i, obj) {
@@ -280,21 +344,9 @@ async function fillSplitWidgetSection(i, obj) {
 
     const w = splitWidgetsOf(obj)[0] || null;
     const title = '<div class="wf-group-title">Split Widget</div>';
-    if (!w) {
-        host.innerHTML = `${title}
-            <p class="slide-items-empty">One widget across both slides: half on the left slide, half on the right. It works while the split is on screen; each slide alone shows its half as it was left.</p>
-            <div class="view-split-add" role="list">
-                ${catalog.map(c => `
-                <button type="button" class="btn btn--sm editor-secondary-btn" data-add-split="${escAttr(c.type)}">
-                    <span class="view-split-add-icon">${widgetIcon(c.type)}</span>
-                    <span>Add ${escHtml(c.label)}</span>
-                </button>`).join('') || '<p class="slide-items-empty">No widget can be split yet.</p>'}
-            </div>`;
-        host.querySelectorAll('[data-add-split]').forEach(b =>
-            b.addEventListener('click', () => addSplitWidget(i, obj, b.dataset.addSplit,
-                catalog.find(c => c.type === b.dataset.addSplit)?.split)));
-        return;
-    }
+    // Split widgets are added as slides of their own (the Split Widget
+    // button); an older deck's view may still carry one, shown below.
+    if (!w) { host.innerHTML = ''; return; }
 
     const entry = catalog.find(c => c.type === w.type);
     const label = w.title || entry?.label || w.type;
@@ -333,29 +385,6 @@ async function fillSplitWidgetSection(i, obj) {
         removeSplitWidget(obj, w);
         fillSplitWidgetSection(i, obj);
     });
-}
-
-function addSplitWidget(i, obj, type, spec) {
-    const s = ctx.state;
-    const key = obj.viewId;
-    if (!s.slideConfigs[key]) s.slideConfigs[key] = {};
-    const cfg = s.slideConfigs[key];
-    if (!Array.isArray(cfg.widgets)) cfg.widgets = [];
-    // One per split view: it fills both slides.
-    if (cfg.widgets.some(w => w?.split)) return;
-    cfg.widgets.push({
-        id: `widget_${Date.now()}`,
-        type,
-        src: '',
-        builtin: true,
-        x: 0, y: 0, width: 1, height: 1,
-        zIndex: 10,
-        split: { left: spec?.left?.[0] || 'editor', right: spec?.right?.[0] || 'shell' },
-    });
-    queueSync();
-    fillSplitWidgetSection(i, obj);
-    // Show the pair on stage, if it isn't already.
-    if (!(s.splitView && s.currentViewIndex === i)) bus.emit('slide:goto', i);
 }
 
 function removeSplitWidget(obj, w) {

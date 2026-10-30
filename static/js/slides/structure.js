@@ -33,6 +33,9 @@ export function getSlideLabels(structure) {
     let pdfCount = 0;
     let blankCount = 0;
     for (const obj of structure) {
+        // A split widget slide's two halves are its own, never shown in the
+        // navigator: no label of their own, and they don't use up a letter.
+        if (obj.splitHalf) { labels.push(''); continue; }
         // A duplicated PDF page (it carries its own cfgId) is labelled like a
         // blank — "7a" — so copying a slide doesn't renumber the rest of the deck.
         if (obj.type !== 'blank' && obj.type !== 'view' && !obj.cfgId) {
@@ -226,6 +229,46 @@ export function insertViewAfterCurrent(chosen = null) {
     if (_state.editMode) bus.emit('view:select', ins);
     // And open it, so the new pair is on stage straight away.
     bus.emit('slide:goto', ins);
+}
+
+/**
+ * A split widget slide: one widget across a split, as a slide of its own.
+ * It is a view slide (widgetLabel set) over two blank halves that belong to
+ * it (splitHalf: hidden, unlabelled, not in the navigator), with the widget
+ * in the view's config. Goes in after the current slide and is opened.
+ */
+export function insertSplitWidgetSlide({ type, split, label }) {
+    const s = _state;
+    const ins = s.slideStructure.length ? s.currentSlide + 1 : 0;
+    const t = Date.now();
+    const viewId = `v${t}`;
+    const half = (k) => ({ type: 'blank', blankId: `b${t}${k}`, parent: null, hidden: true, splitHalf: true });
+    s.slideStructure.splice(ins, 0, { type: 'view', viewId, ratio: 50, widgetLabel: label }, half('l'), half('r'));
+    remapSlideIndices((i) => (i >= ins ? i + 3 : i));
+    // The remap moved anything at or past `ins` — the new three included —
+    // so set the view's panes after it.
+    s.slideStructure[ins].left = ins + 1;
+    s.slideStructure[ins].right = ins + 2;
+    s.slideConfigs[viewId] = { widgets: [{
+        id: `widget_${t}`, type, src: '', builtin: true,
+        x: 0, y: 0, width: 1, height: 1, zIndex: 10,
+        split: { left: split?.left?.[0] || 'editor', right: split?.right?.[0] || 'shell' },
+    }] };
+    bus.emit('nav:refresh');
+    if (s.editMode) bus.emit('view:select', ins);
+    bus.emit('slide:goto', ins);
+}
+
+/** Delete a split widget slide: the view and the two halves it owns. */
+export function removeSplitWidgetSlide(viewIdx) {
+    const s = _state;
+    const v = s.slideStructure[viewIdx];
+    if (!v || v.type !== 'view') return;
+    const owned = [v.left, v.right].filter(i => Number.isInteger(i) && s.slideStructure[i]?.splitHalf);
+    if (s.slideConfigs[v.viewId]) delete s.slideConfigs[v.viewId];
+    // Highest first, so the lower indices stay put while removing.
+    for (const i of [viewIdx, ...owned].sort((a, b) => b - a)) removeSlideAt(i);
+    bus.emit('split-widgets:changed');
 }
 
 // Delete any slide (Remove slide in the editor panel, edit mode). A PDF

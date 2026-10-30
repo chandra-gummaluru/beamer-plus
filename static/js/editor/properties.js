@@ -278,7 +278,7 @@ async function showWidgetPanel(index) {
 
 /** What kind of thing is selected ("Widget", "Video"…), or null. */
 export function selectedItemKind() {
-    if (ctx.selectedSplit) return 'Widget';
+    if (ctx.selectedSplit) return ctx.selectedSplit.kind || 'Widget';
     const sel = ctx.selectedOverlay;
     return sel ? KIND_LABELS[sel.arrKey] || 'Element' : null;
 }
