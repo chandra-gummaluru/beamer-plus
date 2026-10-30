@@ -3067,7 +3067,35 @@ body.is-viewer #trace-tip { display: none !important; }
 .expr-input::placeholder { color: var(--sn-faint); }
 .color-swatch { border: 1.5px solid color-mix(in srgb, var(--sn-ink) 30%, transparent); }
 .cp-chip, .cp-custom input[type="color"] { border-color: color-mix(in srgb, var(--sn-ink) 30%, transparent); }
-#color-pop { border-radius: var(--sn-r); }
+/* The colour picker, drawn like the rest of Beamer+: an ink-outlined card,
+   swatches outlined in ink; the chosen one ringed in the highlighter
+   yellow; Custom colour… a row that fills yellow when pointed at. */
+#color-pop {
+  padding: 10px;
+  border: 1.5px solid var(--sn-ink);
+  border-radius: var(--sn-r);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.12);
+  font-family: var(--font-ui);
+}
+.cp-grid { grid-template-columns: repeat(4, 24px); gap: 8px; }
+.cp-chip, .cp-custom input[type="color"] {
+  width: 24px; height: 24px;
+  border: 1.5px solid var(--sn-ink);
+}
+.cp-chip { transition: none; }
+.cp-chip:hover { transform: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--sn-ink); }
+.cp-chip.on, .cp-chip.on:hover { box-shadow: 0 0 0 2px var(--bg), 0 0 0 5px var(--sn-hl); }
+.cp-custom {
+  margin: 10px -4px 0; padding: 4px;
+  border-top: 0; border-radius: 5px;
+  position: relative;
+  font-size: 13px; color: var(--sn-ink);
+}
+.cp-custom::before {
+  content: ''; position: absolute; left: 4px; right: 4px; top: -6px;
+  height: 1px; background: var(--sn-faint);
+}
+.cp-custom:hover { background: var(--sn-hl); }
 
 .slider-range { height: 2px; background: var(--sn-faint); }
 .slider-range::-webkit-slider-thumb {
