@@ -2550,28 +2550,17 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
 html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 
 /* ── Toolbar ────────────────────────────────────────────── */
-/* Stopwatch / Countdown as one segmented control. */
-.seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; flex: 0 0 auto; }
-.seg .bw-btn { border: 0; border-radius: 0; height: calc(var(--ctl-h) - 2px); }
-.seg .bw-btn + .bw-btn { border-left: 1px solid var(--border); }
-.presets { display: contents; }
-.presets[hidden] { display: none; }
-.presets .bw-btn { font-family: var(--font-mono); padding: 0 9px; }
-#btn-start { min-width: 64px; }
-
-/* A small slide region keeps the controls that matter. */
-#btn-start { min-width: 78px; justify-content: center; }
-#btn-reset { min-width: 62px; justify-content: center; }
-
-@media (max-width: 600px) { .presets { display: none !important; } }
-@media (max-width: 460px) {
-  .bw-toolbar-title, .bw-toolbar-title + .bw-sep { display: none !important; }
-  .seg .bw-btn { padding: 0 8px; }
-  /* The shared bar's own reset button does the same job. */
-  #btn-reset { display: none !important; }
-}
+/* Edit mode only: Countdown / Stopwatch and the starting mode, labelled like
+   the poll's settings. While running the bar is just the shared controls. */
+.tm-field { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; color: var(--text-3); white-space: nowrap; }
+.tm-sep { flex: 0 0 auto; width: 1px; height: 16px; background: var(--border-med); }
+/* The name is set in the editor's panel, not typed on the bar. */
+body.bw-editing .bw-topbar-title { display: none !important; }
 
 /* ── The clock ──────────────────────────────────────────── */
+/* The poll's timer, as large as the region allows: typewriter digits with
+   fixed-width figures, an outlined rail under a countdown that empties in the
+   deck's yellow, and red for the last ten seconds. */
 #app {
   flex: 1 1 auto;
   min-height: 0;
@@ -2579,171 +2568,88 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 4% 6% 8%;          /* bias slightly above true centre */
+  padding: 4% 6% 6%;
   container-type: size;
   overflow: hidden;
+  position: relative;
 }
+body.is-presenter:not(.bw-editing) #app { cursor: pointer; }
 
 #clock {
   display: flex;
   align-items: baseline;
   justify-content: center;
-  /* The UI face with fixed-width figures: plain, open zeros that read from
-     the back of the room, and digits that don't shuffle as they change. */
-  font-family: var(--font-ui);
-  font-weight: 500;
+  font-family: var(--font-mono);
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
-  letter-spacing: -0.03em;
   line-height: 1;
-  color: var(--text);
+  color: var(--sn-ink);
   white-space: nowrap;
   user-select: none;
-  /* As big as the region allows, by width or by height, whichever runs out. */
-  font-size: min(22cqw, 62cqh);
-  transition: color 0.3s, font-size 0.18s ease;
+  font-size: min(20cqw, 50cqh);
+  transition: color 0.2s;
 }
-#clock.is-long  { font-size: min(15.5cqw, 58cqh); }   /* h:mm:ss */
-
-/* Reserved boxes: the fields never resize as their digits change, so the
-   clock is dead still through a whole countdown. */
-#clock .unit, #clock .colon, #clock .tenth {
-  display: inline-block;
-  text-align: center;
-  flex: 0 0 auto;
-}
+#clock.is-long { font-size: min(14cqw, 50cqh); }   /* h:mm:ss */
+#clock .unit, #clock .colon { display: inline-block; text-align: center; flex: 0 0 auto; }
 #clock .unit  { width: 2ch; }
-#clock .unit[data-u="h"] { width: 1ch; }   /* capped at 6 hours: one digit */
+#clock .unit[data-u="h"] { width: 1ch; }
 #clock .unit.wide { width: 3ch; }
-#clock .colon { width: 0.62ch; color: var(--sn-cap); }
-#clock .tenth { width: 1.3ch; font-size: 0.42em; color: var(--sn-cap); margin-left: 0.04em; }
-#clock.is-idle { color: var(--sn-cap); }
-
-/* Minutes only ("3 mins"): the number, then the word, smaller and quieter.
-   Sized so the longest likely reading, "120 mins", still fits. */
-#clock.is-minutes { font-size: min(20cqw, 58cqh); }
-#clock.is-minutes .unit { width: auto; min-width: 1ch; }
-#clock .word { margin-left: 0.22em; font-size: 0.5em; color: var(--sn-cap); letter-spacing: 0; }
-
-/* Countdown digits can be set in place before starting: scroll, arrow keys,
-   or type. They look like digits until pointed at. */
-.unit { border-radius: var(--sn-r); outline: none; transition: background 0.15s; }
-#clock.is-editable .unit { cursor: ns-resize; }
-#clock.is-editable .unit:hover { background: var(--sn-node); }
-#clock.is-editable .unit:focus { background: color-mix(in srgb, var(--sn-hl) 30%, var(--bg)); box-shadow: inset 0 -0.04em 0 var(--sn-ink); }
-
-/* The last stretch of a countdown, and the end of it. The last stretch
-   is marked with the highlighter on the progress, not a new hue; running
-   out is the one place a red still says something. */
-#clock.is-expired { color: var(--err); }
+#clock .colon { width: 1ch; }
+#clock.is-urgent, #clock.is-expired { color: var(--err); }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
 #clock.is-expired.is-pulsing { animation: pulse 0.9s ease-in-out 4; }
 
-/* Progress: an outlined bar under the digits, drawn like the deck's TikZ
-   bars, emptying as time runs out. */
+/* Countdown only: the rail. */
 #bar {
-  width: min(70cqw, 900px);
-  height: clamp(10px, 2.2cqh, 22px);
-  margin-top: 4cqh;
+  width: min(64cqw, 900px);
+  height: clamp(7px, 3.2cqh, 26px);
+  margin-top: 6cqh;
   box-sizing: border-box;
-  border: var(--sn-line) solid var(--sn-ink);
-  border-radius: 3px;
+  border: clamp(1.5px, 0.5cqh, 3px) solid var(--sn-ink);
+  border-radius: clamp(4px, 1cqh, 8px);
   background: var(--bg);
   overflow: hidden;
-  opacity: 1;
-  transition: opacity 0.3s;
 }
-#bar[hidden] { display: block; opacity: 0; }
+#bar[hidden] { display: none; }
 #bar-fill {
   height: 100%;
   width: 100%;
-  border-radius: 0;
-  background: var(--sn-ink);
+  background: var(--sn-hl);
   transform-origin: left center;
-  transition: background 0.3s;
+  transition: transform 0.25s linear, background 0.2s;
 }
-#clock.is-warn ~ #bar #bar-fill    { background: var(--sn-hl); }
-#clock.is-expired ~ #bar #bar-fill { background: var(--err); }
+#clock.is-urgent ~ #bar #bar-fill, #clock.is-expired ~ #bar #bar-fill { background: var(--err); }
+
+/* What a click does now, small and grey, like the poll's labels. */
+#cap {
+  margin-top: 4cqh;
+  font-family: var(--font-chrome);
+  font-size: clamp(11px, 4.5cqh, 22px);
+  color: var(--sn-cap);
+  white-space: nowrap;
+  min-height: 1em;
+}
+#cap:empty { visibility: hidden; }
 
 @media (prefers-reduced-motion: reduce) {
   #clock.is-expired.is-pulsing { animation: none; }
+  #bar-fill { transition: none; }
 }
 
-/* ── Ring ───────────────────────────────────────────────── */
-/* Progress as a circle round the digits instead of a line under them. A
-   countdown's ring empties clockwise from the top; a stopwatch's sweeps
-   once a minute. */
-#ring { display: none; }
-#app.is-ring { padding: 4%; position: relative; }
-#app.is-ring #bar { display: none; }
-#app.is-ring #ring {
-  display: block;
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: min(90cqw, 90cqh);
-  height: min(90cqw, 90cqh);
-  transform: translate(-50%, -50%) rotate(-90deg);
-  overflow: visible;
-  pointer-events: none;
-}
-#ring circle { fill: none; stroke-width: 3; }
-#ring .ring-track { stroke: var(--sn-faint); stroke-width: 0.8; }
-#ring .ring-fg {
-  stroke: var(--sn-ink);
-  stroke-linecap: butt;
-  transition: stroke 0.3s;
-}
-#app.is-warn #ring .ring-fg    { stroke: var(--sn-hl); stroke-width: 4; }
-#app.is-expired #ring .ring-fg { stroke: var(--err); }
-/* Digits sized to sit inside the circle. */
-#app.is-ring #clock            { font-size: min(21cqw, 21cqh); position: relative; }
-#app.is-ring #clock.is-long    { font-size: min(15cqw, 15cqh); }
-#app.is-ring #clock.is-minutes {
-  font-size: min(26cqw, 26cqh);
-  flex-direction: column;
-  align-items: center;
-}
-/* In the ring, "mins" sits under the number. */
-#app.is-ring #clock.is-minutes .word { margin: 0.12em 0 0; font-size: 0.34em; line-height: 1; }
+/* Countdown digits are set in place in edit mode: scroll, arrow keys, or type. */
+.unit { border-radius: var(--sn-r); outline: none; transition: background 0.15s; }
+#clock.is-editable .unit { cursor: ns-resize; }
+#clock.is-editable .unit:hover { background: var(--sn-node); }
+#clock.is-editable .unit:focus { background: var(--edit-soft); }
 
 /* ── Overlay ────────────────────────────────────────────── */
-/* A clock in the corner of a content slide: just the digits and the
-   hairline, edge to edge. Click the clock to start or pause; reset and
-   start/pause also sit in the small hover cluster. */
-body.bw-overlay #app { padding: 6% 6% 7%; position: relative; }
-body.bw-overlay #clock       { font-size: min(24cqw, 66cqh); }
-body.bw-overlay #clock.is-long { font-size: min(17cqw, 62cqh); }
-body.bw-overlay #clock.is-minutes { font-size: min(23cqw, 64cqh); }
-body.bw-overlay #bar { width: 84cqw; height: clamp(8px, 5cqh, 22px); margin-top: 6cqh; }
-body.bw-overlay.is-presenter #app { cursor: pointer; }
-body.bw-overlay.is-presenter #clock.is-editable .unit { cursor: ns-resize; }
+body.bw-overlay #app { padding: 6% 6% 7%; }
+body.bw-overlay #clock       { font-size: min(22cqw, 60cqh); }
+body.bw-overlay #clock.is-long { font-size: min(15cqw, 56cqh); }
+body.bw-overlay #bar { width: 84cqw; margin-top: 7cqh; }
+body.bw-overlay #cap { display: none; }
 .bw-overlay-controls svg { width: 14px; height: 14px; }
-
-/* ── Edit mode ──────────────────────────────────────────── */
-/* The digits are the duration: each field outlined, scroll or type to set. */
-body.bw-editing #clock .unit { cursor: ns-resize; }
-body.bw-editing #clock .colon { color: var(--sn-cap); }
-/* Chosen mode and preset: the bar's one chosen-button style (widget-base.css). */
-body.bw-editing #clock.is-editable .unit:focus { box-shadow: none; background: var(--edit-soft); }
-/* Room under the clock for the caption: the content box shrinks, so the
-   digits and ring (sized in cq units) shrink with it and sit above it. */
-body.bw-editing #app { position: relative; padding-bottom: 130px; }
-body.bw-editing #app.is-ring #ring { top: calc(50% - 65px); }
-#edit-cap {
-  position: absolute;
-  left: 0; right: 0; bottom: 14px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--fs-chrome);
-  color: var(--text-2);
-}
-#edit-hint { color: var(--edit-ink); }
-#edit-cap .cap-row { display: flex; align-items: center; gap: 8px; }
-#edit-cap .bw-seg > .bw-btn { height: 24px; padding: 0 9px; }
-body.bw-editing #bar, body.bw-editing #ring { opacity: 0.55; }
 </style>
 </head>
 <body>
@@ -2751,64 +2657,27 @@ body.bw-editing #bar, body.bw-editing #ring { opacity: 0.55; }
 
   <div id="toolbar" class="bw-toolbar" data-bw-topbar>
     <span class="bw-toolbar-title">Timer</span>
-    <div class="bw-sep"></div>
-    <div class="seg" id="mode-seg">
-      <button class="bw-btn" id="tb-countdown">Countdown</button>
-      <button class="bw-btn" id="tb-stopwatch">Stopwatch</button>
-    </div>
-    <span class="presets" id="presets">
-      <div class="bw-sep"></div>
-      <button class="bw-btn" data-min="1">1m</button>
-      <button class="bw-btn" data-min="2">2m</button>
-      <button class="bw-btn" data-min="5">5m</button>
-      <button class="bw-btn" data-min="10">10m</button>
-    </span>
-    <!-- Edit mode sets only what the timer does: count down or up (above)
-         and for how long (the presets, or typed on the digits). How the time
-         is shown and the line/ring are no longer offered; these stay in the
-         page only so older settings keep working. -->
-    <span class="bw-edit-only" style="display:none !important" hidden>
-      <div class="bw-sep"></div>
-      <div class="bw-seg" id="ed-format" title="How the time is shown">
-        <button class="bw-btn" data-v="clock">3:00</button>
-        <button class="bw-btn" data-v="minutes">3 mins</button>
+    <!-- Edit mode: what the timer does. Its length is typed on the digits. -->
+    <span class="bw-edit-only" style="display:contents">
+      <div class="bw-seg" id="ed-mode" title="Count down from a time, or up from zero">
+        <button class="bw-btn" type="button" data-v="countdown">Countdown</button>
+        <button class="bw-btn" type="button" data-v="stopwatch">Stopwatch</button>
       </div>
-      <div class="bw-seg" id="ed-progress" title="Progress">
-        <button class="bw-btn" data-v="line">Line</button>
-        <button class="bw-btn" data-v="ring">Ring</button>
-      </div>
+      <span class="tm-sep" aria-hidden="true"></span>
+      <span class="tm-field">Starting Mode
+        <span class="bw-seg" id="ed-auto" title="Manual: click the timer to start it. Automatic: it starts when its slide opens.">
+          <button class="bw-btn" type="button" data-v="0">Manual</button>
+          <button class="bw-btn" type="button" data-v="1">Automatic</button>
+        </span>
+      </span>
     </span>
     <div class="bw-spacer"></div>
-    <button class="bw-btn bw-run-only" id="btn-reset" title="Reset (R)">Reset</button>
-    <button class="bw-btn bw-btn--primary bw-run-only" id="btn-start" title="Start / pause (Space)">Start</button>
   </div>
 
   <div id="app">
     <div id="clock" aria-live="off"></div>
     <div id="bar" hidden><div id="bar-fill"></div></div>
-    <!-- Edit mode: what it does, said as sentences you can change. -->
-    <div id="edit-cap" class="bw-edit-only">
-      <div id="edit-hint"></div>
-      <div class="cap-row">
-        <span>Starts</span>
-        <div class="bw-seg" id="ed-auto">
-          <button class="bw-btn" data-v="0" title="Waits for you to press Start">when you press Start</button>
-          <button class="bw-btn" data-v="1" title="Auto-start">as soon as its slide opens</button>
-        </div>
-      </div>
-      <div class="cap-row">
-        <span>Leave its slide and it</span>
-        <div class="bw-seg" id="ed-leave">
-          <button class="bw-btn" data-v="keep">keeps going</button>
-          <button class="bw-btn" data-v="pause">pauses</button>
-          <button class="bw-btn" data-v="restart">starts over</button>
-        </div>
-      </div>
-    </div>
-    <svg id="ring" viewBox="0 0 100 100" aria-hidden="true">
-      <circle class="ring-track" cx="50" cy="50" r="46"/>
-      <circle class="ring-fg" id="ring-fg" cx="50" cy="50" r="46" pathLength="100" stroke-dasharray="100" stroke-dashoffset="0"/>
-    </svg>
+    <div id="cap" aria-live="polite"></div>
     <div class="bw-overlay-controls bw-overlay-only" id="ov-controls">
       <button class="bw-btn bw-btn--icon" id="ov-reset" title="Reset (R)" aria-label="Reset">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.5 15a9 9 0 1 0 2.1-9.4L1 10"/></svg>
@@ -2839,22 +2708,13 @@ body.bw-editing #bar, body.bw-editing #ring { opacity: 0.55; }
   const clock     = $('clock');
   const bar       = $('bar');
   const barFill   = $('bar-fill');
-  const btnStart  = $('btn-start');
-  const btnReset  = $('btn-reset');
-  const tbCount   = $('tb-countdown');
-  const tbWatch   = $('tb-stopwatch');
-  const presets   = $('presets');
-  const modeSeg   = $('mode-seg');
+  const capEl     = $('cap');
   const app       = $('app');
-  const ringFg    = $('ring-fg');
   const ovCtl     = $('ov-controls');
   const ovStart   = $('ov-start');
   const ovReset   = $('ov-reset');
-  const edFormat  = $('ed-format');
-  const edProg    = $('ed-progress');
+  const edMode    = $('ed-mode');
   const edAuto    = $('ed-auto');
-  const edLeave   = $('ed-leave');
-  const editHint  = $('edit-hint');
 
   const ICON_PLAY  = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><polygon points="7 4 20 12 7 20 7 4"/></svg>';
   const ICON_PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>';
@@ -2885,8 +2745,7 @@ body.bw-editing #bar, body.bw-editing #ring { opacity: 0.55; }
       return { h: Math.floor(t / 3600), m: Math.floor(t / 60) % 60, s: t % 60, tenth: null, rem };
     }
     const t = Math.floor(S.elapsed / 1000);
-    return { h: Math.floor(t / 3600), m: Math.floor(t / 60) % 60, s: t % 60,
-             tenth: Math.floor(S.elapsed / 100) % 10, rem: 0 };
+    return { h: Math.floor(t / 3600), m: Math.floor(t / 60) % 60, s: t % 60, tenth: null, rem: 0 };
   }
 
   const isIdle = () => !S.running && S.elapsed === 0 && !S.expired;
@@ -2895,8 +2754,9 @@ body.bw-editing #bar, body.bw-editing #ring { opacity: 0.55; }
   const editing = () => !!(window.BeamerWidget && BeamerWidget.edit && BeamerWidget.edit.active);
   // Setting the digits in place is for the full timer. As an overlay a
   // click on the clock starts it, and the arrow keys stay with the slides.
-  const editable = () => !IS_VIEWER && S.mode === 'countdown' && isIdle()
-    && (editing() || !document.body.classList.contains('bw-overlay'));
+  // The countdown's length is typed on its digits, in edit mode; otherwise a
+  // click anywhere on the timer starts and pauses it.
+  const editable = () => !IS_VIEWER && S.mode === 'countdown' && isIdle() && editing();
 
   // ── Render ──────────────────────────────────────────────────────────────────
   // The digits are rebuilt only when their shape changes, so a unit being
@@ -2913,8 +2773,7 @@ body.bw-editing #bar, body.bw-editing #ring { opacity: 0.55; }
       const unit = (u) => `<span class="unit${u === 'm' && bigMin ? ' wide' : ''}${editing() && editable() ? ' bw-editable' : ''}" data-u="${u}"`
         + `${editable() ? ' tabindex="0"' : ''}></span>`;
       const colon = '<span class="colon">:</span>';
-      clock.innerHTML = (long ? unit('h') + colon : '') + unit('m') + colon + unit('s') +
-        (S.mode === 'stopwatch' ? '<span class="tenth"></span>' : '');
+      clock.innerHTML = (long ? unit('h') + colon : '') + unit('m') + colon + unit('s');
       clock.classList.toggle('is-long', long);
       clock.classList.toggle('is-editable', editable());
     }
@@ -2922,11 +2781,8 @@ body.bw-editing #bar, body.bw-editing #ring { opacity: 0.55; }
     set('h', String(p.h));
     set('m', long ? pad(p.m) : pad(p.m + p.h * 60));
     set('s', pad(p.s));
-    const tenth = clock.querySelector('.tenth');
-    if (tenth) tenth.textContent = '.' + p.tenth;
-
-    const warnAt = Math.max(10000, S.duration * 0.1);
-    clock.classList.toggle('is-warn', S.mode === 'countdown' && !S.expired && !isIdle() && p.rem <= warnAt);
+    // The last ten seconds are the one moment it should be loud (as the poll's).
+    clock.classList.toggle('is-urgent', S.mode === 'countdown' && !S.expired && !isIdle() && p.rem <= 10000);
     clock.classList.toggle('is-expired', S.expired);
     showProgress(p.rem);
   }
@@ -2936,13 +2792,9 @@ body.bw-editing #bar, body.bw-editing #ring { opacity: 0.55; }
   // hidden — there's no end to measure against).
   function showProgress(rem) {
     const cd = S.mode === 'countdown';
-    const frac = cd ? rem / S.duration : (S.elapsed % 60000) / 60000;
-    app.classList.toggle('is-ring', ringStyle);
-    app.classList.toggle('is-warn', clock.classList.contains('is-warn'));
-    app.classList.toggle('is-expired', S.expired);
+    const frac = cd ? rem / S.duration : 1;
     bar.hidden = !cd;
-    barFill.style.transform = `scaleX(${cd ? frac.toFixed(4) : 1})`;
-    ringFg.setAttribute('stroke-dashoffset', (100 * (1 - Math.max(0, Math.min(1, frac)))).toFixed(2));
+    barFill.style.transform = `scaleX(${Math.max(0, Math.min(1, frac)).toFixed(4)})`;
   }
 
   // Whole minutes and the word. A countdown rounds up, so it reads "1 min"
@@ -2970,14 +2822,6 @@ body.bw-editing #bar, body.bw-editing #ring { opacity: 0.55; }
   function render() {
     clock.classList.toggle('is-minutes', minutesOnly);
     renderClock();
-    tbCount.classList.toggle('is-active', S.mode === 'countdown');
-    tbWatch.classList.toggle('is-active', S.mode === 'stopwatch');
-    presets.hidden = !(S.mode === 'countdown' && isIdle());
-    btnStart.textContent = S.running ? 'Pause' : (S.elapsed > 0 && !S.expired ? 'Resume' : 'Start');
-    btnStart.disabled = S.expired;
-    btnReset.disabled = isIdle();
-    // The audience sees the clock and nothing else.
-    [modeSeg, presets, btnStart, btnReset].forEach(el => { el.style.display = IS_VIEWER ? 'none' : ''; });
     ovCtl.hidden = IS_VIEWER;
     document.body.classList.toggle('is-presenter', !IS_VIEWER);
     const label = S.running ? 'Pause' : (S.elapsed > 0 && !S.expired ? 'Resume' : 'Start');
@@ -2985,20 +2829,18 @@ body.bw-editing #bar, body.bw-editing #ring { opacity: 0.55; }
     ovStart.setAttribute('aria-label', label);
     ovStart.disabled = S.expired;
     ovReset.disabled = isIdle();
-    presets.querySelectorAll('[data-min]').forEach(b =>
-      b.classList.toggle('is-active', S.duration === Number(b.dataset.min) * 60000));
+    // Under the clock: what a click does now.
+    capEl.textContent = IS_VIEWER || editing() || S.running ? ''
+      : S.expired ? 'time’s up · click to reset'
+      : S.elapsed > 0 ? 'paused · click to resume'
+      : 'click to start';
     renderEdit();
   }
 
   function renderEdit() {
     const pick = (seg, v) => seg.querySelectorAll('[data-v]').forEach(b => b.classList.toggle('is-active', b.dataset.v === v));
-    pick(edFormat, minutesOnly ? 'minutes' : 'clock');
-    pick(edProg,   ringStyle ? 'ring' : 'line');
-    pick(edLeave,  cfg.onLeave || 'keep');
-    pick(edAuto,   cfg.autoStart ? '1' : '0');
-    editHint.textContent = S.mode === 'countdown'
-      ? 'Click a number and type, or scroll it, to set the time'
-      : 'A stopwatch counts up from 0:00';
+    pick(edMode, S.mode);
+    pick(edAuto, cfg.autoStart ? '1' : '0');
   }
 
   // ── Running ─────────────────────────────────────────────────────────────────
@@ -3134,8 +2976,6 @@ body.bw-editing #bar, body.bw-editing #ring { opacity: 0.55; }
   clock.addEventListener('focusout', () => { typed = { u: null, buf: '' }; });
 
   // ── Events ──────────────────────────────────────────────────────────────────
-  btnStart.addEventListener('click', () => (S.running ? pause() : start()));
-  btnReset.addEventListener('click', reset);
   ovStart .addEventListener('click', () => (S.running ? pause() : start()));
   ovReset .addEventListener('click', reset);
 
@@ -3143,7 +2983,7 @@ body.bw-editing #bar, body.bw-editing #ring { opacity: 0.55; }
   // anywhere on it starts or pauses (an expired countdown resets). A click on
   // a digit being set before the start is left to edit it.
   app.addEventListener('click', e => {
-    if (IS_VIEWER || !document.body.classList.contains('bw-overlay')) return;
+    if (IS_VIEWER || editing()) return;
     if (e.target.closest('.bw-overlay-controls')) return;
     if (editable() && e.target.closest('.unit')) return;
     if (S.expired) reset();
@@ -3151,9 +2991,7 @@ body.bw-editing #bar, body.bw-editing #ring { opacity: 0.55; }
     else start();
   });
   const segValue = (e) => e.target.closest('[data-v]')?.dataset.v;
-  edFormat.addEventListener('click', e => { const v = segValue(e); if (v) setting({ format: v }); });
-  edProg  .addEventListener('click', e => { const v = segValue(e); if (v) setting({ progress: v }); });
-  edLeave .addEventListener('click', e => { const v = segValue(e); if (v) setting({ onLeave: v }); });
+  edMode  .addEventListener('click', e => { const v = segValue(e); if (v) setMode(v); });
   edAuto  .addEventListener('click', e => { const v = segValue(e); if (v) setting({ autoStart: v === '1' }); });
 
   // Into edit mode the clock goes back to how it will start; out of it, it
@@ -3173,12 +3011,6 @@ body.bw-editing #bar, body.bw-editing #ring { opacity: 0.55; }
     }
   });
 
-  tbCount .addEventListener('click', () => setMode('countdown'));
-  tbWatch .addEventListener('click', () => setMode('stopwatch'));
-  presets .addEventListener('click', e => {
-    const b = e.target.closest('[data-min]');
-    if (b) setDuration(Number(b.dataset.min) * 60000);
-  });
 
   // Space starts and pauses, R resets — from anywhere in the widget except a
   // unit being typed into.
@@ -3293,7 +3125,8 @@ body.bw-editing #bar, body.bw-editing #ring { opacity: 0.55; }
         changed = true;
       }
     }
-    const fmt = cfg.format === 'minutes', ring = cfg.progress === 'ring';
+    // The older "3 mins" display and ring are retired: every timer is the clock.
+    const fmt = false, ring = false;
     if (fmt !== minutesOnly || ring !== ringStyle) shapeKey = '';
     minutesOnly = fmt;
     ringStyle   = ring;
