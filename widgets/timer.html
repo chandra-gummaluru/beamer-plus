@@ -2620,17 +2620,7 @@ body.is-presenter:not(.bw-editing) #app { cursor: pointer; }
   transition: transform 0.25s linear, background 0.2s;
 }
 #clock.is-urgent ~ #bar #bar-fill, #clock.is-expired ~ #bar #bar-fill { background: var(--err); }
-
-/* What a click does now, small and grey, like the poll's labels. */
-#cap {
-  margin-top: 4cqh;
-  font-family: var(--font-chrome);
-  font-size: clamp(11px, 4.5cqh, 22px);
-  color: var(--sn-cap);
-  white-space: nowrap;
-  min-height: 1em;
-}
-#cap:empty { visibility: hidden; }
+#bar.is-still #bar-fill { background: var(--sn-faint); }
 
 @media (prefers-reduced-motion: reduce) {
   #clock.is-expired.is-pulsing { animation: none; }
@@ -2648,7 +2638,6 @@ body.bw-overlay #app { padding: 6% 6% 7%; }
 body.bw-overlay #clock       { font-size: min(22cqw, 60cqh); }
 body.bw-overlay #clock.is-long { font-size: min(15cqw, 56cqh); }
 body.bw-overlay #bar { width: 84cqw; margin-top: 7cqh; }
-body.bw-overlay #cap { display: none; }
 .bw-overlay-controls svg { width: 14px; height: 14px; }
 </style>
 </head>
@@ -2677,7 +2666,6 @@ body.bw-overlay #cap { display: none; }
   <div id="app">
     <div id="clock" aria-live="off"></div>
     <div id="bar" hidden><div id="bar-fill"></div></div>
-    <div id="cap" aria-live="polite"></div>
     <div class="bw-overlay-controls bw-overlay-only" id="ov-controls">
       <button class="bw-btn bw-btn--icon" id="ov-reset" title="Reset (R)" aria-label="Reset">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.5 15a9 9 0 1 0 2.1-9.4L1 10"/></svg>
@@ -2708,7 +2696,6 @@ body.bw-overlay #cap { display: none; }
   const clock     = $('clock');
   const bar       = $('bar');
   const barFill   = $('bar-fill');
-  const capEl     = $('cap');
   const app       = $('app');
   const ovCtl     = $('ov-controls');
   const ovStart   = $('ov-start');
@@ -2829,11 +2816,8 @@ body.bw-overlay #cap { display: none; }
     ovStart.setAttribute('aria-label', label);
     ovStart.disabled = S.expired;
     ovReset.disabled = isIdle();
-    // Under the clock: what a click does now.
-    capEl.textContent = IS_VIEWER || editing() || S.running ? ''
-      : S.expired ? 'time’s up · click to reset'
-      : S.elapsed > 0 ? 'paused · click to resume'
-      : 'click to start';
+    // Not started yet, or paused: the rail goes grey until it runs.
+    bar.classList.toggle('is-still', !S.running && !S.expired);
     renderEdit();
   }
 
