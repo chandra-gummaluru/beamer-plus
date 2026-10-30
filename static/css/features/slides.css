@@ -324,16 +324,18 @@ model-viewer { pointer-events: auto !important; }
    (clicking it again leaves the editor; editor.js). While a take is in
    progress Record stays: it is the take's timer (recorder.css). */
 /* Along the bottom: Record at the start, Edit and Close side by side at the
-   end, all on the thumbnails' centre line. */
+   end — upright rectangles as tall as the thumbnails, the column's wide
+   buttons turned on end. */
 body.split-view-active .slide-nav-tools {
     flex-direction: row;
     align-items: center;
     justify-content: center;
-    padding: 0 var(--sp-3);
+    gap: var(--sp-1);
+    padding: 0 var(--sp-2);
     border: none;
 }
 body.split-view-active :is(#slide-nav-top, #slide-nav-foot) { padding-block: 0; border-top: none; }
-body.split-view-active .slide-nav-tool { width: var(--ctl-h); padding: 0; }
+body.split-view-active .slide-nav-tool { width: 38px; height: 66px; padding: 0; }
 body.split-view-active .slide-nav-tool span { display: none; }
 
 #slide-nav-slides {
@@ -1210,8 +1212,8 @@ body.edit-mode #split-widget-layer .widget-iframe[data-split-live="false"] { opa
 /* Small screens: the navigator runs along the bottom (as in split view),
    except in landscape, where it is a narrow column again. */
 @media (max-width: 1024px) {
-    .slide-nav-tools { flex-direction: row; align-items: center; justify-content: center; padding: 0 var(--sp-3); border: none; }
-    .slide-nav-tool { width: var(--ctl-h); padding: 0; }
+    .slide-nav-tools { flex-direction: row; align-items: center; justify-content: center; gap: var(--sp-1); padding: 0 var(--sp-2); border: none; }
+    .slide-nav-tool { width: 38px; height: 66px; padding: 0; }
     .slide-nav-tool span { display: none; }
 }
 @media (max-width: 1024px) and (orientation: portrait) {
@@ -1219,5 +1221,5 @@ body.edit-mode #split-widget-layer .widget-iframe[data-split-live="false"] { opa
 }
 @media (max-width: 1024px) and (orientation: landscape) {
     body:not(.split-view-active) .slide-nav-tools { flex-direction: column; align-items: stretch; padding: var(--sp-2); }
-    body:not(.split-view-active) .slide-nav-tool { width: 100%; }
+    body:not(.split-view-active) .slide-nav-tool { width: 100%; height: auto; }
 }
