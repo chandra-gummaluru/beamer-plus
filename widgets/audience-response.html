@@ -3776,6 +3776,7 @@ body.bw-editing #ed-qr {
 /* Too narrow for the words (fitJoinText): the QR and the figures stay, the
    text goes, rather than breaking one word to a line. */
 #join.is-tight #join-text { display: none; }
+#join.is-tight #ed-qr span { display: none; }
 #join-sub-closed[hidden], #join-sub-open[hidden] { display: none; }
 /* Closed: the QR stays where it was, faded, so the slide doesn't jump. */
 #join.is-closed #qr-wrap { opacity: 0.18; filter: grayscale(1); }
@@ -5816,7 +5817,7 @@ body.ar-static .ar-split-pane { pointer-events: none; }
     const els = [questionEl, choicesEl, fillTpl, promptEl, ...questionEl.querySelectorAll('pre'),
                  ...document.querySelectorAll('.ar-split-pane')];
     return els.some(el => el.offsetParent !== null && el.clientHeight > 0 &&
-      (el.scrollHeight > el.clientHeight + 2 || el.scrollWidth > el.clientWidth + 2)) || joinOverflows();
+      (el.scrollHeight > el.clientHeight + 2 || el.scrollWidth > el.clientWidth + 2));
   }
   // The banner overflows when anything in it runs into its right padding
   // (scrollWidth doesn't count a visible box's padding).
@@ -5840,6 +5841,26 @@ body.ar-static .ar-split-pane { pointer-events: none; }
     stage.style.removeProperty('--u');
     fitJoinText();
     shrinkToFit(relayout, measurable);
+    fitJoin();
+  }
+
+  // The banner fits on its own: words first (fitJoinText), then its own
+  // scale, so a narrow banner never shrinks the question or the answers.
+  function fitJoin() {
+    const side = document.getElementById('side');
+    if (!side) return;
+    side.style.removeProperty('--u');
+    if (!joinOverflows()) return;
+    const u = parseFloat(getComputedStyle(stage).getPropertyValue('--u')) || 1.4;
+    let lo = 0.3, hi = 1;
+    side.style.setProperty('--u', String(u * lo));
+    if (joinOverflows()) return;
+    for (let i = 0; i < 6; i++) {
+      const mid = (lo + hi) / 2;
+      side.style.setProperty('--u', String(u * mid));
+      if (joinOverflows()) hi = mid; else lo = mid;
+    }
+    side.style.setProperty('--u', String(u * lo));
   }
 
   // Largest --u (between FIT_MIN and the presenter's size) at which nothing
@@ -5906,7 +5927,7 @@ body.ar-static .ar-split-pane { pointer-events: none; }
     let joinW = -1;
     new ResizeObserver(() => {
       const w = $('join').clientWidth;
-      if (w !== joinW) { joinW = w; requestAnimationFrame(fitJoinText); }
+      if (w !== joinW) { joinW = w; requestAnimationFrame(() => { fitJoinText(); fitJoin(); }); }
     }).observe($('side'));
   }
 
