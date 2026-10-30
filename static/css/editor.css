@@ -244,6 +244,8 @@ body.edit-mode.split-view-active #editor-add-row { display: none; }
 .editor-rail-sep { width: 1px; height: 20px; background: var(--line-1); margin: 0 4px; }
 
 .editor-icon-btn svg { pointer-events: none; }
+/* Pointed at: an ink outline round the yellow, like every button. */
+.btn.editor-icon-btn:hover:not(:disabled) { --_bd: var(--btn-ink); }
 
 /* ─── Edit overlays on the slide ─────────────────────────────── */
 
