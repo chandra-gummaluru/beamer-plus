@@ -3203,14 +3203,22 @@ function onExprInput(id, val) {
   row.expr      = val;
   row.type      = detectType(val);
   if (row.type === 'slider') row.sliderVal = extractSliderVal(val);
-  if (row.type !== oldType) renderList();
+  if (row.type !== oldType) {
+    // The row is rebuilt (a slider grows its track): keep typing where you were.
+    const cur = document.getElementById(`ei-${id}`);
+    const caret = cur ? cur.selectionStart : val.length;
+    renderList();
+    const inp = document.getElementById(`ei-${id}`);
+    if (inp) { inp.focus(); try { inp.setSelectionRange(caret, caret); } catch (_) {} }
+  }
   else renderOverlay();
   plot();
   emitState();
 }
 
 function detectType(expr) {
-  if (/^\s*[a-zA-Z]\s*=\s*-?[\d.]+\s*$/.test(expr))        return 'slider';
+  // a = 3 is a slider; x, y and z name the axes, so y = 3 is a line.
+  if (/^\s*(?![xyzXYZ]\s*=)[a-zA-Z]\s*=\s*-?[\d.]+\s*$/.test(expr)) return 'slider';
   if (/^\s*\(\s*-?[\d.]+\s*,\s*-?[\d.]+\s*\)\s*$/.test(expr)) return 'point';
   return 'fn';
 }
