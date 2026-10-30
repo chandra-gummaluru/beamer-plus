@@ -29,7 +29,7 @@
     --accent-strong:    oklch(32% 0.006 260);
 
     /* ---------- Semantic ---------- */
-    --bookmark:         oklch(78% 0.13 85);
+    --bookmark:         #f7c548;               /* the deck's highlighter yellow */
     --bookmark-soft:    oklch(94% 0.06 85);
     --bookmark-ink:     oklch(32% 0.08 70);
     --danger:           oklch(58% 0.18 25);    /* fills: armed delete, errors */

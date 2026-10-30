@@ -90,7 +90,7 @@
        --edit-line  outlines and borders, a deeper yellow that still shows
        --edit-soft  wash behind something being typed into
        --edit-ink   text: hints, "+ Add", the type picker */
-  --edit:      oklch(86% 0.16 92);
+  --edit:      #f7c548;   /* the deck's highlighter yellow */
   --on-edit:   oklch(28% 0.05 80);
   --edit-line: oklch(74% 0.16 80);
   --edit-soft: oklch(97% 0.05 98);
