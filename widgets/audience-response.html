@@ -3671,8 +3671,12 @@ body.bw-editing .md-tok[contenteditable="false"]:hover { background: var(--edit-
 body.bw-editing .badge.ed-mark { cursor: pointer; padding: 3px 5px; margin: -3px -5px; border-radius: 4px; }
 body.bw-editing .badge.ed-mark:hover, body.bw-editing .badge.ed-mark:focus-visible { background: var(--edit-soft); color: var(--ar-ink); outline: none; }
 /* Clicking an answer's node (anywhere but its text) marks it right. */
-body.bw-editing #choices .opt { cursor: pointer; }
-body.bw-editing #choices .choice:not(.is-correct) .opt:hover { background: var(--edit-soft); }
+/* An answer's box is for typing in (anywhere in it puts the caret in its
+   text); the letter marks it as the right one. True/false has nothing to
+   type, so its whole box marks it. */
+body.bw-editing #choices .opt { cursor: text; }
+body.bw-editing #choices.is-tf .opt { cursor: pointer; }
+body.bw-editing #choices.is-tf .choice:not(.is-correct) .opt:hover { background: var(--edit-soft); }
 body.bw-editing .choice-label { cursor: text; }
 .choice-label[contenteditable] { min-width: 6ch; min-height: 1.3em; outline-offset: 3px !important; }
 .ed-remove { flex: 0 0 auto; width: 24px; height: 24px; opacity: 0; }
@@ -6406,9 +6410,12 @@ body.bw-editing #ed-secs[hidden] { display: none; }
     if (!li) return;
     const i = Number(li.dataset.i);
     if (e.target.closest('.ed-remove')) { removeOption(i); return; }
-    // Anywhere on the answer marks it right — except its text, which is
-    // clicked to type in.
-    if (S.type === 'truefalse' || !e.target.closest('.choice-label')) markCorrect(i);
+    // True/false: anywhere on the answer marks it right. Otherwise the letter
+    // does, and anywhere else on the answer is for typing in it: a click
+    // beside or around the text puts the caret at its end (a click in the
+    // text itself places it there, as usual).
+    if (S.type === 'truefalse' || e.target.closest('.ed-mark')) { markCorrect(i); return; }
+    if (!e.target.closest('.choice-label')) focusOption(i);
   });
 
   // An answer typed in (live editor): saved as it's typed, committed when
