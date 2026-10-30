@@ -3868,21 +3868,22 @@ body.bw-editing #ed-secs[hidden] { display: none; }
 /* ── The QR square drives the poll ───────────────────────────────────── */
 #qr-slot { position: relative; flex: 0 0 auto; display: flex; border-radius: 5px; outline: none; }
 #qr-slot.is-go { cursor: pointer; }
-/* Pointed at: an ink outline round the square, like a node on the slide,
-   and what the click will do in a small node in its middle. */
+/* Pointed at: an ink outline right on the square, a translucent white
+   cover over it, and what the click will do written on the cover.
+   No fade: it is simply there. */
 #qr-slot.is-go:hover, #qr-slot.is-go:focus-visible {
   outline: var(--ar-line) solid var(--ar-ink);
-  outline-offset: calc(4px * var(--u));
-  border-radius: var(--ar-r);
+  outline-offset: 0;
+  border-radius: 5px;
 }
-#qr-slot.is-go:hover #ed-qr, #qr-slot.is-go:focus-visible #ed-qr { border-color: var(--ar-ink) !important; color: var(--ar-ink) !important; }
 #qr-cue {
-  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  padding: calc(1px * var(--u)) calc(7px * var(--u));
-  background: var(--bg); color: var(--ar-ink);
-  border: 1.5px solid var(--ar-ink); border-radius: 4px;
-  font-size: var(--fs-small); line-height: 1.3; white-space: nowrap;
-  opacity: 0; transition: opacity 0.15s; pointer-events: none; z-index: 2;
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: calc(6px * var(--u)); text-align: center;
+  background: color-mix(in srgb, #fff 80%, transparent); color: var(--ar-ink);
+  border-radius: 5px;
+  font-size: var(--fs-small); line-height: 1.3;
+  opacity: 0; pointer-events: none; z-index: 2;
 }
 #qr-slot.is-go:hover #qr-cue, #qr-slot.is-go:focus-visible #qr-cue { opacity: 1; }
 /* The step button in the bar is gone: the QR square does it. */
