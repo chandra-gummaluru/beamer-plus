@@ -191,12 +191,11 @@ and tells the widget where each half is:
 `{ type: 'widget-split', live, left: {x, y, w, h} | null, right: … }` in the
 iframe's own pixels (`static/js/slides/split-widgets.js`).
 
-A widget that declares `"inlineEdit": true` (Timer, Table and Audience
-Response so far) is set up on itself: Edit puts it into edit mode, where its
-own content is the form — the timer's digits are its duration, the poll's
-question and answers are typed where they show, the table's cells are its
-starting data — and `BeamerWidget.edit.set()` saves each change with the
-slide. Other widgets' Edit still opens a settings form.
+A widget that declares `"inlineEdit": true` (most built-ins now) is set up
+on itself: Edit puts it into edit mode, where its own content is the form —
+the timer's digits are its duration, the poll's question and answers are
+typed where they show — and `BeamerWidget.edit.set()` saves each change with
+the slide. Other widgets' Edit still opens a settings form.
 
 Every widget is self-contained, so it also works opened straight from disk:
 `python tools/stamp_widgets.py` copies the current `widget-base.css` and kit
