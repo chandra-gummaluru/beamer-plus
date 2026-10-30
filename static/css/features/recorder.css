@@ -133,6 +133,20 @@ body.focus-mode #recorder-bar:focus-within { opacity: 1; }
     transition: opacity var(--dur-base), transform var(--dur-base) var(--ease-out);
 }
 #recorder-toast.is-visible { opacity: 1; transform: none; }
+/* Drawn like Beamer+'s dialogs: a white card with an ink outline, in the
+   slides' face. */
+#recorder-toast {
+    bottom: var(--sp-3);
+    padding: 10px 16px;
+    background: #fff;
+    color: var(--ink-1);
+    border: 2px solid var(--ink-1);
+    border-radius: 7px;
+    box-shadow: 0 12px 36px rgb(0 0 0 / .18);
+    font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', var(--font-sans);
+    font-size: 15px;
+    font-weight: 400;
+}
 body.split-view-active #recorder-toast { top: calc(var(--sp-2) + var(--hit-min) + var(--sp-2)); bottom: auto; left: var(--sp-3); right: auto; }
 @media (max-width: 1024px) {
     #recorder-toast { right: var(--sp-2); bottom: calc(100px + var(--sp-3) + var(--hit-min) + var(--sp-2)); }
