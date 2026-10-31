@@ -1215,6 +1215,8 @@ body.slide-muted #ann-canvas, body.slide-muted #ann-canvas-2 { z-index: 2 !impor
 }
 /* Built over the whole stage, then placed: hidden until it has been. */
 #split-widget-layer .widget-iframe:not([data-split-placed]) { visibility: hidden; }
+/* Still following its halves into place (split-widgets.js place()). */
+#split-widget-layer .widget-iframe.is-settling { visibility: hidden; }
 /* Editing a slide that holds one half: the half stays in view but faded, so
    the slide's own items (and their edit boxes) show through it. */
 body.edit-mode #split-widget-layer .widget-iframe[data-split-live="false"] { opacity: 0.4 !important; }

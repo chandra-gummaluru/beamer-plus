@@ -288,6 +288,15 @@ function place(f, id, halves, live) {
 
     const sig = JSON.stringify([msg, box, interactive]);
     const wasHidden = f.style.opacity === '0';
+    // Out of sight while its halves are still moving (arriving, the stage
+    // resizing between splits): shown once they've stayed put a moment, so
+    // it appears in place instead of jumping after them.
+    if (f._placedSig !== sig) {
+        f._placedSig = sig;
+        f.classList.add('is-settling');
+        clearTimeout(f._settle);
+        f._settle = setTimeout(() => f.classList.remove('is-settling'), 160);
+    }
     if (_told.get(id) === sig && !wasHidden) return;
     _told.set(id, sig);
     // Tell it once more when the stage has settled: a widget that laid

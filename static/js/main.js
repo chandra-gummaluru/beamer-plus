@@ -964,6 +964,13 @@ async function _goToSlide(i, direction = null, isSplitPaneNav = false) {
             }
             return;
         }
+        // Straight on to another split view (two split widget slides in a
+        // row): stay split and move to it, rather than closing the split —
+        // the stage jumping to one full slide — and opening it again.
+        if (state.slideStructure[landing]?.type === 'view' && landing !== viewIdx) {
+            await _goToSlide(landing, null, false);
+            return;
+        }
         await setSplitActive(false);
         // Pass direction so the hidden-slide while loop runs in the recursive call.
         // Forward: skips right-pane if hidden, continues to next visible slide.
