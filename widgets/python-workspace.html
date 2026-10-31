@@ -3709,6 +3709,39 @@ html[data-theme="dark"]{
   color: var(--sn-cap);
 }
 .pane-file { color: var(--sn-cap); font-size: 13px; }
+/* Files: one tab each on the editor's header. The open file's tab is its
+   name field (click to rename); the others are buttons; + adds one. */
+.file-tabs {
+  display: inline-flex; align-items: center; gap: 2px;
+  min-width: 0; flex: 0 1 auto; overflow-x: auto; scrollbar-width: none;
+}
+.file-tabs::-webkit-scrollbar { display: none; }
+.file-tab {
+  display: inline-flex; align-items: center; flex: 0 0 auto;
+  height: 24px; box-sizing: border-box; padding: 0 2px 0 6px;
+  border: 1.5px solid transparent; border-radius: 5px;
+  font-family: var(--font-mono); font-size: 13px; color: var(--sn-cap);
+  background: transparent; cursor: pointer; white-space: nowrap;
+}
+.file-tab:hover { color: var(--sn-ink); }
+.file-tab.is-active { border-color: var(--sn-ink); color: var(--sn-ink); background: #fff; cursor: default; padding-left: 0; }
+.file-tab.is-active .pane-file { color: var(--sn-ink); border-color: transparent; padding: 0 2px 0 5px; }
+.file-tab-name { padding-right: 2px; }
+.file-tab-x {
+  display: inline-grid; place-items: center; width: 16px; height: 16px;
+  border: 0; border-radius: 3px; background: none; color: inherit;
+  font: inherit; font-size: 13px; line-height: 1; cursor: pointer; opacity: 0;
+}
+.file-tab:hover .file-tab-x, .file-tab.is-active .file-tab-x { opacity: .6; }
+.file-tab-x:hover { opacity: 1 !important; background: var(--sn-hl); }
+.file-tab-x.is-armed { opacity: 1 !important; background: var(--err); color: #fff; }
+.file-tab-add {
+  flex: 0 0 auto; width: 24px; height: 24px; border: 0; border-radius: 5px;
+  background: none; color: var(--sn-cap); font-size: 16px; line-height: 1; cursor: pointer;
+}
+.file-tab-add:hover { background: var(--sn-hl); color: var(--sn-ink); }
+body.is-viewer .file-tab-x, body.is-viewer .file-tab-add,
+body.ws-readonly .file-tab-x, body.ws-readonly .file-tab-add { display: none; }
 .pane-file:hover:not(:disabled),
 .pane-file:focus { border-color: var(--sn-faint); }
 
@@ -3871,7 +3904,9 @@ body.bw-editing #gutter { cursor: pointer; }
       <section class="pane" id="editor-pane" data-pane="editor">
         <div class="pane-head" id="editor-head">
           <span class="pane-label">Editor</span>
-          <input class="pane-file" id="filename" value="main.py" spellcheck="false" aria-label="File name">
+          <div class="file-tabs" id="file-tabs" role="tablist" aria-label="Files">
+            <input class="pane-file" id="filename" value="main.py" spellcheck="false" aria-label="File name">
+          </div>
           <div class="bw-spacer"></div>
           <span id="mm-tools" class="presenter-only bw-run-only" hidden>
             <span id="traceTools">
@@ -8000,6 +8035,10 @@ print(shopping)
   const S = {
     filename: 'main.py',
     code:     DEFAULT_CODE,
+    // Every file, the open one included ({ name, code, bp }); S.filename /
+    // S.code are the open one's, kept in step by syncOpenFile().
+    files:    [{ name: 'main.py', code: DEFAULT_CODE }],
+    fileIdx:  0,
     entries:  [],            // { k: 'in'|'out'|'err'|'sys', s }
     errLine:  null,
     // kind: one of LAYOUTS. slots: every pane, in slot order — a layout
@@ -8302,6 +8341,127 @@ print(shopping)
     insertText(next);
   }
 
+  // ── Files ──────────────────────────────────────────────────────────────────
+  // Tabs on the editor: Run runs the open one, and every file is on Python's
+  // disk (worker _sync_files) so `import expenses` and pytest find them.
+  // Saved with the slide as `files`; `code` / `filename` stay the first
+  // file's, for decks and tools that know only one file.
+  const tabsEl = $('file-tabs');
+  function syncOpenFile() {
+    const f = S.files[S.fileIdx] || (S.files[S.fileIdx] = {});
+    f.name = S.filename; f.code = S.code; f.bp = S.breakpoints.slice();
+  }
+  function filesNow() { syncOpenFile(); return S.files.map(f => ({ name: f.name, code: f.code })); }
+  function filesPatch() {
+    const fs = filesNow();
+    return { files: fs, code: fs[0].code, filename: fs[0].name };
+  }
+  function saveFilesIfEditing() {
+    if (!editing()) return;
+    const p = filesPatch();
+    Object.keys(p).forEach(k => { lastCfg[k] = JSON.stringify(p[k]); });
+    editSet(p);
+  }
+  function uniqueName(base, except = -1) {
+    const taken = new Set(S.files.filter((f, j) => j !== except).map(f => f.name));
+    if (!taken.has(base + '.py')) return base + '.py';
+    for (let k = 2; ; k++) if (!taken.has(base + k + '.py')) return base + k + '.py';
+  }
+  function loadOpenFile() {
+    const f = S.files[S.fileIdx];
+    S.filename = f.name; S.code = f.code;
+    S.breakpoints = (f.bp || []).slice(); S.errLine = null;
+    codeEl.value = S.code; fileEl.value = S.filename; codeEl.scrollTop = 0;
+    PV.syncCode(S.code);
+    renderEditor(); renderTabs();
+  }
+  function switchFile(i) {
+    if (i === S.fileIdx || !S.files[i]) return;
+    syncOpenFile();
+    if (DBG.session || DBG.recording) stopDebug({ keepLayout: true });
+    S.fileIdx = i;
+    loadOpenFile();
+    emitState();
+  }
+  function addFile() {
+    if (IS_VIEWER || cfg.readOnly) return;
+    syncOpenFile();
+    S.files.push({ name: uniqueName('module'), code: '' });
+    switchFile(S.files.length - 1);
+    saveFilesIfEditing();
+    fileEl.focus(); fileEl.select();
+  }
+  function removeFile(i) {
+    if (IS_VIEWER || cfg.readOnly || S.files.length < 2 || !S.files[i]) return;
+    syncOpenFile();
+    if (DBG.session || DBG.recording) stopDebug({ keepLayout: true });
+    S.files.splice(i, 1);
+    if (i < S.fileIdx) S.fileIdx--;
+    else if (i === S.fileIdx) S.fileIdx = Math.min(i, S.files.length - 1);
+    loadOpenFile();
+    emitState();
+    saveFilesIfEditing();
+  }
+  // The open tab's name field is as wide as the name.
+  function sizeFileEl() { fileEl.style.width = Math.max(6, fileEl.value.length + 1) + 'ch'; }
+  function renderTabs() {
+    if (!tabsEl) return;
+    sizeFileEl();
+    [...tabsEl.children].forEach(n => { if (n !== fileEl.parentNode) n.remove(); });
+    let open = fileEl.parentNode !== tabsEl ? fileEl.parentNode : null;
+    if (!open) {
+      open = document.createElement('span');
+      open.className = 'file-tab is-active';
+      tabsEl.appendChild(open);
+      open.appendChild(fileEl);
+    }
+    const many = S.files.length > 1;
+    const x = (i) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'file-tab-x'; b.textContent = '\u00d7';
+      b.title = 'Delete this file'; b.setAttribute('aria-label', 'Delete ' + S.files[i].name);
+      // Armed first, like the panel's Delete: a second click deletes.
+      b.addEventListener('click', e => {
+        e.stopPropagation();
+        if (!b.classList.contains('is-armed')) {
+          b.classList.add('is-armed'); b.title = 'Click again to delete';
+          setTimeout(() => { b.classList.remove('is-armed'); b.title = 'Delete this file'; }, 3000);
+          return;
+        }
+        removeFile(i);
+      });
+      return b;
+    };
+    open.querySelector('.file-tab-x')?.remove();
+    if (many) open.appendChild(x(S.fileIdx));
+    S.files.forEach((f, i) => {
+      if (i === S.fileIdx) { tabsEl.appendChild(open); return; }
+      const t = document.createElement('span');
+      t.className = 'file-tab'; t.setAttribute('role', 'tab'); t.tabIndex = 0; t.title = 'Open ' + f.name;
+      const nm = document.createElement('span'); nm.className = 'file-tab-name'; nm.textContent = f.name;
+      t.appendChild(nm); t.appendChild(x(i));
+      t.addEventListener('click', () => switchFile(i));
+      t.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); switchFile(i); } });
+      tabsEl.appendChild(t);
+    });
+    const add = document.createElement('button');
+    add.type = 'button'; add.className = 'file-tab-add'; add.textContent = '+';
+    add.title = 'New file'; add.setAttribute('aria-label', 'New file');
+    add.addEventListener('click', addFile);
+    tabsEl.appendChild(add);
+  }
+  function setFiles(list, idx = 0) {
+    const clean = (Array.isArray(list) ? list : [])
+      .filter(f => f && typeof f.name === 'string' && typeof f.code === 'string')
+      .map(f => ({ name: f.name.trim() || 'main.py', code: f.code.replace(/\r\n?/g, '\n'),
+                   bp: Array.isArray(f.bp) ? f.bp : [] }));
+    if (!clean.length) return false;
+    S.files = clean;
+    S.fileIdx = Math.max(0, Math.min(idx | 0, clean.length - 1));
+    loadOpenFile();
+    return true;
+  }
+
   function onCodeInput() {
     const before = S.code;
     S.code = codeEl.value;
@@ -8315,9 +8475,8 @@ print(shopping)
     if (editing()) {
       clearTimeout(codeSaveTimer);
       codeSaveTimer = setTimeout(() => {
-        lastCfg.code = JSON.stringify(S.code);
         const n = S.code.split('\n').length;
-        const patch = { code: S.code, breakpoints: S.breakpoints.slice() };
+        const patch = { ...filesPatch(), breakpoints: S.breakpoints.slice() };
         if (startLine() > n) editSet(patch, ['startLine']); else editSet(patch);
       }, 300);
     }
@@ -8612,7 +8771,34 @@ def _debug_file(src, fname, limit):
     let py = null;
     const dec = { out: new TextDecoder(), err: new TextDecoder() };
     const HELPERS = [
-      'import sys, code, traceback, builtins, linecache',
+      'import sys, code, traceback, builtins, linecache, os, importlib',
+      '# The workspace files, written to the working directory so the program',
+      '# (and the shell, and pytest) can import them. A module whose file',
+      '# changed is dropped from sys.modules (with every other workspace module,',
+      '# since one may hold names imported from it), so imports read it again.',
+      '_files = {}',
+      'def _sync_files(files):',
+      '    global _files',
+      '    now = {}',
+      '    for f in files:',
+      '        n = str(f.get("name") or "")',
+      '        if n and "/" not in n and not n.startswith("."): now[n] = str(f.get("code") or "")',
+      '    stale = set()',
+      '    for n in set(_files) | set(now):',
+      '        if _files.get(n) == now.get(n): continue',
+      '        stale.add(n.rsplit(".", 1)[0])',
+      '        if n in now:',
+      '            with open(n, "w") as fh: fh.write(now[n])',
+      '        else:',
+      '            try: os.remove(n)',
+      '            except OSError: pass',
+      '    if stale:',
+      '        stale |= {n.rsplit(".", 1)[0] for n in set(_files) | set(now)}',
+      '    _files = now',
+      '    for m in list(sys.modules):',
+      '        if m.split(".")[0] in stale: del sys.modules[m]',
+      '    importlib.invalidate_caches()',
+      '    if "" not in sys.path: sys.path.insert(0, "")',
       '# The program runs in a real __main__ module (not a bare dict), so',
       '# doctest.testmod(), pickle and anything else that looks up __main__',
       '# in sys.modules finds what the program defined.',
@@ -8720,12 +8906,18 @@ def _debug_file(src, fname, limit):
       chain = chain.then(async () => {
         if (!py) return;
         try {
+          if (m.files) {
+            const pf = py.toPy(m.files);
+            try { py.globals.get('_sync_files')(pf); } finally { pf.destroy(); }
+          }
+          // Packages any file imports, not just the one being run.
+          const every = m.files ? m.files.map(f => f.code).join('\\n') : (m.src || '');
           if (m.t === 'run') {
-            if (m.auto) { try { await py.loadPackagesFromImports(m.src); } catch (_) { /* reported by the import itself */ } }
+            if (m.auto) { try { await py.loadPackagesFromImports(every); } catch (_) { /* reported by the import itself */ } }
             const line = py.globals.get('_run_file')(m.src, m.name);
             postMessage({ t: 'done', more: false, errLine: line == null ? null : line });
           } else if (m.t === 'debug') {
-            if (m.auto) { try { await py.loadPackagesFromImports(m.src); } catch (_) {} }
+            if (m.auto) { try { await py.loadPackagesFromImports(every); } catch (_) {} }
             const json = py.globals.get('_debug_file')(m.src, m.name, m.limit || 6000);
             postMessage({ t: 'trace', json });
             postMessage({ t: 'done', more: false });
@@ -8864,7 +9056,7 @@ def _debug_file(src, fname, limit):
     append('sys', `=== RUN ${name} ===\n`);
     S.errLine = null;
     renderEditor();
-    send({ t: 'run', src: codeEl.value, name });
+    send({ t: 'run', src: codeEl.value, name, files: filesNow() });
     if (isShown('shell')) inputEl.focus({ preventScroll: true });
   }
 
@@ -8915,7 +9107,7 @@ def _debug_file(src, fname, limit):
   function pushLine(line, typed) {
     append('in', line, more ? PS2 : PS1);
     lastTyped = typed ? line : null;
-    send({ t: 'push', line, pasted: !typed });
+    send({ t: 'push', line, pasted: !typed, files: filesNow() });
   }
 
   function submitLine() {
@@ -9018,11 +9210,16 @@ def _debug_file(src, fname, limit):
   function openFile(file) {
     if (!file || IS_VIEWER) return;
     const reader = new FileReader();
+    // Opens as a tab of its own (or into the tab of that name, if there is one).
     reader.onload = () => {
-      S.filename = file.name;
-      fileEl.value = file.name;
+      syncOpenFile();
+      let i = S.files.findIndex(f => f.name === file.name);
+      if (i < 0) { S.files.push({ name: file.name, code: '' }); i = S.files.length - 1; }
+      switchFile(i);
       codeEl.value = PV.cleanSource(String(reader.result));
       onCodeInput();
+      renderTabs();
+      saveFilesIfEditing();
     };
     reader.readAsText(file);
   }
@@ -9438,6 +9635,7 @@ def _debug_file(src, fname, limit):
     renderDebugChrome();
     codeEl.readOnly  = IS_VIEWER || !!cfg.readOnly;
     fileEl.disabled  = IS_VIEWER || !!cfg.readOnly;
+    document.body.classList.toggle('ws-readonly', !!cfg.readOnly);
     openBtn.disabled = !!cfg.readOnly;
     PV.setReadOnly(IS_VIEWER);
   }
@@ -9516,7 +9714,7 @@ def _debug_file(src, fname, limit):
     renderEditor();
     renderDebug();
     emitState();
-    if (!send({ t: 'debug', src: codeEl.value, name, limit: DBG_LIMIT })) {
+    if (!send({ t: 'debug', src: codeEl.value, name, limit: DBG_LIMIT, files: filesNow() })) {
       DBG.recording = false;
       DBG.view = null;
       renderDebug();
@@ -9807,6 +10005,8 @@ def _debug_file(src, fname, limit):
       v:        2,
       filename: S.filename,
       code:     S.code,
+      files:    filesNow(),
+      fileIdx:  S.fileIdx,
       entries:  S.entries.slice(-MAX_ENTRIES),
       layout:   { ...S.layout, slots: S.layout.slots.slice() },
       max:      S.max,
@@ -9839,6 +10039,12 @@ def _debug_file(src, fname, limit):
     if (!s) return;
     applying = true;
     try {
+      // Several files: restore them all; the open one's code follows below.
+      if (Array.isArray(s.files) && s.files.length) {
+        const top = codeEl.scrollTop;
+        setFiles(s.files, s.fileIdx);
+        codeEl.scrollTop = top;
+      }
       if (typeof s.filename === 'string') { S.filename = s.filename; fileEl.value = s.filename; }
       if (typeof s.code === 'string' && s.code !== codeEl.value) {
         const top = codeEl.scrollTop;
@@ -9908,6 +10114,9 @@ def _debug_file(src, fname, limit):
       fileEl.value = S.filename;
       synced = true;
     }
+    // A deck with several files: they replace the single code / filename.
+    if (changed('files') && setFiles(cfg.files)) synced = true;
+    else if (!Array.isArray(cfg.files) && S.files.length === 1) syncOpenFile();
 
     const lk = changed('layout'), pk = changed('primary'), sk = changed('secondary');
     if (lk || pk || sk) {
@@ -10095,7 +10304,20 @@ def _debug_file(src, fname, limit):
   fileEl.addEventListener('input', () => {
     if (IS_VIEWER) return;
     S.filename = fileEl.value.trim() || 'main.py';
+    sizeFileEl();
+    syncOpenFile();
     emitState();
+    saveFilesIfEditing();
+  });
+  // A name taken by another tab gets a number, so imports stay unambiguous.
+  fileEl.addEventListener('change', () => {
+    const taken = S.files.filter((f, j) => j !== S.fileIdx).map(f => f.name);
+    if (taken.includes(S.filename)) {
+      S.filename = uniqueName(S.filename.replace(/\.py$/, ''), S.fileIdx);
+      fileEl.value = S.filename;
+      syncOpenFile(); emitState(); saveFilesIfEditing();
+    }
+    renderTabs();
   });
 
   runBtn    .addEventListener('click', runFile);
@@ -10288,7 +10510,7 @@ def _debug_file(src, fname, limit):
       paintEditBar();
     } else {
       clearTimeout(codeSaveTimer);
-      if (S.code !== cfg.code) editSet({ code: S.code, breakpoints: S.breakpoints.slice() });
+      editSet({ ...filesPatch(), breakpoints: S.breakpoints.slice() });
       applyStartLine();
     }
     renderEditor();
@@ -10299,6 +10521,8 @@ def _debug_file(src, fname, limit):
   // ── Boot ────────────────────────────────────────────────────────────────────
   codeEl.value = S.code;
   PV.syncCode(S.code);
+  syncOpenFile();
+  renderTabs();
   buildLayoutMenu();
   initSocket(CFG0.socketUrl);
   applyConfig(CFG0);
