@@ -8505,7 +8505,7 @@ def _dbg_name(f):
 def _debug_file(src, fname, limit):
     global _ns
     _buf.clear()
-    _ns = {"__name__": "__main__", "__file__": fname, "__builtins__": builtins}
+    _ns = _fresh_main(fname)
     linecache.cache[fname] = (len(src), None, src.splitlines(True), fname)
     events = []
     out = io.StringIO()
@@ -8613,7 +8613,17 @@ def _debug_file(src, fname, limit):
     const dec = { out: new TextDecoder(), err: new TextDecoder() };
     const HELPERS = [
       'import sys, code, traceback, builtins, linecache',
-      '_ns = {"__name__": "__main__"}',
+      '# The program runs in a real __main__ module (not a bare dict), so',
+      '# doctest.testmod(), pickle and anything else that looks up __main__',
+      '# in sys.modules finds what the program defined.',
+      'import types as _types',
+      'def _fresh_main(fname=None):',
+      '    m = _types.ModuleType("__main__")',
+      '    m.__builtins__ = builtins',
+      '    if fname: m.__file__ = fname',
+      '    sys.modules["__main__"] = m',
+      '    return m.__dict__',
+      '_ns = _fresh_main()',
       '_buf = []',
       'def _tb(skip=1):',
       '    et, ev, tb = sys.exc_info()',
@@ -8647,7 +8657,7 @@ def _debug_file(src, fname, limit):
       'def _run_file(src, fname):',
       '    global _ns',
       '    _buf.clear()',
-      '    _ns = {"__name__": "__main__", "__file__": fname, "__builtins__": builtins}',
+      '    _ns = _fresh_main(fname)',
       '    linecache.cache[fname] = (len(src), None, src.splitlines(True), fname)',
       '    try:',
       '        exec(compile(src, fname, "exec"), _ns)',
