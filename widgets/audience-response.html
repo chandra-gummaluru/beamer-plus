@@ -4136,7 +4136,11 @@ body.bw-editing #ed-secs[hidden] { display: none; }
 /* ── Split across a split view (setSplit) ─────────────────────────────────
    The bar and the question on the left slide; the answers or results and
    the QR banner on the right. Each pane lays out like the stage itself. */
-body.ar-split { background: var(--bg); }
+/* Transparent in a split (see the Python workspace): the halves underneath
+   are the slide's own white, and nothing shows outside them before the
+   frame's clip applies. */
+html:has(body.ar-split), body.ar-split,
+body.ar-split :is(#bw-topbar-body, #shell, #stage) { background: transparent !important; }
 body.ar-split #bw-topbar-body { position: absolute; inset: 0; }
 body.ar-split #bw-topbar { position: absolute; box-sizing: border-box; z-index: 5; }
 body.ar-split.ar-no-left #bw-topbar { display: none !important; }

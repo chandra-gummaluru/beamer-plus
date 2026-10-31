@@ -3850,7 +3850,12 @@ body.ws-readonly .fm-x, body.ws-readonly .fm-new, body.ws-readonly .fm-sep { dis
    and the editor take the left slide, one pane (picked with its tabs) the
    right; everything between them is clipped away by the host. renderLayout
    places the panes; this lets the bar sit on the left half. */
-body.ws-split { background: var(--bg); }
+/* Transparent in a split: the frame spans both halves and the gap, and is
+   clipped to the halves by Beamer+. Some browsers (installed-app windows)
+   draw it a moment before the clip applies; with no background of its own,
+   only the panes show meanwhile, over the slide halves underneath. */
+html:has(body.ws-split), body.ws-split,
+body.ws-split :is(#bw-topbar-body, #root, #workspace, #panes) { background: transparent !important; }
 body.ws-split #bw-topbar-body { position: absolute; inset: 0; }
 body.ws-split #panes { inset: 0; }
 body.ws-split #bw-topbar { position: absolute; box-sizing: border-box; z-index: 5; }
