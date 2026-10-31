@@ -3709,39 +3709,48 @@ html[data-theme="dark"]{
   color: var(--sn-cap);
 }
 .pane-file { color: var(--sn-cap); font-size: 13px; }
-/* Files: one tab each on the editor's header. The open file's tab is its
-   name field (click to rename); the others are buttons; + adds one. */
-.file-tabs {
-  display: inline-flex; align-items: center; gap: 2px;
-  min-width: 0; flex: 0 1 auto; overflow-x: auto; scrollbar-width: none;
+/* Files: a dropdown on the editor's header. The open file's name is
+   typed into to rename it; the caret lists every file, + New File, and a
+   delete for each. */
+.file-pick {
+  display: inline-flex; align-items: center; flex: 0 1 auto; min-width: 0;
+  height: 26px; box-sizing: border-box;
+  border: 1.5px solid var(--sn-faint); border-radius: 5px; background: #fff;
 }
-.file-tabs::-webkit-scrollbar { display: none; }
-.file-tab {
-  display: inline-flex; align-items: center; flex: 0 0 auto;
-  height: 24px; box-sizing: border-box; padding: 0 2px 0 6px;
-  border: 1.5px solid transparent; border-radius: 5px;
-  font-family: var(--font-mono); font-size: 13px; color: var(--sn-cap);
-  background: transparent; cursor: pointer; white-space: nowrap;
+.file-pick:hover, .file-pick:focus-within, .file-pick.is-open { border-color: var(--sn-ink); }
+.file-pick .pane-file { color: var(--sn-ink); border: 0; padding: 0 2px 0 7px; min-width: 0; }
+.file-pick-btn {
+  flex: 0 0 auto; width: 22px; height: 100%; display: grid; place-items: center;
+  border: 0; border-left: 1px solid var(--sn-faint); border-radius: 0 4px 4px 0;
+  background: none; color: var(--sn-ink); cursor: pointer; padding: 0;
 }
-.file-tab:hover { color: var(--sn-ink); }
-.file-tab.is-active { border-color: var(--sn-ink); color: var(--sn-ink); background: #fff; cursor: default; padding-left: 0; }
-.file-tab.is-active .pane-file { color: var(--sn-ink); border-color: transparent; padding: 0 2px 0 5px; }
-.file-tab-name { padding-right: 2px; }
-.file-tab-x {
-  display: inline-grid; place-items: center; width: 16px; height: 16px;
-  border: 0; border-radius: 3px; background: none; color: inherit;
-  font: inherit; font-size: 13px; line-height: 1; cursor: pointer; opacity: 0;
+.file-pick-btn svg { width: 12px; height: 12px; }
+.file-pick-btn:hover, .file-pick.is-open .file-pick-btn { background: var(--sn-hl); }
+.file-pick-count { font-family: var(--font-mono); font-size: 11px; color: var(--sn-cap); padding: 0 6px 0 2px; }
+#file-menu {
+  position: fixed; z-index: 60; display: none; min-width: 200px; max-height: 60vh; overflow-y: auto;
+  padding: 4px; background: #fff; border: 2px solid var(--sn-ink); border-radius: 7px;
+  box-shadow: 0 12px 36px rgb(0 0 0 / .18); font-family: var(--font-chrome);
 }
-.file-tab:hover .file-tab-x, .file-tab.is-active .file-tab-x { opacity: .6; }
-.file-tab-x:hover { opacity: 1 !important; background: var(--sn-hl); }
-.file-tab-x.is-armed { opacity: 1 !important; background: var(--err); color: #fff; }
-.file-tab-add {
-  flex: 0 0 auto; width: 24px; height: 24px; border: 0; border-radius: 5px;
-  background: none; color: var(--sn-cap); font-size: 16px; line-height: 1; cursor: pointer;
+#file-menu.is-open { display: block; }
+.fm-item {
+  display: flex; align-items: center; gap: 6px; width: 100%; box-sizing: border-box;
+  height: 30px; padding: 0 4px 0 10px; border: 0; border-radius: 5px; background: none;
+  font-family: var(--font-mono); font-size: 13px; color: var(--sn-ink); text-align: left; cursor: pointer;
 }
-.file-tab-add:hover { background: var(--sn-hl); color: var(--sn-ink); }
-body.is-viewer .file-tab-x, body.is-viewer .file-tab-add,
-body.ws-readonly .file-tab-x, body.ws-readonly .file-tab-add { display: none; }
+.fm-item:hover, .fm-item:focus-visible { background: var(--sn-hl); outline: none; }
+.fm-item.is-open::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--sn-ink); margin-left: -2px; }
+.fm-name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fm-x {
+  flex: 0 0 auto; width: 22px; height: 22px; display: grid; place-items: center;
+  border: 0; border-radius: 4px; background: none; color: var(--sn-cap); font-size: 15px; cursor: pointer;
+}
+.fm-x:hover { background: #fff; color: var(--sn-ink); }
+.fm-x.is-armed { background: var(--err); color: #fff; }
+.fm-sep { height: 1px; margin: 4px 6px; background: var(--border); }
+.fm-new { font-family: var(--font-chrome); color: var(--sn-ink); }
+body.is-viewer .fm-x, body.is-viewer .fm-new, body.is-viewer .fm-sep,
+body.ws-readonly .fm-x, body.ws-readonly .fm-new, body.ws-readonly .fm-sep { display: none; }
 .pane-file:hover:not(:disabled),
 .pane-file:focus { border-color: var(--sn-faint); }
 
@@ -3904,9 +3913,12 @@ body.bw-editing #gutter { cursor: pointer; }
       <section class="pane" id="editor-pane" data-pane="editor">
         <div class="pane-head" id="editor-head">
           <span class="pane-label">Editor</span>
-          <div class="file-tabs" id="file-tabs" role="tablist" aria-label="Files">
+          <span class="file-pick" id="file-pick">
             <input class="pane-file" id="filename" value="main.py" spellcheck="false" aria-label="File name">
-          </div>
+            <button class="file-pick-btn" id="file-pick-btn" type="button" aria-haspopup="menu" aria-expanded="false" title="Files">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+          </span>
           <div class="bw-spacer"></div>
           <span id="mm-tools" class="presenter-only bw-run-only" hidden>
             <span id="traceTools">
@@ -8346,7 +8358,6 @@ print(shopping)
   // disk (worker _sync_files) so `import expenses` and pytest find them.
   // Saved with the slide as `files`; `code` / `filename` stay the first
   // file's, for decks and tools that know only one file.
-  const tabsEl = $('file-tabs');
   function syncOpenFile() {
     const f = S.files[S.fileIdx] || (S.files[S.fileIdx] = {});
     f.name = S.filename; f.code = S.code; f.bp = S.breakpoints.slice();
@@ -8403,53 +8414,81 @@ print(shopping)
     saveFilesIfEditing();
   }
   // The open tab's name field is as wide as the name.
-  function sizeFileEl() { fileEl.style.width = Math.max(6, fileEl.value.length + 1) + 'ch'; }
+  function sizeFileEl() { fileEl.style.width = `calc(${Math.max(6, fileEl.value.length)}ch + 12px)`; }
+  // The dropdown: the open file's name (typed into to rename it) and a
+  // caret listing every file. renderTabs() keeps its name in step.
+  const pickEl = $('file-pick'), pickBtn = $('file-pick-btn');
+  let fileMenu = null;
   function renderTabs() {
-    if (!tabsEl) return;
     sizeFileEl();
-    [...tabsEl.children].forEach(n => { if (n !== fileEl.parentNode) n.remove(); });
-    let open = fileEl.parentNode !== tabsEl ? fileEl.parentNode : null;
-    if (!open) {
-      open = document.createElement('span');
-      open.className = 'file-tab is-active';
-      tabsEl.appendChild(open);
-      open.appendChild(fileEl);
-    }
-    const many = S.files.length > 1;
-    const x = (i) => {
-      const b = document.createElement('button');
-      b.type = 'button'; b.className = 'file-tab-x'; b.textContent = '\u00d7';
-      b.title = 'Delete this file'; b.setAttribute('aria-label', 'Delete ' + S.files[i].name);
-      // Armed first, like the panel's Delete: a second click deletes.
-      b.addEventListener('click', e => {
-        e.stopPropagation();
-        if (!b.classList.contains('is-armed')) {
-          b.classList.add('is-armed'); b.title = 'Click again to delete';
-          setTimeout(() => { b.classList.remove('is-armed'); b.title = 'Delete this file'; }, 3000);
-          return;
-        }
-        removeFile(i);
-      });
-      return b;
-    };
-    open.querySelector('.file-tab-x')?.remove();
-    if (many) open.appendChild(x(S.fileIdx));
-    S.files.forEach((f, i) => {
-      if (i === S.fileIdx) { tabsEl.appendChild(open); return; }
-      const t = document.createElement('span');
-      t.className = 'file-tab'; t.setAttribute('role', 'tab'); t.tabIndex = 0; t.title = 'Open ' + f.name;
-      const nm = document.createElement('span'); nm.className = 'file-tab-name'; nm.textContent = f.name;
-      t.appendChild(nm); t.appendChild(x(i));
-      t.addEventListener('click', () => switchFile(i));
-      t.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); switchFile(i); } });
-      tabsEl.appendChild(t);
-    });
-    const add = document.createElement('button');
-    add.type = 'button'; add.className = 'file-tab-add'; add.textContent = '+';
-    add.title = 'New file'; add.setAttribute('aria-label', 'New file');
-    add.addEventListener('click', addFile);
-    tabsEl.appendChild(add);
+    pickBtn.title = S.files.length > 1 ? `Files (${S.files.length})` : 'Files';
+    if (fileMenu?.classList.contains('is-open')) buildFileMenu();
   }
+  function closeFileMenu() {
+    fileMenu?.classList.remove('is-open');
+    pickEl.classList.remove('is-open');
+    pickBtn.setAttribute('aria-expanded', 'false');
+  }
+  function buildFileMenu() {
+    if (!fileMenu) {
+      fileMenu = document.createElement('div');
+      fileMenu.id = 'file-menu'; fileMenu.setAttribute('role', 'menu');
+      document.body.appendChild(fileMenu);
+    }
+    fileMenu.textContent = '';
+    const many = S.files.length > 1;
+    S.files.forEach((f, i) => {
+      const it = document.createElement('div');
+      it.className = 'fm-item' + (i === S.fileIdx ? ' is-open' : '');
+      it.setAttribute('role', 'menuitem'); it.tabIndex = 0;
+      const nm = document.createElement('span'); nm.className = 'fm-name'; nm.textContent = f.name;
+      it.appendChild(nm);
+      if (many) {
+        const x = document.createElement('button');
+        x.type = 'button'; x.className = 'fm-x'; x.textContent = '\u00d7';
+        x.title = 'Delete ' + f.name; x.setAttribute('aria-label', 'Delete ' + f.name);
+        // Armed first, like the panel's Delete: a second click deletes.
+        x.addEventListener('click', e => {
+          e.stopPropagation();
+          if (!x.classList.contains('is-armed')) {
+            x.classList.add('is-armed'); x.title = 'Click again to delete';
+            setTimeout(() => { x.classList.remove('is-armed'); x.title = 'Delete ' + f.name; }, 3000);
+            return;
+          }
+          removeFile(i);
+          buildFileMenu();
+        });
+        it.appendChild(x);
+      }
+      const go = () => { switchFile(i); closeFileMenu(); };
+      it.addEventListener('click', go);
+      it.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+      fileMenu.appendChild(it);
+    });
+    const sep = document.createElement('div'); sep.className = 'fm-sep'; fileMenu.appendChild(sep);
+    const add = document.createElement('button');
+    add.type = 'button'; add.className = 'fm-item fm-new'; add.textContent = '+ New File';
+    add.addEventListener('click', () => { closeFileMenu(); addFile(); });
+    fileMenu.appendChild(add);
+  }
+  function openFileMenu() {
+    buildFileMenu();
+    const r = pickEl.getBoundingClientRect();
+    fileMenu.style.left = Math.max(4, Math.min(r.left, window.innerWidth - 210)) + 'px';
+    fileMenu.style.top = (r.bottom + 4) + 'px';
+    fileMenu.style.minWidth = Math.max(200, r.width) + 'px';
+    fileMenu.classList.add('is-open');
+    pickEl.classList.add('is-open');
+    pickBtn.setAttribute('aria-expanded', 'true');
+  }
+  pickBtn.addEventListener('click', () => (fileMenu?.classList.contains('is-open') ? closeFileMenu() : openFileMenu()));
+  document.addEventListener('pointerdown', e => {
+    if (fileMenu?.classList.contains('is-open') && !fileMenu.contains(e.target) && !pickEl.contains(e.target)) closeFileMenu();
+  }, true);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && fileMenu?.classList.contains('is-open')) { e.stopPropagation(); closeFileMenu(); pickBtn.focus(); }
+  }, true);
+  window.addEventListener('blur', () => setTimeout(() => { if (!document.hasFocus()) closeFileMenu(); }, 0));
   function setFiles(list, idx = 0) {
     const clean = (Array.isArray(list) ? list : [])
       .filter(f => f && typeof f.name === 'string' && typeof f.code === 'string')
