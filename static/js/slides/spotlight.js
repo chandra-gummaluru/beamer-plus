@@ -14,7 +14,10 @@ bus.on('tool:change', (tool) => {
 export function setWidgetInteractivityForSpotlight(spotlightActive) {
     const widgets = document.querySelectorAll('.widget-iframe');
     widgets.forEach((iframe) => {
-        if (spotlightActive) {
+        // A parked widget (off screen, opacity 0) stays out of the pointer's
+        // way: it is still laid over the stage — a split widget's frame
+        // covers it whole — and taking clicks would block the slide showing.
+        if (spotlightActive || iframe.style.opacity === '0') {
             iframe.style.pointerEvents = 'none';
             return;
         }
