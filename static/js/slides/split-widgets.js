@@ -221,6 +221,8 @@ async function sync() {
             f.addEventListener('load', () => { _told.delete(id); queueSync(); });
         }
         place(f, id, halves, live);
+        // Follow the stage from now on, not only once the whole sync is done.
+        if (!_rafLoop) _rafLoop = requestAnimationFrame(follow);
     }
 
     // Keep up with the slides while any half is on screen: the stage slides
@@ -232,7 +234,11 @@ async function sync() {
 
 function follow() {
     _rafLoop = 0;
-    if (!_syncing) {
+    // Also while a sync is running: it can wait seconds on a widget being
+    // built (Python starting), and the halves already on screen must keep
+    // up with the stage meanwhile — a slide drawn late at its final size
+    // otherwise shows round a widget still at the old one.
+    {
         // Cheap: re-place what's shown from where the slides are now.
         const panes = paneSlides();
         let shown = false;
