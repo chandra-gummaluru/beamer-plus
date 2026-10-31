@@ -198,10 +198,17 @@ async function sync() {
         if (!want.has(f.dataset.widgetId)) remove(f);
     }
 
+    // Off screen first: the split widget being left goes before the next
+    // one is built, rather than lingering over the new halves meanwhile.
+    for (const [id, { halves }] of want) {
+        if (halves.left || halves.right) continue;
+        const f = findIframe(id);
+        if (f) hide(f);
+    }
     for (const [id, { w, halves, live }] of want) {
         const any = halves.left || halves.right;
         let f = findIframe(id);
-        if (!any) { if (f) hide(f); continue; }
+        if (!any) continue;
         if (!f || f.dataset.widgetSig !== widgetConfigSignature(w)) {
             // First time on screen (or its settings changed in a way that
             // needs a rebuild): build it. renderWidgets also restores the
@@ -251,6 +258,8 @@ function findIframe(id) {
 }
 
 const _placed = new Map();   // widget id → { halves, live } last placed
+const _resent = new Map();   // widget id → the placement already told twice
+const _resendTimers = new Map();
 
 function place(f, id, halves, live) {
     _placed.set(id, { halves, live });
@@ -281,6 +290,18 @@ function place(f, id, halves, live) {
     const wasHidden = f.style.opacity === '0';
     if (_told.get(id) === sig && !wasHidden) return;
     _told.set(id, sig);
+    // Tell it once more when the stage has settled: a widget that laid
+    // itself out mid-transition (fonts, its bar, its own frame still
+    // resizing) would otherwise stay off until something nudged it.
+    if (_resent.get(id) !== sig) {
+        clearTimeout(_resendTimers.get(id));
+        _resendTimers.set(id, setTimeout(() => {
+            _resent.set(id, sig);
+            if (_told.get(id) !== sig) return;          // moved again meanwhile
+            _told.delete(id);
+            queueSync();
+        }, 450));
+    }
 
     const r1 = (v) => Math.round(v * 100) / 100;
     Object.assign(f.style, {

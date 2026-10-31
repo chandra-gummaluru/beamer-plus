@@ -9339,8 +9339,19 @@ def _debug_file(src, fname, limit):
       if (bar) ['left', 'top', 'width'].forEach(k => bar.style.removeProperty(k));
     }
     renderLayout();
+    // Once more after the frame has settled (its own size, the bar's fonts).
+    requestAnimationFrame(() => { if (S.split) renderLayout(); });
     // The memory model draws for its pane's size.
     if (isShown('memory')) PV.render();
+  }
+  // The frame resizing under a split (the stage settling) lays it out again.
+  if (window.ResizeObserver) {
+    let rq = 0;
+    new ResizeObserver(() => {
+      if (!S.split) return;
+      cancelAnimationFrame(rq);
+      rq = requestAnimationFrame(() => { if (S.split) renderLayout(); });
+    }).observe(document.documentElement);
   }
 
   function renderSplitLayout() {
