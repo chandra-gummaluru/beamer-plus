@@ -1798,14 +1798,6 @@ function wireResizeAndFullscreen() {
     });
 }
 
-/* ─── a widget's own settings changed (its settings dialog) → re-render, so
-   that widget is rebuilt with them (the others are reused as they are) */
-bus.on('widgets:changed', async () => {
-    if (!state.zipFile || state.editMode) return;
-    if (state.splitView) await renderSplitSlides(state.currentSlide, state.rightSlideIndex);
-    else await renderLogicalSlide(state.currentSlide, false, true);
-});
-
 /* ─── editor: exit → re-render so added media appears immediately */
 bus.on('editor:exited', async ({ splitRatio = null } = {}) => {
     if (state.splitView) {

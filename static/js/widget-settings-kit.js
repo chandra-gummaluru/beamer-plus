@@ -1,34 +1,32 @@
 // Beamer+ widget settings kit — runs INSIDE each widget iframe.
 //
-// Every widget is self-contained: its own settings are edited from the widget
-// itself — the pencil in its top bar (or, laid over part of a slide with no
-// bar, the pencil that shows on hover) asks the host to open the widget's
-// settings dialog (editor/widget-settings-dialog.js), drawn from the same
-// schema block. The editor's panel keeps only Name, Text size and layout.
-// The kit also provides the rest of the host contract: the server origin,
-// presentation scale, saving files into the deck. BeamerWidget.openSettings()
-// opens the same dialog.
+// Every widget is self-contained: its own settings are the widget's business.
+// A widget that has any declares "inlineEdit": true in its schema; the kit
+// then puts an Edit button in its top bar (or, laid over part of a slide with
+// no bar, a pencil in its corner) that switches the widget into edit mode,
+// where the widget's own content becomes the form and each change is saved
+// with BeamerWidget.edit.set(). Beamer+ edits only what every widget shares —
+// its name, text size and place on the slide — never the widget's settings.
+//
+// The kit also provides the rest of the host contract: the shared top bar,
+// the server origin, presentation scale, saving files into the deck, printing
+// into the notes PDF.
 //
 // This file is injected into every widget iframe (see iframe-widget-renderer.js),
 // right after window.WIDGET_CONFIG. It reads the widget's OWN schema block —
 //
 //   <script id="widget-schema" type="application/json">
-//   { "label": "...", "fields": [ { "key": ..., "label": ..., "type": ... } ] }
+//   { "label": "Timer", "inlineEdit": true, "modes": ["full", "overlay"] }
 //   </script>
 //
-// — renders a settings panel from it, and posts changes back to the parent,
-// which merges them into the widget's config item so they survive a save.
-//
-// A widget that wants a bespoke settings UI declares "customSettings": true in
-// its schema and handles the `widget-open-settings` message itself; the kit
-// then stays out of the way entirely.
+// — for its label, how it can be shown, and whether it can be edited.
 (function () {
     'use strict';
     if (window.__beamerWidgetSettings) return;
     window.__beamerWidgetSettings = true;
 
     // Keys the layout system owns — a widget never edits these about itself.
-    // The parent enforces the same list; this copy just keeps them out of the UI.
+    // The parent enforces the same list; edit.set() drops them too.
     var RESERVED = [
         'id', 'type', 'x', 'y', 'width', 'height', 'zIndex', 'step', 'display',
         'builtin', 'src', 'interactive',
@@ -40,9 +38,8 @@
 
     // This script is injected at the TOP of <head> — before the widget's own
     // <script id="widget-schema"> has been parsed — so the schema cannot be
-    // read at load time. It is read on first use instead, and the parent isn't
-    // told whether we have settings until there is a document to read it from.
-    var schema = null, fields = [], customSettings = false, hasSettings = false;
+    // read at load time. It is read on first use instead.
+    var schema = null;
     var _schemaRead = false;
 
     // Returns false while the document is still parsing and the schema element
@@ -54,55 +51,12 @@
         _schemaRead = true;
         try { schema = el ? JSON.parse(el.textContent.trim()) : null; }
         catch (e) { schema = null; }
-        fields = (schema && Array.isArray(schema.fields))
-            ? schema.fields.filter(function (f) { return f && f.key && RESERVED.indexOf(f.key) === -1; })
-            : [];
-        // Every widget with a schema gets a Name (see name() below). Keep in
-        // step with nameField() in editor/widget-schema.js.
-        if (schema && !fields.some(function (f) { return f.key === 'title'; })) {
-            fields.unshift({ key: 'title', label: 'Name', type: 'text',
-                             placeholder: schema.label || 'Title and download file name' });
-        }
-        // …and a Text size, the stepper's default, offering its steps. Keep in
-        // step with textSizeField() in editor/widget-schema.js.
-        if (schema && schema.fontSize !== false) {
-            var own = -1;
-            for (var k = 0; k < fields.length; k++) if (fields[k].key === 'scale') { own = k; break; }
-            var def = own >= 0 && fields[own].default != null ? String(fields[own].default) : '1.4';
-            if (own >= 0) fields.splice(own, 1);
-            var at = 0;
-            for (var t = 0; t < fields.length; t++) if (fields[t].key === 'title') { at = t + 1; break; }
-            fields.splice(at, 0, { key: 'scale', label: 'Text size', type: 'select', default: def,
-                options: ['1', '1.2', '1.4', '1.7', '2', '2.4'].map(function (v) {
-                    return { v: v, l: Math.round(parseFloat(v) * 100) + '%' };
-                }) });
-        }
-        customSettings = !!(schema && schema.customSettings);
-        hasSettings = !customSettings && fields.length > 0;
         return true;
     }
 
     function cfg() { return window.WIDGET_CONFIG || (window.WIDGET_CONFIG = {}); }
 
-    /* ─── its own settings (the pencil) ─────────────────────────── */
-    // Does the widget have settings of its own, beyond the Name and Text size
-    // every widget has (those are in the editor's panel)?
-    function hasOwnSettings() {
-        if (!readSchema()) return false;
-        if (customSettings) return true;
-        return fields.some(function (f) { return f.key !== 'title' && f.key !== 'scale'; });
-    }
-
-    // Open them: the host's settings dialog, or — for a widget that draws its
-    // own ("customSettings": true) — the widget's handler.
-    function editSettings() {
-        readSchema();
-        if (customSettings) {
-            try { window.dispatchEvent(new MessageEvent('message', { data: { type: 'widget-open-settings' } })); } catch (e) {}
-            return;
-        }
-        post({ type: 'widget-edit-settings', widgetId: cfg().id });
-    }
+    function el(tag, cls) { var n = document.createElement(tag); if (cls) n.className = cls; return n; }
 
     var PENCIL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>';
 
@@ -127,25 +81,16 @@
     }
 
     /* ─── presentation scale ────────────────────────────────────── */
-    // A widget that declares a `scale` field gets the room-size control for
-    // free: whatever the presenter picks is applied to --u, which the shared
-    // base stylesheet uses to size everything the audience has to read.
-    // Chrome stays fixed, so the furniture doesn't inflate with the content.
+    // Every widget gets the room-size control (the top bar's stepper):
+    // whatever the presenter picks is applied to --u, which the shared base
+    // stylesheet uses to size everything the audience has to read. Chrome
+    // stays fixed, so the furniture doesn't inflate with the content.
 
-    function fieldByKey(key) {
-        if (!readSchema()) return null;
-        for (var i = 0; i < fields.length; i++) if (fields[i].key === key) return fields[i];
-        return null;
-    }
-
-    // The presentation scale in force: what the presenter set, else the scale
-    // field's default if the widget declares one, else the base stylesheet's.
-    // Every widget has a scale now — the top bar's stepper is the control — so
-    // this no longer requires a declared field.
+    // The presentation scale in force: what the presenter set, else the
+    // widget's own default (its schema's "scale"), else the base stylesheet's.
     function currentScale() {
         if (!readSchema()) return 1.4;
-        var f = fieldByKey('scale');
-        var raw = cfg().scale !== undefined ? cfg().scale : (f ? f.default : undefined);
+        var raw = cfg().scale !== undefined ? cfg().scale : (schema ? schema.scale : undefined);
         var v = parseFloat(raw);
         return (!isNaN(v) && v > 0) ? v : 1.4;
     }
@@ -166,386 +111,7 @@
     }
 
     function post(msg) { try { parent.postMessage(msg, '*'); } catch (e) {} }
-    function announce() {
-        if (!readSchema()) return;   // asked again on DOMContentLoaded
-        post({ type: 'widget-has-settings', widgetId: cfg().id, has: hasSettings });
-    }
-
-    /* ─── styles ────────────────────────────────────────────────── */
-    // Uses the design tokens Beamer+ injects ahead of this script, so the
-    // panel matches the rest of the app in both light and dark.
-
-    function injectStyles() {
-        if (document.getElementById('bws-style')) return;
-        var st = document.createElement('style');
-        st.id = 'bws-style';
-        st.textContent = [
-            '.bws-root{position:fixed;inset:0;z-index:2147483000;display:flex;flex-direction:column;',
-            'background:var(--bg,#fff);color:var(--text,#1a1a18);font-family:var(--font-ui,system-ui,sans-serif);',
-            'opacity:0;transition:opacity .12s ease}',
-            '.bws-root.is-open{opacity:1}',
-            '.bws-head{display:flex;align-items:center;justify-content:space-between;gap:8px;',
-            'padding:12px 14px;border-bottom:1px solid var(--border,#e9e9e6);flex:0 0 auto}',
-            '.bws-title{font-size:15px;font-weight:600;letter-spacing:-0.01em}',
-            '.bws-x{border:none;background:none;cursor:pointer;color:var(--text-2,#6b6b65);',
-            'font-size:18px;line-height:1;padding:4px 8px;border-radius:var(--radius,6px)}',
-            '.bws-x:hover{background:var(--accent-bg,#f0f0ee);color:var(--text,#1a1a18)}',
-            '.bws-body{flex:1 1 auto;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:14px}',
-            '.bws-row{display:flex;flex-direction:column;gap:5px}',
-            '.bws-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;',
-            'color:var(--text-2,#6b6b65);display:flex;align-items:center;gap:6px}',
-            '.bws-input,.bws-select,.bws-area{width:100%;box-sizing:border-box;padding:6px 8px;font-size:13px;',
-            'font-family:inherit;color:var(--text,#1a1a18);background:var(--bg-subtle,#f9f9f8);',
-            'border:1px solid var(--border-med,#d4d4cf);border-radius:var(--radius,6px)}',
-            '.bws-area{font-family:var(--font-mono,ui-monospace,monospace);resize:vertical;line-height:1.45}',
-            '.bws-input:focus,.bws-select:focus,.bws-area:focus{outline:none;border-color:var(--accent,#52524e)}',
-            // On/off: a row shaped like the inputs, label left, switch right.
-            '.bws-check{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;',
-            'cursor:pointer;padding:5px 6px 5px 8px;background:var(--bg-subtle,#f9f9f8);',
-            'border:1px solid var(--border-med,#d4d4cf);border-radius:var(--radius,6px)}',
-            '.bws-switch{appearance:none;-webkit-appearance:none;flex:0 0 auto;position:relative;width:34px;',
-            'height:20px;margin:0;border-radius:999px;background:var(--border-med,#d4d4cf);cursor:pointer;',
-            'transition:background .12s}',
-            '.bws-switch::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;',
-            'border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .12s}',
-            '.bws-switch:checked{background:var(--text,#1a1a18)}',
-            '.bws-switch:checked::after{transform:translateX(14px)}',
-            '.bws-file{display:flex;gap:6px;align-items:center}',
-            '.bws-file .bws-input{flex:1 1 auto;min-width:0}',
-            '.bws-btn{flex:0 0 auto;padding:6px 11px;font-size:12px;font-family:inherit;cursor:pointer;',
-            'color:var(--text,#1a1a18);background:var(--bg-subtle,#f9f9f8);',
-            'border:1px solid var(--border-med,#d4d4cf);border-radius:var(--radius,6px)}',
-            '.bws-btn:hover{background:var(--accent-bg,#f0f0ee)}',
-            '.bws-btn[disabled]{opacity:.55;cursor:default}',
-            '.bws-empty{font-size:13px;color:var(--text-2,#6b6b65);line-height:1.5}',
-            '.bws-dur{display:flex;gap:8px}',
-            '.bws-dur-part{flex:1 1 0;min-width:0;display:flex;align-items:center;gap:6px}',
-            '.bws-dur-part .bws-input{flex:1 1 auto;min-width:0}',
-            '.bws-dur-unit{flex:0 0 auto;font-size:12px;color:var(--text-3,#9a9a94)}',
-        ].join('');
-        document.head.appendChild(st);
-    }
-
-    /* ─── field rows ────────────────────────────────────────────── */
-
-    function el(tag, cls) { var n = document.createElement(tag); if (cls) n.className = cls; return n; }
-
-    // The value a control should show: what the presenter set, else the
-    // schema's declared default.
-    function effective(field) {
-        var v = cfg()[field.key];
-        return v !== undefined ? v : field.default;
-    }
-
-    // Label only — see the matching note in editor/properties.js.
-    function labelFor(field) {
-        var lab = el('div', 'bws-label');
-        lab.textContent = field.label || field.key;
-        return lab;
-    }
-
-    // Each row returns { key, node, read() } — read() reports either a value to
-    // write or that the key should be dropped, matching how the editor panel
-    // used to treat a cleared field.
-    // A colour + count list, kept simple here: a colour menu and a number per
-    // row. (The editor's panel draws this as swatches and steppers.)
-    function buildColourCountsRow(field, onChange) {
-        var row = el('div', 'bws-row');
-        row.appendChild(labelFor(field));
-        var opts = field.options || [];
-        var box = el('div');
-        row.appendChild(box);
-        var eff = effective(field);
-        var items = (Array.isArray(eff) ? eff : []).map(function (x) { return { c: String(x && x.c), n: Number(x && x.n) || 0 }; });
-        var add = el('button', 'bws-btn');
-        add.type = 'button';
-        add.textContent = '+ Add colour';
-        row.appendChild(add);
-        function paint() {
-            box.innerHTML = '';
-            items.forEach(function (it, i) {
-                var line = el('div');
-                line.style.cssText = 'display:flex;gap:6px;align-items:center;margin:4px 0';
-                var dot = el('span');
-                var sel = el('select', 'bws-select');
-                opts.forEach(function (o) {
-                    var op = el('option'); op.value = String(o.v); op.textContent = o.l; if (String(o.v) === it.c) op.selected = true; sel.appendChild(op);
-                });
-                var hexOf = function () { var o = opts.filter(function (o) { return String(o.v) === it.c; })[0]; return (o && o.hex) || '#888'; };
-                dot.style.cssText = 'width:18px;height:18px;border-radius:50%;flex:none;background:' + hexOf();
-                sel.addEventListener('change', function () { it.c = sel.value; dot.style.background = hexOf(); onChange(); });
-                var num = el('input', 'bws-input');
-                num.type = 'number'; num.min = field.countMin || 0; num.max = field.countMax || 99; num.value = it.n;
-                num.style.width = '64px';
-                num.addEventListener('input', function () { it.n = Math.max(0, parseInt(num.value, 10) || 0); onChange(); });
-                var rm = el('button', 'bws-btn');
-                rm.type = 'button'; rm.textContent = '×'; rm.disabled = items.length <= 1;
-                rm.addEventListener('click', function () { items.splice(i, 1); paint(); onChange(); });
-                line.appendChild(dot); line.appendChild(sel); line.appendChild(num); line.appendChild(rm);
-                box.appendChild(line);
-            });
-            add.hidden = items.length >= Math.min(field.max || opts.length, opts.length);
-        }
-        add.addEventListener('click', function () {
-            var free = opts.filter(function (o) { return !items.some(function (x) { return x.c === String(o.v); }); })[0];
-            if (!free) return;
-            items.push({ c: String(free.v), n: 2 }); paint(); onChange();
-        });
-        paint();
-        return {
-            key: field.key,
-            node: row,
-            read: function () {
-                if (!items.length) return { remove: true };
-                return { value: items.map(function (x) { return { c: typeof (opts[0] && opts[0].v) === 'number' ? Number(x.c) : x.c, n: x.n }; }) };
-            },
-        };
-    }
-
-    // A list of dropdowns (e.g. a set of dice), with Add and remove.
-    function buildSelectListRow(field, onChange) {
-        var row = el('div', 'bws-row');
-        row.appendChild(labelFor(field));
-        var opts = (field.options || []).map(function (o) { return o && typeof o === 'object' ? o : { v: o, l: String(o) }; });
-        var box = el('div');
-        row.appendChild(box);
-        var eff = effective(field);
-        var items = (Array.isArray(eff) ? eff : []).map(String);
-        var add = el('button', 'bws-btn');
-        add.type = 'button';
-        add.textContent = '+ Add';
-        row.appendChild(add);
-        function paint() {
-            box.innerHTML = '';
-            items.forEach(function (val, i) {
-                var line = el('div');
-                line.style.cssText = 'display:flex;gap:6px;align-items:center;margin:4px 0';
-                var sel = el('select', 'bws-select');
-                opts.forEach(function (o) { var op = el('option'); op.value = String(o.v); op.textContent = o.l; if (String(o.v) === val) op.selected = true; sel.appendChild(op); });
-                sel.addEventListener('change', function () { items[i] = sel.value; onChange(); });
-                var rm = el('button', 'bws-btn');
-                rm.type = 'button'; rm.textContent = '×'; rm.disabled = items.length <= 1;
-                rm.addEventListener('click', function () { items.splice(i, 1); paint(); onChange(); });
-                line.appendChild(sel); line.appendChild(rm);
-                box.appendChild(line);
-            });
-            add.hidden = items.length >= (field.max || 99);
-        }
-        add.addEventListener('click', function () { items.push(String(field.addValue != null ? field.addValue : (opts[0] && opts[0].v))); paint(); onChange(); });
-        paint();
-        return {
-            key: field.key,
-            node: row,
-            read: function () {
-                if (!items.length) return { remove: true };
-                return { value: items.map(function (x) { return typeof (opts[0] && opts[0].v) === 'number' ? Number(x) : x; }) };
-            },
-        };
-    }
-
-    function buildRow(field, onChange) {
-        if (field.type === 'select-list') return buildSelectListRow(field, onChange);
-        if (field.type === 'colour-counts') return buildColourCountsRow(field, onChange);
-        var eff = effective(field);
-        var row = el('div', 'bws-row');
-        var input;
-
-        if (field.type === 'checkbox') {
-            var lab = el('label', 'bws-check');
-            var span = el('span');
-            span.textContent = field.label || field.key;
-            input = el('input', 'bws-switch');
-            input.type = 'checkbox';
-            input.setAttribute('role', 'switch');
-            input.checked = eff === true;
-            lab.appendChild(span);
-            lab.appendChild(input);
-            row.appendChild(lab);
-
-        } else if (field.type === 'select') {
-            row.appendChild(labelFor(field));
-            input = el('select', 'bws-select');
-            var matched = false;
-            // Options may be declared as { v, l } pairs or as plain strings.
-            // Compare as strings: a deck may have stored 1.4 where the schema
-            // declares "1.4", and a strict compare would lose the selection.
-            (field.options || []).forEach(function (o) {
-                var isObj = o && typeof o === 'object';
-                var v = isObj ? o.v : o;
-                var l = isObj ? (o.l !== undefined ? o.l : o.v) : o;
-                var opt = el('option');
-                opt.value = v;
-                opt.textContent = l;
-                if (String(eff) === String(v)) { opt.selected = true; matched = true; }
-                input.appendChild(opt);
-            });
-            // A saved value no option matches (an older deck's 1.8 where the
-            // sizes now step 1.7, 2): show the nearest, not the first.
-            if (!matched && !isNaN(parseFloat(eff))) {
-                var best = -1, bestD = Infinity;
-                for (var oi = 0; oi < input.options.length; oi++) {
-                    var dd = Math.abs(parseFloat(input.options[oi].value) - parseFloat(eff));
-                    if (dd < bestD) { bestD = dd; best = oi; }
-                }
-                if (best >= 0) input.selectedIndex = best;
-            }
-            row.appendChild(input);
-
-        } else if (field.type === 'ai-model') {
-            row.appendChild(labelFor(field));
-            input = el('select', 'bws-select');
-            var loading = el('option');
-            loading.value = eff == null ? '' : String(eff);
-            loading.textContent = eff ? String(eff) : '— loading… —';
-            input.appendChild(loading);
-            loadModels(input, eff);
-            row.appendChild(input);
-
-        } else if (field.type === 'textarea' || field.type === 'textarea-lines') {
-            row.appendChild(labelFor(field));
-            input = el('textarea', 'bws-area');
-            input.rows = field.rows || (field.type === 'textarea-lines' ? 4 : 3);
-            input.spellcheck = false;
-            if (field.placeholder) input.placeholder = field.placeholder;
-            input.value = Array.isArray(eff) ? eff.join('\n') : (eff == null ? '' : String(eff));
-            row.appendChild(input);
-
-        } else if (field.type === 'file') {
-            row.appendChild(labelFor(field));
-            var fileRow = el('div', 'bws-file');
-            input = el('input', 'bws-input');
-            input.type = 'text';
-            input.readOnly = true;
-            input.placeholder = 'No file selected';
-            input.value = eff == null ? '' : String(eff);
-            input.title = input.value;
-            var btn = el('button', 'bws-btn');
-            btn.type = 'button';
-            btn.textContent = 'Upload';
-            btn.addEventListener('click', function () { pickAsset(field, input, btn, onChange); });
-            fileRow.appendChild(input);
-            fileRow.appendChild(btn);
-            row.appendChild(fileRow);
-
-        } else if (field.type === 'duration') {
-            // Stored as whole seconds, typed as minutes and seconds. Keep in
-            // step with the editor's copy in editor/widget-fields.js.
-            row.appendChild(labelFor(field));
-            var dur = el('div', 'bws-dur');
-            var part = function (unit) {
-                var pl = el('label', 'bws-dur-part');
-                var pi = el('input', 'bws-input');
-                pi.type = 'number'; pi.min = '0'; pi.step = '1'; pi.inputMode = 'numeric';
-                pi.setAttribute('aria-label', (field.label || field.key) + ' — ' + (unit === 'min' ? 'minutes' : 'seconds'));
-                var pu = el('span', 'bws-dur-unit');
-                pu.textContent = unit;
-                pl.appendChild(pi); pl.appendChild(pu);
-                dur.appendChild(pl);
-                return pi;
-            };
-            var dMin = part('min'), dSec = part('sec');
-            var showDur = function (t) {
-                t = Math.max(0, Math.round(Number(t)));
-                dMin.value = String(Math.floor(t / 60));
-                dSec.value = String(t % 60);
-            };
-            if (eff != null && eff !== '' && isFinite(Number(eff))) showDur(eff);
-            else if (field.default != null && isFinite(Number(field.default))) {
-                var dt = Math.round(Number(field.default));
-                dMin.placeholder = String(Math.floor(dt / 60));
-                dSec.placeholder = String(dt % 60);
-            }
-            dur.addEventListener('change', function () {
-                var t = durationTotal(dMin, dSec);
-                if (t != null) showDur(t);
-            });
-            row.appendChild(dur);
-            input = { mins: dMin, secs: dSec,
-                      addEventListener: function (ev, fn) {
-                          dMin.addEventListener(ev, fn); dSec.addEventListener(ev, fn);
-                      } };
-
-        } else {
-            row.appendChild(labelFor(field));
-            input = el('input', 'bws-input');
-            input.type = field.type === 'password' ? 'password'
-                       : (field.type === 'number' || field.type === 'number-nullable') ? 'number'
-                       : 'text';
-            if (field.min !== undefined)  input.min  = field.min;
-            if (field.max !== undefined)  input.max  = field.max;
-            if (field.step !== undefined) input.step = field.step;
-            if (field.placeholder) input.placeholder = field.placeholder;
-            input.value = eff == null ? '' : String(eff);
-            row.appendChild(input);
-        }
-
-        input.addEventListener('input',  onChange);
-        input.addEventListener('change', onChange);
-
-        return {
-            key: field.key,
-            node: row,
-            read: function () {
-                if (field.type === 'checkbox') return { value: input.checked };
-                if (field.type === 'duration') {
-                    var total = durationTotal(input.mins, input.secs);
-                    if (total == null) return { remove: true };
-                    var lo = field.min !== undefined ? Number(field.min) : 1;
-                    return { value: Math.max(lo, total) };
-                }
-                if (field.type === 'number' || field.type === 'number-nullable') {
-                    var raw = input.value.trim();
-                    if (raw === '') return { remove: true };
-                    var n = parseFloat(raw);
-                    return isNaN(n) ? { remove: true } : { value: n };
-                }
-                if (field.type === 'textarea-lines') {
-                    var lines = input.value.split('\n').map(function (s) { return s.trim(); })
-                                     .filter(function (s) { return !!s; });
-                    return lines.length ? { value: lines } : { remove: true };
-                }
-                return input.value === '' ? { remove: true } : { value: input.value };
-            },
-        };
-    }
-
-    // Minutes + seconds boxes → whole seconds, or null when both are empty.
-    function durationTotal(mins, secs) {
-        var m = mins.value.trim(), sv = secs.value.trim();
-        if (m === '' && sv === '') return null;
-        var t = (parseFloat(m) || 0) * 60 + (parseFloat(sv) || 0);
-        return Math.max(0, Math.round(t));
-    }
-
-    /* ─── ai-model options ──────────────────────────────────────── */
-
-    function loadModels(select, current) {
-        var base = cfg().serverUrl;
-        if (!base) return;
-        fetch(base.replace(/\/+$/, '') + '/api/models')
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
-                var models = (data && data.models) || [];
-                select.textContent = '';
-                var none = el('option');
-                none.value = '';
-                none.textContent = '— no model —';
-                select.appendChild(none);
-                models.forEach(function (m) {
-                    var opt = el('option');
-                    opt.value = m;
-                    opt.textContent = m;
-                    if (current === m) opt.selected = true;
-                    select.appendChild(opt);
-                });
-            })
-            .catch(function () {
-                var first = select.firstChild;
-                if (first && first.textContent === '— loading… —') first.textContent = '— unavailable —';
-            });
-    }
-
-    /* ─── file fields ───────────────────────────────────────────── */
+    /* ─── files ─────────────────────────────────────────────────── */
     // The widget can't reach the editor's pending-files map, so the bytes go
     // to the parent, which stores them for the save ZIP, uploads them so the
     // widget can read the file before the deck is saved, and replies with the
@@ -583,31 +149,6 @@
         });
     }
 
-    function pickAsset(field, input, btn, onChange) {
-        var picker = el('input');
-        picker.type = 'file';
-        if (field.accept) picker.accept = field.accept;
-        picker.addEventListener('change', function () {
-            var file = picker.files && picker.files[0];
-            if (!file) return;
-            btn.disabled = true;
-            btn.textContent = 'Uploading…';
-            file.arrayBuffer().then(function (buffer) {
-                return saveFile({ key: field.key, name: file.name, folder: field.folder || 'files', buffer: buffer });
-            }).then(function (path) {
-                btn.disabled = false;
-                btn.textContent = 'Upload';
-                input.value = path;
-                input.title = path;
-                onChange();
-            }).catch(function () {
-                btn.disabled = false;
-                btn.textContent = 'Upload';
-            });
-        });
-        picker.click();
-    }
-
     function onAssetSaved(msg) {
         var p = _pendingAssets[msg.key];
         if (!p) return;
@@ -624,189 +165,7 @@
 
     function onFlushFiles(fn) { _flushHandler = typeof fn === 'function' ? fn : null; }
 
-    /* ─── panel ─────────────────────────────────────────────────── */
-
-    var root = null, rows = [], isOpen = false, commitTimer = null, selfDispatch = false;
-
-    function commit() {
-        var patch = {}, remove = [];
-        rows.forEach(function (r) {
-            var res = r.read();
-            if (res.remove) remove.push(r.key);
-            else patch[r.key] = res.value;
-        });
-        post({ type: 'widget-settings', widgetId: cfg().id, patch: patch, remove: remove });
-
-        // Apply to our own config too, so a widget that re-reads on
-        // `widget-config` updates while the panel is still open rather than
-        // waiting for the next load.
-        var c = cfg();
-        remove.forEach(function (k) { delete c[k]; });
-        Object.keys(patch).forEach(function (k) { c[k] = patch[k]; });
-        applyScale();
-        selfDispatch = true;
-        try { window.dispatchEvent(new MessageEvent('message', { data: { type: 'widget-config', config: c } })); }
-        catch (e) {}
-        selfDispatch = false;
-    }
-
-    // `showIf: { otherKey: value | [values] }` on a field hides it unless
-    // another field currently holds one of those values. Mirrors the editor's
-    // properties panel so both surfaces show the same form.
-    function syncVisibility() {
-        var values = {};
-        rows.forEach(function (r) {
-            var res = r.read();
-            values[r.key] = res.remove ? (r.field ? r.field['default'] : undefined) : res.value;
-        });
-        rows.forEach(function (r) {
-            var cond = r.field && r.field.showIf, show = true;
-            if (cond && typeof cond === 'object') {
-                show = Object.keys(cond).every(function (k) {
-                    var want = Array.isArray(cond[k]) ? cond[k] : [cond[k]];
-                    return want.some(function (w) { return String(w) === String(values[k]); });
-                });
-            }
-            r.node.style.display = show ? '' : 'none';
-        });
-    }
-
-    function scheduleCommit() {
-        if (commitTimer) clearTimeout(commitTimer);
-        commitTimer = setTimeout(function () { commitTimer = null; commit(); }, 150);
-    }
-
-    function onKey(e) {
-        if (e.key !== 'Escape') return;
-        e.preventDefault();
-        e.stopPropagation();
-        closePanel();
-    }
-
-    function build() {
-        injectStyles();
-        rows = [];
-        root = el('div', 'bws-root');
-
-        var head  = el('div', 'bws-head');
-        var title = el('span', 'bws-title');
-        title.textContent = ((schema && schema.label) || 'Widget') + ' settings';
-        var x = el('button', 'bws-x');
-        x.type = 'button';
-        x.title = 'Close settings';
-        x.textContent = '×';
-        x.addEventListener('click', function () { closePanel(); });
-        head.appendChild(title);
-        head.appendChild(x);
-
-        var body = el('div', 'bws-body');
-        if (!fields.length) {
-            var empty = el('div', 'bws-empty');
-            empty.textContent = 'This widget has no settings.';
-            body.appendChild(empty);
-        } else {
-            var onFieldChange = function () { syncVisibility(); scheduleCommit(); };
-            fields.forEach(function (f) {
-                var row = buildRow(f, onFieldChange);
-                row.field = f;
-                rows.push(row);
-                body.appendChild(row.node);
-            });
-            syncVisibility();
-        }
-
-        root.appendChild(head);
-        root.appendChild(body);
-    }
-
-    function openPanel() {
-        if (isOpen) return;
-        isOpen = true;
-        // Grow to the full slide first — most widgets are far too small to
-        // hold a settings form at their placed size.
-        post({ type: 'widget-expand', widgetId: cfg().id });
-        build();
-        document.body.appendChild(root);
-        requestAnimationFrame(function () { if (root) root.classList.add('is-open'); });
-        document.addEventListener('keydown', onKey, true);
-    }
-
-    // silent: the parent already knows (it asked us to close), so don't tell it again.
-    function closePanel(silent) {
-        if (!isOpen) return;
-        isOpen = false;
-        document.removeEventListener('keydown', onKey, true);
-        if (commitTimer) { clearTimeout(commitTimer); commitTimer = null; commit(); }
-        if (root && root.parentNode) root.parentNode.removeChild(root);
-        root = null;
-        rows = [];
-        post({ type: 'widget-collapse', widgetId: cfg().id });
-        if (!silent) post({ type: 'widget-settings-close', widgetId: cfg().id });
-    }
-
-    // "inlineForm": true (with "inlineEdit": true): a widget whose settings are
-    // a form rather than its own content is still edited on itself — the same
-    // fields as the sheet, drawn over the widget while it is in edit mode.
-    var inlineRoot = null;
-    function openInlineForm() {
-        if (inlineRoot) return;
-        readSchema();
-        injectStyles();
-        rows = [];
-        inlineRoot = el('div', 'bws-root bws-inline');
-        var body = el('div', 'bws-body');
-        var onFieldChange = function () { syncVisibility(); scheduleCommit(); };
-        fields.forEach(function (f) {
-            if (f.key === 'scale') return;          // the bar's A / A does that
-            var row = buildRow(f, onFieldChange);
-            row.field = f;
-            rows.push(row);
-            body.appendChild(row.node);
-        });
-        inlineRoot.appendChild(body);
-        (document.getElementById('bw-topbar-body') || document.body).appendChild(inlineRoot);
-        syncVisibility();
-        inlineRoot.classList.add('is-open');
-    }
-    function closeInlineForm() {
-        if (!inlineRoot) return;
-        if (commitTimer) { clearTimeout(commitTimer); commitTimer = null; commit(); }
-        if (inlineRoot.parentNode) inlineRoot.parentNode.removeChild(inlineRoot);
-        inlineRoot = null;
-        rows = [];
-    }
-
-    // edit.form(keys): some of the schema's fields as a form the widget places
-    // itself (a "Settings" popover in its edit bar, say), for the settings that
-    // have no place of their own on the widget. Each change is saved through
-    // edit.set like any other edit. Returns the form's element; call its
-    // .flush() before taking it away so a change still pending is saved.
-    function editForm(keys) {
-        readSchema();
-        injectStyles();
-        var own = [], timer = null;
-        var node = el('div', 'bws-root bws-pop');
-        var body = el('div', 'bws-body');
-        function save() {
-            timer = null;
-            var patch = {}, remove = [];
-            own.forEach(function (r) {
-                var res = r.read();
-                if (res.remove) remove.push(r.key); else patch[r.key] = res.value;
-            });
-            editSet(patch, remove);
-        }
-        (fields || []).forEach(function (f) {
-            if (keys.indexOf(f.key) === -1) return;
-            var row = buildRow(f, function () { if (timer) clearTimeout(timer); timer = setTimeout(save, 200); });
-            row.field = f;
-            own.push(row);
-            body.appendChild(row.node);
-        });
-        node.appendChild(body);
-        node.flush = function () { if (timer) { clearTimeout(timer); save(); } };
-        return node;
-    }
+    var selfDispatch = false;   // our own re-broadcast of widget-config (edit.set)
 
     /* ─── edit mode (editing on the widget itself) ──────────────── */
     // A widget that declares "inlineEdit": true in its schema is set up on the
@@ -830,8 +189,8 @@
     // Opened as a file, outside Beamer+, edit mode works the same; changes
     // simply stay with the page until it is reloaded.
     //
-    // Widgets without "inlineEdit" keep the older route: Edit opens the host's
-    // settings sheet, or, outside Beamer+, the kit's own form (openPanel).
+    // A widget without "inlineEdit" has nothing to set up (whatever it holds
+    // — code, a circuit, a sum — is written on it directly): no Edit button.
 
     var editing = false, editGrew = false;
 
@@ -842,10 +201,7 @@
     function canEdit() {
         if (cfg().role === 'viewer' || window.BEAMER_PRINT || cfg().printMode) return false;
         try { if (new URLSearchParams(location.search).get('viewer') === '1') return false; } catch (e) {}
-        // "edit": false — nothing to set up: whatever the widget holds (code,
-        // a circuit, a function) is written on it directly. No Edit button.
-        if (readSchema() && schema && schema.edit === false) return false;
-        return hasOwnSettings() || inlineEdit();
+        return inlineEdit();
     }
 
     function editSet(patch, remove, opts) {
@@ -887,15 +243,11 @@
     }
 
     function onEditButton() {
-        if (editing) { exitEdit(); return; }
-        if (inlineEdit()) { enterEdit(); return; }
-        // Older widgets: a form, from the host or (opened as a file) our own.
-        if (hosted()) editSettings();
-        else { readSchema(); if (hasSettings) openPanel(); }
+        if (editing) exitEdit(); else enterEdit();
     }
 
     function enterEdit() {
-        if (editing || !canEdit() || !inlineEdit()) return;
+        if (editing || !canEdit()) return;
         editing = true;
         // An overlay or an inset is too small to edit in place: grow it to the
         // slide and show the full widget, with its bar, while it is edited.
@@ -913,7 +265,6 @@
         syncLayoutMode();
         paintEditButtons();
         document.addEventListener('keydown', onEditKey, true);
-        if (schema && schema.inlineForm) openInlineForm();
         // The host stops taking dropped files (as a new deck) while a widget
         // is edited, so a file dropped on the widget reaches the widget.
         post({ type: 'widget-editing', widgetId: cfg().id, on: true });
@@ -932,7 +283,6 @@
             titleEl.removeAttribute('title');
         }
         document.removeEventListener('keydown', onEditKey, true);
-        closeInlineForm();
         if (editGrew) post({ type: 'widget-collapse', widgetId: cfg().id });
         editGrew = false;
         syncTitle();
@@ -978,7 +328,7 @@
 
     var editApi = {
         /** Can this copy be edited at all (presenter, not a print copy)? */
-        available: function () { return canEdit() && inlineEdit(); },
+        available: function () { return canEdit(); },
         /** Is the widget in edit mode now? */
         get active() { return editing; },
         isActive: function () { return editing; },
@@ -989,8 +339,6 @@
          * Saved with the slide inside Beamer+, kept until reload outside it.
          */
         set: editSet,
-        /** Some schema fields as a form for the widget to place: form(keys). */
-        form: editForm,
     };
 
     /* ─── top bar ───────────────────────────────────────────────── */
@@ -1455,7 +803,7 @@
                : target || document.getElementById('bw-topbar-body') || document.body;
         if (!el) return Promise.reject(new Error('nothing to snapshot'));
         var scale = opts.scale || _printScale || 2;
-        var ignoreSel = '.bw-topbar, [data-bw-print-hide], .bws-root' + (opts.ignore ? ', ' + opts.ignore : '');
+        var ignoreSel = '.bw-topbar, [data-bw-print-hide]' + (opts.ignore ? ', ' + opts.ignore : '');
         return loadHtml2Canvas().then(function (h2c) {
             return h2c(el, {
                 scale: scale,
@@ -1516,9 +864,6 @@
                 useCORS: true,
                 width: window.innerWidth,
                 height: window.innerHeight,
-                ignoreElements: function (n) {
-                    try { return n.matches && n.matches('.bws-root'); } catch (e) { return false; }
-                },
             });
         }).then(function (canvas) {
             return (window.createImageBitmap ? createImageBitmap(canvas) : Promise.resolve(null))
@@ -1617,8 +962,6 @@
     window.addEventListener('message', function (e) {
         if (selfDispatch) return;   // our own local re-broadcast of widget-config
         var d = e.data || {};
-        if (d.type === 'widget-open-settings')  { readSchema(); if (hasSettings) openPanel(); return; }
-        if (d.type === 'widget-close-settings') { closePanel(true); exitEdit(); return; }
         if (d.type === 'widget-cleanup')        { exitEdit(); return; }
         if (d.type === 'widget-asset-saved')    { onAssetSaved(d); return; }
         if (d.type === 'widget-print')          { handlePrint(d); return; }
@@ -1640,7 +983,6 @@
             syncTitle();
             if (editing && !canEdit()) exitEdit();
             syncLayoutMode();
-            announce();  // the id may only have arrived with this message
             return;
         }
         // The host moved or resized the widget's box (edited in the editor
@@ -1664,11 +1006,8 @@
         serverUrl:     serverUrl,
         saveFile:      saveFile,
         onFlushFiles:  onFlushFiles,
-        openSettings:  onEditButton,
         // Editing on the widget itself — see "edit mode" above.
         edit:          editApi,
-        closeSettings: function () { closePanel(); },
-        hasSettings:   function () { readSchema(); return hasSettings; },
         topbar:        topbarApi,
         name:          function (fallback) { readSchema(); return name(fallback); },
         fileName:      function (fallback, ext) { readSchema(); return fileName(fallback, ext); },
@@ -1702,7 +1041,7 @@
     }, true);
 
     function init() {
-        applyScale(); announce(); buildTopbar(); syncScaleButtons();
+        applyScale(); buildTopbar(); syncScaleButtons();
         watchBarControls(); syncLayoutMode();
     }
 

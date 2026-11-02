@@ -95,7 +95,7 @@ export function initSplitWidgets(state) {
     mo.observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
     for (const ev of ['slide:changed', 'split:resized', 'slides:remapped', 'slides:reordered',
-                      'widgets:changed', 'split-widgets:changed']) bus.on(ev, queueSync);
+                      'split-widgets:changed']) bus.on(ev, queueSync);
     bus.on('deck:loaded', () => { _told.clear(); _placed.clear(); _loads.clear(); queueSync(); });
     window.addEventListener('resize', queueSync);
 }
@@ -226,8 +226,8 @@ async function sync() {
     }
 
     // Keep up with the slides while any half is on screen: the stage slides
-    // and resizes in transitions (opening the split, the settings sheet, the
-    // divider) that end without an event.
+    // and resizes in transitions (opening the split, the divider) that end
+    // without an event.
     const anyShown = splitIframes().some(f => f.style.opacity !== '0');
     if (anyShown && !_rafLoop) _rafLoop = requestAnimationFrame(follow);
 }

@@ -65,22 +65,18 @@ const _WIDGET_BASE_INJECT = `<link rel="preconnect" href="https://fonts.googleap
 const _SETTINGS_KIT_INJECT = `<script src="/static/js/widget-settings-kit.js"></script>`;
 
 // ── Widget schema protocol ─────────────────────────────────────────────────
-// Each widget HTML file may declare its own editable fields via:
+// Each widget HTML file describes itself in:
 //
 //   <script id="widget-schema" type="application/json">
-//   { "label": "...", "category": "...", "fields": [ ... ] }
+//   { "label": "...", "category": "...", "inlineEdit": true, "modes": [...] }
 //   </script>
 //
-// The settings kit injected into every widget reads it and, when there are
-// fields beyond Name and Text size, puts a pencil in the widget's top bar that
-// opens the widget's settings dialog (editor/widget-settings-dialog.js); the
-// editor panel shows only Name, Text size and layout. A widget that wants a
-// settings UI of its own declares "customSettings": true and handles the
-// widget-open-settings message itself.
-// The fields array:
-//   { key, label, type, placeholder?, default?, min?, max?, step?, note?,
-//     options?: [{v, l}], rows? }
-// type ∈ text | number | number-nullable | checkbox | select | textarea | textarea-lines
+// Beamer+ reads only how the widget is shown (editor/widget-schema.js); it
+// never reads or edits the widget's own settings. A widget with settings
+// declares "inlineEdit": true: the settings kit injected into it then puts an
+// Edit button in its top bar, and the widget edits its settings on itself and
+// saves them with BeamerWidget.edit.set() (editor/widget-settings.js stores
+// them on its config item).
 
 // ── Expand/collapse registry ───────────────────────────────────────────────
 // widgetId → { iframe, container, savedStyle }
@@ -955,9 +951,8 @@ export function postToWidget(widgetId, message) {
 }
 
 /**
- * Hand a widget its changed settings while it keeps running (a widget whose
- * schema declares "liveSettings": true — see editor/widget-settings-dialog.js).
- * Every live copy gets the same payload it was built with, so the widget sees
+ * Hand a widget its changed config while it keeps running (its name or text
+ * size, changed in the editor's panel). Every live copy gets the same payload it was built with, so the widget sees
  * one full config, never a patch: a key that's gone means "back to default".
  * Each copy's signature is brought up to date, so the next render reuses the
  * iframe instead of rebuilding it for a change it already has.

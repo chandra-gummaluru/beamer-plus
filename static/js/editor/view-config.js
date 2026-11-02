@@ -4,13 +4,13 @@
 // shown are the insert toolbar's trash and eye (editor.js).
 import { bus } from '../core/events.js';
 import { getSlideLabels } from '../slides/structure.js';
-import { ctx, escAttr, escHtml, setPanelMode, resolvePanelMode, setTitleEditable, setPanelTitle, slideName } from './context.js';
+import { ctx, escAttr, escHtml, setPanelMode, resolvePanelMode, setTitleEditable, slideName } from './context.js';
 import { pickPanes } from './pane-picker.js';
-import { splitWidgetsOf, queueSync, loadSplitConfig } from '../slides/split-widgets.js';
+import { splitWidgetsOf, loadSplitConfig } from '../slides/split-widgets.js';
 import { removeSplitWidgetSlide, insertSplitWidgetSlide } from '../slides/structure.js';
 import { widgetCatalog, widgetIcon, pickSplitWidget } from './widget-picker.js';
 import { getWidgetSchema } from './widget-schema.js';
-import { buildWidgetForm } from './widget-fields.js';
+import { buildTextSizeGroup } from './widget-panel.js';
 import { pushWidgetConfig } from '../core/iframe-widget-renderer.js';
 
 export function showViewConfig(i) {
@@ -298,13 +298,12 @@ async function openSplitWidgetPanel(i, obj, w, label, opts = {}) {
     const sel = ctx.selectedSplit;
     const schema = await getWidgetSchema(w);
     if (ctx.selectedSplit !== sel) return;
-    const scale = (schema?.fields || []).filter(f => f.key === 'scale');
-    if (scale.length) {
-        const form = buildWidgetForm({ ...schema, fields: scale }, w, 'panel');
-        host.appendChild(form.node);
-        const apply = () => { form.apply(w); pushWidgetConfig(w.id, w); };
-        form.node.addEventListener('input', apply);
-        form.node.addEventListener('change', apply);
+    const general = buildTextSizeGroup(w, schema, () => pushWidgetConfig(w.id, w));
+    if (general) {
+        const root = document.createElement('div');
+        root.className = 'wf wf--panel';
+        root.appendChild(general);
+        host.appendChild(root);
     }
     // A split widget slide sets its split here too: there is no split view
     // panel behind it.

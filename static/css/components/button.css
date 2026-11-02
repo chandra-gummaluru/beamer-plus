@@ -7,7 +7,7 @@
    .btn--add            adds something: dashed ink outline, yellow when hovered
    .btn--ghost          no fill or border until hovered: toolbars, ×, quiet links
    .btn--danger         destructive; filled red once armed (.is-armed)
-   .btn--sm             --ctl-h tall: the editor panel and settings sheet
+   .btn--sm             --ctl-h tall: the editor panel
    .btn--icon           square, for an icon alone
    .btn_selected        a toggle that is on (tools, split view, bookmark)
    .link                a quiet text action inside prose ("Or download instead")

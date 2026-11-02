@@ -158,20 +158,38 @@ def summarize(responses: list[str], n: int, api_key: str | None = None):
 Widgets are standalone HTML files in `widgets/`, rendered in iframes on
 slides. Built-ins include a calculator, camera, circuit sandbox, function
 plotter, Jupyter-notebook runner, map, an audience-response panel (multiple
-choice, true/false, rating, numeric estimate, word cloud, open-ended), PDF
-textbook viewer, Python workspace, Python shell, randomizer, table, terminal,
-timer, and YouTube player.
+choice, true/false, rating, numeric estimate, numerical answer, word cloud,
+fill in the blanks, 2D plot, open-ended), PDF textbook viewer, Python
+workspace, randomizer, terminal, timer, and YouTube player.
 A widget is shown either full (the whole slide) or, if it supports it, as an
 overlay — a small box over part of a content slide, with no bar (the timer,
-calculator and Python shell do).
+calculator and function plotter do).
+
+A widget's own settings are the widget's business: Beamer+ edits only what
+every widget shares — its name, text size and place on the slide (the
+editor panel). A widget with settings declares `"inlineEdit": true` and is
+set up on itself: the Edit button in its top-right corner puts it into edit
+mode, where its own content is the form — the timer's digits are its
+duration, the poll's question and answers are typed where they show — and
+`BeamerWidget.edit.set()` saves each change with the slide. A widget without
+it (the calculator, the circuit sandbox) has nothing to set up and no Edit
+button.
 
 To add your own, drop an `.html` file in `widgets/`. A `<script
-id="widget-schema" type="application/json">` block in the file describes its
-settings (the editor panel only holds its name, text size and position). The
-settings kit (`static/js/widget-settings-kit.js`) gives every widget the
-`BeamerWidget` API and the Edit button in its top-right corner; a widget can
-say how it appears in the notes PDF by registering a print handler
-(`BeamerWidget.print.register`).
+id="widget-schema" type="application/json">` block in the file describes it:
+
+```json
+{ "label": "My Widget", "category": "Tools", "inlineEdit": true,
+  "modes": ["full", "overlay"], "overlaySize": { "width": 0.3, "height": 0.3 } }
+```
+
+`label` and `category` place it in the widget picker; `modes` (or
+`"fullSlide": true`) say how it can be shown; `"fontSize": false` opts out
+of the text-size control and `"scale"` sets its default. The settings kit
+(`static/js/widget-settings-kit.js`) gives every widget the `BeamerWidget`
+API (its config, edit mode, saving files into the deck) and the shared top
+bar; a widget can say how it appears in the notes PDF by registering a print
+handler (`BeamerWidget.print.register`).
 
 ### Split widgets
 
@@ -184,18 +202,11 @@ It is one widget with one iframe, saved in the view's own config
 each in its own pane; a slide shown on its own shows its half as it was left,
 not clickable. Deleting it removes both halves.
 
-A widget opts in with `"split": { "left": [...], "right": [...], "hide": [...] }`
-in its schema (which panes may go on each side, and which settings don't
-apply when split). The host lays the iframe over both slides, clipped to them,
-and tells the widget where each half is:
+A widget opts in with `"split": { "left": [...], "right": [...] }` in its
+schema (which panes may go on each side). The host lays the iframe over both
+slides, clipped to them, and tells the widget where each half is:
 `{ type: 'widget-split', live, left: {x, y, w, h} | null, right: … }` in the
 iframe's own pixels (`static/js/slides/split-widgets.js`).
-
-A widget that declares `"inlineEdit": true` (most built-ins now) is set up
-on itself: Edit puts it into edit mode, where its own content is the form —
-the timer's digits are its duration, the poll's question and answers are
-typed where they show — and `BeamerWidget.edit.set()` saves each change with
-the slide. Other widgets' Edit still opens a settings form.
 
 Every widget is self-contained, so it also works opened straight from disk:
 `python tools/stamp_widgets.py` copies the current `widget-base.css` and kit

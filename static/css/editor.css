@@ -174,46 +174,6 @@ body.edit-mode #editor-panel { display: flex; }
     cursor: pointer;
 }
 
-/* Textareas share the input's box, minus its fixed single-line height. */
-.editor-prop-area {
-    min-height: 0;
-    line-height: 1.45;
-    resize: vertical;
-}
-
-.editor-prop-file {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-}
-.editor-prop-file .field {
-    flex: 1 1 auto;
-    min-width: 0;
-}
-.editor-prop-file-btn { flex: 0 0 auto; }
-
-/* Duration: minutes and seconds side by side, each with its unit after it. */
-.wf-duration {
-    display: flex;
-    gap: var(--sp-2);
-}
-.wf-duration-part {
-    flex: 1 1 0;
-    min-width: 0;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-.wf-duration-part .field {
-    flex: 1 1 auto;
-    min-width: 0;
-}
-.wf-duration-unit {
-    flex: 0 0 auto;
-    font-size: var(--fs-xs);
-    color: var(--ink-3);
-}
-
 /* ─── Insert toolbar ───────────────────────────────────────────────
    Docked to the top edge of the stage while editing, the way the annotation
    toolbar docks to the right edge while presenting: the same glass surface,
@@ -363,8 +323,7 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
     body.edit-mode .slide-nav-ghost { transform: none; transition: none; }
 }
 
-/* ─── Widget settings form (editor/widget-fields.js) ──────────── */
-/* Shared by the editor panel and the settings sheet. */
+/* ─── Panel settings: rows, switches, groups ─────────────────── */
 
 /* Slide settings: a toggle per setting, as a labelled row. */
 .slide-setting {
@@ -484,7 +443,7 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
     box-shadow: 0 0 0 3px oklch(from var(--accent) l c h / 0.25);
 }
 
-/* Groups ("section" in the schema). */
+/* Groups in the panel (General, Layout). */
 .wf { display: flex; flex-direction: column; gap: var(--sp-5); }
 .wf-group { display: flex; flex-direction: column; gap: var(--sp-3); }
 /* A step above the field labels (which are small caps), so a group reads as
@@ -502,139 +461,6 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 /* `hidden` loses to the flex display above without this. */
 .wf-group[hidden],
 .wf .editor-prop-row[hidden] { display: none; }
-
-.wf-mono { font-family: var(--font-mono); font-size: var(--fs-sm); }
-
-/* List editor — one input per answer. */
-.wf-list { display: flex; flex-direction: column; gap: 6px; }
-.wf-list-item {
-    display: grid;
-    grid-template-columns: 16px minmax(0, 1fr) auto auto;
-    align-items: center;
-    gap: 6px;
-}
-.wf-list:not(.has-correct) .wf-list-item { grid-template-columns: 16px minmax(0, 1fr) auto; }
-.wf-list-num {
-    font-size: var(--fs-xs);
-    font-weight: 600;
-    color: var(--ink-4);
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-    font-family: var(--font-sans);
-}
-.wf-list-correct,
-.wf-list-remove {
-    width: 26px;
-    height: 26px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    border-radius: var(--r-sm);
-    background: none;
-    border: 1px solid transparent;
-    color: var(--ink-4);
-    cursor: pointer;
-    transition: color var(--dur-fast), background var(--dur-fast), border-color var(--dur-fast);
-}
-.wf-list-correct { border-color: var(--line-2); background: var(--surface-paper); }
-.wf-list-correct:hover { color: var(--success); border-color: var(--success); }
-.wf-list-correct[aria-pressed="true"] { background: var(--success); border-color: var(--success); color: var(--ink-on-accent); }
-.wf-list-item.is-correct .wf-list-input { border-color: oklch(from var(--success) l c h / 0.6); }
-.wf-list-remove:hover:not(:disabled) { color: var(--danger); background: oklch(from var(--danger) l c h / 0.08); }
-.wf-list-remove:disabled { opacity: 0.35; cursor: default; }
-.wf-list-add {
-    /* Under the list, at its right edge, the same height as the controls. */
-    align-self: flex-end;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    height: 26px;
-    padding: 0 10px;
-    background: none;
-    border: 1px dashed var(--line-3);
-    border-radius: var(--r-sm);
-    font-size: var(--fs-xs);
-    font-family: var(--font-sans);
-    color: var(--ink-2);
-    cursor: pointer;
-}
-.wf-list-add:hover { border-color: var(--accent); color: var(--ink-1); background: var(--surface-paper); }
-
-/* Template editor — the textarea is transparent over a mirror that paints
-   the same text, so every blank can be highlighted in place. The two must
-   share every metric that affects wrapping. */
-.wf-template-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); }
-.wf-chip-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 3px 9px 3px 4px;
-    background: var(--surface-paper);
-    border: 1px solid var(--line-2);
-    border-radius: var(--r-pill);
-    font-size: var(--fs-xs);
-    font-family: var(--font-sans);
-    color: var(--ink-1);
-    cursor: pointer;
-}
-.wf-chip-btn:hover { border-color: var(--accent); }
-.wf-blank-chip {
-    padding: 3px 5px;
-    border-radius: var(--r-sm);
-    background: var(--bookmark-soft);
-    color: var(--bookmark-ink);
-    font: 600 var(--fs-xs)/1 var(--font-mono);
-    letter-spacing: 0.04em;
-}
-.wf-blank-count { font-size: var(--fs-xs); color: var(--ink-3); font-family: var(--font-sans); }
-.wf-blank-count.is-empty { color: var(--warning); }
-.wf-code {
-    position: relative;
-    background: var(--surface-paper);
-    border: 1px solid var(--line-2);
-    border-radius: var(--r-sm);
-}
-.wf-code:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px oklch(from var(--accent) l c h / 0.12); }
-.wf-code-mirror,
-.wf-code-input {
-    box-sizing: border-box;
-    width: 100%;
-    margin: 0;
-    padding: 8px 10px;
-    border: 0;
-    font-family: var(--font-mono);
-    font-size: var(--fs-sm);
-    line-height: 1.55;
-    letter-spacing: 0;
-    tab-size: 4;
-    white-space: pre-wrap;
-    overflow-wrap: break-word;
-    word-break: normal;
-    scrollbar-gutter: stable;
-}
-.wf-code-mirror {
-    position: absolute;
-    inset: 0;
-    overflow: hidden;
-    color: transparent;
-    pointer-events: none;
-}
-.wf-code-mirror mark {
-    color: transparent;
-    background: var(--bookmark-soft);
-    border-radius: var(--r-xs);
-    box-shadow: 0 0 0 1px var(--bookmark);
-}
-.wf-code-input {
-    position: relative;
-    display: block;
-    min-height: 0;
-    background: transparent;
-    color: var(--ink-1);
-    resize: vertical;
-    outline: none;
-}
 
 /* ─── Widget settings, in the panel (editor/widget-panel.js) ───── */
 
@@ -688,39 +514,6 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 #editor-widget .editor-prop-row--inline > .field { width: 100%; }
 #editor-widget select.field { max-width: none; align-self: stretch; }
 
-/* Two or three choices: a segmented control, every option in view. */
-.wf-seg {
-    display: flex;
-    padding: 3px;
-    gap: 3px;
-    background: var(--surface-cream-2);
-    border-radius: var(--r-sm);
-}
-.wf-seg-btn {
-    flex: 1 1 0;
-    min-width: 0;
-    min-height: 28px;
-    padding: 0 6px;
-    background: none;
-    border: none;
-    border-radius: var(--r-sm);
-    font-family: var(--font-sans);
-    font-size: var(--fs-sm);
-    font-weight: 500;
-    color: var(--ink-2);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    cursor: pointer;
-    transition: background var(--dur-fast), color var(--dur-fast), box-shadow var(--dur-fast);
-}
-.wf-seg-btn:hover { color: var(--ink-1); }
-.wf-seg-btn.is-active {
-    background: #f7c548;
-    color: var(--ink-1);
-    box-shadow: inset 0 0 0 1.5px var(--ink-1);
-}
-
 /* Text size: A, A, A … growing — pick the one that looks right. */
 .wf-sizes {
     display: flex;
@@ -754,9 +547,6 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
     background: #f7c548;
     box-shadow: inset 0 0 0 1.5px var(--ink-1);
 }
-
-/* Minutes and seconds share the line evenly. */
-#editor-widget .wf-duration-part { flex: 1 1 0; }
 
 /* ── Layout card ── a Full slide switch over X / Y / Width / Height. */
 .wp-geom { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
@@ -1058,7 +848,6 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 .wp-num input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .wp-num input { -moz-appearance: textfield; appearance: textfield; }
 
-
 /* ─── View slide: the split picker (editor/view-config.js) ──────── */
 /* The two panes drawn to scale; drag anywhere on it to move the line. */
 .vs-split {
@@ -1235,194 +1024,6 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 .edit-snap-guide--center.edit-snap-guide--v { background: repeating-linear-gradient(to bottom, var(--guide) 0 6px, transparent 6px 10px); }
 .edit-snap-guide--center.edit-snap-guide--h { background: repeating-linear-gradient(to right,  var(--guide) 0 6px, transparent 6px 10px); }
 
-/* Colour + count list — a swatch that opens a palette, and a −/+ count. */
-.wf-cc { display: flex; flex-direction: column; gap: 6px; }
-.wf-cc-item {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto auto;
-    align-items: center;
-    gap: 8px;
-}
-.wf-cc .wf-cc-swatch { width: 26px; height: 26px; }   /* the pen swatch, row-sized */
-.wf-cc-swatch.is-open,
-.wf-cc-swatch:focus-visible,
-.wf-cc-choice:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 2px var(--surface-paper), 0 0 0 4px var(--accent);
-    border-color: transparent;
-}
-.wf-cc-name { font-size: var(--fs-sm); color: var(--ink-2); font-family: var(--font-sans); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wf-cc-step {
-    display: inline-flex; align-items: center;
-    height: 26px;
-    border: 1px solid var(--line-2);
-    border-radius: var(--r-sm);
-    background: var(--surface-paper);
-    overflow: hidden;
-}
-.wf-cc-step button {
-    width: 24px; height: 100%; padding: 0;
-    border: none; background: none;
-    color: var(--ink-3); font-size: var(--fs-base); line-height: 1;
-    cursor: pointer;
-}
-.wf-cc-step button:hover:not(:disabled) { background: oklch(from var(--accent) l c h / 0.08); color: var(--ink-1); }
-.wf-cc-step button:disabled { opacity: 0.3; cursor: default; }
-.wf-cc-num {
-    width: 30px; height: 100%;
-    border: none; border-left: 1px solid var(--line-1); border-right: 1px solid var(--line-1);
-    background: none; text-align: center;
-    font: 600 var(--fs-sm) var(--font-sans); color: var(--ink-1);
-    font-variant-numeric: tabular-nums;
-}
-.wf-cc-num:focus { outline: none; background: oklch(from var(--accent) l c h / 0.06); }
-.wf-cc-add[hidden] { display: none; }
-.wf-cc-pop {
-    position: fixed; z-index: 10000;
-    display: grid; grid-template-columns: repeat(4, 32px); gap: var(--sp-2, 8px);
-    padding: 12px;
-    background: var(--surface-paper, var(--surface-paper));
-    border: 1px solid var(--line-1);
-    border-radius: var(--r-md);
-    box-shadow: 0 8px 24px oklch(0% 0 0 / 0.16), 0 2px 6px oklch(0% 0 0 / 0.08);
-    animation: wf-cc-in 120ms ease-out;
-}
-.wf-cc-pop .wf-cc-choice:disabled { opacity: 0.25; cursor: default; transform: none; }
-@keyframes wf-cc-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
-.wf-list-add[hidden] { display: none; }
-
-/* ─── A widget's own settings sheet (editor/widget-settings-dialog.js) ───
-   Opened from the pencil on the widget. A fixed panel down the right edge,
-   the same as the editor's (width, surface, header), over the tool rail, so
-   the slide — and the widget changing as you edit — stays in view. One column: headed groups separated by a hairline, labels
-   as sentences, every control the same height. */
-.wsheet {
-    position: fixed;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 1100;
-    width: var(--editor-panel-width);
-    display: flex;
-    flex-direction: column;
-    background: var(--surface-cream);
-    border-left: var(--line-soft);
-    font-family: var(--font-sans);
-    color: var(--ink-1);
-    opacity: 0;
-    transform: translateX(16px);
-    transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-slow) var(--ease-out);
-    pointer-events: none;
-}
-.wsheet.is-open { opacity: 1; transform: none; pointer-events: auto; }
-/* The stage makes room for it, as for the editor's panel. The tool rail
-   stays where it is, under the sheet, until the sheet closes. */
-body.wsheet-open #main-content { padding-right: var(--editor-panel-width); }
-
-.wsheet-head {
-    flex: 0 0 auto;
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    height: 64px;
-    padding: 0 14px 0 20px;
-    border-bottom: var(--line-soft);
-}
-.wsheet-titles { flex: 1 1 auto; min-width: 0; }
-.wsheet-title {
-    margin: 0;
-    font-family: var(--font-serif);
-    font-size: var(--fs-xl);
-    font-weight: 500;
-    line-height: 1.15;
-    letter-spacing: -0.01em;
-    color: var(--ink-1);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.wsheet-kind { margin-top: 2px; font-size: var(--fs-sm); color: var(--ink-3); }
-.wsheet-close { flex: 0 0 auto; }
-
-.wsheet-body {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    padding: 18px 20px 24px;
-    scrollbar-width: thin;
-    scrollbar-color: var(--line-2) transparent;
-}
-
-.wsheet-foot {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: var(--sp-3);
-    padding: var(--sp-3) var(--sp-5);
-    border-top: var(--line-soft);
-}
-/* The form: groups as sections, not cards. */
-.wsheet .wf { gap: 0; }
-.wsheet .wf-group { gap: var(--sp-3); }
-.wsheet .wf-group:not([hidden]) ~ .wf-group:not([hidden]) {
-    margin-top: var(--sp-5);
-    padding-top: var(--sp-5);
-    border-top: var(--line-soft);
-}
-.wsheet .wf-group-title {
-    padding: 0;
-    border: none;
-    font-family: var(--font-sans);
-    font-size: var(--fs-xs);
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--ink-3);
-}
-.wsheet .wf-group-body { gap: var(--sp-4); }
-.wsheet .editor-prop-row { gap: 6px; }
-.wsheet .editor-prop-label {
-    font-size: var(--fs-sm);
-    font-weight: 500;
-    text-transform: none;
-    letter-spacing: 0;
-    color: var(--ink-1);
-}
-
-/* Fields are the standard .field; a code box takes the same focus ring. */
-.wsheet .wf-code:focus-within {
-    border-color: var(--ink-2);
-    box-shadow: var(--ring);
-}
-.wsheet textarea.field { resize: none; }
-/* Short settings stack under their label, full width; only a switch sits
-   beside its label. */
-.wsheet .editor-prop-row--inline { flex-direction: column; align-items: stretch; }
-.wsheet .editor-prop-row--inline > select.field,
-.wsheet .editor-prop-row--inline > .field,
-.wsheet select.field { max-width: none; align-self: stretch; }
-.wsheet .wf-seg { padding: 3px; }
-.wsheet .wf-seg-btn { min-height: 28px; }
-.wsheet .wf-duration-part { flex: 1 1 0; }
-.wsheet .num-stepper { min-height: var(--ctl-h); }
-.wsheet .wf-mono,
-.wsheet .wf-code-mirror,
-.wsheet .wf-code-input { font-size: var(--fs-sm); }
-
-/* Answer lists: the row inputs at the same height as everything else. */
-.wsheet .wf-list { gap: var(--sp-2); }
-.wsheet .wf-list-input { min-height: var(--ctl-h); }
-
-
-@media (max-width: 640px) {
-    body.wsheet-open #main-content { padding-right: 0; }
-    .wsheet { top: auto; left: 8px; right: 8px; bottom: 8px; width: auto; max-height: 72vh; transform: translateY(16px); }
-}
-@media (prefers-reduced-motion: reduce) {
-    .wsheet { transition: none; transform: none; }
-}
-
 /* ═══════════════════════════════════════════════════════════════════
    The editor panel, as designed (Beamer+ Edit Mode Redesign, boards 4–7)
    Always open while editing. One height (34px), one border, one radius
@@ -1595,7 +1196,7 @@ body.wsheet-open #main-content { padding-right: var(--editor-panel-width); }
 
 .editor-dd-menu {
     position: fixed;
-    z-index: 1300;          /* over the panel, the settings sheet and the toolbar */
+    z-index: 1300;          /* over the panel and the toolbar */
     box-sizing: border-box;
     padding: 4px;
     display: flex;
@@ -1632,8 +1233,7 @@ body.wsheet-open #main-content { padding-right: var(--editor-panel-width); }
 .editor-dd-check { flex: 0 0 auto; color: var(--ink-1); }
 
 /* ── Number boxes: the unit inside, small arrows stacked at the right ── */
-#editor-panel .num-stepper,
-.wsheet .num-stepper {
+#editor-panel .num-stepper {
     display: flex;
     align-items: stretch;
     min-height: var(--ctl-h);
@@ -1645,12 +1245,9 @@ body.wsheet-open #main-content { padding-right: var(--editor-panel-width); }
     overflow: hidden;
 }
 #editor-panel .num-stepper:hover { border-color: var(--line-3); }
-#editor-panel .num-stepper:focus-within,
-.wsheet .num-stepper:focus-within { border-color: var(--ink-2); box-shadow: var(--ring); background: var(--surface-paper); }
-#editor-panel .num-stepper-field,
-.wsheet .num-stepper-field { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; padding: 0 6px 0 12px; justify-content: flex-start; }
-#editor-panel .num-stepper .field,
-.wsheet .num-stepper .field {
+#editor-panel .num-stepper:focus-within { border-color: var(--ink-2); box-shadow: var(--ring); background: var(--surface-paper); }
+#editor-panel .num-stepper-field { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; padding: 0 6px 0 12px; justify-content: flex-start; }
+#editor-panel .num-stepper .field {
     min-height: 0; height: 100%; padding: 0; border: 0; background: transparent; box-shadow: none;
     text-align: left; font-size: var(--fs-base);
 }
@@ -1676,12 +1273,8 @@ body.wsheet-open #main-content { padding-right: var(--editor-panel-width); }
 .num-stepper-arrows .num-stepper-btn + .num-stepper-btn { border-top: 1px solid var(--line-1); }
 .num-stepper-arrows .num-stepper-btn:hover { background: var(--surface-cream-2); color: var(--ink-1); }
 
-/* ── Switch rows ── */
-
-/* ── Choices of two or three, and Text size ── */
-#editor-panel .wf-seg,
+/* ── Text size ── */
 #editor-panel .wf-sizes { padding: 3px; gap: 2px; background: var(--surface-cream-2); border-radius: var(--r-md); }
-#editor-panel .wf-seg-btn { min-height: 28px; border-radius: var(--r-sm); font-size: var(--fs-sm); }
 #editor-panel .wf-size-btn { height: 30px; border-radius: var(--r-sm); }
 
 /* ── On This Slide ── */
@@ -1727,7 +1320,6 @@ body.wsheet-open #main-content { padding-right: var(--editor-panel-width); }
 
 .slide-item:hover .slide-item-chev { color: var(--ink-2); }
 .slide-items-empty { margin: 0; font-size: var(--fs-sm); line-height: 1.5; color: var(--ink-3); }
-
 
 /* ─── Picking a split view's slides (editor/pane-picker.js) ─────────
    A bar docked to the top of the stage says which pane comes next; the
@@ -1790,7 +1382,6 @@ body.picking-panes #slide-nav-slides .slide-nav-item:hover .slide-preview { outl
 .editor-secondary-btn { width: 100%; }
 .slide-item.is-empty { cursor: default; border-style: dashed; background: transparent; }
 .slide-item.is-empty .slide-item-name { color: var(--ink-3); }
-
 
 /* The split view's panel: its split widget (view-config.js). */
 .view-split-add { display: flex; flex-direction: column; gap: 6px; }

@@ -1,23 +1,25 @@
-// Widget schema reader — the parent's copy of a widget's own field list.
+// Widget schema reader — what Beamer+ needs to know about a widget.
 //
-// Every widget declares what it can be configured with in a JSON block:
+// Every widget describes itself in a JSON block:
 //
 //   <script id="widget-schema" type="application/json">
-//   { "label": "...", "fields": [ { "key": ..., "label": ..., "type": ... } ] }
+//   { "label": "Timer", "category": "Tools", "inlineEdit": true,
+//     "modes": ["full", "overlay"] }
 //   </script>
 //
-// The settings kit inside the iframe reads that block to draw the widget's own
-// panel. The editor reads it here, from the widget's HTML directly: the
-// editor panel's Name / Text size / layout (widget-panel.js), and the
-// widget's own settings dialog (widget-settings-dialog.js).
+// Beamer+ reads only how the widget can be shown (its label, modes, overlay
+// size, whether it fills the slide or can span a split view) and its text
+// size: the editor panel's Name / Text size / layout (widget-panel.js). A
+// widget's own settings are the widget's business — it edits them itself, in
+// its edit mode, and saves them with BeamerWidget.edit.set().
 //
 // The HTML comes from wherever the widget itself would be loaded from: the
 // server for a built-in, the deck's ZIP (or the pending-files map) for one the
 // presenter supplied.
-import { ctx, WIDGET_RESERVED } from './context.js';
+import { ctx } from './context.js';
 import { resolveWidgetPath, findWidgetFile } from '../core/iframe-widget-renderer.js';
 
-// cache key → Promise<{ label, fields, … } | null>. Keyed by
+// cache key → Promise<{ label, modes, … } | null>. Keyed by
 // source rather than by widget id: two survey widgets share one schema, and
 // the fetch should happen once per deck.
 const _cache = new Map();
@@ -30,7 +32,7 @@ function cacheKey(item) {
     return path ? `file:${path}` : null;
 }
 
-/** Read a widget's declared fields. Resolves null if it declares none. */
+/** Read a widget's schema. Resolves null if it declares none. */
 export function getWidgetSchema(item) {
     const key = cacheKey(item);
     if (!key) return Promise.resolve(null);
@@ -57,33 +59,15 @@ async function loadSchema(item) {
     try { schema = JSON.parse(m[1].trim()); }
     catch (err) { console.warn('[editor] widget-schema is not valid JSON:', err); return null; }
 
-    const fields = Array.isArray(schema?.fields)
-        // The layout keys belong to Beamer+, not to the widget — the same list
-        // the kit and the settings bridge enforce.
-        ? schema.fields.filter(f => f && typeof f.key === 'string' && !WIDGET_RESERVED.has(f.key))
-        : [];
-
-    // Every widget has a Name: its title in the bar, inside any PDF it
-    // exports, and on any file it downloads. Added here (and in the settings
-    // kit) rather than declared per widget, so no widget can forget it. A
-    // widget that declares its own `title` field keeps that one.
-    if (!fields.some(f => f.key === 'title')) fields.unshift(nameField(schema?.label));
-
-    // Every widget also gets a Text size: the default for the top bar's
-    // stepper, offering the same steps. A widget's own `scale` field is
-    // replaced by it (keeping its default), so all widgets offer one set of
-    // sizes. Skipped for widgets that opt out of the stepper (fontSize: false).
-    if (schema?.fontSize !== false) {
-        const own = fields.findIndex(f => f.key === 'scale');
-        const def = own >= 0 && fields[own].default != null ? String(fields[own].default) : '1.4';
-        if (own >= 0) fields.splice(own, 1);
-        fields.splice(fields.findIndex(f => f.key === 'title') + 1, 0, textSizeField(def));
-    }
+    // The default for the Text size control (the top bar's stepper), unless
+    // the widget opts out of it ("fontSize": false).
+    const textSize = schema?.fontSize !== false;
+    const scale = TEXT_SIZES.includes(String(schema?.scale)) ? String(schema.scale) : DEFAULT_TEXT_SIZE;
 
     return {
         label: typeof schema?.label === 'string' ? schema.label : null,
-        // Takes setting changes while running (widget-settings-dialog.js).
-        liveSettings: schema?.liveSettings === true,
+        textSize,
+        scale,
         // Only works as the whole slide (a notebook, a workspace, a circuit
         // canvas): the editor locks its box to fill the slide.
         fullSlide: schema?.fullSlide === true,
@@ -91,9 +75,8 @@ async function loadSchema(item) {
         modes: widgetModes(schema),
         modesDeclared: !schema?.fullSlide && Array.isArray(schema?.modes) && widgetModes(schema).length > 0,
         overlaySize: overlaySize(schema),
-        // Can span a split view's two slides: { left: [panes], right: [panes], hide: [keys] }.
+        // Can span a split view's two slides: { left: [panes], right: [panes] }.
         split: schema?.split && typeof schema.split === 'object' ? schema.split : null,
-        fields,
     };
 }
 
@@ -160,28 +143,8 @@ export function setWidgetDisplay(item, schema, display) {
 }
 
 /** The steps of the top bar's text-size stepper (SCALE_STEPS in widget-settings-kit.js). */
-const TEXT_SIZES = ['1', '1.2', '1.4', '1.7', '2', '2.4'];
-
-/** The universal Text size field. Keep in step with textSizeField() in widget-settings-kit.js. */
-export function textSizeField(def = '1.4') {
-    return {
-        key: 'scale',
-        label: 'Text Size',
-        type: 'select',
-        options: TEXT_SIZES.map(v => ({ v, l: `${Math.round(parseFloat(v) * 100)}%` })),
-        default: def,
-    };
-}
-
-/** The universal Name field. Keep in step with nameField() in widget-settings-kit.js. */
-export function nameField(label) {
-    return {
-        key: 'title',
-        label: 'Name',
-        type: 'text',
-        placeholder: (typeof label === 'string' && label) ? label : 'Title and download file name',
-    };
-}
+export const TEXT_SIZES = ['1', '1.2', '1.4', '1.7', '2', '2.4'];
+export const DEFAULT_TEXT_SIZE = '1.4';
 
 async function loadWidgetHtml(item) {
     if (item?.builtin && item.type) {

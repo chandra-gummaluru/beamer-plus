@@ -61,7 +61,7 @@
   /* Type */
   /* Computer Modern, as on the slides (see "Slide-native look" below). */
   --font-ui:   'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', 'DM Sans', system-ui, -apple-system, sans-serif;
-  /* Chrome — the bar's buttons, the settings sheet — in the slides' face
+  /* Chrome — the bar and its buttons — in the slides' face
      too, in one weight (see the end of this file). */
   --font-chrome: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', 'DM Sans', system-ui, -apple-system, sans-serif;
   --font-chrome-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
@@ -850,52 +850,6 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
 .bw-hint { color: var(--sn-cap); }
 .bw-empty, .bw-boot { color: var(--sn-cap); }
 
-/* The settings form — the sheet, or drawn on the widget in edit mode
-   (.bws-inline) — in Beamer+'s style: white, the title on the highlighter,
-   fields with a faint outline that inks when in use, switches and buttons
-   like the app's (ink outline; yellow when on or pointed at). */
-.bws-root { font-family: var(--font-chrome); background: #fff; }
-.bws-root .bws-head { background: #fff; border-bottom: 1px solid var(--border); }
-.bws-root .bws-title { font-size: 18px; letter-spacing: 0; background: var(--sn-hl); padding: 0 .18em; color: var(--sn-ink); }
-.bws-root .bws-label { text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--sn-cap); }
-.bws-root :is(.bws-input, .bws-select, .bws-area, .bws-check) {
-  background: #fff;
-  border: 1.5px solid var(--sn-faint);
-  border-radius: var(--sn-r);
-  color: var(--sn-ink);
-  font-size: 14px;
-}
-.bws-root :is(.bws-input, .bws-select, .bws-area):focus { border-color: var(--sn-ink); }
-.bws-root .bws-btn {
-  background: #fff; color: var(--sn-ink);
-  border: 1.5px solid var(--sn-ink); border-radius: 5px;
-}
-.bws-root .bws-btn:hover:not([disabled]) { background: var(--sn-hl); }
-.bws-root .bws-x:hover { background: var(--sn-hl); color: var(--sn-ink); }
-.bws-root .bws-switch {
-  box-sizing: border-box; width: 36px;
-  background: #fff; border: 1.5px solid var(--sn-ink);
-}
-.bws-root .bws-switch::after { top: 2.5px; left: 2.5px; width: 12px; height: 12px; background: var(--sn-ink); box-shadow: none; }
-.bws-root .bws-switch:checked { background: var(--sn-hl); }
-.bws-root .bws-switch:checked::after { transform: translateX(16px); }
-/* Drawn on the widget itself, under the bar, while it's in edit mode. */
-.bws-root.bws-inline {
-  position: absolute; inset: 0; z-index: 30; opacity: 1;
-  overflow-y: auto;
-}
-/* edit.form(): a popover the widget places, drawn like a slide node. */
-.bws-root.bws-pop {
-  position: fixed; inset: auto; z-index: 40;
-  border: var(--sn-line) solid var(--sn-ink); border-radius: var(--sn-r);
-  box-shadow: 0 12px 36px rgb(0 0 0 / .18);
-  overflow-y: auto; opacity: 1;
-}
-.bws-pop .bws-body { padding: 14px 16px 16px; gap: 14px; overflow: visible; }
-.bws-inline .bws-body {
-  width: min(560px, 100%); margin: 0 auto; box-sizing: border-box;
-  padding: 20px 16px 28px; gap: 16px; overflow: visible;
-}
 :is(.bw-topbar, .bw-toolbar) :is(.bw-input, .bw-select, .bw-textarea) {
   background: var(--bg-subtle);
   border: 1px solid var(--border-med);
@@ -1061,4 +1015,4 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
 
 /* One weight in the chrome: Computer Modern's bold is a wide, heavy cut that
    reads as a different typeface beside the regular. */
-:is(.bw-topbar, .bw-toolbar, .bws-root), :is(.bw-topbar, .bw-toolbar, .bws-root) * { font-weight: 400 !important; }
+:is(.bw-topbar, .bw-toolbar), :is(.bw-topbar, .bw-toolbar) * { font-weight: 400 !important; }

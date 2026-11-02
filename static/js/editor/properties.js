@@ -4,11 +4,12 @@
 // change is applied to the in-memory config immediately. Also builds the
 // slide properties' item list (refreshSlideItems).
 //
-// A selected widget shows its settings in the same panel (widget-panel.js;
-// form from widget-fields.js, fields read from the widget's own
+// A selected widget shows its Text size and layout in the same panel
+// (widget-panel.js; how it can be shown is read from the widget's own
 // `widget-schema` block — see widget-schema.js): selected by clicking it on
 // the slide, by Edit in the slide's item list, and straight after adding it.
-import { ctx, getSlideEl, getOrCreateConfig, escAttr, setPanelMode, setPanelTitle,
+// Its own settings are edited from the widget itself, never here.
+import { ctx, getSlideEl, getOrCreateConfig, escAttr, setPanelMode,
          resolvePanelMode, slideName, setTitleEditable } from './context.js';
 import { cleanupEditOverlays, renderEditOverlays, positionOverlay, selectOverlayEl, overlayLabel, syncWidgetLock } from './overlays.js';
 import { WIDGET_LABELS } from './widget-picker.js';
@@ -214,16 +215,16 @@ export function widgetTypeLabel(item) {
         || 'Custom Widget';
 }
 
-/* ─── a widget's settings, in the panel ───────────────────────────── */
+/* ─── a widget's text size and layout, in the panel ───────────────── */
 
 let _widgetShown = null;   // { item, panel } — what the panel is showing now
 let _widgetToken = 0;      // the schema read is async; only the latest wins
 
 /**
  * Select widget #index on the current slide: its box is marked on the slide
- * and the panel shows its settings.
+ * and the panel shows its text size and layout.
  */
-export function openWidgetSettingsFor(index) {
+export function selectWidgetAt(index) {
     const div = document.querySelector(`.edit-overlay[data-arr-key="widgets"][data-item-index="${index}"]`);
     if (div) { selectOverlayEl(div, 'widgets', index); return; }
     ctx.selectedOverlay = { div: null, arrKey: 'widgets', index };
@@ -255,7 +256,7 @@ async function showWidgetPanel(index) {
     const host = document.getElementById('editor-widget-body');
     if (!host) return;
     const box = () => document.querySelector(`.edit-overlay[data-arr-key="widgets"][data-item-index="${index}"]`);
-    _widgetShown.panel = renderWidgetPanel(host, item, schema || { label: null, fields: [], modes: ['full'] }, {
+    _widgetShown.panel = renderWidgetPanel(host, item, schema || { label: null, modes: ['full'] }, {
         // Keep the box on the slide in step with the Layout card.
         onLayout: () => {
             const div = box();
@@ -263,12 +264,6 @@ async function showWidgetPanel(index) {
             if (schema) { syncWidgetLock(div, item, schema); return; }
             const cr = getSlideEl()?.getBoundingClientRect();
             if (cr) positionOverlay(div, item, cr);
-        },
-        onName: () => {
-            const name = item.title || widgetTypeLabel(item);
-            setPanelTitle(name);
-            const label = box()?.querySelector('.edit-overlay-label');
-            if (label) label.textContent = overlayLabel('widgets', item, name);
         },
     });
 }
@@ -364,7 +359,7 @@ export function refreshSlideItems() {
         row.addEventListener('mouseleave', () => box()?.classList.remove('is-hinted'));
         const open = () => {
             box()?.classList.remove('is-hinted');
-            if (isWidget) { openWidgetSettingsFor(index); return; }
+            if (isWidget) { selectWidgetAt(index); return; }
             const b = box();
             if (b) selectOverlayEl(b, arrKey, index);
         };

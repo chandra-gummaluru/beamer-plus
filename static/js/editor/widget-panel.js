@@ -4,13 +4,12 @@
 // every widget has: Name (in the panel header), Text size and its layout
 // (full slide, box, reveal step), and Remove. Where it sits and how big it
 // is can also be changed on the slide itself (drag it, drag its corner).
-// The widget's own settings are not here: they are edited from the widget,
-// through its pencil (widget-settings-dialog.js).
+// The widget's own settings are not here: the widget edits them itself, in
+// its edit mode (the Edit button in its top bar, while presenting).
 //
 // Every change is applied to the config item as it's made; the widget is
 // rebuilt with them when edit mode closes.
-import { buildWidgetForm } from './widget-fields.js';
-import { widgetDisplay, setWidgetDisplay } from './widget-schema.js';
+import { widgetDisplay, setWidgetDisplay, TEXT_SIZES } from './widget-schema.js';
 
 const near = (a, b) => Math.abs((a ?? 0) - b) < 0.005;
 const isFullBox = (it) => near(it.x, 0) && near(it.y, 0) && near(it.width ?? 1, 1) && near(it.height ?? 1, 1);
@@ -23,28 +22,73 @@ const isFullBox = (it) => near(it.x, 0) && near(it.y, 0) && near(it.width ?? 1, 
  * @param {object} schema   from getWidgetSchema(item)
  * @param {object} opts
  * @param {() => void} opts.onLayout  after its box, display or step changed
- * @param {() => void} opts.onName    after its Name changed
  * @returns {{ refresh(): void }}  refresh: the box moved on the slide
  */
-export function renderWidgetPanel(host, item, schema, { onLayout, onName } = {}) {
+export function renderWidgetPanel(host, item, schema, { onLayout } = {}) {
     host.textContent = '';
-    // Only Text size: the name is edited in the panel's header, and the
-    // widget's own fields from the widget.
-    const form = buildWidgetForm({ ...schema, fields: (schema.fields || []).filter(f => f.key === 'scale') }, item, 'panel');
+    const root = document.createElement('div');
+    root.className = 'wf wf--panel';
+    const general = buildTextSizeGroup(item, schema);
+    if (general) root.appendChild(general);
     const layout = buildLayoutCard(item, schema, () => onLayout?.());
-    const general = form.commonNode;
-    form.node.insertBefore(layout.node, general ? general.nextSibling : form.node.firstChild);
-    host.appendChild(form.node);
-
-    const apply = (e) => {
-        if (e.target.closest('[data-k]')) return;   // the layout rows apply themselves
-        form.apply(item);
-        form.syncVisibility();
-        onName?.();
-    };
-    form.node.addEventListener('input', apply);
-    form.node.addEventListener('change', apply);
+    root.appendChild(layout.node);
+    host.appendChild(root);
     return { refresh: layout.show };
+}
+
+/**
+ * General: the widget's Text size, as a row of A's growing in size — the
+ * default for the stepper in its top bar. Null for a widget without one
+ * ("fontSize": false). onChange runs after each pick.
+ */
+export function buildTextSizeGroup(item, schema, onChange) {
+    if (schema && schema.textSize === false) return null;
+    const node = document.createElement('section');
+    node.className = 'wf-group';
+    node.innerHTML = `
+        <div class="wf-group-title">General</div>
+        <div class="wf-group-body">
+            <div class="editor-prop-row editor-prop-row--seg">
+                <div class="editor-prop-label">Text Size</div>
+                <div class="wf-sizes" role="group" aria-label="Text Size"></div>
+            </div>
+        </div>`;
+    const wrap = node.querySelector('.wf-sizes');
+    const def = schema?.scale || '1.4';
+    // The saved value, or the nearest step to it (an older deck's 1.8).
+    const current = () => {
+        const v = parseFloat(item.scale ?? def);
+        if (isNaN(v)) return def;
+        return TEXT_SIZES.reduce((best, s) => Math.abs(parseFloat(s) - v) < Math.abs(parseFloat(best) - v) ? s : best);
+    };
+    TEXT_SIZES.forEach((v, i) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'wf-size-btn';
+        b.dataset.v = v;
+        const label = `${Math.round(parseFloat(v) * 100)}%`;
+        b.title = label;
+        b.setAttribute('aria-label', label);
+        // 11px → 21px across the steps: the size you pick, drawn.
+        const px = Math.round(11 + (10 * i) / Math.max(1, TEXT_SIZES.length - 1));
+        b.innerHTML = `<span style="font-size:${px}px">A</span>`;
+        b.addEventListener('click', () => {
+            if (v === def) delete item.scale; else item.scale = v;
+            mark();
+            onChange?.();
+        });
+        wrap.appendChild(b);
+    });
+    function mark() {
+        const cur = current();
+        wrap.querySelectorAll('button').forEach(b => {
+            const on = b.dataset.v === cur;
+            b.classList.toggle('is-active', on);
+            b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+    }
+    mark();
+    return node;
 }
 
 // Layout: a Full slide switch over X / Y / Width / Height. Switching Full

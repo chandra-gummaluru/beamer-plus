@@ -44,9 +44,6 @@ const INDEX = Object.getOwnPropertyDescriptor(PROTO, 'selectedIndex');
 
 function enhance(select) {
     if (select.dataset.dd || select.multiple) return;
-    // A select a segmented control or size picker stands in for stays hidden
-    // and keeps no box of its own.
-    if (select.hidden && select.nextElementSibling?.matches?.('.wf-seg, .wf-sizes')) return;
     select.dataset.dd = '1';
 
     const box = document.createElement('button');

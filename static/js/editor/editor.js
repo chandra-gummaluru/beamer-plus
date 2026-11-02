@@ -20,7 +20,6 @@ import { addWidget } from './widget-picker.js';
 import { showViewConfig, hideViewConfig, chooseSplitWidget } from './view-config.js';
 import { applySlideReorder, removeSlideReorder } from './reorder.js';
 import { initWidgetSettings } from './widget-settings.js';
-import { initWidgetSettingsDialog, closeWidgetSettings } from './widget-settings-dialog.js';
 import { initNumberSteppers } from './number-stepper.js';
 import { initDropdowns } from './dropdown.js';
 import { realSlideCount, insertViewAfterCurrent, removeSlideAt } from '../slides/structure.js';
@@ -114,7 +113,6 @@ export function initEditor(state) {
     fileInput?.addEventListener('change', () => onMediaFileSelected(fileInput));
 
     initWidgetSettings();
-    initWidgetSettingsDialog();
     initNumberSteppers();
     initDropdowns();
     wireDeselect();
@@ -222,7 +220,6 @@ function syncNavTools(editing) {
 }
 
 async function enterEditMode() {
-    closeWidgetSettings();   // its widget is about to become a box on the slide
     ctx.state.editMode = true;
     document.body.classList.add('edit-mode');
     syncNavTools(true);

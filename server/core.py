@@ -17,8 +17,8 @@ app = Flask(
 )
 
 # cors_allowed_origins='*' lets any page on the LAN open a socket. That's
-# deliberate — widget iframes connect from assorted origins — but it means the
-# widget_state relay trusts its senders. Beamer+ assumes a cooperative local
+# deliberate — widget iframes connect from assorted origins — but it means anything
+# on the network can join a session's rooms. Beamer+ assumes a cooperative local
 # network; do not expose this server to the public internet.
 socketio = SocketIO(app, cors_allowed_origins='*', async_mode='threading')
 

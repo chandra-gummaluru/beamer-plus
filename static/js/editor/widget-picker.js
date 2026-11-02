@@ -9,7 +9,7 @@
 // only thing kept here is the icon, with a generic one for anything unlisted.
 import { ctx, getOrCreateConfig, escHtml } from './context.js';
 import { renderEditOverlays, cleanupEditOverlays } from './overlays.js';
-import { openWidgetSettingsFor } from './properties.js';
+import { selectWidgetAt } from './properties.js';
 import { getWidgetSchema, setWidgetDisplay } from './widget-schema.js';
 
 const WIDGET_ICONS = {
@@ -233,7 +233,7 @@ function _pickCustomWidget() {
         cleanupEditOverlays();
         renderEditOverlays();
         // A new widget always needs setting up — go straight to its settings.
-        openWidgetSettingsFor(newIndex);
+        selectWidgetAt(newIndex);
     });
     input.click();
 }
@@ -261,5 +261,5 @@ async function _doAddWidget(type) {
     const newIndex = cfg.widgets.length - 1;
     cleanupEditOverlays();
     renderEditOverlays();
-    openWidgetSettingsFor(newIndex);
+    selectWidgetAt(newIndex);
 }

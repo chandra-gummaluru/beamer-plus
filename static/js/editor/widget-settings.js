@@ -1,16 +1,13 @@
-// Widget settings bridge — the parent half of the settings protocol.
+// Widget settings bridge — where a widget's own settings are stored.
 //
-// A widget declares what it can be configured with in its `widget-schema`
-// block; those fields are edited in the editor's properties panel (see
-// editor/widget-schema.js and editor/properties.js), which is the single place
-// a widget is configured from. What remains here is the other direction: a
-// widget writing its own settings back at runtime, and the files its fields
-// own — a widget's settings belong in its slide config item, so they save and
-// reload like everything else on the slide.
+// A widget edits its settings itself (its edit mode; BeamerWidget.edit.set()
+// in the settings kit) and sends each change here, to be merged into its slide
+// config item, so it saves and reloads like everything else on the slide.
+// Files it saves (BeamerWidget.saveFile()) are stored in the deck the same way.
 //
 // Protocol
 //   ← widget   widget-settings        { patch, remove } to merge into the item
-//   ← widget   widget-asset-upload    a file field picked a file
+//   ← widget   widget-asset-upload    a file the widget saved
 //   → widget   widget-asset-saved     …and the path it was stored under
 import { ctx, WIDGET_RESERVED } from './context.js';
 import { postToWidget, widgetIdForWindow, syncWidgetSignature } from '../core/iframe-widget-renderer.js';
@@ -88,7 +85,7 @@ export function requestWidgetFileFlush() {
     });
 }
 
-/* ─── file fields ───────────────────────────────────────────────── */
+/* ─── files ───────────────────────────────────────────────── */
 
 // A widget's file field hands us the bytes; we stash them for the save ZIP and
 // POST them so the widget can read the file immediately, before any save.
@@ -103,13 +100,12 @@ async function storeAsset(widgetId, msg) {
 
 /**
  * Stash a widget's file in the deck and record its path on the widget's config
- * item. Shared by the in-widget file field (above) and the editor panel's own
- * file rows, so both land the bytes in exactly the same place.
+ * item.
  *
  * msg: { key, buffer, name, folder = 'files', serve = true }
  * Returns the saved path, or null if the request was malformed.
  */
-export async function saveWidgetAsset(item, msg) {
+async function saveWidgetAsset(item, msg) {
     if (!item) return null;
     const key = msg?.key;
     if (typeof key !== 'string' || WIDGET_RESERVED.has(key)) return null;
