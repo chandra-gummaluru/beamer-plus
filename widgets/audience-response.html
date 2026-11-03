@@ -3420,6 +3420,43 @@ body.ar-split #stage { position: absolute; inset: 0; display: block; padding: 0;
 }
 #ar-split-right #prompt { padding-bottom: 0; }
 body.ar-static .ar-split-pane { pointer-events: none; }
+/* The QR beside the answers, not under them. Under them it is one strip
+   across half a slide, sized by the shared --u, and the split's fit shrinks
+   it to a thumbnail. Beside them it gets a column of its own, the height of
+   the pane less the count and timer under it, sized from the pane itself
+   (container units) so the fit never touches it. The words go: in a
+   column this narrow the link only ellipsises, and the QR says it all.
+   With the results up the strip goes back under them: the charts want the
+   width, and the faded QR is only a footnote by then. */
+body.ar-split #stage:not(.is-data) #ar-split-right:has(> #side:not(.is-empty)) {
+  container-type: size;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr);
+  gap: calc(24px * var(--u));
+}
+body.ar-split #stage:not(.is-data) #ar-split-right #side {
+  grid-column: 2; grid-row: 1; align-self: start;
+  /* Room under the QR: the banner's padding, one gap, the figures. */
+  --qr: max(72px, min(100cqh - calc(92px * var(--u)), 44cqw));
+}
+body.ar-split #stage:not(.is-data) #ar-split-right #join {
+  /* render() sets display inline (flex / none); a grid here, unless none. */
+  display: grid !important;
+  grid-template-columns: auto auto;
+  justify-content: space-evenly;
+  align-items: end;
+  gap: calc(10px * var(--u)) calc(16px * var(--u));
+  padding: calc(12px * var(--u));
+}
+body.ar-split #stage:not(.is-data) #ar-split-right #join[style*="none"] { display: none !important; }
+body.ar-split #stage:not(.is-data) #ar-split-right #qr-slot { grid-column: 1 / -1; justify-self: center; }
+body.ar-split #stage:not(.is-data) #ar-split-right :is(#qr-wrap, #ed-qr) { width: var(--qr) !important; height: var(--qr) !important; }
+body.ar-split #stage:not(.is-data) #ar-split-right :is(#join-text, .bw-spacer) { display: none; }
+body.ar-split #stage:not(.is-data) #ar-split-right #join:not(:has(#timer.is-on)) #join-count { grid-column: 1 / -1; }
+body.ar-split #stage:not(.is-data) #ar-split-right #timer { min-width: 0; padding-left: calc(16px * var(--u)); }
+body.ar-split #stage:not(.is-data) #ar-split-right #join-count { padding-left: 0; border-left: 0; }
+body.ar-split #stage:not(.is-data) #ar-split-right .fig-v { font-size: calc(28px * var(--u)); }
+body.ar-split #stage:not(.is-data) #ar-split-right #timer-track { width: calc(84px * var(--u)); }
 </style>
 </head>
 <body>
