@@ -6,6 +6,7 @@
 import { ctx, getSlideEl, getOrCreateConfig, getConfigItems, arrKeyForType } from './context.js';
 import { updatePropertiesPanel, syncPropertiesPosition, widgetTypeLabel } from './properties.js';
 import { getWidgetSchema, isPinnedFull } from './widget-schema.js';
+import { paintRevealOverlay } from './reveal-colour.js';
 
 let _pendingMediaType = null;
 
@@ -31,6 +32,7 @@ function buildOverlay(type, arrKey, item, index, container, rect) {
     const z = parseInt(item.zIndex, 10);
     if (Number.isFinite(z)) div.style.zIndex = String(50 + z);
     positionOverlay(div, item, rect);
+    if (arrKey === 'reveals') paintRevealOverlay(div, item);
 
     const label = document.createElement('div');
     label.className = 'edit-overlay-label';

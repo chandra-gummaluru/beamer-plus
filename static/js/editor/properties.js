@@ -15,6 +15,8 @@ import { cleanupEditOverlays, renderEditOverlays, positionOverlay, selectOverlay
 import { WIDGET_LABELS } from './widget-picker.js';
 import { getWidgetSchema } from './widget-schema.js';
 import { renderWidgetPanel } from './widget-panel.js';
+import { pickColourFromSlide, paintRevealOverlay } from './reveal-colour.js';
+import { blendColour, toHex } from '../slides/reveals.js';
 
 export function updatePropertiesPanel() {
     const panel = document.getElementById('editor-properties');
@@ -53,6 +55,16 @@ export function updatePropertiesPanel() {
     // refreshes — addEventListener here would stack a new listener per refresh.
     body.oninput  = () => applyPropertiesQuiet();
     body.onchange = () => applyPropertiesQuiet();
+
+    // Reveal box colour: the eyedropper sets the colour input, then applies.
+    const pick = document.getElementById('prop-revealPick');
+    if (pick) pick.onclick = async () => {
+        const hex = await pickColourFromSlide(pick);
+        const input = document.getElementById('prop-revealColor');
+        if (!hex || !input) return;
+        input.value = hex;
+        applyPropertiesQuiet();
+    };
 }
 
 function buildPropsHTML(arrKey, item) {
@@ -80,7 +92,19 @@ function buildPropsHTML(arrKey, item) {
                 <select class="field" id="prop-revealStyle">
                     <option value="blend" ${sel(item.style ?? 'blend', 'blend')} data-desc="Matches the slide behind it">Blend Into Slide</option>
                     <option value="frosted" ${sel(item.style, 'frosted')} data-desc="A visible panel over the hidden part">Frosted Panel</option>
-                </select></label>`;
+                    <option value="color" ${sel(item.style, 'color')} data-desc="A color you choose — pick it from the slide">Solid Color</option>
+                </select></label>
+            <div class="editor-prop-row reveal-colour-row" ${item.style === 'color' ? '' : 'hidden'}>
+                <span class="editor-prop-label">Color</span>
+                <span class="reveal-colour">
+                    <label class="text-color-swatch reveal-colour-swatch" title="Choose Any Color" style="--c:${escAttr(toHex(item.color))}">
+                        <input type="color" id="prop-revealColor" value="${escAttr(toHex(item.color))}" aria-label="Choose Any Color"></label>
+                    <button type="button" class="btn btn--ghost reveal-colour-pick" id="prop-revealPick" title="Pick a color from anywhere on the slide">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 22 1-1h3l9-9"/><path d="M3 21v-3l9-9"/><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z"/></svg>
+                        Pick from Slide</button>
+                    <code class="reveal-colour-hex" id="prop-revealHex">${escAttr(toHex(item.color))}</code>
+                </span>
+            </div>`;
     } else {
         layout += `
             <label class="editor-prop-row"><span class="editor-prop-label">Appear on Step</span>
@@ -172,7 +196,23 @@ function applyPropertiesQuiet() {
     const step = parseInt(get('prop-step')?.value ?? '', 10);
     if (arrKey === 'reveals') {
         item.step  = step > 0 ? step : 1;
+        const prevStyle = item.style;
         item.style = get('prop-revealStyle')?.value || 'blend';
+        if (item.style === 'color') {
+            // Switching to Solid Color starts from what Blend showed there.
+            if (prevStyle !== 'color' && !item.color) {
+                item.color = blendColour(getSlideEl(), item);
+                const input = get('prop-revealColor');
+                if (input) input.value = item.color;
+            } else item.color = toHex(get('prop-revealColor')?.value || item.color);
+        }
+        const row = document.querySelector('.reveal-colour-row');
+        if (row) row.hidden = item.style !== 'color';
+        const hex = toHex(item.color);
+        document.querySelector('.reveal-colour-swatch')?.style.setProperty('--c', hex);
+        const hexEl = get('prop-revealHex');
+        if (hexEl) hexEl.textContent = hex;
+        paintRevealOverlay(div, item);
     } else if (step > 0) item.step = step;
     else delete item.step;
 

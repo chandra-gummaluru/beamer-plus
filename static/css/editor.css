@@ -1391,3 +1391,46 @@ body.picking-panes #slide-nav-slides .slide-nav-item:hover .slide-preview { outl
 .view-split-item .slide-item-icon svg { width: 16px; height: 16px; }
 .view-split-item { padding-right: 6px; }
 .view-split-item .btn.is-armed { --_bg: var(--btn-danger); --_fg: var(--ink-on-accent); }
+
+/* Reveal box "Solid Color": swatch, eyedropper and hex in the panel. */
+.reveal-colour { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.reveal-colour-swatch {
+    width: 28px; height: 28px; flex: none;
+    background: var(--c); overflow: hidden; border-radius: var(--r-sm);
+}
+.reveal-colour-swatch input {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    opacity: 0; border: 0; padding: 0; cursor: pointer;
+}
+.reveal-colour-pick { display: inline-flex; align-items: center; gap: 6px; }
+.reveal-colour-pick.is-active { --_bd: var(--accent); --_bg: oklch(from var(--accent) l c h / 0.12); }
+.reveal-colour-hex { font-size: var(--fs-xs); color: var(--ink-3); }
+
+/* Edit mode: a Solid Color box shows its colour under the hatching. */
+.edit-overlay--reveal.edit-overlay--reveal-color,
+.edit-overlay--reveal.edit-overlay--reveal-color:hover {
+    background:
+        repeating-linear-gradient(-45deg,
+            oklch(from var(--accent) l c h / 0.18) 0 8px, transparent 8px 16px),
+        var(--reveal-fill);
+}
+
+/* While picking, the editor's boxes step aside so they can't tint the pick. */
+body.reveal-picking .edit-overlay { visibility: hidden; }
+
+/* Eyedropper fallback (no EyeDropper API): crosshair over the slide. */
+.reveal-pick-surface { position: absolute; inset: 0; z-index: 200; cursor: crosshair; }
+.reveal-pick-chip {
+    position: absolute; pointer-events: none;
+    transform: translate(14px, 14px);
+    display: flex; align-items: center; gap: 6px;
+    padding: 3px 8px 3px 3px;
+    font: 600 var(--fs-xs) var(--font-mono, monospace);
+    color: var(--ink-1); background: var(--surface-paper);
+    border-radius: 999px; box-shadow: 0 2px 8px oklch(0% 0 0 / 0.25);
+}
+.reveal-pick-chip::before {
+    content: ""; width: 18px; height: 18px; border-radius: 50%;
+    background: var(--c); border: 1px solid oklch(0% 0 0 / 0.2);
+}
+.reveal-pick-chip[hidden] { display: none; }

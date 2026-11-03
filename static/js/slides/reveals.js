@@ -15,7 +15,9 @@
 // a closed box whatever its layer — the annotation canvas is masked there.
 //
 // "blend" fills the box with the slide's own colour around it, so a hidden
-// region looks like empty slide; "frosted" is a visible frosted panel.
+// region looks like empty slide; "frosted" is a visible frosted panel;
+// "color" fills it with the box's own `color` (any CSS colour, normally a
+// hex picked in the editor — often straight off the slide with the eyedropper).
 // In edit mode nothing is hidden — the editor draws the boxes as outlines.
 import { configKeyOf, slideUid } from './structure.js';
 
@@ -72,7 +74,7 @@ export function renderReveals(container, obj, slideKey) {
             zIndex: String(parseInt(r.zIndex, 10) || 4),
         });
         el.dataset.box = [r.x ?? 0, r.y ?? 0, r.width ?? 0.3, r.height ?? 0.2].join(',');
-        if (r.style !== 'frosted') el.style.background = sampleColour(container, r);
+        if (r.style !== 'frosted') el.style.background = revealFill(container, r);
         container.appendChild(el);
     }
     tagSteppedMedia(container, cfg, slideKey);
@@ -221,6 +223,49 @@ function paintMask(ann, open) {
 }
 
 /* ─── colour under a box ──────────────────────────────────────── */
+/** What a non-frosted box is filled with: its own colour, or the slide's. */
+export function revealFill(container, r) {
+    if (r?.style === 'color' && r.color) return r.color;
+    return sampleColour(container, r);
+}
+
+/** "rgb(1, 2, 3)" / "#abc" → "#010203", for <input type="color">. */
+export function toHex(c) {
+    if (!c) return '#ffffff';
+    if (/^#[0-9a-f]{6}$/i.test(c)) return c.toLowerCase();
+    if (/^#[0-9a-f]{3}$/i.test(c)) return '#' + [...c.slice(1)].map(h => h + h).join('').toLowerCase();
+    const m = c.match(/rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/i);
+    if (!m) return '#ffffff';
+    return '#' + m.slice(1, 4).map(v => Math.max(0, Math.min(255, +v)).toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * The slide's colour at a point on screen — the eyedropper's fallback where
+ * the browser has no EyeDropper. Reads the slide image (PDF canvas); a blank
+ * slide is its paper colour.
+ */
+export function colourAt(container, clientX, clientY) {
+    const canvas = container?.querySelector(':scope > canvas');
+    const paper = () => {
+        const bg = container ? getComputedStyle(container).backgroundColor : '';
+        return !bg || /rgba\([^)]*,\s*0\)|transparent/.test(bg) ? '#ffffff' : toHex(bg);
+    };
+    if (!canvas || canvas.style.visibility === 'hidden' || !canvas.width) return paper();
+    const rect = canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return paper();
+    const x = Math.round((clientX - rect.left) / rect.width * canvas.width);
+    const y = Math.round((clientY - rect.top) / rect.height * canvas.height);
+    if (x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) return paper();
+    try {
+        const d = canvas.getContext('2d', { willReadFrequently: true }).getImageData(x, y, 1, 1).data;
+        if (d[3] < 10) return '#ffffff';
+        return toHex(`rgb(${d[0]}, ${d[1]}, ${d[2]})`);
+    } catch { return '#ffffff'; }
+}
+
+/** The colour a "blend" box would have here, as a hex. */
+export function blendColour(container, r) { return toHex(sampleColour(container, r)); }
+
 // Median colour of the slide just outside the box's edges, so a blended
 // cover matches whatever background the slide has there. Blank slides (no
 // PDF canvas showing) are white.
