@@ -18,3 +18,11 @@ demo.zip
 
 # Browser walkthrough screenshots
 tests/browser/shots/
+Claude outputs/opts.png
+Claude outputs/n1.png
+Claude outputs/mock-split.png
+Claude outputs/mock-halves.png
+Claude outputs/mock-bands.png
+Claude outputs/mips-machine.html
+Claude outputs/mips-machine-1.html
+Claude outputs/m8.png
