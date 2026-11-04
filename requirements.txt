@@ -5,3 +5,6 @@ python-socketio==5.16.2
 simple-websocket==1.1.0
 # Self-signed HTTPS certificates (launch.py and the app.py adhoc fallback)
 cryptography>=42.0
+# Content filter for free-text survey answers (server/moderation.py).
+# Optional, stronger: pip install detoxify (large; needs PyTorch)
+better-profanity==0.7.0

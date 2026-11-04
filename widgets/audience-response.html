@@ -2208,6 +2208,7 @@ body.bw-editing .bw-topbar-title + .bw-sep,
   font-size: 12px;
 }
 .ar-in--num { width: 5ch; text-align: center; }
+.ar-in:disabled { opacity: 0.45; }
 .ar-in:focus { outline: 2px solid var(--edit-line); outline-offset: -1px; }
 
 /* ── Stage ───────────────────────────────────────────
@@ -3225,6 +3226,34 @@ body.bw-editing .md-tok[contenteditable="false"]:hover { background: var(--sn-hl
 .ed-menu button:hover, .ed-menu button:focus-visible { background: var(--sn-hl); outline: none; }
 .ed-menu button.is-active { font-weight: 700; }
 
+/* The content filter's settings, opened from its button in the bar. */
+#ed-filter-btn svg { width: 11px; height: 11px; margin-left: 4px; }
+#ed-filter-pop {
+  position: fixed;
+  z-index: 50;
+  width: 300px;
+  max-width: calc(100vw - 16px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px 14px;
+  background: var(--bg);
+  border: var(--ar-line) solid var(--ar-ink);
+  border-radius: var(--ar-r);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  font-family: var(--font-chrome);
+  font-size: var(--fs-chrome);
+  color: var(--ar-ink);
+}
+#ed-filter-pop[hidden] { display: none; }
+#ed-filter-pop .fp-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+#ed-filter-pop .fp-label { font-weight: 600; }
+#ed-filter-pop .fp-note { margin: 0; font-size: var(--fs-chrome-sm); color: var(--ar-cap); line-height: 1.35; }
+#ed-filter-pop .fp-field { display: flex; flex-direction: column; gap: 4px; }
+#ed-filter-pop .fp-field small { font-size: var(--fs-chrome-sm); color: var(--ar-cap); }
+#ed-filter-pop .ar-in { width: 100%; height: 28px; }
+#ed-filter-pop.is-off .fp-field { opacity: 0.45; }
+
 /* Answers typed in their nodes; the letter marks the right one. */
 body.bw-editing .badge.ed-mark { cursor: pointer; padding: 3px 5px; margin: -3px -5px; border-radius: 4px; }
 body.bw-editing .badge.ed-mark:hover, body.bw-editing .badge.ed-mark:focus-visible { background: var(--sn-hl); color: var(--ar-ink); outline: none; }
@@ -3457,6 +3486,18 @@ body.ar-split #stage:not(.is-data) #ar-split-right #timer { min-width: 0; paddin
 body.ar-split #stage:not(.is-data) #ar-split-right #join-count { padding-left: 0; border-left: 0; }
 body.ar-split #stage:not(.is-data) #ar-split-right .fig-v { font-size: calc(28px * var(--u)); }
 body.ar-split #stage:not(.is-data) #ar-split-right #timer-track { width: calc(84px * var(--u)); }
+/* Nothing beside it (no answers to list until the results go up): the QR
+   has the right slide to itself, centred in it and sized from the whole
+   pane rather than a column at its edge. */
+body.ar-split #stage.is-bare:not(.is-data) #ar-split-right:has(> #side:not(.is-empty)) {
+  grid-template-columns: minmax(0, 1fr);
+  place-items: center;
+}
+body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #prompt { display: none !important; }
+body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
+  grid-column: 1; align-self: center; justify-self: center;
+  --qr: max(72px, min(100cqh - calc(92px * var(--u)), 70cqw));
+}
 </style>
 </head>
 <body>
@@ -3531,6 +3572,13 @@ body.ar-split #stage:not(.is-data) #ar-split-right #timer-track { width: calc(84
           <input class="ar-in" id="ed-key" type="password" placeholder="optional" autocomplete="off">
         </label>
         <datalist id="ed-models"></datalist>
+      </span>
+      <!-- The content filter, for the answers typed in the room's own words.
+           One button; its settings open beside it, since the bar is
+           already full for an open-ended question. -->
+      <span class="ar-group" id="ed-filter-wrap" hidden>
+        <span class="ar-sep" aria-hidden="true"></span>
+        <button class="bw-btn" id="ed-filter-btn" type="button" aria-haspopup="dialog" aria-expanded="false" title="Content filter: turn away answers with profanity or abuse"><span id="ed-filter-label">Filter: On</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></button>
       </span>
       <span class="ar-group" id="ed-blank-wrap" hidden>
         <span class="ar-sep" aria-hidden="true"></span>
@@ -3671,6 +3719,25 @@ body.ar-split #stage:not(.is-data) #ar-split-right #timer-track { width: calc(84
     </div>
 
     <div id="ed-type-menu" class="ed-menu bw-edit-only" role="listbox" aria-label="Question type" hidden></div>
+    <!-- The lists stay on the server; phones never see them. -->
+    <div id="ed-filter-pop" class="bw-edit-only" role="dialog" aria-label="Content filter" hidden>
+      <div class="fp-row">
+        <span class="fp-label">Content filter</span>
+        <span class="bw-seg" id="ed-filter">
+          <button class="bw-btn" type="button" data-v="1">On</button>
+          <button class="bw-btn" type="button" data-v="0">Off</button>
+        </span>
+      </div>
+      <p class="fp-note">Answers with profanity or abuse are turned away, and the student is asked to rephrase.</p>
+      <label class="fp-field"><span class="fp-label">Allow</span>
+        <input class="ar-in" id="ed-allow" type="text" placeholder="e.g. mole, cocktail party" autocomplete="off" spellcheck="false">
+        <small>Words never to flag for this question, separated by commas</small>
+      </label>
+      <label class="fp-field"><span class="fp-label">Block</span>
+        <input class="ar-in" id="ed-block" type="text" placeholder="none" autocomplete="off" spellcheck="false">
+        <small>Extra words or phrases to turn away, separated by commas</small>
+      </label>
+    </div>
 
     <div id="spot">
       <div id="spot-card">
@@ -4553,6 +4620,10 @@ body.ar-split #stage:not(.is-data) #ar-split-right #timer-track { width: calc(84
     stage.classList.toggle('is-preview', preview);
     stage.classList.toggle('is-data',    showData);
     stage.classList.toggle('is-fill',    showData);
+    // Nothing for the answers' half to show yet (an open, word-cloud, rating,
+    // number or fill question while the room answers): on a split the QR has
+    // the right slide to itself, in the middle of it (see .is-bare).
+    stage.classList.toggle('is-bare', !ed && !showData && !isChoiceLike(t));
 
     joinEl.style.display = withJoin ? 'flex' : 'none';
     sideEl.classList.toggle('is-empty', !withJoin);
@@ -5379,6 +5450,13 @@ body.ar-split #stage:not(.is-data) #ar-split-right #timer-track { width: calc(84
   }
 
   // What the phone page needs to draw the right input for this type.
+  // The question types a student answers in their own words, which the
+  // server's content filter checks; the rest can't carry anything to filter.
+  const FILTERED = new Set(['open', 'wordcloud', 'fill']);
+  // "carbon, mole fraction" → ['carbon', 'mole fraction']; the server cleans
+  // and caps the list again.
+  const wordList = v => String(v || '').split(/[,\n]/).map(w => w.trim()).filter(Boolean).slice(0, 200);
+
   function createBody() {
     // A fill-in-the-blanks question often has no prose at all — the template
     // is the question — so the phone gets something sensible to head it with.
@@ -5395,6 +5473,11 @@ body.ar-split #stage:not(.is-data) #ar-split-right #timer-track { width: calc(84
     if (S.type === 'fill')      body.meta = { template: S.question.split('\n').filter(l => !/^\s*```/.test(l)).join('\n').trim() };
     if (S.type === 'plot')      body.meta = { xLabel: S.plot.x, yLabel: S.plot.y, xLow: S.plot.xLow, xHigh: S.plot.xHigh,
                                               yLow: S.plot.yLow, yHigh: S.plot.yHigh };
+    if (FILTERED.has(S.type)) {
+      body.filter       = cfg.contentFilter !== false;
+      body.filter_allow = wordList(cfg.filterAllow);
+      body.filter_block = wordList(cfg.filterBlock);
+    }
     if (S.type === 'open') {
       body.model         = aiOn() ? cfg.model : null;
       body.num_summaries = parseInt(cfg.numSummaries, 10) || 3;
@@ -5851,6 +5934,13 @@ body.ar-split #stage:not(.is-data) #ar-split-right #timer-track { width: calc(84
   const edWords     = $('ed-words');
   const edOpen      = $('ed-open');
   const edAiWrap    = $('ed-ai-wrap');
+  const edFilterWrap = $('ed-filter-wrap');
+  const edFilterBtn = $('ed-filter-btn');
+  const edFilterLbl = $('ed-filter-label');
+  const edFilterPop = $('ed-filter-pop');
+  const edFilter    = $('ed-filter');
+  const edAllow     = $('ed-allow');
+  const edBlock     = $('ed-block');
   const edLayout    = $('ed-layout');
   const edLayoutWrap = $('ed-layout-wrap');
   const edAddWrap   = $('ed-add-wrap');
@@ -5935,7 +6025,7 @@ body.ar-split #stage:not(.is-data) #ar-split-right #timer-track { width: calc(84
 
   function renderEdit(ed) {
     makeEditable(questionEl, ed, S.type === 'fill' ? 'Type the question, with + Insert blank for each gap…' : 'Type your question…');
-    if (!ed) { closeTypeMenu(); edSecs.hidden = true; return; }
+    if (!ed) { closeTypeMenu(); closeFilterPop(); edSecs.hidden = true; return; }
     const t = S.type;
 
     edTypeLabel.textContent = typeOptions().find(o => o.v === t)?.l || TYPES[t].title;
@@ -5951,6 +6041,16 @@ body.ar-split #stage:not(.is-data) #ar-split-right #timer-track { width: calc(84
     edRmaxWrap.hidden  = t !== 'rating';
     edWordsWrap.hidden = t !== 'wordcloud';
     edBlankWrap.hidden = t !== 'fill';
+    edFilterWrap.hidden = !FILTERED.has(t);
+    if (FILTERED.has(t)) {
+      const on = cfg.contentFilter !== false;
+      pick(edFilter, on ? '1' : '0');
+      edFilterLbl.textContent = 'Filter: ' + (on ? 'On' : 'Off');
+      setVal(edAllow, String(cfg.filterAllow || ''));
+      setVal(edBlock, String(cfg.filterBlock || ''));
+      edAllow.disabled = edBlock.disabled = !on;
+      edFilterPop.classList.toggle('is-off', !on);
+    } else closeFilterPop();
 
     // The banner's timer column: the countdown's length is typed into its
     // digits; no timer, no column.
@@ -6240,6 +6340,8 @@ body.ar-split #stage:not(.is-data) #ar-split-right #timer-track { width: calc(84
   [['x', 'plotX'], ['y', 'plotY'], ['xLow', 'plotXLow'], ['xHigh', 'plotXHigh'], ['yLow', 'plotYLow'], ['yHigh', 'plotYHigh']]
     .forEach(([k, key]) => wireText(plLabels[k], key, { read: el => typedText(el).trim() }));
   wireText(edKey,   'apiKey',       { read: el => el.value.trim() });
+  wireText(edAllow, 'filterAllow',  { read: el => el.value });
+  wireText(edBlock, 'filterBlock',  { read: el => el.value });
 
   // The models the server offers, as suggestions; any name can be typed (and
   // must be, opened as a file, where there's no server to ask).
@@ -6264,6 +6366,7 @@ body.ar-split #stage:not(.is-data) #ar-split-right #timer-track { width: calc(84
   // ── Segmented choices ───────────────────────────────────────────────────────
   const segValue = e => e.target.closest('[data-v]')?.dataset.v;
   edAuto  .addEventListener('click', e => { const v = segValue(e); if (v) setting({ autoStart: v === '1' }); });
+  edFilter.addEventListener('click', e => { const v = segValue(e); if (v) setting({ contentFilter: v === '1' }); });
   edTimer .addEventListener('click', e => { const v = segValue(e); if (v) setting({ timerMode: v }); });
   edRmax  .addEventListener('click', e => { const v = segValue(e); if (v) setting({ ratingMax: v }); });
   edLayout.addEventListener('click', e => { const v = segValue(e); if (v) setting({ choiceLayout: v }); });
@@ -6336,10 +6439,38 @@ body.ar-split #stage:not(.is-data) #ar-split-right #timer-track { width: calc(84
   }, true);
   window.addEventListener('resize', closeTypeMenu);
 
+  // ── The content filter's popover ────────────────────────────────────────────
+  function openFilterPop() {
+    edFilterPop.hidden = false;
+    const r = edFilterBtn.getBoundingClientRect();
+    const w = edFilterPop.offsetWidth;
+    edFilterPop.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + 'px';
+    edFilterPop.style.top  = (r.bottom + 4) + 'px';
+    edFilterBtn.setAttribute('aria-expanded', 'true');
+  }
+  function closeFilterPop() {
+    if (edFilterPop.hidden) return;
+    if (edFilterPop.contains(document.activeElement)) document.activeElement.blur();   // commits a half-typed list
+    edFilterPop.hidden = true;
+    edFilterBtn.setAttribute('aria-expanded', 'false');
+  }
+  edFilterBtn.addEventListener('click', () => {
+    if (!editing()) return;
+    if (edFilterPop.hidden) openFilterPop(); else closeFilterPop();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !edFilterPop.hidden) { e.preventDefault(); closeFilterPop(); edFilterBtn.focus(); }
+  }, true);
+  document.addEventListener('pointerdown', e => {
+    if (!edFilterPop.hidden && !edFilterPop.contains(e.target) && !edFilterBtn.contains(e.target)) closeFilterPop();
+  }, true);
+  window.addEventListener('resize', closeFilterPop);
+
   // ── Into and out of edit mode ───────────────────────────────────────────────
   window.addEventListener('bw-edit', e => {
     if (IS_VIEWER) return;
     closeTypeMenu();
+    closeFilterPop();
     if (e.detail.editing) {
       // A new poll that was waiting for typing to pause waits for Done instead.
       clearTimeout(restartTimer); restartTimer = null;

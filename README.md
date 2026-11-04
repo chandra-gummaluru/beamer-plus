@@ -143,6 +143,24 @@ Two models ship built in:
   key in the widget settings; requires `pip install anthropic`)
 - `gpt4o` — uses the OpenAI API (`OPENAI_API_KEY`; requires `pip install openai`)
 
+### Content filter
+
+Free-text answers (open text, word cloud, fill in the blanks) are checked on
+the server before they're stored or shown. A rejected answer never reaches the
+slide; the student is told it may contain inappropriate language and can
+rephrase it. Everything runs on this computer.
+
+- **Word list** (`better-profanity`, in `requirements.txt`): swear words,
+  including leetspeak. Each question has its own settings in the widget's
+  edit bar (**Filter**): on/off, an **Allow** list (words never to flag, e.g.
+  course terms) and a **Block** list (extra words or phrases), comma-separated.
+  The lists are saved with the slide and never sent to phones.
+- **Toxicity model** (optional, `pip install detoxify` — large, needs
+  PyTorch): also catches insults and threats without swear words. Loads in
+  the background at startup; the first run downloads the model.
+  `BEAMER_TOXICITY_THRESHOLD` (default `0.8`) sets how strict it is.
+- `BEAMER_CONTENT_FILTER=off` turns it off on this machine for every question.
+
 ### Custom models
 
 Drop a Python file in `ai/` (server-wide) or inside a presentation ZIP under

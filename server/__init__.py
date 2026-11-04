@@ -10,6 +10,7 @@ Module map:
 - presentation.py  upload, ZIP assets, demo packaging
 - widgets.py       built-in widget serving, embeddability probe
 - surveys.py       survey REST API
+- moderation.py    content filter for free-text answers
 - sockets.py       Socket.IO handlers
 - env.py           settings from a .env file
 
@@ -23,6 +24,7 @@ from .core import app, socketio  # noqa: E402
 
 from . import sockets  # noqa: F401  (registers Socket.IO handlers on import)
 from .ai_models import init_builtin_models  # noqa: E402
+from . import moderation  # noqa: E402
 from .pages import pages_bp
 from .presentation import presentation_bp
 from .sessions import sessions_bp
@@ -36,3 +38,4 @@ app.register_blueprint(surveys_bp)
 app.register_blueprint(sessions_bp)
 
 init_builtin_models()
+moderation.init()

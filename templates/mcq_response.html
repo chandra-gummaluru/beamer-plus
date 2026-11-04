@@ -12,6 +12,7 @@
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
 <script src="/static/vendor/marked.min.js"></script>
+<script src="/static/js/respond-code.js"></script>
 <link rel="stylesheet" href="/static/css/tokens.css">
 <link rel="stylesheet" href="/static/css/fonts-cm.css">
 <style>
@@ -273,6 +274,7 @@ function setQuestion(src) {
   el._src = src = src || '';
   if (!window.marked) { el.textContent = src; return; }
   el.innerHTML = marked.parse(src, { breaks: false });
+  if (window.decorateCode) decorateCode(el);
   el.classList.toggle('has-block', !!el.querySelector('pre, ul, ol, blockquote'));
   if (window.renderMathInElement) {
     renderMathInElement(el, {

@@ -1,12 +1,13 @@
 """Survey API: creation, audience responses, and AI summarization (per session)."""
 import inspect
+import json
 import time
 import traceback
 import uuid
 
 from flask import Blueprint, jsonify, request
 
-from . import state
+from . import moderation, state
 from .core import socketio
 from .sessions import get_session_or_404, presenter_room, survey_room
 
@@ -62,6 +63,12 @@ def create_survey(session_id):
         'options': options,
         'kind': kind,
         'meta': _clean_meta(data.get('meta')),
+        # Free-text answers go through the content filter unless the
+        # presenter turned it off for this question.
+        'filter': data.get('filter') is not False,
+        # The question's own word lists. Server-side only: never sent to phones.
+        'filter_allow': moderation.clean_words(data.get('filter_allow')),
+        'filter_block': moderation.clean_words(data.get('filter_block')),
     }
     if options and kind in ('choice', 'truefalse'):
         url = f'/s/{session_id}/mcq/{survey_id}'
@@ -91,6 +98,19 @@ def get_survey(session_id, survey_id):
     })
 
 
+def _answer_words(text, kind):
+    """The student's own words in an answer: a fill-in-the-blanks answer is a
+    JSON list, one string per blank."""
+    if kind == 'fill':
+        try:
+            vals = json.loads(text)
+            if isinstance(vals, list):
+                return [str(v) for v in vals]
+        except ValueError:
+            pass
+    return text
+
+
 @surveys_bp.route('/s/<session_id>/api/survey/<survey_id>/respond', methods=['POST'])
 def respond_survey(session_id, survey_id):
     sess = get_session_or_404(session_id)
@@ -106,7 +126,19 @@ def respond_survey(session_id, survey_id):
     text = data.get('response', '')
     if not isinstance(text, str):
         text = str(text)
-    response = {'text': text[:state.MAX_RESPONSE_LENGTH], 'timestamp': time.time()}
+    text = text[:state.MAX_RESPONSE_LENGTH]
+    survey = sess.surveys[survey_id]
+    if survey.get('filter', True) and survey.get('kind', 'open') in moderation.TEXT_KINDS:
+        reason = moderation.check(_answer_words(text, survey.get('kind')),
+                                  allow=survey.get('filter_allow', []), block=survey.get('filter_block', []))
+        if reason:
+            # Never stored or shown; the student is told and can rephrase.
+            return jsonify({
+                'error': "Your answer wasn't accepted because it may contain inappropriate language. "
+                         'Please rephrase it and try again.',
+                'rejected': reason,
+            }), 422
+    response = {'text': text, 'timestamp': time.time()}
     sess.survey_responses[survey_id].append(response)
     payload = {'survey_id': survey_id, 'response': response, 'total': len(sess.survey_responses[survey_id])}
     socketio.emit('survey_response', payload, room=presenter_room(session_id))

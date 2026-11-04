@@ -62,3 +62,45 @@ textarea::placeholder, .line-input::placeholder { color: var(--rs-cap); }
 .status-title, .status-card.ok .status-title, .status-card.err .status-title {
   color: var(--rs-ink); background: var(--rs-hl); padding: 0 .18em; font-size: 1.5rem;
 }
+
+/* Code in the question: the listing as the slide draws it (see #question pre
+   in widgets/audience-response.html) — a pale panel in an ink outline, line
+   numbers in a gutter, the widget's token colours, long lines wrapping under
+   their own text rather than scrolling sideways on a phone. */
+.question-text pre {
+  margin: 14px 0;
+  padding: 12px 14px 12px 0;
+  background: color-mix(in srgb, var(--rs-ink) 4%, #fff);
+  border: 2px solid var(--rs-ink);
+  border-radius: 7px;
+  overflow-x: auto;
+}
+.question-text pre code {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.72em;
+  line-height: 1.55;
+  color: var(--rs-ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  tab-size: 4;
+}
+.question-text .cl { display: block; position: relative; padding-left: 2.6em; }
+.question-text .cl::before {
+  content: attr(data-n);
+  position: absolute; left: 0; width: 1.9em; text-align: right;
+  color: var(--rs-cap); font-variant-numeric: tabular-nums; user-select: none;
+}
+.question-text .cl::after { content: '\200b'; }   /* keeps a blank line's height */
+.question-text .pk-kw  { color: #8250df; }
+.question-text .pk-str { color: #0a7a68; }
+.question-text .pk-num { color: #1257c9; }
+.question-text .pk-bi  { color: #9a3d84; }
+.question-text .pk-com { color: #8a938e; font-style: italic; }
+/* Inline `code` reads as typewriter text, as on the slide: no box round it. */
+.question-text :not(pre) > code {
+  padding: 0; background: none; border: 0; border-radius: 0;
+  font-family: var(--font-mono); font-size: 1em;
+}
+
+.hint-text:empty { display: none; }

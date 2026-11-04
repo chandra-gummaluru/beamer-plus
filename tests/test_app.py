@@ -219,6 +219,74 @@ def test_survey_lifecycle(client):
     assert resp.status_code == 403
 
 
+def test_content_filter_rejects_profanity_in_free_text(client):
+    session_id = create_session(client)
+    sid = create_survey(client, session_id, question='Thoughts?', kind='open')['survey_id']
+    url = f'{session_prefix(session_id)}/api/survey/{sid}/respond'
+
+    resp = client.post(url, json={'response': 'this is sh1t'})
+    assert resp.status_code == 422
+    assert resp.get_json()['rejected'] == 'profanity'
+    assert 'rephrase' in resp.get_json()['error']
+
+    assert client.post(url, json={'response': 'recursion is neat'}).status_code == 200
+    data = client.get(f'{session_prefix(session_id)}/api/survey/{sid}/responses').get_json()
+    assert [r['text'] for r in data['responses']] == ['recursion is neat']
+
+
+def test_content_filter_checks_each_blank(client):
+    session_id = create_session(client)
+    sid = create_survey(client, session_id, question='Fill', kind='fill', meta={'template': 'A ___ B ___'})['survey_id']
+    url = f'{session_prefix(session_id)}/api/survey/{sid}/respond'
+    assert client.post(url, json={'response': '["stack", "fuck"]'}).status_code == 422
+    assert client.post(url, json={'response': '["stack", "queue"]'}).status_code == 200
+
+
+def test_content_filter_can_be_turned_off_per_question(client):
+    session_id = create_session(client)
+    sid = create_survey(client, session_id, question='Q', kind='open', filter=False)['survey_id']
+    resp = client.post(f'{session_prefix(session_id)}/api/survey/{sid}/respond', json={'response': 'damn'})
+    assert resp.status_code == 200
+
+
+def test_content_filter_uses_the_questions_own_lists(client):
+    session_id = create_session(client)
+    sid = create_survey(client, session_id, question='Q', kind='open',
+                        filter_allow=['Hell'], filter_block='quiz bowl, mumble')['survey_id']
+    url = f'{session_prefix(session_id)}/api/survey/{sid}/respond'
+    assert client.post(url, json={'response': 'the hell of exam week'}).status_code == 200
+    assert client.post(url, json={'response': 'MUMBLE'}).status_code == 422
+    assert client.post(url, json={'response': 'like quiz  bowl'}).status_code == 422
+    assert client.post(url, json={'response': 'quiz bowling'}).status_code == 200
+
+    # Another question keeps the default lists.
+    other = create_survey(client, session_id, question='Q2', kind='open')['survey_id']
+    assert client.post(f'{session_prefix(session_id)}/api/survey/{other}/respond',
+                       json={'response': 'what the hell'}).status_code == 422
+    assert client.post(f'{session_prefix(session_id)}/api/survey/{other}/respond',
+                       json={'response': 'mumble'}).status_code == 200
+
+    # The lists are the presenter's; the phone's view of the survey leaves them out.
+    public = client.get(f'{session_prefix(session_id)}/api/survey/{sid}').get_json()
+    assert 'filter_allow' not in public and 'filter_block' not in public
+
+
+def test_content_filter_uses_toxicity_model_when_loaded(client, monkeypatch):
+    from server import moderation
+
+    class FakeDetox:
+        def predict(self, text):
+            return {'toxicity': 0.95 if 'useless' in text else 0.01}
+
+    monkeypatch.setattr(moderation, '_detox', FakeDetox())
+    session_id = create_session(client)
+    sid = create_survey(client, session_id, question='Q', kind='open')['survey_id']
+    url = f'{session_prefix(session_id)}/api/survey/{sid}/respond'
+    resp = client.post(url, json={'response': 'you are useless'})
+    assert resp.status_code == 422 and resp.get_json()['rejected'] == 'toxicity'
+    assert client.post(url, json={'response': 'great lecture'}).status_code == 200
+
+
 def test_survey_public_endpoint_does_not_leak_api_key(client):
     session_id = create_session(client)
     survey = create_survey(client, session_id, question='Q', model='claude', api_key='sk-secret')

@@ -12,6 +12,7 @@
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
 <script src="/static/vendor/marked.min.js"></script>
+<script src="/static/js/respond-code.js"></script>
 <link rel="stylesheet" href="/static/css/tokens.css">
 <link rel="stylesheet" href="/static/css/fonts-cm.css">
 <style>
@@ -269,7 +270,7 @@ textarea::placeholder { color: var(--text-3); }
   <div id="input-slot"></div>
   <div class="field-error" id="field-error"></div>
   <button class="submit-btn" id="submit-btn" onclick="submit()">Submit</button>
-  <div class="hint-text" id="hint-text">Ctrl + Enter to submit</div>
+  <div class="hint-text" id="hint-text"></div>
 </div>
 
 <div class="status-card ok" id="thanks-card">
@@ -415,7 +416,7 @@ function buildInput(data) {
       }
     });
     slot.appendChild(box);
-    hint.textContent = 'Enter moves to the next blank';
+    hint.textContent = '';   // the keys still work; a phone has none to show
     setTimeout(() => slot.querySelector('.blank-input')?.focus(), 50);
     return;
   }
@@ -450,7 +451,7 @@ function buildInput(data) {
     inputEl.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
     wrap.insertBefore(inputEl, wrap.firstChild);
     slot.appendChild(wrap);
-    hint.textContent = 'Enter to submit';
+    hint.textContent = '';   // the keys still work; a phone has none to show
     setTimeout(() => inputEl.focus(), 50);
     return;
   }
@@ -462,7 +463,7 @@ function buildInput(data) {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') submit();
   });
   slot.appendChild(inputEl);
-  hint.textContent = 'Ctrl + Enter to submit';
+  hint.textContent = '';   // the keys still work; a phone has none to show
 }
 
 // The answer to send, or null (with the reason shown) if there isn't one yet.
@@ -515,12 +516,21 @@ async function submit() {
     if (!res.ok) {
       const d = await res.json().catch(() => ({}));
       if ((d.error || '').toLowerCase().includes('closed')) { showCard('closed-card'); return; }
+      if (d.rejected) {
+        // The content filter turned it down: say so, keep what they typed
+        // so they can rephrase it.
+        setInputsDisabled(false);
+        document.getElementById('field-error').textContent = d.error;
+        (inputEl || document.querySelector('.blank-input'))?.focus();
+        return;
+      }
       throw new Error(d.error || 'Failed');
     }
     sessionStorage.setItem(SESSION_KEY, '1');
     showCard('thanks-card');
   } catch (e) {
     setInputsDisabled(false);
+    document.getElementById('field-error').textContent = "Couldn't send your answer. Please try again.";
   }
 }
 
@@ -532,6 +542,7 @@ function setQuestion(src) {
   el._src = src = src || '';
   if (!window.marked) { el.textContent = src; return; }
   el.innerHTML = marked.parse(src, { breaks: false });
+  if (window.decorateCode) decorateCode(el);
   el.classList.toggle('has-block', !!el.querySelector('pre, ul, ol, blockquote'));
   if (window.renderMathInElement) {
     renderMathInElement(el, {
