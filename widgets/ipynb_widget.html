@@ -2454,7 +2454,7 @@ body {
   z-index: 5;
 }
 .cell-block:hover .cell-controls,
-.cell-card.focused .cell-controls { display: flex; }
+.cell-row:has(.cell-card.focused) .cell-controls { display: flex; }
 
 .cc-btn {
   width: 23px; height: 23px;
@@ -2815,6 +2815,23 @@ body {
   background: var(--sn-node);
   border: var(--sn-line) solid var(--sn-ink);
   border-radius: var(--sn-r);
+  /* Wrapped, as the code cells are: a long docstring line used to run out
+     past the box's right edge. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* The hover controls hang in the free gutter to the right of the cell,
+   stacked, rather than over its top-right corner — there they covered the
+   end of the first line (on a markdown cell, the prose itself). They sit in
+   the row, not the card: the card clips what overflows it. */
+#notebook-area:not(.paper) .cell-controls {
+  top: 0;
+  right: auto;
+  left: 100%;
+  padding-left: 4px;   /* not a margin: the pointer crosses it without leaving the cell */
+  flex-direction: column;
+  gap: 2px;
 }
 
 /* Cell controls drawn like every Beamer+ icon button: ink icons, and an
@@ -3783,7 +3800,6 @@ function addCodeCell(code = '', insertAfterId = null, { focus = true } = {}) {
         <span class="exec-num" id="enum-${id}">[ ]</span>
       </div>
       <div class="cell-card" id="card-${id}">
-        ${ctrlsHtml}
         <div class="code-area has-hl">
           <pre class="code-ln" aria-hidden="true">1</pre>
           <pre class="code-hl" aria-hidden="true"></pre>
@@ -3801,6 +3817,7 @@ function addCodeCell(code = '', insertAfterId = null, { focus = true } = {}) {
           <div id="out-items-${id}"></div>
         </div>
       </div>
+      ${ctrlsHtml}
     </div>`;
 
   placeCell(block, insertAfterId);
@@ -3842,7 +3859,6 @@ function addMarkdownCell(src = '', insertAfterId = null) {
         <span class="md-gutter-label">M</span>
       </div>
       <div class="cell-card" id="card-${id}">
-        ${ctrlsHtml}
         <!-- edit mode (hidden by default) -->
         <div id="md-edit-${id}" style="display:none">
           <textarea
@@ -3857,6 +3873,7 @@ function addMarkdownCell(src = '', insertAfterId = null) {
           ${isEmpty ? 'Double-click to edit…' : mdParse(src)}
         </div>
       </div>
+      ${ctrlsHtml}
     </div>`;
 
   placeCell(block, insertAfterId);
