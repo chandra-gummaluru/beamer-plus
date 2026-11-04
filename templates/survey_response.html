@@ -130,7 +130,20 @@ textarea::placeholder { color: var(--text-3); }
 .fill-template pre code { line-height: 2; }
 .fill-para { display: flex; flex-direction: column; gap: 14px; margin: 0 0 0.6em; }
 .fill-para:last-child { margin-bottom: 0; }
-.fill-line { line-height: 2.4; }
+.fill-line { line-height: 2.1; }
+.fill-line .keep, .fill-line .keep > code { white-space: nowrap; }   /* inline code is pre-wrap */
+/* In a sentence: an underlined gap, like the slide's, not a box. */
+.fill-template .blank-input.is-inline {
+  height: 1.75em; margin: 0 2px; padding: 0 4px;
+  border: 0; border-bottom: 2px solid var(--rs-ink, var(--text)); border-radius: 0;
+  background: color-mix(in srgb, var(--rs-hl, #f7c548) 22%, #fff);
+  vertical-align: baseline;
+}
+.fill-template .blank-input.is-inline:focus {
+  background: color-mix(in srgb, var(--rs-hl, #f7c548) 50%, #fff); box-shadow: none;
+}
+.fill-line .pick-group.is-inline { vertical-align: baseline; }
+.fill-line .pick-group.is-inline .pick-btn { min-height: 34px; padding: 0 10px; }
 .fill-field { display: flex; flex-direction: column; gap: 6px; }
 .fill-label { line-height: 1.35; }
 .fill-field .blank-input.is-full { width: 100%; margin: 0; height: 46px; }
@@ -585,6 +598,36 @@ const blankSpecs = src => [...String(src || '').matchAll(BLANK_RE)].map(m => bla
 // laid out as one: the label on top, the box the full width under it, every
 // box lined up with the next. A blank inside a sentence ("returns ___ because
 // ___") stays in the sentence, and blanks in code stay in the code.
+// Blanks inside a sentence are drawn as the slide draws them: an underlined
+// gap in the line, as wide as the blank asks for. Each is held on the same
+// line as the word before it ("test_" + gap) and the punctuation after it,
+// so a line never breaks between them.
+function inSentence(line) {
+  [...line.children].filter(n => n.matches('.blank-input, .pick-group')).forEach(b => {
+    b.classList.add('is-inline');
+    if (b.matches('.blank-input')) {
+      const spec = blanks[+b.dataset.blank];
+      b.dataset.base = (spec && spec.width) || 8;
+      b.style.width = b.dataset.base + 'ch';
+    }
+    const keep = document.createElement('span');
+    keep.className = 'keep';
+    b.replaceWith(keep);
+    let prev = keep.previousSibling, next = keep.nextSibling;
+    if (prev?.nodeType === 3) {
+      const m = prev.data.match(/\S+$/);
+      prev = m ? prev.splitText(prev.data.length - m[0].length) : null;
+    } else if (prev?.nodeType !== 1 || prev.matches('.keep')) prev = null;   // `code` right before it
+    if (next?.nodeType === 3) {
+      const m = next.data.match(/^[.,;:!?)\]'"]+/);
+      if (m) next.splitText(m[0].length); else next = null;
+    } else next = null;
+    if (prev) keep.appendChild(prev);
+    keep.appendChild(b);
+    if (next) keep.appendChild(next);
+  });
+}
+
 function formFields(box) {
   const isBlank = n => n.nodeType === 1 && (n.classList.contains('blank-input') || n.classList.contains('pick-group'));
   const isEmpty = n => n.nodeType === 3 ? !n.data.trim() : n.nodeName === 'BR';
@@ -618,6 +661,7 @@ function formFields(box) {
         const l = document.createElement('div');
         l.className = 'fill-line';
         line.forEach(n => l.appendChild(n));
+        inSentence(l);
         out.appendChild(l);
       }
     });
@@ -638,11 +682,11 @@ function blankInput(spec, k, inCode) {
     inp.spellcheck = false;
     inp.dataset.blank = k;
     inp.setAttribute('aria-label', `Blank ${k + 1}`);
-    const base = spec.width || (inCode ? 10 : 14);
-    inp.style.width = base + 'ch';
+    inp.dataset.base = spec.width || (inCode ? 10 : 14);
+    inp.style.width = inp.dataset.base + 'ch';
     inp.addEventListener('input', () => {
       if (inp.classList.contains('is-full')) return;   // a form field is already the full width
-      inp.style.width = Math.max(base, Math.min(40, inp.value.length + 2)) + 'ch';
+      inp.style.width = Math.max(+inp.dataset.base, Math.min(40, inp.value.length + 2)) + 'ch';
     });
     inp.addEventListener('keydown', e => {
       if (e.key !== 'Enter') return;

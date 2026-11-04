@@ -14,8 +14,11 @@
     'filter type input open round isinstance append';
   const CLIKE = new Set(['js', 'javascript', 'ts', 'typescript', 'java', 'c', 'cpp', 'c++', 'cs', 'csharp',
                          'go', 'rust', 'php', 'swift', 'kotlin', 'scala', 'dart']);
-  const RE_COM = String.raw`#[^\n]*|//[^\n]*|/\*.*?\*/`;
-  const RE_STR = String.raw`"(?:\\.|[^"\\])*"?|'(?:\\.|[^'\\])*'?`;
+  // The listing is coloured as a whole, not line by line, so a docstring or a
+  // /* comment */ that runs over several lines stays coloured on every one
+  // (an unclosed one runs to the end, as an editor would show it).
+  const RE_COM = String.raw`#[^\n]*|//[^\n]*|/\*[\s\S]*?(?:\*/|$)`;
+  const RE_STR = String.raw`"""[\s\S]*?(?:"""|$)|'''[\s\S]*?(?:'''|$)|"(?:\\.|[^"\\\n])*"?|'(?:\\.|[^'\\\n])*'?`;
   const RE_NUM = String.raw`0[xXbBoO][0-9a-fA-F_]+|\d[\d_]*\.?\d*(?:[eE][+-]?\d+)?`;
 
   const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -29,18 +32,28 @@
                       '|\\b(' + alt(BI_PY) + ')\\b|\\b(' + RE_NUM + ')\\b', 'g');
   }
 
-  function highlightLine(line, re) {
-    const sp = (c, t) => `<span class="pk-${c}">${esc(t)}</span>`;
-    let out = '', last = 0, m;
+  // A listing, coloured: one string of HTML per line. A token that spans
+  // lines (a docstring) is closed at each line's end and reopened on the next,
+  // so every line stands on its own (the gutter wraps each in a span).
+  function highlightLines(src, re) {
+    const toks = [];
+    let last = 0, m;
     re.lastIndex = 0;
-    while ((m = re.exec(line))) {
-      out += esc(line.slice(last, m.index));
-      out += m[1] ? sp('com', m[1]) : m[2] ? sp('str', m[2]) : m[3] ? sp('kw', m[3])
-           : m[4] ? sp('bi', m[4]) : sp('num', m[5]);
+    while ((m = re.exec(src))) {
+      if (m.index > last) toks.push(['', src.slice(last, m.index)]);
+      toks.push([m[1] ? 'com' : m[2] ? 'str' : m[3] ? 'kw' : m[4] ? 'bi' : 'num', m[0]]);
       last = re.lastIndex;
       if (m[0] === '') re.lastIndex++;
     }
-    return out + esc(line.slice(last));
+    if (last < src.length) toks.push(['', src.slice(last)]);
+    const lines = [''];
+    for (const [c, t] of toks) {
+      t.split('\n').forEach((piece, i) => {
+        if (i) lines.push('');
+        if (piece) lines[lines.length - 1] += c ? `<span class="pk-${c}">${esc(piece)}</span>` : esc(piece);
+      });
+    }
+    return lines;
   }
 
   window.decorateCode = function (root) {
@@ -48,8 +61,8 @@
       const lang = (code.className.match(/language-([\w+#]+)/) || ['', ''])[1].toLowerCase();
       const re   = tokenRe(lang);
       const src  = code.textContent.replace(/\n+$/, '');
-      code.innerHTML = src.split('\n')
-        .map((line, i) => `<span class="cl" data-n="${i + 1}">${highlightLine(line, re)}</span>`)
+      code.innerHTML = highlightLines(src, re)
+        .map((line, i) => `<span class="cl" data-n="${i + 1}">${line}</span>`)
         .join('');
     });
   };

@@ -2853,6 +2853,7 @@ body.bw-editing .blank { background: var(--edit-soft); color: var(--edit-ink); }
    student's answer on screen, what they picked takes the highlighter (as a
    typed answer does) and the rest fade; revealed, the right options get a
    tick. */
+.keep, .keep > code, #question .keep > code { white-space: nowrap; }   /* inline code is pre-wrap, which would still break after it */
 .blank-pick { display: inline-flex; flex-wrap: wrap; gap: 0.3em; margin: 0 2px; vertical-align: baseline; }
 .pick {
   display: inline-flex;
@@ -2889,6 +2890,34 @@ body.bw-editing .pick.is-right { background: var(--ar-hl); color: var(--ar-on-hl
 #fill-stats { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #fill-foot .bw-spacer { flex: 1; }
 #fill-pos { font-family: var(--ar-tt); color: var(--ar-ink); }
+/* Stepping through the class, in the banner's place (where the QR code
+   was): the same node as the banner, with the number on screen as its
+   figure and a node arrow either side. Scales with the slide text. */
+#fill-nav {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: calc(22px * var(--u));
+  padding: calc(14px * var(--u)) calc(18px * var(--u));
+  border: var(--ar-line) solid var(--ar-ink);
+  border-radius: var(--ar-r);
+  background: var(--bg);
+}
+#fill-nav .join-fig { padding-left: 0; border-left: 0; min-width: calc(110px * var(--u)); }
+#fill-nav .fig-v { font-size: calc(40px * var(--u)); }
+#fill-nav button.bw-btn--icon {
+  width: calc(54px * var(--u));
+  height: calc(46px * var(--u));
+  padding: 0;
+  border: var(--ar-line) solid var(--ar-ink);
+  border-radius: var(--ar-r);
+  background: var(--ar-node);
+  color: var(--ar-ink);
+  transition: background var(--dur), opacity var(--dur);
+}
+#fill-nav button.bw-btn--icon svg { width: calc(20px * var(--u)); height: calc(20px * var(--u)); }
+#fill-nav button.bw-btn--icon:hover:not(:disabled) { background: color-mix(in srgb, var(--ar-ink) 10%, var(--bg)); }
+#fill-nav button.bw-btn--icon:disabled { opacity: 0.25; cursor: default; }
 #fill-foot .bw-btn--icon,
 #sum-nav .bw-btn--icon,
 #spot-foot .bw-btn--icon { border: 1.5px solid var(--ar-ink); background: var(--bg); color: var(--ar-ink); }
@@ -3676,9 +3705,7 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
       <div id="fill">
         <div id="fill-tpl"></div>
         <div id="fill-foot">
-          <button class="bw-btn bw-btn--icon" id="fill-prev" title="Previous response (←)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg></button>
           <span id="fill-pos"></span>
-          <button class="bw-btn bw-btn--icon" id="fill-next" title="Next response (→)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg></button>
           <span class="bw-spacer"></span>
           <span id="fill-stats"></span>
         </div>
@@ -3742,6 +3769,16 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
           <span class="fig-l" id="timer-cap"></span>
           <div id="timer-track"><div id="timer-fill"></div></div>
         </div>
+      </div>
+      <!-- Fill in the blanks, results up: where the QR code was, the way
+           through the class — one student's answer at a time. -->
+      <div id="fill-nav">
+        <button class="bw-btn bw-btn--icon" id="fill-prev" title="Previous response (←)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg></button>
+        <div class="join-fig" id="fill-fig">
+          <span class="fig-v" id="fill-n">1</span>
+          <span class="fig-l" id="fill-of">of 1</span>
+        </div>
+        <button class="bw-btn bw-btn--icon" id="fill-next" title="Next response (→)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg></button>
       </div>
     </aside>
 
@@ -4069,6 +4106,24 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
       if (text) frag.appendChild(document.createTextNode(text));
       n.replaceWith(frag);
     });
+    // A blank stays on one line with what it's written against: the word
+    // right before it ("test_" + gap) and a full stop or comma right after,
+    // so a line never starts with "." or ends with a lone "test_".
+    root.querySelectorAll('.blank, .blank-pick').forEach(b => {
+      if (b.parentElement?.classList.contains('keep')) return;
+      let pv = b.previousSibling, nx = b.nextSibling;
+      if (pv?.nodeType === 3) {
+        const w = pv.data.match(/\S+$/);
+        pv = w ? pv.splitText(pv.data.length - w[0].length) : null;
+      } else if (!(pv?.nodeType === 1 && pv.matches('code, em, strong'))) pv = null;
+      const m = nx?.nodeType === 3 && nx.data.match(/^[.,;:!?)\]'"]+/);
+      if (m) nx.splitText(m[0].length); else nx = null;
+      if (!pv && !nx) return;
+      const keep = document.createElement('span');
+      keep.className = 'keep';
+      b.replaceWith(keep);
+      keep.append(...[pv, b, nx].filter(Boolean));
+    });
   }
 
   // What a fill-in-the-blanks question draws: its blanks, and with the
@@ -4151,7 +4206,7 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
     // block that ends on an empty line gets a <br> to hold the caret there
     // (a <br data-pad> adds nothing to the source).
     const html = `<span class="fence-mark">${escHtml(head.slice(0, -1))}</span>\n` +
-           body.split('\n').map(line => highlightLine(line, re)).join('\n') +
+           highlightLines(body, re).join('\n') +
            (closed ? `<span class="fence-mark">\`\`\`</span>` : '');
     return t.endsWith('\n') ? html + '<br data-pad="1">' : html;
   }
@@ -4456,8 +4511,11 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
   // Written with String.raw so the regex reads as a regex, not as a wall of
   // doubled backslashes. Back-tick strings are left out on purpose: they'd
   // need escaping here, and slide code rarely uses them.
-  const RE_COM = String.raw`#[^\n]*|//[^\n]*|/\*.*?\*/`;
-  const RE_STR = String.raw`"(?:\\.|[^"\\])*"?|'(?:\\.|[^'\\])*'?`;
+  // The listing is coloured as a whole, not line by line, so a docstring or a
+  // /* comment */ that runs over several lines stays coloured on every one
+  // (an unclosed one runs to the end, as an editor would show it).
+  const RE_COM = String.raw`#[^\n]*|//[^\n]*|/\*[\s\S]*?(?:\*/|$)`;
+  const RE_STR = String.raw`"""[\s\S]*?(?:"""|$)|'''[\s\S]*?(?:'''|$)|"(?:\\.|[^"\\\n])*"?|'(?:\\.|[^'\\\n])*'?`;
   const RE_NUM = String.raw`0[xXbBoO][0-9a-fA-F_]+|\d[\d_]*\.?\d*(?:[eE][+-]?\d+)?`;
 
   function tokenRe(lang) {
@@ -4473,18 +4531,28 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
       '|\\b(' + RE_NUM + ')\\b', 'g');
   }
 
-  function highlightLine(line, re) {
-    const sp = (c, t) => `<span class="pk-${c}">${escHtml(t)}</span>`;
-    let out = '', last = 0, m;
+  // A listing, coloured: one string of HTML per line. A token that spans
+  // lines (a docstring) is closed at each line's end and reopened on the next,
+  // so every line stands on its own (the gutter wraps each in a span).
+  function highlightLines(src, re) {
+    const toks = [];
+    let last = 0, m;
     re.lastIndex = 0;
-    while ((m = re.exec(line))) {
-      out += escHtml(line.slice(last, m.index));
-      out += m[1] ? sp('com', m[1]) : m[2] ? sp('str', m[2]) : m[3] ? sp('kw', m[3])
-           : m[4] ? sp('bi', m[4]) : sp('num', m[5]);
+    while ((m = re.exec(src))) {
+      if (m.index > last) toks.push(['', src.slice(last, m.index)]);
+      toks.push([m[1] ? 'com' : m[2] ? 'str' : m[3] ? 'kw' : m[4] ? 'bi' : 'num', m[0]]);
       last = re.lastIndex;
       if (m[0] === '') re.lastIndex++;
     }
-    return out + escHtml(line.slice(last));
+    if (last < src.length) toks.push(['', src.slice(last)]);
+    const lines = [''];
+    for (const [c, t] of toks) {
+      t.split('\n').forEach((piece, i) => {
+        if (i) lines.push('');
+        if (piece) lines[lines.length - 1] += c ? `<span class="pk-${c}">${escHtml(piece)}</span>` : escHtml(piece);
+      });
+    }
+    return lines;
   }
 
   function decorateCode(root) {
@@ -4492,8 +4560,8 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
       const lang = (code.className.match(/language-([\w+#]+)/) || ['', ''])[1].toLowerCase();
       const re   = tokenRe(lang);
       const src  = code.textContent.replace(/\n+$/, '');
-      code.innerHTML = src.split('\n')
-        .map((line, i) => `<span class="cl" data-n="${i + 1}">${highlightLine(line, re)}</span>`)
+      code.innerHTML = highlightLines(src, re)
+        .map((line, i) => `<span class="cl" data-n="${i + 1}">${line}</span>`)
         .join('');
     });
   }
@@ -4730,15 +4798,20 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
     // each phase (QR up, closed, results) and visibly jumps between them.
     stage.classList.add('is-top');
     stage.classList.toggle('is-preview', preview);
-    stage.classList.toggle('is-data',    showData);
+    // Fill in the blanks shows its results in the question itself, so on a
+    // split the right slide keeps the banner's place to itself, centred, as
+    // the QR had it — now holding the way through the class (#fill-nav).
+    stage.classList.toggle('is-data',    showData && t !== 'fill');
     stage.classList.toggle('is-fill',    showData);
     // Nothing for the answers' half to show yet (an open, word-cloud, rating,
     // number or fill question while the room answers): on a split the QR has
     // the right slide to itself, in the middle of it (see .is-bare).
-    stage.classList.toggle('is-bare', !ed && !showData && !isChoiceLike(t));
+    stage.classList.toggle('is-bare', (!ed && (!showData || t === 'fill') && !isChoiceLike(t)) || (ed && t === 'open'));
 
     joinEl.style.display = withJoin ? 'flex' : 'none';
-    sideEl.classList.toggle('is-empty', !withJoin);
+    const fillNavOn = t === 'fill' && results && !ed && !preview;
+    $('fill-nav').style.display = fillNavOn ? 'flex' : 'none';
+    sideEl.classList.toggle('is-empty', !withJoin && !fillNavOn);
     previewMsg.textContent = IS_VIEWER ? 'Waiting for the presenter to set up this question.'
                                        : 'Sample data — ' + missing().replace(/^A/, 'a');
     previewBtn.style.display = IS_VIEWER || !window.BeamerWidget?.edit?.available?.() ? 'none' : '';
@@ -5182,9 +5255,11 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
   function renderFill(D) {
     const showData = true;
     const n = D.fills.length;
-    $('fill-foot').style.display = showData ? 'flex' : 'none';
+    $('fill-foot').style.display = 'none';   // the way through is in the banner's place (#fill-nav)
     if (!showData) return;
-    fillPos.textContent = n ? `response ${D.fillIdx + 1} of ${n}` : 'no responses';
+    fillPos.textContent = n ? `Response ${D.fillIdx + 1} of ${n}` : 'No responses';
+    $('fill-n').textContent  = n ? String(D.fillIdx + 1) : '0';
+    $('fill-of').textContent = n ? `of ${n} ${n === 1 ? 'response' : 'responses'}` : 'responses';
     $('fill-prev').disabled = D.fillIdx <= 0;
     $('fill-next').disabled = D.fillIdx >= n - 1;
     ['fill-prev', 'fill-next'].forEach(id => { $(id).style.display = IS_VIEWER ? 'none' : ''; });
@@ -6196,7 +6271,9 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
     edCloud.style.display = t === 'wordcloud' ? 'flex' : 'none';
     if (t === 'wordcloud') pick(edWords, String(S.words));
 
-    edOpen.style.display = t === 'open' ? 'flex' : 'none';
+    // No stand-in for the responses while editing: the slide shows the
+    // question and the QR, as it will while the room answers.
+    edOpen.style.display = 'none';
     if (t === 'open') {
       setVal(edModel, String(cfg.model || ''));
       setVal(edNsum,  String(parseInt(cfg.numSummaries, 10) || 3));
