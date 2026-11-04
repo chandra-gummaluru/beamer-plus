@@ -4806,7 +4806,11 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
     // Nothing for the answers' half to show yet (an open, word-cloud, rating,
     // number or fill question while the room answers): on a split the QR has
     // the right slide to itself, in the middle of it (see .is-bare).
-    stage.classList.toggle('is-bare', (!ed && (!showData || t === 'fill') && !isChoiceLike(t)) || (ed && t === 'open'));
+    // Being edited, the types with nothing to set up on the answers' side
+    // (open-ended, word cloud, fill in the blanks — all set up in the
+    // question) leave the QR centred there too, as it will be live.
+    const bareEdit = ed && (t === 'open' || t === 'wordcloud' || t === 'fill');
+    stage.classList.toggle('is-bare', (!ed && (!showData || t === 'fill') && !isChoiceLike(t)) || bareEdit);
 
     joinEl.style.display = withJoin ? 'flex' : 'none';
     const fillNavOn = t === 'fill' && results && !ed && !preview;
@@ -6268,7 +6272,7 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
       [edAnswer, edTol, edUnit].forEach(fitWidth);
     }
 
-    edCloud.style.display = t === 'wordcloud' ? 'flex' : 'none';
+    edCloud.style.display = 'none';   // no stand-in for the cloud while editing (as for open-ended)
     if (t === 'wordcloud') pick(edWords, String(S.words));
 
     // No stand-in for the responses while editing: the slide shows the
