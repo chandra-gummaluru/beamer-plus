@@ -2896,6 +2896,146 @@ body:not(.bw-editing) #toolbar .tb-btn.primary:hover:not(:disabled) { border-col
 /* No Run All or download in the bar: cells run one by one on the slide. */
 #btn-run-all, #btn-download, #toolbar > .sep { display: none !important; }
 
+/* ── Files: the notebook's working directory ──────────────────────
+   A Jupyter-style browser down the left. The deck's files are written
+   to Python's disk before any cell runs, so open('vitals.csv') just
+   works; files a cell writes show up here too. A file opens over the
+   notebook (a CSV as a table or as text) and closes back to it. */
+#nb-main {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  position: relative;
+}
+#nb-stage {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+#files-pane {
+  flex: 0 0 auto;
+  width: calc(190px * var(--u));
+  max-width: 38%;
+  display: none;
+  flex-direction: column;
+  border-right: 1.5px solid var(--sn-faint);
+  background: var(--bg);
+  font-family: var(--font-chrome);
+  min-height: 0;
+}
+body.files-open #files-pane { display: flex; }
+.fp-head {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 4px;
+  height: 38px; padding: 0 6px 0 12px;
+}
+.fp-label { flex: 1 1 auto; font-size: 13px; color: var(--sn-cap); }
+.fp-head .bw-btn--icon svg { width: 14px; height: 14px; }
+#fp-list {
+  flex: 1 1 auto; min-height: 0;
+  overflow-y: auto; overflow-x: hidden;
+  padding: 0 6px 10px;
+}
+#fp-list::-webkit-scrollbar { width: 6px; }
+#fp-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.fp-item {
+  display: flex; align-items: center; gap: calc(6px * var(--u));
+  width: 100%; min-height: calc(28px * var(--u));
+  padding: 2px 4px 2px calc(6px + var(--depth, 0) * 14px * var(--u));
+  border: 1.5px solid transparent; border-radius: 5px;
+  background: none; color: var(--sn-ink); text-align: left; cursor: pointer;
+  font-family: var(--font-mono); font-size: calc(12.5px * var(--u));
+}
+.fp-item:hover, .fp-item:focus-visible { background: var(--sn-node); outline: none; }
+.fp-item.is-open { background: var(--sn-hl); color: var(--sn-on-hl); }
+.fp-item > svg { flex: 0 0 auto; width: calc(14px * var(--u)); height: calc(14px * var(--u)); color: var(--sn-cap); }
+.fp-item.is-open > svg { color: var(--sn-on-hl); }
+.fp-dir { cursor: default; color: var(--sn-cap); }
+.fp-dir:hover { background: none; }
+.fp-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Written by a cell, not part of the deck: a quiet "new" caption, so it's
+   clear which files were handed out and which the code made. */
+.fp-new { flex: 0 0 auto; font-family: var(--font-chrome); font-size: 11px; color: var(--sn-cap); }
+.fp-item.is-open .fp-new { color: var(--sn-on-hl); }
+.fp-x {
+  flex: 0 0 auto; width: 22px; height: 22px; display: none; place-items: center;
+  border: 0; border-radius: 4px; background: none; color: var(--sn-cap); font-size: 15px; cursor: pointer;
+}
+body.bw-editing .fp-item.is-deck .fp-x { display: grid; }
+.fp-x:hover { background: var(--bg); color: var(--sn-ink); }
+.fp-x.is-armed { background: var(--err); color: #fff; }
+.fp-empty {
+  padding: 8px 8px; font-size: 12.5px; line-height: 1.45; color: var(--sn-cap);
+}
+.fp-msg { padding: 4px 8px 0; font-size: 12px; color: var(--sn-cap); }
+.fp-msg.is-err { color: var(--err); }
+/* Edit mode: the pane takes dropped files, like the bar's source row. */
+#files-pane.is-over { background: color-mix(in srgb, var(--sn-hl) 18%, var(--bg)); }
+#files-pane.is-over #fp-list { outline: 1.5px dashed var(--sn-ink); outline-offset: -4px; border-radius: 6px; }
+.fp-edit-only { display: none !important; }
+body.bw-editing .fp-edit-only { display: inline-flex !important; }
+
+/* The open file, over the notebook. */
+#file-view {
+  position: absolute; inset: 0; z-index: 5;
+  display: none; flex-direction: column;
+  background: var(--bg);
+}
+#file-view.is-open { display: flex; }
+.fv-head {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 6px;
+  height: 38px; padding: 0 10px 0 12px;
+  border-bottom: 1.5px solid var(--sn-faint);
+  font-family: var(--font-chrome);
+}
+#fv-name {
+  flex: 0 1 auto; min-width: 4ch;
+  height: 26px; padding: 0 6px;
+  border: 1.5px solid transparent; border-radius: 5px; background: none;
+  font-family: var(--font-mono); font-size: 13px; color: var(--sn-ink);
+}
+#fv-name:not([readonly]):hover, #fv-name:not([readonly]):focus { border-color: var(--sn-faint); outline: none; }
+#fv-name.is-bad { border-color: var(--err); }
+.fv-meta { flex: 0 1 auto; min-width: 0; font-size: 12px; color: var(--sn-cap); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* !important: the base's toggle style sets display with !important. */
+#file-view:not(.is-table-able) #fv-seg { display: none !important; }
+.fv-body { flex: 1 1 auto; min-height: 0; position: relative; }
+#fv-text {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  border: 0; outline: none; resize: none;
+  padding: calc(12px * var(--u)) calc(16px * var(--u));
+  background: var(--bg); color: var(--sn-ink);
+  font-family: var(--font-mono); font-size: calc(12.5px * var(--u)); line-height: 1.6;
+  tab-size: 4; white-space: pre; overflow: auto;
+  font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0;
+}
+#fv-table-wrap, #fv-other { position: absolute; inset: 0; overflow: auto; padding: calc(12px * var(--u)) calc(16px * var(--u)); }
+#fv-table {
+  border-collapse: collapse;
+  font-family: var(--font-mono); font-size: calc(12.5px * var(--u));
+  color: var(--sn-ink);
+}
+#fv-table th, #fv-table td {
+  padding: calc(3px * var(--u)) calc(12px * var(--u));
+  border-bottom: 1px solid var(--border);
+  text-align: left; white-space: nowrap;
+}
+#fv-table th { border-bottom: 1.5px solid var(--sn-ink); font-weight: 700; position: sticky; top: calc(-12px * var(--u)); background: var(--bg); }
+#fv-table td.num { text-align: right; }
+#fv-table .rn { color: var(--sn-faint); text-align: right; padding-right: calc(8px * var(--u)); user-select: none; }
+.fv-trunc { margin-top: 8px; font-family: var(--font-chrome); font-size: 12px; color: var(--sn-cap); }
+#fv-other { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding-bottom: 10%; color: var(--sn-cap); font-family: var(--font-chrome); font-size: calc(13px * var(--u)); }
+.fv-body > [hidden] { display: none !important; }
+#fv-other img { max-width: 100%; max-height: 80%; object-fit: contain; }
+
+@media print {
+  #files-pane, #file-view { display: none !important; }
+  #nb-main, #nb-stage { display: block; }
+}
+
 </style>
 </head>
 <body>
@@ -2914,6 +3054,11 @@ body:not(.bw-editing) #toolbar .tb-btn.primary:hover:not(:disabled) { border-col
     <span class="bw-source-msg" id="nb-ed-msg"></span>
   </div>
     <button class="bw-btn bw-edit-only" type="button" id="nb-choose">Choose Notebook…</button>
+  <!-- Opens and closes the files pane, live and while editing. -->
+  <button class="bw-btn" type="button" id="btn-files" title="Files" aria-pressed="false" data-bw-print-hide>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 6.5V18a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8.5a1 1 0 0 0-1-1h-8l-2-2.5H4a1 1 0 0 0-1 1z"/></svg>
+    Files
+  </button>
 
   <button class="tb-btn primary" id="btn-run-all" disabled onclick="runAll()">
     Run All
@@ -2927,6 +3072,25 @@ body:not(.bw-editing) #toolbar .tb-btn.primary:hover:not(:disabled) { border-col
     Notebook
   </button>
 </div>
+
+<div id="nb-main">
+
+<!-- ── Files ──────────────────────────────────────────────────────────── -->
+<aside id="files-pane" aria-label="Files" data-bw-print-hide>
+  <div class="fp-head">
+    <span class="fp-label">files</span>
+    <button class="bw-btn bw-btn--icon fp-edit-only" type="button" id="fp-new" title="New file" aria-label="New file">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M12 11v6M9 14h6"/></svg>
+    </button>
+    <button class="bw-btn bw-btn--icon fp-edit-only" type="button" id="fp-upload" title="Add files from your computer" aria-label="Add files">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+    </button>
+  </div>
+  <div id="fp-list" role="tree"></div>
+  <div class="fp-msg" id="fp-msg"></div>
+</aside>
+
+<div id="nb-stage">
 
 <!-- ── Notebook ───────────────────────────────────────────────────────── -->
 <div id="notebook-area">
@@ -2952,6 +3116,30 @@ body:not(.bw-editing) #toolbar .tb-btn.primary:hover:not(:disabled) { border-col
     </div>
   </div>
 </div>
+
+<!-- ── An open file, over the notebook ────────────────────────────────── -->
+<section id="file-view" aria-label="File" data-bw-print-hide>
+  <div class="fv-head">
+    <input id="fv-name" spellcheck="false" aria-label="File name" readonly>
+    <span class="fv-meta" id="fv-meta"></span>
+    <div class="bw-spacer"></div>
+    <div class="bw-seg" id="fv-seg" role="group" aria-label="Show as">
+      <button class="bw-btn is-active" type="button" data-mode="table">Table</button>
+      <button class="bw-btn" type="button" data-mode="text">Text</button>
+    </div>
+    <button class="bw-btn bw-btn--icon" type="button" id="fv-close" title="Back to the notebook (Esc)" aria-label="Close file">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+  <div class="fv-body">
+    <textarea id="fv-text" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
+    <div id="fv-table-wrap" hidden><table id="fv-table"></table><div class="fv-trunc" id="fv-trunc"></div></div>
+    <div id="fv-other" hidden></div>
+  </div>
+</section>
+
+</div><!-- #nb-stage -->
+</div><!-- #nb-main -->
 
 <!-- ── Viewer overlay ─────────────────────────────────────────────────── -->
 <div id="viewer-toast" data-bw-print-hide>View only</div>
@@ -3235,6 +3423,9 @@ async function initPyodide() {
   const nbPromise = resolveNotebook();
 
   pyodide = await loadPyodide();
+  // The deck's files go on Python's disk now, while packages install, so
+  // they're there before the first cell can run.
+  const filesMounted = nbFiles.mountKernel();
   const { nb, filename, error: nbError } = await nbPromise;
 
   await pyodide.loadPackage(BASE_PACKAGES);
@@ -3279,10 +3470,144 @@ def _bp_capture_figures():
 import builtins as _bp_builtins
 from pyodide.code import eval_code_async as _bp_eval
 
+# ── Notebook magics: %%writefile, %%ipytest, !pytest ─────────────────────
+# The Jupyter spellings, so a notebook reads as it would anywhere else.
+# There is no shell in the browser: a "!" line is only ever pytest, which
+# runs here, in this kernel, on the files in the working directory.
+import os as _bp_os, sys as _bp_sys, re as _bp_re, shlex as _bp_shlex
+import ast as _bp_ast, linecache as _bp_linecache, importlib as _bp_importlib
+_BP_HOME = _bp_os.getcwd()
+
+def _bp_fresh_modules():
+    # Modules imported from the working directory are dropped, so the next
+    # import (pytest's included) reads each file as it is now, not as it was
+    # the first time — a fixed bug in helpers.py has to count.
+    home = _BP_HOME + '/'
+    for k, m in list(_bp_sys.modules.items()):
+        f = getattr(m, '__file__', None) or ''
+        if k != '__main__' and f.startswith(home):
+            del _bp_sys.modules[k]
+    _bp_importlib.invalidate_caches()
+
+async def _bp_import_pytest():
+    try:
+        import pytest
+    except ImportError:
+        # Loaded on first use: a slide without tests never pays for it.
+        import pyodide_js
+        await pyodide_js.loadPackage('pytest')
+        import pytest
+    return pytest
+
+_BP_PYTEST_BASE = ['-p', 'no:cacheprovider', '--color=no']
+
+async def _bp_pytest(args):
+    pytest = await _bp_import_pytest()
+    _bp_fresh_modules()
+    if _BP_HOME not in _bp_sys.path:
+        _bp_sys.path.insert(0, _BP_HOME)
+    pytest.main(_BP_PYTEST_BASE + list(args))
+
+def _bp_writefile(arg, body):
+    parts = _bp_shlex.split(arg)
+    append = any(p in ('-a', '--append') for p in parts)
+    names = [p for p in parts if not p.startswith('-')]
+    if len(names) != 1:
+        print('UsageError: %%writefile [-a] filename', file=_bp_sys.stderr)
+        return
+    path = _bp_os.path.expanduser(names[0])
+    existed = _bp_os.path.exists(path)
+    d = _bp_os.path.dirname(path)
+    if d:
+        _bp_os.makedirs(d, exist_ok=True)
+    with open(path, 'a' if append else 'w') as fh:
+        fh.write(body)
+    print(('Appending to ' if append else 'Overwriting ' if existed else 'Writing ') + names[0])
+    _bp_fresh_modules()
+
+_bp_ipytest_runs = 0
+
+async def _bp_ipytest(arg, body):
+    # Like the ipytest extension: the cell runs in the notebook's namespace
+    # (so its tests can use functions from earlier cells), with pytest's
+    # assertion rewriting, then pytest collects test_* from the notebook.
+    # Tests from earlier %%ipytest cells are cleared first, so a cell runs
+    # its own tests — ipytest's default too.
+    global _bp_ipytest_runs
+    pytest = await _bp_import_pytest()
+    from _pytest.assertion.rewrite import rewrite_asserts
+    g = globals()
+    for k in [k for k in g if _bp_re.match(r'[Tt]est', k)]:
+        del g[k]
+    _bp_ipytest_runs += 1
+    fname = '<cell %d>' % _bp_ipytest_runs
+    _bp_linecache.cache[fname] = (len(body), None, body.splitlines(True), fname)
+    tree = _bp_ast.parse(body, fname)
+    rewrite_asserts(tree, body.encode(), None, None)
+    exec(compile(tree, fname, 'exec'), g)
+
+    main = _bp_sys.modules['__main__']
+    holder = '/tmp/_bp_notebook'
+    _bp_os.makedirs(holder, exist_ok=True)
+    path = holder + '/notebook.py'
+    open(path, 'w').close()
+
+    class _Notebook:
+        @pytest.hookimpl(tryfirst=True)
+        def pytest_pycollect_makemodule(self, module_path, parent):
+            if str(module_path) == path:
+                mod = pytest.Module.from_parent(parent, path=module_path, nodeid='notebook.py')
+                mod._getobj = lambda: main
+                return mod
+
+    _bp_fresh_modules()
+    if _BP_HOME not in _bp_sys.path:
+        _bp_sys.path.insert(0, _BP_HOME)
+    # Named notebook.py, and rooted in the working directory, so a test
+    # reads as notebook.py::test_x rather than by its holder's path.
+    pytest.main(_BP_PYTEST_BASE + ['--rootdir', _BP_HOME] + _bp_shlex.split(arg) + [path],
+                plugins=[_Notebook()])
+
+async def _bp_shell(cmd):
+    try:
+        argv = _bp_shlex.split(cmd)
+    except ValueError as e:
+        print('!' + cmd + ': ' + str(e), file=_bp_sys.stderr)
+        return
+    if argv[:1] == ['pytest']:
+        return await _bp_pytest(argv[1:])
+    if argv[:3] in (['python', '-m', 'pytest'], ['python3', '-m', 'pytest']):
+        return await _bp_pytest(argv[3:])
+    print('!' + (argv[0] if argv else '') + ': shell commands don\\'t run in this notebook (only !pytest)',
+          file=_bp_sys.stderr)
+
+_BP_BANG = _bp_re.compile(r'^([ \\t]*)!(.*)$', _bp_re.M)
+
+def _bp_magics(src):
+    # A cell magic → (handled, coroutine or None). Line "!" commands → the
+    # source with each one turned into an awaited call.
+    first, _, body = src.partition('\\n')
+    head = first.strip()
+    if head.startswith('%%'):
+        name, _, arg = head[2:].partition(' ')
+        if name == 'writefile':
+            _bp_writefile(arg, body)
+            return True, None
+        if name in ('ipytest', 'pytest'):
+            return True, _bp_ipytest(arg, body)
+        print('UsageError: Cell magic \`%%' + name + '\` not found.', file=_bp_sys.stderr)
+        return True, None
+    return False, _BP_BANG.sub(lambda m: m.group(1) + 'await _bp_shell(' + repr(m.group(2)) + ')', src)
+
 async def _bp_run_cell(src):
+    handled, rest = _bp_magics(src)
+    if handled:
+        if rest is not None:
+            await rest
+        return None
     # globals() is __main__'s dict, so names defined in one cell are still
     # there in the next, exactly as before.
-    value = await _bp_eval(src, globals=globals())
+    value = await _bp_eval(rest, globals=globals())
     if value is None:
         return None
     _bp_builtins._ = value      # the last result, as at any Python prompt
@@ -3290,6 +3615,7 @@ async def _bp_run_cell(src):
 `);
 
   bpRunCell = pyodide.globals.get('_bp_run_cell');
+  await filesMounted;
 
   removeBoot();
   pythonVersion = pyodide.runPython('import sys; sys.version.split()[0]');
@@ -3692,10 +4018,17 @@ async function runCell(id) {
 
   let stdoutBuf = '';
   let stderrBuf = '';
-  pyodide.setStdout({ batched: (s) => { stdoutBuf += s + '\n'; } });
-  pyodide.setStderr({ batched: (s) => { stderrBuf += s + '\n'; } });
+  // Raw writes, not `batched`: batched hands over line by line and adds the
+  // newline itself, so text written without one — pytest's progress dots,
+  // print(..., end='') — arrived one piece per line.
+  const decOut = new TextDecoder(), decErr = new TextDecoder();
+  pyodide.setStdout({ write: (b) => { stdoutBuf += decOut.decode(b, { stream: true }); return b.length; } });
+  pyodide.setStderr({ write: (b) => { stderrBuf += decErr.decode(b, { stream: true }); return b.length; } });
 
   const outputs = [];
+
+  // A file edited a moment ago is on disk before the cell reads it.
+  await nbFiles.ready();
 
   try {
     // Pull in any Pyodide-distributed package this cell imports but that isn't
@@ -3744,6 +4077,7 @@ async function runCell(id) {
   }
 
   renderOutputs(id, outputs, n);
+  nbFiles.afterRun();
 
   const en = document.getElementById(`enum-${id}`);
   if (en) { en.textContent = `[${n}]`; en.classList.add('ran'); }
@@ -4315,6 +4649,631 @@ function escHtml(s) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// FILES
+//
+// The notebook's working directory, as in Jupyter: a pane of files down the
+// left, and the same files on Python's disk before any cell runs, so
+// open('vitals.csv') and `import helpers` just work — no setup cell writing
+// the data out first. Files a cell writes appear in the pane as well.
+//
+// The deck's files are saved in the widget config under `files`:
+//   { name, text }  a text file, inline (CSV, TXT, JSON, .py …)
+//   { name, key }   anything else: the bytes are saved into the deck with
+//                   BeamerWidget.saveFile under config[key], like a pasted
+//                   image. A top-level key (not a path inside `files`) is what
+//                   lets Beamer+ hand an unsaved upload over as a blob URL.
+// Names may hold folders ("data/vitals.csv").
+//
+// They're set up in edit mode (+ / upload / drop / rename / delete). On the
+// live slide the files can be opened and edited, but those changes live on
+// Python's disk only — like the kernel's variables, they're gone on reload,
+// and the deck's own copies come back.
+// ─────────────────────────────────────────────────────────────────────────────
+const nbFiles = (() => {
+  const TEXT_LIMIT = 512 * 1024;   // bigger, or not UTF-8 → saved as a deck asset
+  const LIST_LIMIT = 400;          // entries shown, so a cell writing 10 000 files can't stall the pane
+  const ROW_LIMIT  = 1000;         // table rows shown for a CSV
+
+  const pane     = document.getElementById('files-pane');
+  const listEl   = document.getElementById('fp-list');
+  const msgEl    = document.getElementById('fp-msg');
+  const toggle   = document.getElementById('btn-files');
+  const newBtn   = document.getElementById('fp-new');
+  const upBtn    = document.getElementById('fp-upload');
+  const view     = document.getElementById('file-view');
+  const nameEl   = document.getElementById('fv-name');
+  const metaEl   = document.getElementById('fv-meta');
+  const textEl   = document.getElementById('fv-text');
+  const tblWrap  = document.getElementById('fv-table-wrap');
+  const tblEl    = document.getElementById('fv-table');
+  const truncEl  = document.getElementById('fv-trunc');
+  const otherEl  = document.getElementById('fv-other');
+  const segEl    = document.getElementById('fv-seg');
+  const closeBtn = document.getElementById('fv-close');
+
+  const cfgNow  = () => window.WIDGET_CONFIG || {};
+  const editing = () => !!(window.BeamerWidget && BeamerWidget.edit && BeamerWidget.edit.active);
+  const kernel  = () => (mounted && typeof pyodide !== 'undefined' && pyodide && pyodide.FS) ? pyodide : null;
+
+  let deck     = cleanList(cfgNow().files);
+  let mounted  = null;     // name → signature of what was last written to Python's disk
+  let home     = '';       // Python's starting directory; a cell may chdir away from it
+  let openName = null;     // the file in the view
+  let openKind = null;     // 'text' | 'bytes'
+  let mode     = 'table';  // a CSV's view: 'table' | 'text'
+  let paneOn   = false;
+  let writeTimer = null;
+  let syncing  = Promise.resolve();
+  let blobUrl  = null;
+  const local  = new Map();  // standalone only: key → bytes of an uploaded binary file
+
+  // ── Names and the saved list ────────────────────────────────────────────────
+  function cleanName(n) {
+    return String(n || '').replace(/\\/g, '/').split('/')
+      .map(s => s.trim()).filter(s => s && s !== '.' && s !== '..').join('/');
+  }
+  function cleanList(v) {
+    if (!Array.isArray(v)) return [];
+    const seen = new Set(), out = [];
+    for (const f of v) {
+      const name = cleanName(f && f.name);
+      if (!name || seen.has(name)) continue;
+      if (typeof f.text === 'string')     out.push({ name, text: f.text.replace(/\r\n?/g, '\n') });
+      else if (typeof f.key === 'string') out.push({ name, key: f.key });
+      else continue;
+      seen.add(name);
+    }
+    return out;
+  }
+  const deckFile = name => deck.find(f => f.name === name) || null;
+  const isTable  = name => /\.(csv|tsv)$/i.test(name);
+  const isImage  = name => /\.(png|jpe?g|gif|svg|webp|bmp)$/i.test(name);
+
+  function uniqueName(base) {
+    const taken = new Set(listEntries().map(e => e.name));
+    if (!taken.has(base)) return base;
+    const dot = base.lastIndexOf('.');
+    const stem = dot > 0 ? base.slice(0, dot) : base, ext = dot > 0 ? base.slice(dot) : '';
+    for (let k = 2; ; k++) if (!taken.has(stem + k + ext)) return stem + k + ext;
+  }
+
+  function saveDeck(removeKeys = []) {
+    const files = deck.map(f => f.text != null ? { name: f.name, text: f.text } : { name: f.name, key: f.key });
+    if (window.BeamerWidget && BeamerWidget.edit && BeamerWidget.edit.set) {
+      BeamerWidget.edit.set({ files }, removeKeys, { silent: true });
+    } else {
+      const c = cfgNow(); c.files = files; removeKeys.forEach(k => { delete c[k]; });
+    }
+  }
+
+  function say(t, err) { msgEl.textContent = t || ''; msgEl.classList.toggle('is-err', !!err); }
+
+  function fmtSize(n) {
+    if (n == null) return '';
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(n < 10240 ? 1 : 0) + ' KB';
+    return (n / 1048576).toFixed(1) + ' MB';
+  }
+
+  // ── Python's disk ───────────────────────────────────────────────────────────
+  // Called once the kernel is up, before any cell can run.
+  async function mountKernel() {
+    home = pyodide.FS.cwd();
+    mounted = new Map();
+    // The working directory on the import path, so a deck's helpers.py imports.
+    pyodide.runPython(`import sys\nif ${JSON.stringify(home)} not in sys.path: sys.path.insert(0, ${JSON.stringify(home)})`);
+    await syncToDisk();
+    render();
+  }
+
+  async function bytesOf(f) {
+    if (f.text != null) return f.text;
+    if (local.has(f.key)) return local.get(f.key);
+    const p = cfgNow()[f.key];
+    if (!p) throw new Error('not in the deck');
+    const r = await fetch(assetUrl(p));
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return new Uint8Array(await r.arrayBuffer());
+  }
+  const sigOf = f => f.text != null ? 't:' + f.text : 'k:' + f.key + ':' + (cfgNow()[f.key] || '');
+
+  // Chained, so an edit made while an earlier sync is still fetching an asset
+  // lands after it rather than racing it.
+  function syncToDisk() {
+    syncing = syncing.then(doSync).catch(e => console.warn('[notebook] file sync failed', e));
+    return syncing;
+  }
+  async function doSync() {
+    const py = kernel();
+    if (!py) return;
+    const want = new Map(deck.map(f => [f.name, f]));
+    const touched = [];
+    for (const [name, f] of want) {
+      const s = sigOf(f);
+      if (mounted.get(name) === s) continue;
+      try {
+        const data = await bytesOf(f);
+        const path = home + '/' + name;
+        const dir  = path.slice(0, path.lastIndexOf('/'));
+        if (dir && dir !== home) py.FS.mkdirTree(dir);
+        py.FS.writeFile(path, data);
+        mounted.set(name, s);
+        touched.push(name);
+      } catch (e) {
+        say(`Couldn’t load ${name}: ${e.message || e}`, true);
+      }
+    }
+    for (const name of [...mounted.keys()]) {
+      if (want.has(name)) continue;
+      try { py.FS.unlink(home + '/' + name); } catch (_) { /* a cell already removed it */ }
+      mounted.delete(name);
+      touched.push(name);
+    }
+    forgetModules(touched);
+  }
+
+  // A changed helpers.py has to be read again by the next `import helpers`,
+  // not served from sys.modules.
+  function forgetModules(names) {
+    const mods = names.filter(n => /\.py$/i.test(n)).map(n => n.slice(0, -3).replace(/\//g, '.'));
+    if (!mods.length || !kernel()) return;
+    try {
+      pyodide.runPython(
+        'import sys, importlib\n' +
+        `for _m in ${JSON.stringify(mods)}:\n` +
+        '    for _k in [k for k in sys.modules if k == _m or k.startswith(_m + ".")]: del sys.modules[_k]\n' +
+        'importlib.invalidate_caches()');
+    } catch (e) { console.warn('[notebook] module reset failed', e); }
+  }
+
+  function writeDisk(name, data) {
+    const py = kernel();
+    if (!py) return;
+    try { py.FS.writeFile(home + '/' + name, data); forgetModules([name]); }
+    catch (e) { say(`Couldn’t write ${name}`, true); }
+  }
+
+  // ── Listing ─────────────────────────────────────────────────────────────────
+  // What's on Python's disk once the kernel is up; the deck's list before that
+  // (and for a viewer, which has no kernel).
+  function listEntries() {
+    const py = kernel();
+    if (!py) {
+      return deck.map(f => ({ name: f.name, size: f.text != null ? new Blob([f.text]).size : null }));
+    }
+    const out = [];
+    const walk = (dir, rel, depth) => {
+      let names;
+      try { names = py.FS.readdir(dir); } catch (_) { return; }
+      for (const n of names) {
+        if (out.length >= LIST_LIMIT) return;
+        if (n === '.' || n === '..' || n.startsWith('.') || n === '__pycache__') continue;
+        const p = dir + '/' + n;
+        let st;
+        try { st = py.FS.stat(p); } catch (_) { continue; }
+        if (py.FS.isDir(st.mode)) {
+          out.push({ name: rel + n, dir: true });
+          if (depth < 6) walk(p, rel + n + '/', depth + 1);
+        } else {
+          out.push({ name: rel + n, size: st.size });
+        }
+      }
+    };
+    walk(home, '', 0);
+    return out;
+  }
+
+  // Flat names → a tree, folders first, each level in name order.
+  function flatten(entries) {
+    const root = { kids: new Map() };
+    for (const e of entries) {
+      const parts = e.name.split('/');
+      let node = root;
+      parts.forEach((part, i) => {
+        const last = i === parts.length - 1;
+        if (!node.kids.has(part)) {
+          node.kids.set(part, { label: part, name: parts.slice(0, i + 1).join('/'),
+                                dir: !last || !!e.dir, kids: new Map() });
+        }
+        node = node.kids.get(part);
+        if (last && !e.dir) node.size = e.size;
+      });
+    }
+    const out = [];
+    const emit = (node, depth) => {
+      [...node.kids.values()]
+        .sort((a, b) => (b.dir - a.dir) || a.label.localeCompare(b.label, undefined, { numeric: true }))
+        .forEach(k => { out.push({ ...k, depth }); if (k.dir) emit(k, depth + 1); });
+    };
+    emit(root, 0);
+    return out;
+  }
+
+  const FILE_ICON   = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg>';
+  const FOLDER_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 6.5V18a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8.5a1 1 0 0 0-1-1h-8l-2-2.5H4a1 1 0 0 0-1 1z"/></svg>';
+
+  function render() {
+    if (!paneOn) return;
+    const rows = flatten(listEntries());
+    const live = !!kernel();
+    listEl.textContent = '';
+    if (!rows.length) {
+      const p = document.createElement('div');
+      p.className = 'fp-empty';
+      p.textContent = editing()
+        ? 'No files yet. Add one with the buttons above, or drop files here. Cells can open them by name.'
+        : 'No files. Anything a cell writes shows up here.';
+      listEl.appendChild(p);
+      return;
+    }
+    for (const r of rows) {
+      const it = document.createElement('div');
+      it.className = 'fp-item' + (r.dir ? ' fp-dir' : '') + (r.name === openName ? ' is-open' : '');
+      it.style.setProperty('--depth', r.depth);
+      it.setAttribute('role', 'treeitem');
+      it.title = r.dir ? r.name + '/' : r.name + (r.size != null ? ' · ' + fmtSize(r.size) : '');
+      it.innerHTML = r.dir ? FOLDER_ICON : FILE_ICON;
+      const nm = document.createElement('span');
+      nm.className = 'fp-name'; nm.textContent = r.label;
+      it.appendChild(nm);
+      if (!r.dir) {
+        const inDeck = !!deckFile(r.name);
+        if (inDeck) it.classList.add('is-deck');
+        else if (live) {
+          const n = document.createElement('span');
+          n.className = 'fp-new'; n.textContent = 'new';
+          n.title = 'Written by a cell. Not saved with the deck.';
+          it.appendChild(n);
+        }
+        if (inDeck && !IS_VIEWER) {
+          const x = document.createElement('button');
+          x.type = 'button'; x.className = 'fp-x'; x.textContent = '×';
+          x.title = 'Delete ' + r.name; x.setAttribute('aria-label', 'Delete ' + r.name);
+          // Armed first: a second click deletes.
+          x.addEventListener('click', e => {
+            e.stopPropagation();
+            if (!x.classList.contains('is-armed')) {
+              x.classList.add('is-armed'); x.title = 'Click again to delete';
+              setTimeout(() => { x.classList.remove('is-armed'); x.title = 'Delete ' + r.name; }, 3000);
+              return;
+            }
+            removeDeckFile(r.name);
+          });
+          it.appendChild(x);
+        }
+        it.tabIndex = 0;
+        it.addEventListener('click', () => openFile(r.name));
+        it.addEventListener('keydown', e => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openFile(r.name); }
+        });
+      }
+      listEl.appendChild(it);
+    }
+  }
+
+  // ── The pane ────────────────────────────────────────────────────────────────
+  // Open by default when the deck has files; a presenter who toggles it while
+  // editing sets that slide's default (`filesPane`).
+  function defaultOpen() {
+    const v = cfgNow().filesPane;
+    return v != null ? !!v : deck.length > 0;
+  }
+  function setPane(on, save) {
+    paneOn = !!on;
+    document.body.classList.toggle('files-open', paneOn);
+    toggle.classList.toggle('is-active', paneOn);
+    toggle.setAttribute('aria-pressed', String(paneOn));
+    if (paneOn) render();
+    if (save && editing() && window.BeamerWidget?.edit?.set) {
+      BeamerWidget.edit.set({ filesPane: paneOn }, [], { silent: true });
+    }
+  }
+
+  // ── The open file ───────────────────────────────────────────────────────────
+  async function readFile(name) {
+    const py = kernel();
+    let bytes;
+    if (py) {
+      try { bytes = py.FS.readFile(home + '/' + name); }
+      catch (_) { return null; }
+    } else {
+      const f = deckFile(name);
+      if (!f) return null;
+      if (f.text != null) return { text: f.text, size: new Blob([f.text]).size };
+      try { bytes = await bytesOf(f); } catch (_) { return { bytes: null, size: null }; }
+    }
+    if (bytes.length <= TEXT_LIMIT * 4) {
+      try { return { text: new TextDecoder('utf-8', { fatal: true }).decode(bytes), size: bytes.length }; }
+      catch (_) { /* not text: shown as a binary file */ }
+    }
+    return { bytes, size: bytes.length };
+  }
+
+  async function openFile(name, { keep = false } = {}) {
+    const got = await readFile(name);
+    if (!got) { if (openName === name) closeFile(); render(); return; }
+    if (!keep) mode = 'table';
+    openName = name;
+    const canRename = editing() && !!deckFile(name) && !IS_VIEWER;
+    nameEl.value = name;
+    nameEl.readOnly = !canRename;
+    nameEl.classList.remove('is-bad');
+    nameEl.style.width = `calc(${Math.max(6, name.length)}ch + 16px)`;
+    metaEl.textContent = [fmtSize(got.size), IS_VIEWER ? 'read only' : ''].filter(Boolean).join(' · ');
+
+    if (blobUrl) { URL.revokeObjectURL(blobUrl); blobUrl = null; }
+    openKind = got.text != null ? 'text' : 'bytes';
+    view.classList.toggle('is-table-able', openKind === 'text' && isTable(name));
+    if (openKind === 'text') {
+      if (textEl.value !== got.text) textEl.value = got.text;
+      textEl.readOnly = IS_VIEWER;
+      showMode(got.text);
+    } else {
+      textEl.hidden = true; tblWrap.hidden = true; otherEl.hidden = false;
+      otherEl.textContent = '';
+      if (got.bytes && isImage(name)) {
+        const type = /\.svg$/i.test(name) ? 'image/svg+xml' : '';
+        blobUrl = URL.createObjectURL(new Blob([got.bytes], type ? { type } : {}));
+        const img = document.createElement('img'); img.src = blobUrl; img.alt = name;
+        otherEl.appendChild(img);
+      }
+      const cap = document.createElement('div');
+      cap.textContent = got.bytes ? `Binary file · ${fmtSize(got.size)}` : 'Couldn’t load this file';
+      otherEl.appendChild(cap);
+    }
+    view.classList.add('is-open');
+    render();
+  }
+
+  function showMode(text) {
+    const table = isTable(openName) && mode === 'table';
+    segEl.querySelectorAll('.bw-btn').forEach(b => b.classList.toggle('is-active', b.dataset.mode === mode));
+    otherEl.hidden = true;
+    textEl.hidden = table;
+    tblWrap.hidden = !table;
+    if (table) drawTable(text != null ? text : textEl.value);
+  }
+
+  function parseDelimited(text, sep) {
+    const rows = [];
+    let row = [], cell = '', q = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (q) {
+        if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; }
+        else cell += ch;
+      } else if (ch === '"' && cell === '') q = true;
+      else if (ch === sep) { row.push(cell); cell = ''; }
+      else if (ch === '\n' || ch === '\r') {
+        if (ch === '\r' && text[i + 1] === '\n') i++;
+        row.push(cell); rows.push(row); row = []; cell = '';
+        if (rows.length > ROW_LIMIT) return { rows, more: true };
+      } else cell += ch;
+    }
+    if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+    return { rows, more: false };
+  }
+
+  function drawTable(text) {
+    const { rows, more } = parseDelimited(text, /\.tsv$/i.test(openName) ? '\t' : ',');
+    tblEl.textContent = '';
+    if (!rows.length) { truncEl.textContent = 'Empty file'; return; }
+    const isNum = s => s.trim() !== '' && !isNaN(Number(s));
+    const thead = tblEl.createTHead().insertRow();
+    thead.appendChild(Object.assign(document.createElement('th'), { className: 'rn' }));
+    for (const h of rows[0]) thead.appendChild(Object.assign(document.createElement('th'), { textContent: h }));
+    const tb = tblEl.createTBody();
+    rows.slice(1, ROW_LIMIT + 1).forEach((r, i) => {
+      const tr = tb.insertRow();
+      tr.appendChild(Object.assign(document.createElement('td'), { className: 'rn', textContent: String(i + 1) }));
+      for (const c of r) {
+        const td = tr.insertCell();
+        td.textContent = c;
+        if (isNum(c)) td.className = 'num';
+      }
+    });
+    truncEl.textContent = more ? `First ${ROW_LIMIT} rows. Switch to Text for the whole file.` : '';
+  }
+
+  function closeFile() {
+    view.classList.remove('is-open');
+    openName = null; openKind = null;
+    if (blobUrl) { URL.revokeObjectURL(blobUrl); blobUrl = null; }
+    render();
+  }
+
+  // Typing in an open file: into the deck while editing, onto Python's disk live.
+  function onTextInput() {
+    if (IS_VIEWER || !openName) return;
+    const name = openName, text = textEl.value;
+    clearTimeout(writeTimer);
+    writeTimer = setTimeout(() => {
+      const f = deckFile(name);
+      if (editing() && f) {
+        if (f.key) { delete f.key; }   // a binary file that turned out to be text
+        f.text = text;
+        saveDeck();
+        syncToDisk();
+      } else {
+        writeDisk(name, text);
+      }
+      metaEl.textContent = fmtSize(new Blob([text]).size);
+    }, 300);
+  }
+
+  function renameOpen() {
+    if (nameEl.readOnly || !openName) return;
+    const f = deckFile(openName);
+    const next = cleanName(nameEl.value);
+    if (!f || next === openName) { nameEl.value = openName; nameEl.classList.remove('is-bad'); return; }
+    if (!next || listEntries().some(e => e.name === next)) {
+      nameEl.classList.add('is-bad');
+      say(next ? `${next} already exists` : 'A file needs a name', true);
+      return;
+    }
+    say('');
+    f.name = next; openName = next;
+    nameEl.value = next; nameEl.classList.remove('is-bad');
+    saveDeck();
+    syncToDisk().then(() => openFile(next, { keep: true }));
+  }
+
+  // ── Adding and removing (edit mode) ─────────────────────────────────────────
+  function newFile() {
+    if (IS_VIEWER || !editing()) return;
+    const name = uniqueName('untitled.txt');
+    deck.push({ name, text: '' });
+    saveDeck();
+    syncToDisk().then(async () => {
+      await openFile(name);
+      nameEl.focus();
+      nameEl.setSelectionRange(0, name.lastIndexOf('.'));
+    });
+    render();
+  }
+
+  async function addFiles(fileList) {
+    if (IS_VIEWER || !editing()) return;
+    const files = [...fileList].filter(f => f && f.size != null);
+    if (!files.length) return;
+    say('Adding…');
+    const removeKeys = [];
+    let last = null, failed = 0;
+    for (const [i, file] of files.entries()) {
+      const name = cleanName(file.webkitRelativePath || file.name);
+      if (!name) continue;
+      try {
+        const buffer = await file.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        let entry = null;
+        if (bytes.length <= TEXT_LIMIT) {
+          try { entry = { name, text: new TextDecoder('utf-8', { fatal: true }).decode(bytes).replace(/\r\n?/g, '\n') }; }
+          catch (_) { /* binary */ }
+        }
+        if (!entry) {
+          const key = 'nbFile' + Date.now().toString(36) + i;
+          const hosted = window.parent !== window && cfgNow().id != null;
+          if (hosted && window.BeamerWidget?.saveFile) {
+            await BeamerWidget.saveFile({ key, name: name.split('/').pop(), folder: 'assets', buffer });
+          } else {
+            local.set(key, bytes);   // standalone: kept for this page only
+          }
+          entry = { name, key };
+        }
+        // Same name: the new one replaces it (an updated data file).
+        const at = deck.findIndex(f => f.name === name);
+        if (at >= 0) {
+          if (deck[at].key) removeKeys.push(deck[at].key);
+          deck[at] = entry;
+        } else deck.push(entry);
+        last = name;
+      } catch (e) {
+        console.warn('[notebook] add file failed', e);
+        failed++;
+      }
+    }
+    saveDeck(removeKeys);
+    say(failed ? `${failed} file${failed > 1 ? 's' : ''} couldn’t be added` : '', !!failed);
+    await syncToDisk();
+    render();
+    if (last) openFile(last);
+  }
+
+  function removeDeckFile(name) {
+    if (IS_VIEWER) return;
+    const at = deck.findIndex(f => f.name === name);
+    if (at < 0) return;
+    const [gone] = deck.splice(at, 1);
+    saveDeck(gone.key ? [gone.key] : []);
+    if (gone.key) local.delete(gone.key);
+    syncToDisk().then(() => { if (openName === name) closeFile(); else render(); });
+  }
+
+  // ── Host config ─────────────────────────────────────────────────────────────
+  function applyConfig(c) {
+    if (!c) return;
+    const next = cleanList(c.files);
+    if (JSON.stringify(next) !== JSON.stringify(deck)) {
+      deck = next;
+      syncToDisk().then(() => { render(); if (openName) openFile(openName, { keep: true }); });
+    }
+    if (!editing() && 'filesPane' in c && !!c.filesPane !== paneOn) setPane(!!c.filesPane);
+  }
+
+  // After a cell: it may have written, changed or removed files.
+  function afterRun() {
+    render();
+    if (!openName) return;
+    const busy = document.activeElement === textEl || document.activeElement === nameEl;
+    if (!busy) openFile(openName, { keep: true });
+  }
+
+  // ── Wiring ──────────────────────────────────────────────────────────────────
+  toggle.addEventListener('click', () => setPane(!paneOn, true));
+  closeBtn.addEventListener('click', closeFile);
+  segEl.addEventListener('click', e => {
+    const b = e.target.closest('[data-mode]');
+    if (!b || b.dataset.mode === mode) return;
+    mode = b.dataset.mode;
+    showMode();
+  });
+  textEl.addEventListener('input', onTextInput);
+  textEl.addEventListener('keydown', e => {
+    if (e.key !== 'Tab' || textEl.readOnly) return;
+    e.preventDefault();
+    textEl.setRangeText(isTable(openName) ? '\t' : '    ', textEl.selectionStart, textEl.selectionEnd, 'end');
+    onTextInput();
+  });
+  nameEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); nameEl.blur(); }
+  });
+  nameEl.addEventListener('change', renameOpen);
+  nameEl.addEventListener('blur', renameOpen);
+  nameEl.addEventListener('input', () => { nameEl.style.width = `calc(${Math.max(6, nameEl.value.length)}ch + 16px)`; });
+
+  // Escape closes the open file first — before the kit takes it as Done.
+  window.addEventListener('keydown', e => {
+    if (e.key !== 'Escape' || !view.classList.contains('is-open')) return;
+    if (document.activeElement === nameEl && !nameEl.readOnly) { nameEl.value = openName; }
+    e.preventDefault(); e.stopImmediatePropagation();
+    closeFile();
+    toggle.focus({ preventScroll: true });
+  }, true);
+
+  const picker = document.createElement('input');
+  picker.type = 'file'; picker.multiple = true;
+  picker.addEventListener('change', () => { addFiles(picker.files); picker.value = ''; });
+  newBtn.addEventListener('click', newFile);
+  upBtn.addEventListener('click', () => picker.click());
+
+  // Dropping files on the pane adds them while editing; outside edit mode a
+  // drop is swallowed, so the browser doesn't open the file in the widget's place.
+  pane.addEventListener('dragover', e => {
+    e.preventDefault();
+    if (editing() && !IS_VIEWER) pane.classList.add('is-over');
+  });
+  pane.addEventListener('dragleave', e => { if (!pane.contains(e.relatedTarget)) pane.classList.remove('is-over'); });
+  pane.addEventListener('drop', e => {
+    e.preventDefault();
+    pane.classList.remove('is-over');
+    if (editing() && e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files);
+  });
+
+  // Edit mode shows the pane (that's where files are added). Done leaves it
+  // as the slide will start: open if it has files, unless the presenter
+  // toggled it while editing (saved as filesPane).
+  window.addEventListener('bw-edit', e => {
+    setPane(e.detail.editing ? true : defaultOpen());
+    say('');
+    if (openName) openFile(openName, { keep: true }); else render();
+  });
+
+  setPane(defaultOpen());
+
+  return { mountKernel, afterRun, applyConfig, ready: () => syncing };
+})();
+
+// ─────────────────────────────────────────────────────────────────────────────
 // VIEWER MODE UI ADJUSTMENTS
 // ─────────────────────────────────────────────────────────────────────────────
 if (IS_VIEWER) {
@@ -4471,6 +5430,7 @@ window.addEventListener('message', function(e) {
     _nbSetState(e.data.state);
   } else if (e.data.type === 'widget-config') {
     applyLiveSettings(e.data.config || {});
+    nbFiles.applyConfig(e.data.config || {});
     // The shared top bar rewrites its title from the widget's own name each
     // time the host re-sends the config. Once a file is open, its name is the
     // more useful thing to show, so put it back. The settings kit registered
