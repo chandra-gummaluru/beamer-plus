@@ -3139,7 +3139,7 @@ body:not(.bw-editing) #join.is-waiting #ed-qr {
   color: var(--ar-ink);
   transition: color 0.2s;
 }
-.fig-l { font-size: var(--fs-small); color: var(--ar-cap); white-space: nowrap; }
+.fig-l { font-size: var(--fs-small); line-height: calc(16px * var(--u)); color: var(--ar-cap); white-space: nowrap; }
 .fig-l:empty { display: none; }
 body.bw-editing #join-n { color: var(--ar-faint); }
 #join-n.bump { animation: ar-bump 0.35s ease-out; }
@@ -3155,6 +3155,9 @@ body.bw-editing #join-n { color: var(--ar-faint); }
   display: none;
   width: calc(104px * var(--u));
   height: calc(7px * var(--u));
+  /* As tall, margins and all, as the count's caption line (.fig-l), so the
+     count and the time are the same height and their digits line up. */
+  margin-block: calc(4.5px * var(--u));
   box-sizing: border-box;
   border: 1.5px solid var(--ar-ink);
   border-radius: 4px;
@@ -3440,6 +3443,7 @@ body.bw-editing #ed-secs {
   font-family: var(--ar-tt);
   font-size: calc(32px * var(--u));
   line-height: 1;
+  height: 1em;   /* an input is taller than its text otherwise; this keeps it level with the count */
   text-align: center;
 }
 body.bw-editing #ed-secs[hidden] { display: none; }
@@ -3542,7 +3546,7 @@ body.ar-split #stage:not(.is-data) #ar-split-right :is(#join-text, .bw-spacer) {
 body.ar-split #stage:not(.is-data) #ar-split-right #join:not(:has(#timer.is-on)) #join-count { grid-column: 1 / -1; }
 body.ar-split #stage:not(.is-data) #ar-split-right #timer { min-width: 0; padding-left: calc(16px * var(--u)); }
 body.ar-split #stage:not(.is-data) #ar-split-right #join-count { padding-left: 0; border-left: 0; }
-body.ar-split #stage:not(.is-data) #ar-split-right .fig-v { font-size: calc(28px * var(--u)); }
+body.ar-split #stage:not(.is-data) #ar-split-right :is(.fig-v, #ed-secs) { font-size: calc(28px * var(--u)); }
 body.ar-split #stage:not(.is-data) #ar-split-right #timer-track { width: calc(84px * var(--u)); }
 /* Nothing beside it (no answers to list until the results go up): the QR
    has the right slide to itself, centred in it and sized from the whole
