@@ -1,6 +1,7 @@
 """Survey API: creation, audience responses, and AI summarization (per session)."""
 import inspect
 import json
+import re
 import time
 import traceback
 import uuid
@@ -26,9 +27,10 @@ def _clean_meta(meta):
     out = {}
     for k, v in list(meta.items())[:12]:
         if isinstance(k, str) and isinstance(v, (str, int, float, bool)) or v is None:
-            # Long enough for a fill-in-the-blanks template, short enough that
-            # this stays a display hint rather than a content store.
-            out[str(k)[:40]] = v[:2000] if isinstance(v, str) else v
+            # Long enough for a fill-in-the-blanks template with its code
+            # listing, short enough that this stays a display hint rather
+            # than a content store.
+            out[str(k)[:40]] = v[:8000] if isinstance(v, str) else v
     return out
 
 
@@ -98,16 +100,38 @@ def get_survey(session_id, survey_id):
     })
 
 
-def _answer_words(text, kind):
-    """The student's own words in an answer: a fill-in-the-blanks answer is a
-    JSON list, one string per blank."""
-    if kind == 'fill':
+# A choice blank in a fill-in-the-blanks template: BLANK(a ^ b) or BLANK(a | b)
+# (see blankSpec in widgets/audience-response.html).
+_CHOICE_BLANK = re.compile(r'\bBLANK\((?=[^()\n]*(?:\^|\||\sX?OR\s))([^()\n]*)\)')
+
+
+def _choice_options(template):
+    """Every option of every choice blank: the presenter's own words, which
+    the content filter has no reason to check."""
+    out = set()
+    for body in _CHOICE_BLANK.findall(template or ''):
+        for o in re.split(r'\s*[\^|]\s*|\s+X?OR\s+', body):
+            o = o.strip().lstrip('*').strip()
+            if o:
+                out.add(o)
+    return out
+
+
+def _answer_words(text, survey):
+    """The student's own words in an answer. A fill-in-the-blanks answer is a
+    JSON list, one entry per blank (a list itself for a pick-any blank);
+    picked options are left out, since the presenter wrote them."""
+    if survey.get('kind') == 'fill':
         try:
             vals = json.loads(text)
-            if isinstance(vals, list):
-                return [str(v) for v in vals]
         except ValueError:
-            pass
+            return text
+        if isinstance(vals, list):
+            options = _choice_options(survey.get('meta', {}).get('template'))
+            flat = []
+            for v in vals:
+                flat.extend(v if isinstance(v, list) else [v])
+            return [str(v) for v in flat if str(v) not in options]
     return text
 
 
@@ -129,7 +153,7 @@ def respond_survey(session_id, survey_id):
     text = text[:state.MAX_RESPONSE_LENGTH]
     survey = sess.surveys[survey_id]
     if survey.get('filter', True) and survey.get('kind', 'open') in moderation.TEXT_KINDS:
-        reason = moderation.check(_answer_words(text, survey.get('kind')),
+        reason = moderation.check(_answer_words(text, survey),
                                   allow=survey.get('filter_allow', []), block=survey.get('filter_block', []))
         if reason:
             # Never stored or shown; the student is told and can rephrase.

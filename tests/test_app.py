@@ -242,6 +242,15 @@ def test_content_filter_checks_each_blank(client):
     assert client.post(url, json={'response': '["stack", "queue"]'}).status_code == 200
 
 
+def test_content_filter_skips_the_presenters_own_options(client):
+    session_id = create_session(client)
+    tpl = 'Rate it: BLANK(great ^ damn hard) Why: BLANK Tags: BLANK(fun | hell week)'
+    sid = create_survey(client, session_id, question='Fill', kind='fill', meta={'template': tpl})['survey_id']
+    url = f'{session_prefix(session_id)}/api/survey/{sid}/respond'
+    assert client.post(url, json={'response': '["damn hard", "too long", ["fun", "hell week"]]'}).status_code == 200
+    assert client.post(url, json={'response': '["great", "damn it", []]'}).status_code == 422
+
+
 def test_content_filter_can_be_turned_off_per_question(client):
     session_id = create_session(client)
     sid = create_survey(client, session_id, question='Q', kind='open', filter=False)['survey_id']
@@ -331,10 +340,10 @@ def test_fill_in_the_blanks_survey_carries_its_template(client):
     assert info['kind'] == 'fill'
     assert info['meta']['template'] == tpl
     # A template longer than the display-hint cap is kept, not dropped.
-    long_tpl = 'x BLANK ' * 300
+    long_tpl = 'x BLANK ' * 1200
     big = create_survey(client, session_id, question='Q', kind='fill', meta={'template': long_tpl})
     meta = client.get(f'{session_prefix(session_id)}/api/survey/{big["survey_id"]}').get_json()['meta']
-    assert meta['template'] == long_tpl[:2000]
+    assert meta['template'] == long_tpl[:8000]
 
 
 def test_create_survey_with_unknown_model_rejected(client):

@@ -2832,7 +2832,7 @@ body.bw-editing #plot [data-bw-placeholder]:empty { display: inline; }
 }
 .blank {
   display: inline-block;
-  min-width: 5ch;
+  min-width: 8ch;
   margin: 0 2px;
   padding: 0 6px;
   border-bottom: var(--ar-line) solid var(--ar-ink);
@@ -2848,6 +2848,35 @@ body.bw-editing .blank { background: var(--edit-soft); color: var(--edit-ink); }
   font-weight: 700;
   animation: ar-pop 0.25s cubic-bezier(.22, 1, .36, 1);
 }
+/* A choice blank: its options as small chips in the line. Pick-one chips
+   are round, pick-any square, like radio buttons and checkboxes. With a
+   student's answer on screen, what they picked takes the highlighter (as a
+   typed answer does) and the rest fade; revealed, the right options get a
+   tick. */
+.blank-pick { display: inline-flex; flex-wrap: wrap; gap: 0.3em; margin: 0 2px; vertical-align: baseline; }
+.pick {
+  display: inline-flex;
+  align-items: baseline;
+  padding: 0 0.5em;
+  border: 1px solid var(--ar-cap);
+  border-radius: 999px;
+  line-height: 1.35;
+  color: var(--ar-ink);
+}
+.blank-pick.is-any .pick { border-radius: 4px; }
+.pick.is-picked {
+  background: var(--ar-hl);
+  color: var(--ar-on-hl);
+  border-color: var(--ar-ink);
+  font-weight: 700;
+  animation: ar-pop 0.25s cubic-bezier(.22, 1, .36, 1);
+}
+.blank-pick.has-answer .pick:not(.is-picked) { opacity: 0.35; }
+.blank-pick.has-answer .pick.is-right::after { content: '\2713'; margin-left: 0.3em; font-weight: 700; }
+.blank-pick.has-answer .pick.is-right:not(.is-picked) { opacity: 0.8; border-style: dashed; }
+body.bw-editing .pick { background: var(--edit-soft); color: var(--edit-ink); border-color: var(--edit-ink); }
+body.bw-editing .pick.is-right { background: var(--ar-hl); color: var(--ar-on-hl); }
+
 #fill-foot {
   display: flex;
   align-items: center;
@@ -3582,7 +3611,11 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
       </span>
       <span class="ar-group" id="ed-blank-wrap" hidden>
         <span class="ar-sep" aria-hidden="true"></span>
-        <button class="bw-btn" type="button" id="ed-blank" title="Insert a blank where the cursor is (or write BLANK)">+ Insert blank</button>
+        <span class="ar-field">Insert blank
+          <button class="bw-btn" type="button" id="ed-blank" title="A text box (or write BLANK, or ___ as wide as you want it)">Text</button>
+          <button class="bw-btn" type="button" id="ed-blank-one" title="Pick exactly one: BLANK(a ^ b). Put * before the right option.">Pick one</button>
+          <button class="bw-btn" type="button" id="ed-blank-any" title="Pick any number: BLANK(a | b). Put * before each right option.">Pick any</button>
+        </span>
       </span>
     </span>
     <div class="bw-spacer"></div>
@@ -3772,7 +3805,36 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
   const POLL_MS  = 3000;
   const CAP      = { groups: 400, nums: 2000, words: 150 };   // what travels to print copies / the deck
 
-  const BLANK_RE = /\bBLANK\b|_{3,}/g;
+  // Blanks, written in the question:
+  //   BLANK  or  ___       a text box; written as underscores, as wide as they are
+  //   BLANK(a ^ b ^ c)     pick exactly one   (BLANK(a XOR b) too)
+  //   BLANK(a | b | c)     pick any number    (BLANK(a OR b) too)
+  // A * before an option marks it right: BLANK(True ^ *False). Parentheses
+  // count only with an operator inside, so BLANK(3) in a code listing is a
+  // text blank followed by "(3)". The phone page reads the same grammar
+  // (templates/survey_response.html) — keep the two in step.
+  const BLANK_RE   = /\bBLANK\((?=[^()\n]*(?:\^|\||\sX?OR\s))[^()\n]*\)|\bBLANK\b|_{3,}/g;
+  const BLANK_FULL = new RegExp('^(?:' + BLANK_RE.source + ')$');
+  // While a question is drawn, each blank stands in its text as one
+  // private-use character (U+E100 + its number): Markdown, KaTeX and the code
+  // colouring all leave a lone character like that alone, where a word could
+  // be split across spans. blankify() swaps them for the drawn blanks.
+  const BLANK_CH = 0xE100;
+  function blankSpec(tok) {
+    const m = /^BLANK\((.*)\)$/.exec(tok);
+    if (!m) return { kind: 'text', width: tok[0] === '_' ? Math.min(40, Math.max(4, tok.length)) : 0 };
+    const body = ' ' + m[1] + ' ';
+    const one = /\^|\sXOR\s/.test(body), any = /\||\sOR\s/.test(body);
+    const options = m[1].split(/\s*[\^|]\s*|\s+X?OR\s+/).map(o => o.trim()).filter(Boolean)
+      .map(o => ({ t: o.replace(/^\*\s*/, ''), ok: o.startsWith('*') })).filter(o => o.t);
+    return { kind: one && any ? 'mixed' : one ? 'one' : 'any', options };
+  }
+  const blankSpecs = src => [...String(src || '').matchAll(BLANK_RE)].map(m => blankSpec(m[0]));
+  function subBlanks(src, k = 0) {
+    return String(src).replace(BLANK_RE, () => String.fromCharCode(BLANK_CH + k++));
+  }
+  // Graded: at least one choice blank has an option marked right.
+  const fillGraded = src => blankSpecs(src).some(b => b.options && b.options.some(o => o.ok));
 
   const TYPES = {
     choice:    { title: 'Multiple Choice',  kicker: 'Multiple choice' },
@@ -3933,12 +3995,15 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
     if (el._md === src && el._mdLibs === libs) return;
     el._md = src; el._mdLibs = libs;
     if (!src) { el.textContent = ''; el.classList.remove('has-code'); return; }
+    if (answers) src = subBlanks(src);
     if (!window.marked) { el.textContent = src; if (answers) blankify(el, answers); return; }
     // Presenter-authored config, not audience input — responses never come
     // through here; they're set with textContent.
     // Trimmed: the trailing newline marked adds shows as a blank line in edit
     // mode, where editable text keeps its whitespace.
-    el.innerHTML = marked.parse(src, { breaks: false }).trim();
+    // A fill-in-the-blanks question keeps its lines as typed ("Description:
+    // ___" over "passwd: ___"), as a form would; elsewhere Markdown joins them.
+    el.innerHTML = marked.parse(src, { breaks: !!answers }).trim();
     decorateCode(el);
     el.classList.toggle('has-code', !!el.querySelector('pre'));
     if (window.renderMathInElement) {
@@ -3957,30 +4022,62 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
   // Fill in the blanks: every BLANK (or ___) in the question, prose or code,
   // becomes a gap — empty, or holding the answer given for it. Counted in
   // reading order, the same order the phone page numbers its inputs.
-  const BLANK_ONE = /\bBLANK\b|_{3,}/;
   const blanksOn = () => S.type === 'fill';
-  function blankSpan(a) {
+  // One blank, drawn. `ans` is the answer of the student on screen (a
+  // string, or a list for pick-any; undefined while collecting), `reveal`
+  // whether the right options are marked.
+  function blankEl(spec, ans, reveal) {
     const b = document.createElement('span');
-    b.className = 'blank' + (a ? ' is-filled' : '');
-    b.textContent = a || '';
+    if (!spec || spec.kind === 'text') {
+      b.className = 'blank' + (ans ? ' is-filled' : '');
+      if (spec?.width) b.style.minWidth = spec.width + 'ch';
+      b.textContent = ans || '';
+      return b;
+    }
+    b.className = 'blank-pick' + (spec.kind === 'any' ? ' is-any' : '') + (ans !== undefined ? ' has-answer' : '');
+    const picked = new Set(Array.isArray(ans) ? ans : ans ? [ans] : []);
+    spec.options.forEach(o => {
+      const c = document.createElement('span');
+      c.className = 'pick' + (picked.has(o.t) ? ' is-picked' : '') + (reveal && o.ok ? ' is-right' : '');
+      const l = document.createElement('span');
+      l.textContent = o.t;
+      c.appendChild(l);
+      b.appendChild(c);
+    });
     return b;
   }
-  function blankify(root, answers = []) {
+  // Swap the stand-in characters (see BLANK_CH) for drawn blanks. `view`:
+  // { specs, answers, reveal } — only specs while editing or collecting.
+  function blankify(root, view = {}) {
+    const specs = view.specs || [];
     const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-      acceptNode: n => n.parentElement?.closest('.katex, .blank, .is-raw') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
+      acceptNode: n => n.parentElement?.closest('.katex, .blank, .blank-pick, .is-raw') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
     });
+    const isMark = c => c >= BLANK_CH && c < BLANK_CH + 0x0F00;
     const nodes = [];
-    for (let n; (n = w.nextNode());) if (BLANK_ONE.test(n.data)) nodes.push(n);
-    let k = root.querySelectorAll('.blank').length;
+    for (let n; (n = w.nextNode());) if ([...n.data].some(ch => isMark(ch.charCodeAt(0)))) nodes.push(n);
     nodes.forEach(n => {
-      const parts = n.data.split(BLANK_RE);
       const frag = document.createDocumentFragment();
-      parts.forEach((part, i) => {
-        if (part) frag.appendChild(document.createTextNode(part));
-        if (i < parts.length - 1) { frag.appendChild(blankSpan(answers[k])); k++; }
-      });
+      let text = '';
+      for (const ch of n.data) {
+        const c = ch.charCodeAt(0);
+        if (!isMark(c)) { text += ch; continue; }
+        if (text) { frag.appendChild(document.createTextNode(text)); text = ''; }
+        const k = c - BLANK_CH;
+        frag.appendChild(blankEl(specs[k], view.answers ? (view.answers[k] ?? '') : undefined, view.reveal));
+      }
+      if (text) frag.appendChild(document.createTextNode(text));
       n.replaceWith(frag);
     });
+  }
+
+  // What a fill-in-the-blanks question draws: its blanks, and with the
+  // results up, one student's whole answer in them — the arrows step
+  // through the class.
+  function fillView(D, results) {
+    const specs = blankSpecs(D.question);
+    if (!results) return { specs };
+    return { specs, answers: D.fills[D.fillIdx] || [], reveal: !!D.revealed };
   }
 
   // ── Live Markdown editing ───────────────────────────────────────────────────
@@ -3998,7 +4095,7 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
   const MD_TOKEN = /```[\s\S]*?```|```[\s\S]*$|\$\$[\s\S]+?\$\$|\$[^$\n]+?\$|`[^`\n]+`|\*\*[^*\n]+?\*\*|\*[^*\s][^*\n]*?\*|(?<![\w])_[^_\s][^_\n]*?_(?![\w])|\[[^\]\n]+\]\([^)\s]+\)/g;
 
   // With blanks on, a BLANK (or ___) is a piece of its own, drawn as the gap.
-  const MD_TOKEN_BLANKS = /```[\s\S]*?```|```[\s\S]*$|\bBLANK\b|_{3,}|\$\$[\s\S]+?\$\$|\$[^$\n]+?\$|`[^`\n]+`|\*\*[^*\n]+?\*\*|\*[^*\s][^*\n]*?\*|(?<![\w])_[^_\s][^_\n]*?_(?![\w])|\[[^\]\n]+\]\([^)\s]+\)/g;
+  const MD_TOKEN_BLANKS = /```[\s\S]*?```|```[\s\S]*$|\bBLANK\((?=[^()\n]*(?:\^|\||\sX?OR\s))[^()\n]*\)|\bBLANK\b|_{3,}|\$\$[\s\S]+?\$\$|\$[^$\n]+?\$|`[^`\n]+`|\*\*[^*\n]+?\*\*|\*[^*\s][^*\n]*?\*|(?<![\w])_[^_\s][^_\n]*?_(?![\w])|\[[^\]\n]+\]\([^)\s]+\)/g;
   function mdSegments(src) {
     const out = [];
     let last = 0, m;
@@ -4015,8 +4112,10 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
 
   // One piece, rendered — or null to show it as typed (maths before KaTeX
   // has loaded, say).
-  function mdRender(t) {
-    if (blanksOn() && /^(?:BLANK|_{3,})$/.test(t)) return '<span class="blank"></span>';
+  function mdRender(t, k = 0) {
+    if (blanksOn() && BLANK_FULL.test(t)) return String.fromCharCode(BLANK_CH + k);
+    // Blanks inside a piece (a code block, `code`) stand in for themselves too.
+    if (blanksOn()) t = subBlanks(t, k);
     if (t.startsWith('```')) {
       // A block not closed yet (still being written) runs to the end.
       const closed = t.length >= 6 && t.endsWith('```');
@@ -4121,7 +4220,9 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
         span.className = 'md-tok';
         span.dataset.src = sg.tok;
         const open = at != null && at >= sg.start && at <= sg.end && !isBlank(sg.tok);
-        const html = open ? null : mdRender(sg.tok);
+        // Its first blank's number: the blanks in the source before it.
+        const k0 = blanksOn() ? (src.slice(0, sg.start).match(BLANK_RE) || []).length : 0;
+        const html = open ? null : mdRender(sg.tok, k0);
         if (open && sg.tok.startsWith('```')) { span.classList.add('is-raw', 'is-fence'); span.innerHTML = fenceSource(sg.tok); }
         else if (html == null) { span.classList.add('is-raw'); span.textContent = sg.tok; }
         else {
@@ -4134,7 +4235,9 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
       // A trailing newline needs something after it for the caret to sit on.
       if (src.endsWith('\n')) { const br = document.createElement('br'); br.dataset.pad = '1'; el.appendChild(br); }
       decorateCode(el);
-      if (blanksOn()) blankify(el);
+      // The right options show as they will when revealed, so marking one
+      // with * is seen to take.
+      if (blanksOn()) blankify(el, { specs: blankSpecs(src), reveal: true });
       el.classList.toggle('has-code', !!el.querySelector('pre'));
       el._md = null;   // setMd must redraw this element when editing ends
       if (at != null) place(at);
@@ -4434,7 +4537,8 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
       S.fills = texts.map(t => {
         try {
           const a = JSON.parse(t);
-          return Array.isArray(a) ? a.map(x => String(x)) : [String(a)];
+          // A pick-any blank's answer is itself a list of the options ticked.
+          return Array.isArray(a) ? a.map(x => Array.isArray(x) ? x.map(String) : String(x)) : [String(a)];
         } catch (_) { return [t]; }
       });
       S.fillIdx = Math.min(S.fillIdx, Math.max(0, S.fills.length - 1));
@@ -4474,6 +4578,11 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
     if (S.type === 'fill') {
       if (!S.question) return 'Add a question to start.';
       if (!blankCount(S.question)) return 'Add at least one blank to the question (+ Insert blank, or write BLANK).';
+      const specs = blankSpecs(S.question);
+      const mixed = specs.findIndex(b => b.kind === 'mixed');
+      if (mixed >= 0) return `Blank ${mixed + 1} mixes ^ and | — use ^ to pick one, | to pick any.`;
+      const thin = specs.findIndex(b => b.options && b.options.length < 2);
+      if (thin >= 0) return `Blank ${thin + 1} needs at least two options.`;
       return '';
     }
     if (!S.question) return 'Add a question to start.';
@@ -4576,7 +4685,7 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
       questionEl._liveMd = false;
       // Fill in the blanks: the gaps stay empty while the room answers; with
       // the results up they hold one response at a time.
-      setMd(questionEl, D.question, t === 'fill' ? (results ? D.fills[D.fillIdx] || [] : []) : undefined);
+      setMd(questionEl, D.question, t === 'fill' ? fillView(D, results) : undefined);
     }
     const collect  = D.phase === 'collect';
     const showData = results;
@@ -4604,7 +4713,10 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
     // the strip, not the layout of the slide.
     const shut = (D.phase === 'closed' || results) && !ed && !preview;
     const waiting = D.phase === 'idle' && !ed && !preview;
-    const withJoin = collect || ed || shut || waiting;
+    // Fill in the blanks with the results up is one student's whole answer
+    // at a time, and the stepper already counts them ("response 2 of 30"):
+    // the banner goes, so the question has the slide.
+    const withJoin = (collect || ed || shut || waiting) && !(t === 'fill' && results && !ed);
     joinEl.classList.toggle('is-closed', shut);
     joinEl.classList.toggle('is-waiting', waiting);
     $('join-h').textContent = shut ? 'Poll closed' : waiting ? 'Poll not open yet' : 'Scan to answer';
@@ -4673,7 +4785,8 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
   // last step it stays, quietly, as the way back.
   function nextStep() {
     const t = S.type, p = S.phase;
-    const canReveal = (isChoiceLike(t) && S.correct != null) || ((t === 'numeric' || t === 'exact') && S.answer != null);
+    const canReveal = (isChoiceLike(t) && S.correct != null) || ((t === 'numeric' || t === 'exact') && S.answer != null)
+                   || (t === 'fill' && fillGraded(S.question));
     if (p === 'idle') return { label: 'Start poll', go: () => startPoll() };
     if (p === 'collect') return { label: 'Close poll', go: closePoll };
     if (p === 'closed') return { label: 'Show results', go: toggleResults };
@@ -5078,19 +5191,9 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
 
     // What the class settled on, blank by blank — the one thing a stepper
     // can't show on its own.
-    const blanks = blankCount(D.question);
-    const bits = [];
-    for (let k = 0; k < Math.min(blanks, 6); k++) {
-      const tally = new Map();
-      D.fills.forEach(f => {
-        const v = (f[k] || '').trim();
-        if (v) tally.set(v, (tally.get(v) || 0) + 1);
-      });
-      if (!tally.size) continue;
-      const [best, count] = [...tally].sort((a, b) => b[1] - a[1])[0];
-      bits.push(`${k + 1}: ${best} (${Math.round(count / n * 100)}%)`);
-    }
-    fillStats.textContent = bits.length ? 'most common — ' + bits.join('  ·  ') : '';
+    // One student at a time, nothing summed up: the class is discussed
+    // answer by answer.
+    fillStats.textContent = '';
   }
 
   function stepFill(d) {
@@ -5468,9 +5571,9 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
     // prompt that doesn't ask the room to guess.
     if (S.type === 'exact')     { body.kind = 'numeric'; body.meta = { unit: S.unit, prompt: 'Your answer' }; }
     if (S.type === 'wordcloud') body.meta = { words: S.words };
-    // The phone shows the question as a listing with an input per blank; the
-    // ``` lines of a code block would only be noise there.
-    if (S.type === 'fill')      body.meta = { template: S.question.split('\n').filter(l => !/^\s*```/.test(l)).join('\n').trim() };
+    // The phone draws the template as the slide does — Markdown, code
+    // listings — with an input per blank, so it gets the whole source.
+    if (S.type === 'fill')      body.meta = { template: S.question.trim() };
     if (S.type === 'plot')      body.meta = { xLabel: S.plot.x, yLabel: S.plot.y, xLow: S.plot.xLow, xHigh: S.plot.xHigh,
                                               yLow: S.plot.yLow, yHigh: S.plot.yHigh };
     if (FILTERED.has(S.type)) {
@@ -5836,7 +5939,8 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
     const prevTimer = S.timer;
     adoptConfig();
 
-    const canReveal = S.correct != null || ((S.type === 'numeric' || S.type === 'exact') && S.answer != null);
+    const canReveal = S.correct != null || ((S.type === 'numeric' || S.type === 'exact') && S.answer != null)
+                   || (S.type === 'fill' && fillGraded(S.question));
     if (!canReveal) S.revealed = false;
 
     const key = pollIdentity(S.type, S.question, S.options, S.scale, S.unit, S.words, S.template, S.plot);
@@ -6273,8 +6377,11 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
 
   // ── Fill in the blanks: a blank goes in where the caret is ────────────────
   // The button mustn't take the focus from the question.
-  edBlank.addEventListener('mousedown', e => e.preventDefault());
-  edBlank.addEventListener('click', () => { if (editing()) questionEd.insert('BLANK'); });
+  [['ed-blank', 'BLANK'], ['ed-blank-one', 'BLANK(*Option A ^ Option B)'], ['ed-blank-any', 'BLANK(*Option A | Option B | *Option C)']]
+    .forEach(([id, text]) => {
+      $(id).addEventListener('mousedown', e => e.preventDefault());   // keep the caret in the question
+      $(id).addEventListener('click', () => { if (editing()) questionEd.insert(text); });
+    });
 
   // ── Small text fields: rating ends, the numbers, the AI options ────────────
   // Each saves quietly as it's typed and commits when left.
@@ -6501,7 +6608,8 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
     if (t === 'open') {
       S.groups.forEach(g => answers.push({ type: 'text', text: g.n > 1 ? `${g.text}  (×${g.n})` : g.text }));
     } else if (t === 'fill') {
-      S.fills.forEach(f => answers.push({ type: 'text', mono: true, text: (Array.isArray(f) ? f : [f]).join('  |  ') }));
+      S.fills.forEach(f => answers.push({ type: 'text', mono: true,
+        text: (Array.isArray(f) ? f : [f]).map(x => Array.isArray(x) ? x.join(', ') : x).join('  |  ') }));
     } else if (t === 'wordcloud') {
       S.cloud.slice().sort((a, b) => b.n - a.n).forEach(w => answers.push({ type: 'text', text: `${w.text}  (${w.n})` }));
     }

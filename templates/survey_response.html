@@ -121,37 +121,53 @@ textarea::placeholder { color: var(--text-3); }
 }
 .field-error { min-height: 16px; font-size: 13px; color: var(--red); text-align: center; }
 
-/* Fill in the blanks: the presenter's template, with an input where each
-   BLANK was. Monospace, because these are nearly always code. */
-.fill-template {
-  padding: 14px;
-  background: var(--bg-subtle);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  font-family: var(--font-mono);
-  font-size: 14px;
-  line-height: 2.1;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  text-align: left;
-  color: var(--text);
-}
+/* Fill in the blanks: the presenter's template drawn as the slide draws it
+   (Markdown, code listings — it is also .question-text, for their styles),
+   with an input where each BLANK was. */
+.fill-template p { margin: 0 0 0.6em; line-height: 1.5; }
+.fill-template p:has(.blank-input, .pick-group) { line-height: 2.4; }   /* room for the boxes */
+.fill-template p:last-child { margin-bottom: 0; }
+.fill-template pre code { line-height: 2; }
+.fill-para { display: flex; flex-direction: column; gap: 14px; margin: 0 0 0.6em; }
+.fill-para:last-child { margin-bottom: 0; }
+.fill-line { line-height: 2.4; }
+.fill-field { display: flex; flex-direction: column; gap: 6px; }
+.fill-label { line-height: 1.35; }
+.fill-field .blank-input.is-full { width: 100%; margin: 0; height: 46px; }
+.fill-field .pick-group { margin: 0; }
 .blank-input {
-  width: 7ch;
-  min-width: 7ch;
-  padding: 3px 6px;
+  max-width: 100%;
+  height: 40px;
+  padding: 0 10px;
+  margin: 2px 0;
   font-family: var(--font-mono);
-  font-size: 14px;
+  font-size: 16px;   /* under 16px, iOS zooms the page in on focus */
+  vertical-align: middle;
   color: var(--text);
   background: var(--bg);
   border: 1px solid var(--border-med);
   border-radius: 5px;
   outline: none;
-  text-align: center;
+  text-align: left;
   -webkit-appearance: none;
   transition: border-color 0.15s;
 }
+.blank-input.in-code { height: 34px; }
 .blank-input:focus { border-color: var(--text); }
+/* A choice blank: chips in the line, round to pick one, square to pick any. */
+.pick-group { display: inline-flex; flex-wrap: wrap; gap: 6px; vertical-align: middle; margin: 2px 0; }
+.pick-btn {
+  min-height: 40px; padding: 0 14px;
+  font-family: var(--font-mono); font-size: 16px;
+  color: var(--rs-ink, var(--text)); background: #fff;
+  border: 2px solid var(--rs-ink, var(--text)); border-radius: 999px;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.pick-group.is-any .pick-btn { border-radius: 7px; }
+.pick-group.is-any .pick-btn::before { content: '\2610\00a0'; }
+.pick-group.is-any .pick-btn.is-on::before { content: '\2611\00a0'; }
+.pick-btn.is-on { background: var(--rs-hl, #f7c548); }
+.pick-btn:disabled { opacity: 0.55; }
 .blank-input:disabled { opacity: 0.55; }
 
 /* Rating scale: one button per point, the scale's end labels underneath. */
@@ -389,32 +405,35 @@ function buildInput(data) {
   }
 
   if (kind === 'fill') {
-    // Every BLANK (or ___) in the template becomes an input, in order.
-    const tpl  = String(meta.template || '');
-    const parts = tpl.split(/\bBLANK\b|_{3,}/);
-    const box  = el('div', 'fill-template');
-    parts.forEach((part, i) => {
-      box.appendChild(document.createTextNode(part));
-      if (i < parts.length - 1) {
-        const inp = el('input', 'blank-input');
-        inp.type = 'text';
-        inp.autocomplete = 'off';
-        inp.autocapitalize = 'none';
-        inp.spellcheck = false;
-        inp.setAttribute('aria-label', `Blank ${i + 1}`);
-        inp.addEventListener('input', () => {
-          // Grow with what's typed, so a long answer stays readable.
-          inp.style.width = Math.max(7, Math.min(28, inp.value.length + 2)) + 'ch';
-        });
-        inp.addEventListener('keydown', e => {
-          if (e.key !== 'Enter') return;
-          const all = [...slot.querySelectorAll('.blank-input')];
-          const next = all[all.indexOf(inp) + 1];
-          if (next) next.focus(); else submit();
-        });
-        box.appendChild(inp);
+    // The template is Markdown, like the question, and drawn the same way.
+    // Each blank goes through as one private-use character (U+E100 + its
+    // number) that Markdown and the code colouring leave alone, and is
+    // swapped for its input afterwards.
+    const tpl = String(meta.template || '');
+    blanks = blankSpecs(tpl);
+    let n = 0;
+    const box = el('div', 'fill-template question-text has-block');
+    // Its lines as typed, as on the slide ("Description: ___" over "passwd: ___").
+    renderRich(box, tpl.replace(BLANK_RE, () => String.fromCharCode(BLANK_CH + n++)), true);
+    const isMark = c => c >= BLANK_CH && c < BLANK_CH + 0x0F00;
+    const nodes = [];
+    const walk = document.createTreeWalker(box, NodeFilter.SHOW_TEXT);
+    while (walk.nextNode()) if ([...walk.currentNode.data].some(ch => isMark(ch.charCodeAt(0)))) nodes.push(walk.currentNode);
+    nodes.forEach(node => {
+      const inCode = !!node.parentElement?.closest('pre');
+      const frag = document.createDocumentFragment();
+      let text = '';
+      for (const ch of node.data) {
+        const c = ch.charCodeAt(0);
+        if (!isMark(c)) { text += ch; continue; }
+        if (text) { frag.appendChild(document.createTextNode(text)); text = ''; }
+        const k = c - BLANK_CH;
+        frag.appendChild(blankInput(blanks[k] || { kind: 'text', width: 0 }, k, inCode));
       }
+      if (text) frag.appendChild(document.createTextNode(text));
+      node.replaceWith(frag);
     });
+    formFields(box);
     slot.appendChild(box);
     hint.textContent = '';   // the keys still work; a phone has none to show
     setTimeout(() => slot.querySelector('.blank-input')?.focus(), 50);
@@ -473,16 +492,24 @@ function readAnswer() {
   if (kind === 'rating') return rating == null ? null : String(rating);
   if (kind === 'plot')   return point == null ? null : JSON.stringify(point);
   if (kind === 'fill') {
-    const inputs = [...document.querySelectorAll('.blank-input')];
-    const vals   = inputs.map(i => i.value.trim());
-    const empty  = vals.findIndex(v => !v);
+    // One answer per blank, in order — the slide replays them into the
+    // question as the presenter steps through the responses. Pick-any gives
+    // a list (possibly empty: "none of these" is an answer).
+    const vals = blanks.map((b, k) => {
+      const box = document.querySelector(`[data-blank="${k}"]`);
+      if (!box) return '';
+      if (b.kind === 'text') return box.value.trim();
+      const on = [...box.querySelectorAll('.pick-btn.is-on')].map(x => x.dataset.v);
+      return b.kind === 'any' ? on : (on[0] || '');
+    });
+    const empty = blanks.findIndex((b, k) => b.kind !== 'any' && !vals[k]);
     if (empty >= 0) {
-      err.textContent = `Fill in blank ${empty + 1}.`;
-      inputs[empty].focus();
+      err.textContent = blanks[empty].kind === 'one' ? `Pick an answer for blank ${empty + 1}.` : `Fill in blank ${empty + 1}.`;
+      const box = document.querySelector(`[data-blank="${empty}"]`);
+      (box?.matches('input') ? box : box?.querySelector('button'))?.focus();
+      box?.scrollIntoView({ block: 'center', behavior: 'smooth' });
       return null;
     }
-    // One answer per blank, in order — the slide replays them into the
-    // template as the presenter steps through the responses.
     return JSON.stringify(vals);
   }
   const text = (inputEl?.value || '').trim();
@@ -499,7 +526,7 @@ function setInputsDisabled(off) {
   document.getElementById('submit-btn').disabled = off;
   if (inputEl) inputEl.disabled = off;
   document.querySelectorAll('.line-sign').forEach(b => { b.disabled = off; });
-  document.querySelectorAll('.scale-btn, .blank-input').forEach(b => { b.disabled = off; });
+  document.querySelectorAll('.scale-btn, .blank-input, .pick-btn').forEach(b => { b.disabled = off; });
   document.querySelectorAll('.plot-box').forEach(b => b.classList.toggle('is-off', off));
 }
 
@@ -534,16 +561,132 @@ async function submit() {
   }
 }
 
+// ── Fill in the blanks ───────────────────────────────────────────────────────
+// The grammar the widget writes (see blankSpec in
+// widgets/audience-response.html — keep the two in step):
+//   BLANK or ___        a text box; written as underscores, as wide as they are
+//   BLANK(a ^ b)        pick exactly one   (XOR too)
+//   BLANK(a | b)        pick any number    (OR too)
+// A * marks a right option; the phone doesn't show which.
+const BLANK_RE = /\bBLANK\((?=[^()\n]*(?:\^|\||\sX?OR\s))[^()\n]*\)|\bBLANK\b|_{3,}/g;
+const BLANK_CH = 0xE100;
+let blanks = [];
+function blankSpec(tok) {
+  const m = /^BLANK\((.*)\)$/.exec(tok);
+  if (!m) return { kind: 'text', width: tok[0] === '_' ? Math.min(40, Math.max(4, tok.length)) : 0 };
+  const body = ' ' + m[1] + ' ';
+  const one = /\^|\sXOR\s/.test(body), any = /\||\sOR\s/.test(body);
+  const options = m[1].split(/\s*[\^|]\s*|\s+X?OR\s+/).map(o => o.trim().replace(/^\*\s*/, '')).filter(Boolean);
+  return { kind: one && !any ? 'one' : any && !one ? 'any' : 'one', options };
+}
+const blankSpecs = src => [...String(src || '').matchAll(BLANK_RE)].map(m => blankSpec(m[0]));
+
+// "Description: ___" on a line of its own reads as a form field, so it is
+// laid out as one: the label on top, the box the full width under it, every
+// box lined up with the next. A blank inside a sentence ("returns ___ because
+// ___") stays in the sentence, and blanks in code stay in the code.
+function formFields(box) {
+  const isBlank = n => n.nodeType === 1 && (n.classList.contains('blank-input') || n.classList.contains('pick-group'));
+  const isEmpty = n => n.nodeType === 3 ? !n.data.trim() : n.nodeName === 'BR';
+  box.querySelectorAll('p').forEach(p => {
+    if (p.closest('pre') || !p.querySelector('.blank-input, .pick-group')) return;
+    // The paragraph's lines (single line breaks are kept, see renderRich).
+    const lines = [[]];
+    [...p.childNodes].forEach(n => { if (n.nodeName === 'BR') lines.push([]); else lines[lines.length - 1].push(n); });
+    const out = document.createElement('div');
+    out.className = 'fill-para';
+    lines.forEach(line => {
+      const blanks = line.filter(isBlank);
+      const at = line.indexOf(blanks[0]);
+      const field = blanks.length === 1 && at > 0 && line.slice(at + 1).every(isEmpty)
+                 && line.slice(0, at).some(n => !isEmpty(n));
+      if (field) {
+        const f = document.createElement('label');
+        f.className = 'fill-field';
+        const lab = document.createElement('span');
+        lab.className = 'fill-label';
+        line.slice(0, at).forEach(n => lab.appendChild(n));
+        // "Description: " → "Description:" — the space was for the inline box.
+        const last = lab.lastChild;
+        if (last?.nodeType === 3) last.data = last.data.replace(/\s+$/, '');
+        f.appendChild(lab);
+        const b = blanks[0];
+        if (b.matches('.blank-input')) { b.classList.add('is-full'); b.style.width = ''; }
+        f.appendChild(b);
+        out.appendChild(f);
+      } else if (line.some(n => !isEmpty(n))) {
+        const l = document.createElement('div');
+        l.className = 'fill-line';
+        line.forEach(n => l.appendChild(n));
+        out.appendChild(l);
+      }
+    });
+    p.replaceWith(out);
+  });
+}
+
+// A blank's input. A text box starts at a useful size — its underscores'
+// width if it was written as ___, else wider in prose than in code — and
+// grows (never shrinks below that) as it's typed in. A choice blank is a row
+// of chips: round to pick one, square to pick any.
+function blankInput(spec, k, inCode) {
+  if (spec.kind === 'text') {
+    const inp = el('input', 'blank-input' + (inCode ? ' in-code' : ''));
+    inp.type = 'text';
+    inp.autocomplete = 'off';
+    inp.autocapitalize = 'none';
+    inp.spellcheck = false;
+    inp.dataset.blank = k;
+    inp.setAttribute('aria-label', `Blank ${k + 1}`);
+    const base = spec.width || (inCode ? 10 : 14);
+    inp.style.width = base + 'ch';
+    inp.addEventListener('input', () => {
+      if (inp.classList.contains('is-full')) return;   // a form field is already the full width
+      inp.style.width = Math.max(base, Math.min(40, inp.value.length + 2)) + 'ch';
+    });
+    inp.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      const all = [...document.querySelectorAll('.blank-input')];
+      const next = all[all.indexOf(inp) + 1];
+      if (next) next.focus(); else submit();
+    });
+    return inp;
+  }
+  const group = el('span', 'pick-group' + (spec.kind === 'any' ? ' is-any' : ''));
+  group.dataset.blank = k;
+  group.setAttribute('role', spec.kind === 'any' ? 'group' : 'radiogroup');
+  group.setAttribute('aria-label', `Blank ${k + 1}` + (spec.kind === 'any' ? ' (pick any)' : ''));
+  spec.options.forEach(o => {
+    const b = el('button', 'pick-btn', o);
+    b.type = 'button';
+    b.dataset.v = o;
+    b.setAttribute('aria-pressed', 'false');
+    b.addEventListener('click', () => {
+      const on = !b.classList.contains('is-on');
+      if (spec.kind === 'one') group.querySelectorAll('.pick-btn').forEach(x => { x.classList.remove('is-on'); x.setAttribute('aria-pressed', 'false'); });
+      b.classList.toggle('is-on', spec.kind === 'one' ? true : on);
+      b.setAttribute('aria-pressed', b.classList.contains('is-on') ? 'true' : 'false');
+      document.getElementById('field-error').textContent = '';
+    });
+    group.appendChild(b);
+  });
+  return group;
+}
+
 // The question as the presenter wrote it: Markdown, $LaTeX$ and code blocks.
 // Falls back to plain text when the CDN can't be reached, so a phone on a
 // captive network still sees the question.
 function setQuestion(src) {
   const el = document.getElementById('question-text');
   el._src = src = src || '';
-  if (!window.marked) { el.textContent = src; return; }
-  el.innerHTML = marked.parse(src, { breaks: false });
-  if (window.decorateCode) decorateCode(el);
+  renderRich(el, src);
   el.classList.toggle('has-block', !!el.querySelector('pre, ul, ol, blockquote'));
+}
+// Markdown, code listings and maths into `el`. Plain text without marked.
+function renderRich(el, src, breaks = false) {
+  if (!window.marked) { el.textContent = src; return; }
+  el.innerHTML = marked.parse(src, { breaks });
+  if (window.decorateCode) decorateCode(el);
   if (window.renderMathInElement) {
     renderMathInElement(el, {
       delimiters: [
@@ -559,6 +702,15 @@ function setQuestion(src) {
 window.addEventListener('load', () => {
   const el = document.getElementById('question-text');
   if (el && el._src) setQuestion(el._src);
+  // The fill-in template has its inputs in it by now, so only its maths is
+  // redone (auto-render leaves the inputs alone), not the whole thing.
+  const fill = document.querySelector('.fill-template');
+  if (fill && window.renderMathInElement) {
+    renderMathInElement(fill, { delimiters: [
+      { left: '$$', right: '$$', display: true }, { left: '$', right: '$', display: false },
+      { left: '\\(', right: '\\)', display: false }, { left: '\\[', right: '\\]', display: true },
+    ], throwOnError: false });
+  }
 });
 
 async function load() {

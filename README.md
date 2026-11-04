@@ -143,6 +143,22 @@ Two models ship built in:
   key in the widget settings; requires `pip install anthropic`)
 - `gpt4o` — uses the OpenAI API (`OPENAI_API_KEY`; requires `pip install openai`)
 
+### Fill in the blanks
+
+Blanks are written in the question, in prose or inside a code block:
+
+| Written | On the phone |
+|---|---|
+| `BLANK` or `___` | a text box (written as underscores, it's as wide as they are) |
+| `BLANK(True ^ False)` | pick exactly one (`XOR` works too) |
+| `BLANK(a \| b \| c)` | pick any number, as checkboxes (`OR` works too) |
+
+With the results up, the slide shows one student's whole answer at a time —
+typed answers and picked options highlighted — and the arrows (or ← →) step
+through the class. Put `*` before the right option(s), as in
+`BLANK(True ^ *False)`, and the poll gets a **Reveal answer** step that ticks
+them. The edit bar's **Insert blank** buttons write these for you.
+
 ### Content filter
 
 Free-text answers (open text, word cloud, fill in the blanks) are checked on
