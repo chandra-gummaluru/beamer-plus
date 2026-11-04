@@ -103,6 +103,17 @@ textarea::placeholder { color: var(--text-3); }
 .line-input::placeholder { color: var(--text-3); }
 .line-input:disabled { opacity: 0.5; }
 .line-wrap { position: relative; }
+/* iOS's decimal keypad has no minus key, so a numeric answer gets its own. */
+.line-sign {
+  position: absolute; left: 6px; top: 50%; transform: translateY(-50%);
+  width: 40px; height: 40px; border: 0; border-radius: calc(var(--radius) - 2px);
+  background: transparent; color: var(--text-2, var(--text-3));
+  font-family: var(--font-mono); font-size: 20px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.line-sign:active { background: var(--bg); }
+.line-sign:disabled { opacity: 0.5; }
+.line-wrap.has-sign .line-input { padding-left: 52px; padding-right: 52px; }
 .line-unit {
   position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
   font-family: var(--font-mono); font-size: 14px; color: var(--text-3); pointer-events: none;
@@ -418,6 +429,19 @@ function buildInput(data) {
       inputEl.inputMode = 'decimal';
       inputEl.placeholder = meta.prompt || 'Your estimate';
       if (meta.unit) wrap.appendChild(el('span', 'line-unit', meta.unit));
+      const sign = el('button', 'line-sign', '±');
+      sign.type = 'button';
+      sign.setAttribute('aria-label', 'Make negative or positive');
+      sign.addEventListener('pointerdown', e => e.preventDefault());   // keep the keypad up
+      sign.addEventListener('click', () => {
+        const v = inputEl.value.replace(/^\s+/, '');
+        inputEl.value = /^[-\u2212\u2013\u2014]/.test(v) ? v.slice(1) : '-' + v;
+        inputEl.focus();
+        const end = inputEl.value.length;
+        try { inputEl.setSelectionRange(end, end); } catch (_) {}
+      });
+      wrap.appendChild(sign);
+      wrap.classList.add('has-sign');
     } else {
       inputEl.maxLength = 60;
       inputEl.placeholder = (+meta.words || 1) > 1 ? 'A short phrase' : 'One word';
@@ -463,7 +487,7 @@ function readAnswer() {
   const text = (inputEl?.value || '').trim();
   if (!text) { inputEl?.focus(); return null; }
   if (kind === 'numeric') {
-    const n = Number(text.replace(/[\s,_]/g, ''));
+    const n = Number(text.replace(/[\s,_]/g, '').replace(/^[\u2212\u2013\u2014]/, '-'));
     if (!Number.isFinite(n)) { err.textContent = 'Please enter a number.'; inputEl.focus(); return null; }
     return String(n);
   }
@@ -473,6 +497,7 @@ function readAnswer() {
 function setInputsDisabled(off) {
   document.getElementById('submit-btn').disabled = off;
   if (inputEl) inputEl.disabled = off;
+  document.querySelectorAll('.line-sign').forEach(b => { b.disabled = off; });
   document.querySelectorAll('.scale-btn, .blank-input').forEach(b => { b.disabled = off; });
   document.querySelectorAll('.plot-box').forEach(b => b.classList.toggle('is-off', off));
 }

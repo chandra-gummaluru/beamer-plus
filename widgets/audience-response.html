@@ -4360,7 +4360,7 @@ body.ar-split #stage:not(.is-data) #ar-split-right #timer-track { width: calc(84
       }
       S.ratings = r;
     } else if (S.type === 'numeric' || S.type === 'exact') {
-      S.nums = texts.map(t => Number(t.replace(/[\s,_]/g, ''))).filter(Number.isFinite);
+      S.nums = texts.map(t => Number(t.replace(/[\s,_]/g, '').replace(/^[\u2212\u2013\u2014]/, '-'))).filter(Number.isFinite);
     } else if (S.type === 'fill') {
       // Each response is one JSON array — an answer per blank, in order. An
       // older or hand-typed response that isn't JSON counts as one answer.
@@ -6202,7 +6202,7 @@ body.ar-split #stage:not(.is-data) #ar-split-right #timer-track { width: calc(84
   // A number, or null for "none" — typed as text so "-" and "1." can be
   // typed on the way to a number without the field throwing them away.
   const optNum = el => {
-    const s = el.value.trim().replace(/\s/g, '').replace(',', '.');
+    const s = el.value.trim().replace(/\s/g, '').replace(',', '.').replace(/^[\u2212\u2013\u2014]/, '-');
     return s === '' ? null : Number(s);
   };
   const okNum  = v => v === null || Number.isFinite(v);
