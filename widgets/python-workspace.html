@@ -2965,50 +2965,70 @@ html[data-theme="dark"]{
   color: var(--sn-cap);
 }
 .pane-file { color: var(--sn-cap); font-size: 13px; }
-/* Files: a dropdown on the editor's header. The open file's name is
-   typed into to rename it; the caret lists every file, + New File, and a
-   delete for each. */
-.file-pick {
-  display: inline-flex; align-items: center; flex: 0 1 auto; min-width: 0;
-  height: 26px; box-sizing: border-box;
-  border: 1.5px solid var(--sn-faint); border-radius: 5px; background: #fff;
+/* The open file's name, in the editor's head: typed into to rename it. An
+   outline only when pointed at, like the notebook's open-file header. */
+#filename {
+  height: 24px; padding: 0 6px; min-width: 6ch;
+  border: 1.5px solid transparent; border-radius: 5px; background: none;
+  font-family: var(--font-mono); font-size: 13px; color: var(--sn-ink);
 }
-.file-pick:hover, .file-pick:focus-within, .file-pick.is-open { border-color: var(--sn-ink); }
-.file-pick .pane-file { color: var(--sn-ink); border: 0; padding: 0 2px 0 7px; min-width: 0; }
-.file-pick-btn {
-  flex: 0 0 auto; width: 22px; height: 100%; display: grid; place-items: center;
-  border: 0; border-left: 1px solid var(--sn-faint); border-radius: 0 4px 4px 0;
-  background: none; color: var(--sn-ink); cursor: pointer; padding: 0;
-}
-.file-pick-btn svg { width: 12px; height: 12px; }
-.file-pick-btn:hover, .file-pick.is-open .file-pick-btn { background: var(--sn-hl); }
-.file-pick-count { font-family: var(--font-mono); font-size: 11px; color: var(--sn-cap); padding: 0 6px 0 2px; }
-#file-menu {
-  position: fixed; z-index: 60; display: none; min-width: 200px; max-height: 60vh; overflow-y: auto;
-  padding: 4px; background: #fff; border: 2px solid var(--sn-ink); border-radius: 7px;
-  box-shadow: 0 12px 36px rgb(0 0 0 / .18); font-family: var(--font-chrome);
-}
-#file-menu.is-open { display: block; }
-.fm-item {
-  display: flex; align-items: center; gap: 6px; width: 100%; box-sizing: border-box;
-  height: 30px; padding: 0 4px 0 10px; border: 0; border-radius: 5px; background: none;
-  font-family: var(--font-mono); font-size: 13px; color: var(--sn-ink); text-align: left; cursor: pointer;
-}
-.fm-item:hover, .fm-item:focus-visible { background: var(--sn-hl); outline: none; }
-.fm-item.is-open::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--sn-ink); margin-left: -2px; }
-.fm-name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fm-x {
-  flex: 0 0 auto; width: 22px; height: 22px; display: grid; place-items: center;
-  border: 0; border-radius: 4px; background: none; color: var(--sn-cap); font-size: 15px; cursor: pointer;
-}
-.fm-x:hover { background: #fff; color: var(--sn-ink); }
-.fm-x.is-armed { background: var(--err); color: #fff; }
-.fm-sep { height: 1px; margin: 4px 6px; background: var(--border); }
-.fm-new { font-family: var(--font-chrome); color: var(--sn-ink); }
-body.is-viewer .fm-x, body.is-viewer .fm-new, body.is-viewer .fm-sep,
-body.ws-readonly .fm-x, body.ws-readonly .fm-new, body.ws-readonly .fm-sep { display: none; }
 .pane-file:hover:not(:disabled),
 .pane-file:focus { border-color: var(--sn-faint); }
+
+/* ── Files: the same pane as the Python Notebook's ─────────────
+   A list down the left of the workspace, flush with the bar; the panes
+   move over to make room. Clicking a file opens it in the editor. */
+#files-pane {
+  position: absolute; left: 0; top: 0; bottom: 0; z-index: 3;
+  width: calc(190px * var(--u)); max-width: 38%;
+  display: none; flex-direction: column;
+  border-right: 1.5px solid var(--sn-faint);
+  background: var(--bg);
+  font-family: var(--font-chrome);
+  box-sizing: border-box;
+}
+body.files-open #files-pane { display: flex; }
+body.files-open:not(.ws-split) #panes { left: calc(min(190px * var(--u), 38%) + 8px); }
+.fp-head {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 4px;
+  height: 38px; padding: 0 6px 0 12px;
+}
+.fp-label { flex: 1 1 auto; font-size: 13px; color: var(--sn-cap); }
+.fp-head .bw-btn--icon { width: 28px; height: 28px; padding: 0; }
+.fp-head .bw-btn--icon svg { width: 14px; height: 14px; }
+#fp-list {
+  flex: 1 1 auto; min-height: 0;
+  overflow-y: auto; overflow-x: hidden;
+  padding: 0 6px 10px;
+}
+#fp-list::-webkit-scrollbar { width: 6px; }
+#fp-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.fp-item {
+  display: flex; align-items: center; gap: calc(6px * var(--u));
+  width: 100%; min-height: calc(28px * var(--u)); box-sizing: border-box;
+  padding: 2px 4px 2px 6px;
+  border: 1.5px solid transparent; border-radius: 5px;
+  background: none; color: var(--sn-ink); text-align: left; cursor: pointer;
+  font-family: var(--font-mono); font-size: calc(12.5px * var(--u));
+}
+.fp-item:hover, .fp-item:focus-visible { background: var(--sn-node); outline: none; }
+.fp-item.is-open { background: var(--sn-hl); color: var(--sn-on-hl); }
+.fp-item > svg { flex: 0 0 auto; width: calc(14px * var(--u)); height: calc(14px * var(--u)); color: var(--sn-cap); }
+.fp-item.is-open > svg { color: var(--sn-on-hl); }
+.fp-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fp-x {
+  flex: 0 0 auto; width: 22px; height: 22px; display: none; place-items: center;
+  border: 0; border-radius: 4px; background: none; color: var(--sn-cap); font-size: 15px; cursor: pointer;
+}
+.fp-item:hover .fp-x, .fp-item:focus-within .fp-x, .fp-x.is-armed { display: grid; }
+.fp-x:hover { background: var(--bg); color: var(--sn-ink); }
+.fp-x.is-armed { background: var(--err); color: #fff; }
+body.is-viewer .fp-change, body.ws-readonly .fp-change,
+body.is-viewer .fp-x, body.ws-readonly .fp-x { display: none !important; }
+/* A static half of a split is a picture of the workspace. */
+body.ws-static #files-pane { pointer-events: none; }
+@media print { #files-pane { display: none !important; } }
 
 #gutter {
   color: var(--sn-cap);
@@ -3173,6 +3193,11 @@ body.bw-editing #gutter { cursor: pointer; }
 
   <div id="toolbar" class="bw-toolbar" data-bw-topbar>
     <span class="bw-toolbar-title">Python</span>
+    <!-- Opens and closes the files pane (the same pane as the Python Notebook's). -->
+    <button class="bw-btn" type="button" id="files-btn" title="Files" aria-pressed="false" data-bw-print-hide>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 6.5V18a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8.5a1 1 0 0 0-1-1h-8l-2-2.5H4a1 1 0 0 0-1 1z"/></svg>
+      Files
+    </button>
     <button class="bw-btn" hidden id="open-btn" title="Open a .py file" aria-label="Open"><svg class="bi" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M1.8 3.5h4l1.4 1.6h7v8H1.8z"/></svg><span class="bl">Open</span></button>
     <button class="bw-btn" hidden id="save-btn" title="Download this file (Ctrl+S)" aria-label="Save"><svg class="bi" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8M4.8 7 8 10.2 11.2 7M2.5 13.5h11"/></svg><span class="bl">Save</span></button>
     <!-- Edit mode: what a click on a line number sets, and the layout. The
@@ -3198,17 +3223,25 @@ body.bw-editing #gutter { cursor: pointer; }
   </div>
 
   <div id="workspace">
+    <!-- ── Files ── -->
+    <aside id="files-pane" aria-label="Files" data-bw-print-hide>
+      <div class="fp-head">
+        <span class="fp-label">files</span>
+        <button class="bw-btn bw-btn--icon fp-change" type="button" id="fp-new" title="New file" aria-label="New file">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M12 11v6M9 14h6"/></svg>
+        </button>
+        <button class="bw-btn bw-btn--icon fp-change" type="button" id="fp-upload" title="Add a file from your computer" aria-label="Add a file">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+        </button>
+      </div>
+      <div id="fp-list" role="tree"></div>
+    </aside>
     <div id="panes">
 
       <section class="pane" id="editor-pane" data-pane="editor">
         <div class="pane-head" id="editor-head">
           <span class="pane-label">Editor</span>
-          <span class="file-pick" id="file-pick">
-            <input class="pane-file" id="filename" value="main.py" spellcheck="false" aria-label="File name">
-            <button class="file-pick-btn" id="file-pick-btn" type="button" aria-haspopup="menu" aria-expanded="false" title="Files">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
-            </button>
-          </span>
+          <input class="pane-file" id="filename" value="main.py" spellcheck="false" aria-label="File name" title="The open file. Type to rename it.">
           <div class="bw-spacer"></div>
           <span id="mm-tools" class="presenter-only bw-run-only" hidden>
             <span id="traceTools">
@@ -7701,80 +7734,73 @@ print(shopping)
   }
   // The open tab's name field is as wide as the name.
   function sizeFileEl() { fileEl.style.width = `calc(${Math.max(6, fileEl.value.length)}ch + 12px)`; }
-  // The dropdown: the open file's name (typed into to rename it) and a
-  // caret listing every file. renderTabs() keeps its name in step.
-  const pickEl = $('file-pick'), pickBtn = $('file-pick-btn');
-  let fileMenu = null;
+  // ── Files pane ─────────────────────────────────────────────────────────────
+  // The Python Notebook's pane: Files in the bar opens a list down the left;
+  // a click opens that file in the editor, + adds one, the upload arrow reads
+  // one in from the computer, and × (twice) deletes. Open by default when the
+  // workspace has more than one file; toggled while editing, that's saved as
+  // the slide's default (`filesPane`).
+  const filesPaneEl = $('files-pane'), fpList = $('fp-list'), filesBtn = $('files-btn');
+  let filesOn = false;
+  const FILE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg>';
+
   function renderTabs() {
     sizeFileEl();
-    pickBtn.title = S.files.length > 1 ? `Files (${S.files.length})` : 'Files';
-    if (fileMenu?.classList.contains('is-open')) buildFileMenu();
+    renderFilesPane();
   }
-  function closeFileMenu() {
-    fileMenu?.classList.remove('is-open');
-    pickEl.classList.remove('is-open');
-    pickBtn.setAttribute('aria-expanded', 'false');
-  }
-  function buildFileMenu() {
-    if (!fileMenu) {
-      fileMenu = document.createElement('div');
-      fileMenu.id = 'file-menu'; fileMenu.setAttribute('role', 'menu');
-      document.body.appendChild(fileMenu);
-    }
-    fileMenu.textContent = '';
+  function renderFilesPane() {
+    if (!filesOn) return;
+    fpList.textContent = '';
     const many = S.files.length > 1;
-    S.files.forEach((f, i) => {
-      const it = document.createElement('div');
-      it.className = 'fm-item' + (i === S.fileIdx ? ' is-open' : '');
-      it.setAttribute('role', 'menuitem'); it.tabIndex = 0;
-      const nm = document.createElement('span'); nm.className = 'fm-name'; nm.textContent = f.name;
-      it.appendChild(nm);
-      if (many) {
-        const x = document.createElement('button');
-        x.type = 'button'; x.className = 'fm-x'; x.textContent = '\u00d7';
-        x.title = 'Delete ' + f.name; x.setAttribute('aria-label', 'Delete ' + f.name);
-        // Armed first, like the panel's Delete: a second click deletes.
-        x.addEventListener('click', e => {
-          e.stopPropagation();
-          if (!x.classList.contains('is-armed')) {
-            x.classList.add('is-armed'); x.title = 'Click again to delete';
-            setTimeout(() => { x.classList.remove('is-armed'); x.title = 'Delete ' + f.name; }, 3000);
-            return;
-          }
-          removeFile(i);
-          buildFileMenu();
-        });
-        it.appendChild(x);
-      }
-      const go = () => { switchFile(i); closeFileMenu(); };
-      it.addEventListener('click', go);
-      it.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
-      fileMenu.appendChild(it);
-    });
-    const sep = document.createElement('div'); sep.className = 'fm-sep'; fileMenu.appendChild(sep);
-    const add = document.createElement('button');
-    add.type = 'button'; add.className = 'fm-item fm-new'; add.textContent = '+ New File';
-    add.addEventListener('click', () => { closeFileMenu(); addFile(); });
-    fileMenu.appendChild(add);
+    // Listed by name, as the notebook lists them; the index is the file's own.
+    S.files.map((f, i) => ({ f, i }))
+      .sort((a, b) => a.f.name.localeCompare(b.f.name, undefined, { numeric: true }))
+      .forEach(({ f, i }) => {
+        const it = document.createElement('div');
+        it.className = 'fp-item' + (i === S.fileIdx ? ' is-open' : '');
+        it.setAttribute('role', 'treeitem'); it.tabIndex = 0;
+        it.title = f.name;
+        it.innerHTML = FILE_ICON;
+        const nm = document.createElement('span');
+        nm.className = 'fp-name'; nm.textContent = i === S.fileIdx ? S.filename : f.name;
+        it.appendChild(nm);
+        if (many) {
+          const x = document.createElement('button');
+          x.type = 'button'; x.className = 'fp-x'; x.textContent = '×';
+          x.title = 'Delete ' + f.name; x.setAttribute('aria-label', 'Delete ' + f.name);
+          // Armed first: a second click deletes.
+          x.addEventListener('click', e => {
+            e.stopPropagation();
+            if (!x.classList.contains('is-armed')) {
+              x.classList.add('is-armed'); x.title = 'Click again to delete';
+              setTimeout(() => { x.classList.remove('is-armed'); x.title = 'Delete ' + f.name; }, 3000);
+              return;
+            }
+            removeFile(i);
+          });
+          it.appendChild(x);
+        }
+        const go = () => { if (S.split && !S.split.live) return; switchFile(i); };
+        it.addEventListener('click', go);
+        it.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+        fpList.appendChild(it);
+      });
   }
-  function openFileMenu() {
-    buildFileMenu();
-    const r = pickEl.getBoundingClientRect();
-    fileMenu.style.left = Math.max(4, Math.min(r.left, window.innerWidth - 210)) + 'px';
-    fileMenu.style.top = (r.bottom + 4) + 'px';
-    fileMenu.style.minWidth = Math.max(200, r.width) + 'px';
-    fileMenu.classList.add('is-open');
-    pickEl.classList.add('is-open');
-    pickBtn.setAttribute('aria-expanded', 'true');
+  function filesDefault() {
+    return cfg.filesPane != null ? !!cfg.filesPane : S.files.length > 1;
   }
-  pickBtn.addEventListener('click', () => (fileMenu?.classList.contains('is-open') ? closeFileMenu() : openFileMenu()));
-  document.addEventListener('pointerdown', e => {
-    if (fileMenu?.classList.contains('is-open') && !fileMenu.contains(e.target) && !pickEl.contains(e.target)) closeFileMenu();
-  }, true);
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && fileMenu?.classList.contains('is-open')) { e.stopPropagation(); closeFileMenu(); pickBtn.focus(); }
-  }, true);
-  window.addEventListener('blur', () => setTimeout(() => { if (!document.hasFocus()) closeFileMenu(); }, 0));
+  function setFilesPane(on, save) {
+    filesOn = !!on;
+    document.body.classList.toggle('files-open', filesOn);
+    filesBtn.classList.toggle('is-active', filesOn);
+    filesBtn.setAttribute('aria-pressed', String(filesOn));
+    renderFilesPane();
+    if (save && editing()) editSet({ filesPane: filesOn });
+    renderLayout();
+  }
+  filesBtn.addEventListener('click', () => setFilesPane(!filesOn, true));
+  $('fp-new').addEventListener('click', addFile);
+  $('fp-upload').addEventListener('click', () => { if (!IS_VIEWER && !cfg.readOnly) fileInput.click(); });
   function setFiles(list, idx = 0) {
     const clean = (Array.isArray(list) ? list : [])
       .filter(f => f && typeof f.name === 'string' && typeof f.code === 'string')
@@ -8693,6 +8719,16 @@ def _debug_file(src, fname, limit):
       el.style.height = Math.max(0, h) + 'px';
     };
     const shown = visiblePanes();
+    // The files pane, when open, goes down the left half's left edge under
+    // the bar, and the editor moves over for it — as it does unsplit.
+    let fpW = 0;
+    if (filesOn && sp.left) {
+      fpW = Math.min(filesPaneEl.offsetWidth || 0, sp.left.w * 0.38);
+      at(filesPaneEl, sp.left.x, sp.left.y + barH, fpW, sp.left.h - barH);
+      filesPaneEl.style.bottom = 'auto';
+    } else {
+      ['left', 'top', 'width', 'height', 'bottom'].forEach(k => filesPaneEl.style.removeProperty(k));
+    }
     PANES.forEach(name => {
       const el = paneEls[name];
       const on = shown.includes(name);
@@ -8700,7 +8736,8 @@ def _debug_file(src, fname, limit):
       if (!on) return;
       const r = name === 'editor' ? sp.left : sp.right;
       const top = name === 'editor' ? barH : 0;
-      at(el, r.x + GAP, r.y + top + GAP, r.w - 2 * GAP, r.h - top - 2 * GAP);
+      const dx = name === 'editor' ? fpW : 0;
+      at(el, r.x + dx + GAP, r.y + top + GAP, r.w - dx - 2 * GAP, r.h - top - 2 * GAP);
     });
     [splitA, splitB].forEach(el => el.classList.add('is-off'));
     splitDefs = [null, null];
@@ -8733,6 +8770,7 @@ def _debug_file(src, fname, limit):
 
   function renderLayout() {
     if (S.split) { renderSplitLayout(); return; }
+    ['left', 'top', 'width', 'height', 'bottom'].forEach(k => filesPaneEl.style.removeProperty(k));
     if (splitTabs?.parentNode) splitTabs.remove();
     PANES.forEach(n => paneEls[n].classList.remove('has-split-tabs'));
     const L    = S.layout;
@@ -9403,6 +9441,9 @@ def _debug_file(src, fname, limit):
     // A deck with several files: they replace the single code / filename.
     if (changed('files')) setFiles(cfg.files);
     else if (!Array.isArray(cfg.files) && S.files.length === 1) syncOpenFile();
+    if (changed('filesPane') || 'filesPane' in c) {
+      if (!editing() && filesDefault() !== filesOn) setFilesPane(filesDefault());
+    }
 
     const lk = changed('layout'), pk = changed('primary'), sk = changed('secondary');
     if (lk || pk || sk) {
@@ -9580,6 +9621,7 @@ def _debug_file(src, fname, limit):
     if (IS_VIEWER) return;
     S.filename = fileEl.value.trim() || 'main.py';
     sizeFileEl();
+    renderFilesPane();
     syncOpenFile();
     saveFilesIfEditing();
   });
@@ -9874,6 +9916,9 @@ def _debug_file(src, fname, limit):
       editSet({ ...filesPatch(), breakpoints: S.breakpoints.slice() });
       applyStartLine();
     }
+    // The pane shows while editing (files are set up there), and as the
+    // slide will start once Done.
+    setFilesPane(e.detail.editing ? true : filesDefault());
     renderEditor();
     renderLayout();
     fitToolbar();
@@ -9886,6 +9931,7 @@ def _debug_file(src, fname, limit):
   renderTabs();
   buildLayoutMenu();
   applyConfig(CFG0);
+  setFilesPane(filesDefault());
   renderDebug();
   applyStartLine();
   if (IS_VIEWER) {
