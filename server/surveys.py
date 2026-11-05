@@ -1,7 +1,9 @@
 """Survey API: creation, audience responses, and AI summarization (per session)."""
 import inspect
 import json
+import os
 import re
+import secrets
 import time
 import traceback
 import uuid
@@ -10,13 +12,52 @@ from flask import Blueprint, jsonify, request
 
 from . import moderation, state
 from .core import socketio
-from .sessions import get_session_or_404, presenter_room, survey_room
+from .sessions import client_ip, get_session_or_404, presenter_room, require_presenter, survey_room
 
 surveys_bp = Blueprint('surveys', __name__)
 
 # What the audience is asked to give. Decides which response page they get
 # and what that page asks for; the server stores every answer as text either way.
 SURVEY_KINDS = {'open', 'choice', 'truefalse', 'rating', 'numeric', 'wordcloud', 'fill', 'plot'}
+
+# One answer per phone per question. A phone is known by an anonymous random
+# cookie, set when it opens the question page. (A script can always start
+# afresh; BEAMER_MAX_RESPONSES_PER_IP is the backstop for that.)
+VOTER_COOKIE = 'bp_voter'
+
+
+def _max_per_ip():
+    """Optional cap on answers per network address per question, against a
+    script that clears its cookie between answers. Off by default (0): a whole
+    class behind one NAT or proxy shares an address."""
+    try:
+        return max(0, int(os.environ.get('BEAMER_MAX_RESPONSES_PER_IP', '0')))
+    except ValueError:
+        return 0
+
+
+def _voter_cookie():
+    """This phone's voter cookie: the one it sent, or a new one (stashed on
+    the request, so the response hands the same value back)."""
+    v = request.cookies.get(VOTER_COOKIE)
+    if isinstance(v, str) and 16 <= len(v) <= 64:
+        return v
+    if not hasattr(request, '_bp_new_voter'):
+        request._bp_new_voter = secrets.token_urlsafe(18)
+    return request._bp_new_voter
+
+
+def voter_id():
+    return 'c:' + _voter_cookie()
+
+
+def ensure_voter_cookie(resp):
+    """Give an audience page its anonymous voter cookie, if it has none."""
+    v = _voter_cookie()
+    if request.cookies.get(VOTER_COOKIE) != v:
+        resp.set_cookie(VOTER_COOKIE, v, max_age=180 * 24 * 3600,
+                        path='/', httponly=True, samesite='Lax', secure=request.is_secure)
+    return resp
 
 
 def _clean_meta(meta):
@@ -26,7 +67,7 @@ def _clean_meta(meta):
         return {}
     out = {}
     for k, v in list(meta.items())[:12]:
-        if isinstance(k, str) and isinstance(v, (str, int, float, bool)) or v is None:
+        if isinstance(k, str) and (isinstance(v, (str, int, float, bool)) or v is None):
             # Long enough for a fill-in-the-blanks template with its code
             # listing, short enough that this stays a display hint rather
             # than a content store.
@@ -35,8 +76,8 @@ def _clean_meta(meta):
 
 
 @surveys_bp.route('/s/<session_id>/api/survey/create', methods=['POST'])
-def create_survey(session_id):
-    sess = get_session_or_404(session_id)
+@require_presenter
+def create_survey(session_id, sess):
     data = request.json
     if not isinstance(data, dict):
         return jsonify({'error': 'Invalid request body'}), 400
@@ -95,7 +136,7 @@ def get_survey(session_id, survey_id):
         'question': s.get('question'),
         'options': s.get('options'),
         'kind': s.get('kind', 'open'),
-        'meta': s.get('meta', {}),
+        'meta': _public_meta(s.get('meta', {})),
         'active': s.get('active', False),
     })
 
@@ -103,6 +144,21 @@ def get_survey(session_id, survey_id):
 # A choice blank in a fill-in-the-blanks template: BLANK(a ^ b) or BLANK(a | b)
 # (see blankSpec in widgets/audience-response.html).
 _CHOICE_BLANK = re.compile(r'\bBLANK\((?=[^()\n]*(?:\^|\||\sX?OR\s))([^()\n]*)\)')
+
+
+def _without_answer_marks(template):
+    """A fill-in-the-blanks template as phones get it: the `*` that marks a
+    choice blank's right option(s) is the presenter's answer key."""
+    def strip(m):
+        body = re.sub(r'(^|\^|\||\sX?OR\s)(\s*)\*\s*', r'\1\2', m.group(1))
+        return f'BLANK({body})'
+    return _CHOICE_BLANK.sub(strip, template)
+
+
+def _public_meta(meta):
+    if isinstance(meta, dict) and isinstance(meta.get('template'), str):
+        return {**meta, 'template': _without_answer_marks(meta['template'])}
+    return meta
 
 
 def _choice_options(template):
@@ -142,8 +198,6 @@ def respond_survey(session_id, survey_id):
         return jsonify({'error': 'Survey not found'}), 404
     if not sess.surveys[survey_id]['active']:
         return jsonify({'error': 'Survey is closed'}), 403
-    if len(sess.survey_responses[survey_id]) >= state.MAX_RESPONSES_PER_SURVEY:
-        return jsonify({'error': 'Response limit reached'}), 429
     data = request.json
     if not isinstance(data, dict):
         return jsonify({'error': 'Invalid request body'}), 400
@@ -162,17 +216,27 @@ def respond_survey(session_id, survey_id):
                          'Please rephrase it and try again.',
                 'rejected': reason,
             }), 422
+    voter, ip, cap = voter_id(), client_ip(), _max_per_ip()
     response = {'text': text, 'timestamp': time.time()}
-    sess.survey_responses[survey_id].append(response)
+    with sess.lock:     # check and record together, so parallel posts can't slip past
+        if len(sess.survey_responses[survey_id]) >= state.MAX_RESPONSES_PER_SURVEY:
+            return jsonify({'error': 'Response limit reached'}), 429
+        if voter in sess.survey_voters[survey_id]:
+            return jsonify({'error': 'You have already answered this question.'}), 409
+        if cap and sess.survey_ip_counts[survey_id][ip] >= cap:
+            return jsonify({'error': 'Too many answers from this network.'}), 429
+        sess.survey_responses[survey_id].append(response)
+        sess.survey_voters[survey_id].add(voter)
+        sess.survey_ip_counts[survey_id][ip] += 1
     payload = {'survey_id': survey_id, 'response': response, 'total': len(sess.survey_responses[survey_id])}
+    # Answers go to the presenter only — never to the other phones.
     socketio.emit('survey_response', payload, room=presenter_room(session_id))
-    socketio.emit('survey_response', payload, room=survey_room(session_id, survey_id))
-    return jsonify({'success': True})
+    return ensure_voter_cookie(jsonify({'success': True}))
 
 
 @surveys_bp.route('/s/<session_id>/api/survey/<survey_id>/responses')
-def get_responses(session_id, survey_id):
-    sess = get_session_or_404(session_id)
+@require_presenter
+def get_responses(session_id, survey_id, sess):
     if survey_id not in sess.surveys:
         return jsonify({'error': 'Survey not found'}), 404
     try:
@@ -184,8 +248,8 @@ def get_responses(session_id, survey_id):
 
 
 @surveys_bp.route('/s/<session_id>/api/survey/<survey_id>/analyze', methods=['POST'])
-def analyze_survey(session_id, survey_id):
-    sess = get_session_or_404(session_id)
+@require_presenter
+def analyze_survey(session_id, survey_id, sess):
     if survey_id not in sess.surveys:
         return jsonify({'error': 'Survey not found'}), 404
     survey = sess.surveys[survey_id]
@@ -213,14 +277,18 @@ def analyze_survey(session_id, survey_id):
             'model': model_name,
             'num_responses': len(responses),
         })
-    except Exception as e:
+    except RuntimeError as e:
+        # The models' own messages for the presenter ("No API key provided …").
         traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': str(e)[:300]}), 500
+    except Exception:
+        traceback.print_exc()
+        return jsonify({'error': 'The summary failed. See the server log for details.'}), 500
 
 
 @surveys_bp.route('/s/<session_id>/api/survey/<survey_id>/close', methods=['POST'])
-def close_survey(session_id, survey_id):
-    sess = get_session_or_404(session_id)
+@require_presenter
+def close_survey(session_id, survey_id, sess):
     if survey_id in sess.surveys:
         sess.surveys[survey_id]['active'] = False
         socketio.emit('survey_closed', {'survey_id': survey_id}, room=survey_room(session_id, survey_id))
