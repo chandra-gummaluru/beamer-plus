@@ -29,6 +29,22 @@ function normalizeWidgetSrcs(cfg) {
     };
 }
 
+// Settings that belong to the presenter, never to the deck: a deck is a file
+// that gets shared, and everything in config/ can be read back from it. The
+// audience-response widget keeps its AI key in the browser now; a deck saved
+// before that still carries one in its config, and this drops it.
+const SECRET_KEYS = new Set(['apiKey', 'api_key']);
+
+function withoutSecrets(value) {
+    if (Array.isArray(value)) return value.map(withoutSecrets);
+    if (!value || typeof value !== 'object') return value;
+    const out = {};
+    for (const [k, v] of Object.entries(value)) {
+        if (!SECRET_KEYS.has(k)) out[k] = withoutSecrets(v);
+    }
+    return out;
+}
+
 /** The presentation as it stands now, as a ZIP Blob. `extra` maps more
  *  ZIP paths to their contents (Save adds config/resume.json); `store`
  *  skips compression (quicker, for the copy kept in the browser). */
@@ -87,8 +103,10 @@ export async function buildPresentationZip({ extra = {}, store = false } = {}) {
                 // its file over as-is — this used to be skipped, which dropped
                 // every widget, video and model on those slides.
                 const text = await f.async('string');
-                newZip.file(path, text);
-                try { noteWidgets(JSON.parse(text)); } catch (_) { /* kept verbatim anyway */ }
+                let parsed = null;
+                try { parsed = JSON.parse(text); } catch (_) { /* kept verbatim below */ }
+                newZip.file(path, parsed ? JSON.stringify(withoutSecrets(parsed), null, 2) : text);
+                if (parsed) noteWidgets(parsed);
                 continue;
             }
             newZip.file(path, await f.async('uint8array'));
@@ -96,7 +114,7 @@ export async function buildPresentationZip({ extra = {}, store = false } = {}) {
 
         for (const [key, cfg] of Object.entries(cfgs)) {
             if (!cfg || !liveKeys.has(String(key))) continue;
-            newZip.file(`config/s${key}.json`, JSON.stringify(normalizeWidgetSrcs(cfg), null, 2));
+            newZip.file(`config/s${key}.json`, JSON.stringify(withoutSecrets(normalizeWidgetSrcs(cfg)), null, 2));
             noteWidgets(cfg);
         }
 
@@ -127,7 +145,7 @@ export async function buildPresentationZip({ extra = {}, store = false } = {}) {
             else if (loaded[id] !== undefined) widgetStates[id] = loaded[id];
         }
         if (Object.keys(widgetStates).length > 0) {
-            newZip.file('config/widget-states.json', JSON.stringify(widgetStates));
+            newZip.file('config/widget-states.json', JSON.stringify(withoutSecrets(widgetStates)));
         }
 
         for (const [path, buffer] of Object.entries(ctx.state.editorNewFiles)) {

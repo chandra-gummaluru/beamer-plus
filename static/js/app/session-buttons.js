@@ -11,6 +11,7 @@
 import { bus } from '../core/events.js';
 import { savePresentation } from '../library/ui.js';
 import { isRecording, stopRecording } from './recorder.js';
+import { sessionUrl } from './session.js';
 
 let appState = null;
 // Set while Close session's "Save…" is under way: a finished save then
@@ -29,6 +30,9 @@ export function initSessionButtons(state) {
         setTimeout(leave, 700);   // long enough to see the "Saved …" toast
     });
     refresh();
+    // Heartbeat: the server drops sessions nobody has presented from for a
+    // while (BEAMER_SESSION_IDLE_HOURS); an open presenter tab counts.
+    setInterval(() => { fetch(sessionUrl('/api/ping'), { method: 'POST' }).catch(() => {}); }, 10 * 60 * 1000);
 }
 
 function refresh() {
@@ -41,6 +45,9 @@ async function leave() {
     if (isRecording()) await stopRecording();
     bus.emit('session:ending');
     leaving = true;
+    // End it on the server too: its polls close and its copy of the deck is
+    // deleted rather than left until the idle sweep.
+    try { await fetch(sessionUrl('/api/close'), { method: 'POST', keepalive: true }); } catch (_) { /* leaving anyway */ }
     window.location.href = '/';
 }
 
