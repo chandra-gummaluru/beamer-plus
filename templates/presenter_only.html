@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Presenter Only — Beamer+</title>
+<link rel="stylesheet" href="/static/css/tokens.css">
+<link rel="stylesheet" href="/static/css/fonts-cm.css">
+<style>
+:root {
+  /* Local names for the app's tokens (static/css/tokens.css). */
+  --bg:        var(--surface-paper);
+  --border:    var(--line-1);
+  --text:      var(--ink-1);
+  --text-3:    var(--ink-3);
+  --red:       var(--danger);
+  --font-ui:   var(--font-sans);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: var(--font-ui); font-size: 15px;
+  display: flex; flex-direction: column;
+  -webkit-font-smoothing: antialiased;
+}
+
+
+.content {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 40px 24px; gap: 8px; text-align: center;
+}
+.status-title {
+  font-size: 1.3rem; font-weight: 600;
+  color: var(--text); line-height: 1.3;
+}
+.status-sub {
+  font-size: 14px; color: var(--text-3);
+  line-height: 1.5; margin-top: 2px;
+}
+</style>
+<link rel="stylesheet" href="/static/css/respond.css">
+</head>
+<body>
+
+
+<div class="content">
+  <div class="status-title">This session is open in another browser</div>
+  <div class="status-sub">Only the presenter's browser can show this session.<br>
+    To present from here, use the presenter link from the original browser,<br>
+    or <a href="/">start a new session</a>.</div>
+</div>
+
+</body>
+</html>

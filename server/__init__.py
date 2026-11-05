@@ -5,7 +5,7 @@ Module map:
 - paths.py         BASE_PATH and derived folders
 - state.py         shared limits (MAX_RESPONSES_PER_SURVEY, …)
 - sessions.py      per-presenter session registry + create API
-- ai_models.py     survey-summarization model loading (built-ins + ZIP models)
+- ai_models.py     survey-summarization model loading (server ai/ folder only)
 - pages.py         HTML pages and PWA files
 - presentation.py  upload, ZIP assets, demo packaging
 - widgets.py       built-in widget serving, embeddability probe
@@ -39,3 +39,8 @@ app.register_blueprint(sessions_bp)
 
 init_builtin_models()
 moderation.init()
+
+# Idle sessions are swept while the server runs. (Old decks left in uploads/
+# by an earlier run are cleared by the entry points: sessions.clear_orphaned_uploads.)
+from .sessions import start_idle_sweeper  # noqa: E402
+start_idle_sweeper()

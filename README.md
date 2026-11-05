@@ -42,8 +42,8 @@ A new session starts with the **Open** window (see below); you can also drag
 a file onto the window. Either way, load:
 
 - **A plain PDF** — every page becomes a slide.
-- **A presentation ZIP** — a PDF plus saved configuration, media, widgets and
-  AI models (see below). The in-app editor can add media/widgets to slides and
+- **A presentation ZIP** — a PDF plus saved configuration, media and widgets
+  (see below). The in-app editor can add media/widgets to slides and
   save the result back out as a ZIP.
 
 ### Presentation ZIP format
@@ -56,10 +56,12 @@ presentation.zip
 │   ├── s<N>.json               # per-slide config: embedded videos/audio/models/widgets + layout
 │   ├── annotations.json        # saved pen strokes per slide
 │   └── widget-states.json      # widget state snapshots so widgets resume where they left off
-├── assets/ video/ models/ …    # media referenced by the configs
-└── ai/
-    └── <model>.py              # optional survey-summarization models (see below)
+└── assets/ video/ models/ …    # media referenced by the configs
 ```
+
+An `ai/` folder in a ZIP (older decks may have one) is ignored: opening a
+deck never runs code from it. Summarizer models live on the server (see
+Custom models).
 
 ## What Save writes
 
@@ -140,7 +142,8 @@ summaries by an AI model.
 Two models ship built in:
 
 - `claude` — uses the Anthropic API (`ANTHROPIC_API_KEY` env var, or paste a
-  key in the widget settings; requires `pip install anthropic`)
+  key in the widget settings; requires `pip install anthropic`). A key pasted
+  in the widget is kept in that browser only, never saved in the deck.
 - `gpt4o` — uses the OpenAI API (`OPENAI_API_KEY`; requires `pip install openai`)
 
 ### Fill in the blanks
@@ -179,8 +182,7 @@ rephrase it. Everything runs on this computer.
 
 ### Custom models
 
-Drop a Python file in `ai/` (server-wide) or inside a presentation ZIP under
-`ai/`. It must expose:
+Drop a Python file in the server's `ai/` folder. It must expose:
 
 ```python
 def summarize(responses: list[str], n: int, api_key: str | None = None):
@@ -249,17 +251,56 @@ when a copy is stale). Opened on its own, edits last until the page reloads.
 
 ## Security model
 
-Beamer+ assumes a **cooperative local network** (a lecture hall, not the open
-internet):
+The session code is public — it is in every audience link and QR code — so it
+only gets you the audience side: the question pages and sending one answer.
 
-- Loading a presentation ZIP **executes any `ai/*.py` inside it** — only open
-  ZIPs you trust.
-- Socket.IO accepts connections from any origin so widget iframes and audience
-  devices can connect.
+- **Presenter token.** Creating a session sets a secret, HttpOnly cookie in
+  that browser. Everything else needs it: the presenter view, opening a deck,
+  the deck's files, starting / closing polls, reading answers, AI summaries,
+  and the socket room the answers arrive in. Presenter POSTs must also come
+  from this server's own pages (Origin / Sec-Fetch-Site), so a page elsewhere
+  on the same domain can't send them with the presenter's cookie. A session
+  belongs to the browser that started it; to present from another one, start
+  a new session there.
+- **No code from decks.** An uploaded ZIP's `ai/*.py` is never run;
+  summarizer models come only from the server's `ai/` folder.
+- **Secrets stay out of decks.** An AI key typed into the audience-response
+  widget lives in that browser's storage; Save strips any `apiKey` from the
+  deck (older decks carried one — save them again, and rotate the key if a
+  deck with one in it was shared).
+- **Deck files can't act as pages.** Files served from a deck or uploaded in
+  the editor carry `Content-Security-Policy: sandbox` and `nosniff`.
+  Widgets themselves are code: they run in same-origin iframes with the
+  presenter's rights (the app's API, and AI keys kept in this browser), so
+  only open decks with custom widgets from people you trust.
+- **Audience limits.** One answer per phone per question (an anonymous
+  cookie). Answers go to the presenter only, not to the other phones.
+- **Resource limits.** Requests up to `BEAMER_MAX_UPLOAD_MB` (1024);
+  files uploaded from the editor up to `BEAMER_MAX_TEMP_ASSETS_MB` (256) per
+  session and `BEAMER_MAX_TEMP_ASSETS_TOTAL_MB` (1024) across sessions; deck
+  files are streamed, never inflated whole. A session with no presenter
+  activity for `BEAMER_SESSION_IDLE_HOURS` (24) is removed with its deck (an
+  open presenter tab keeps it alive), one that never got a deck after
+  `BEAMER_EMPTY_SESSION_MINUTES` (60), and Close session removes one at
+  once. At most `BEAMER_MAX_SESSIONS` (200) at a time,
+  `BEAMER_MAX_LIVE_SESSIONS_PER_IP` (10) per address and
+  `BEAMER_MAX_SESSIONS_PER_IP_PER_HOUR` (30) new ones per address. At
+  startup, `app.py` / `launch.py` delete session folders in `uploads/`
+  older than the idle limit.
+- **Answer keys stay with the presenter.** The `*` marking a right option in
+  a fill-in-the-blanks template is removed before phones get it.
+- **Sockets** accept only this server's own pages. Behind a proxy with a
+  different public address, list it in `BEAMER_ALLOWED_ORIGINS`.
 - The TLS certificate is self-signed (`cert.pem` / `key.pem`, regenerated by
-  `launch.py`; delete them to force regeneration).
+  `launch.py`; delete them to force regeneration; the key is written
+  owner-only).
 
-Do not expose the server to the public internet.
+Optional: `BEAMER_MAX_RESPONSES_PER_IP` caps answers per network address per
+question, against a script that clears its cookie. It's off by default since a
+whole class behind one NAT or proxy shares an address.
+
+There are no user accounts: anyone who can reach the server can start a
+session. Keep it on the campus network rather than the open internet.
 
 ## Project layout
 
@@ -323,6 +364,7 @@ of its own. Controls are one of a few shared components:
 pip install -r requirements-dev.txt
 pytest
 python tests/browser/flow_sessions.py   # with the app running on :5001 (--http)
+python tests/browser/flow_security.py   # presenter / audience split, same server
 ```
 
 Third-party frontend libraries are vendored in `static/vendor/` so the app

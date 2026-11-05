@@ -1,10 +1,11 @@
 """HTML pages and PWA files (manifest, service worker)."""
 import os
 
-from flask import Blueprint, render_template, send_file
+from flask import Blueprint, make_response, render_template, send_file
 
 from .paths import BASE_PATH
-from .sessions import get_session_or_404
+from .sessions import get_session_or_404, is_presenter, set_presenter_cookie
+from .surveys import ensure_voter_cookie
 
 pages_bp = Blueprint('pages', __name__)
 
@@ -20,8 +21,13 @@ def welcome():
 @pages_bp.route('/s/<session_id>/')
 @pages_bp.route('/s/<session_id>')
 def presenter(session_id):
-    get_session_or_404(session_id)
-    return render_template('index.html', session_id=session_id)
+    sess = get_session_or_404(session_id)
+    # The session code is in every audience URL, so knowing it isn't enough:
+    # only the browser holding the presenter cookie gets the presenter view.
+    if not is_presenter(session_id, sess):
+        return render_template('presenter_only.html'), 403
+    resp = make_response(render_template('index.html', session_id=session_id))
+    return set_presenter_cookie(resp, session_id, sess)
 
 
 @pages_bp.route('/s/<session_id>/survey/<survey_id>')
@@ -29,7 +35,7 @@ def survey_page(session_id, survey_id):
     sess = get_session_or_404(session_id)
     if survey_id not in sess.surveys:
         return render_template('survey_not_found.html'), 404
-    return render_template('survey_response.html', session_id=session_id, survey_id=survey_id)
+    return ensure_voter_cookie(make_response(render_template('survey_response.html', session_id=session_id, survey_id=survey_id)))
 
 
 @pages_bp.route('/s/<session_id>/wordcloud/<survey_id>')
@@ -37,7 +43,7 @@ def wordcloud_page(session_id, survey_id):
     sess = get_session_or_404(session_id)
     if survey_id not in sess.surveys:
         return render_template('survey_not_found.html'), 404
-    return render_template('survey_response.html', session_id=session_id, survey_id=survey_id)
+    return ensure_voter_cookie(make_response(render_template('survey_response.html', session_id=session_id, survey_id=survey_id)))
 
 
 @pages_bp.route('/s/<session_id>/mcq/<survey_id>')
@@ -45,7 +51,7 @@ def mcq_page(session_id, survey_id):
     sess = get_session_or_404(session_id)
     if survey_id not in sess.surveys:
         return render_template('survey_not_found.html'), 404
-    return render_template('mcq_response.html', session_id=session_id, survey_id=survey_id)
+    return ensure_voter_cookie(make_response(render_template('mcq_response.html', session_id=session_id, survey_id=survey_id)))
 
 
 # ── PWA ────────────────────────────────────────────────────────────────────

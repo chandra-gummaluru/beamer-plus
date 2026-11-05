@@ -12,6 +12,8 @@ from server import app, socketio  # noqa: F401  (launch.py imports both from her
 # plain HTTP only when forced or when `cryptography` is missing.
 if __name__ == '__main__':
     import argparse
+    from server.sessions import clear_orphaned_uploads
+    clear_orphaned_uploads()
     parser = argparse.ArgumentParser()
     parser.add_argument('--port', type=int, default=5001)
     parser.add_argument('--http', action='store_true', help='Force plain HTTP (disables camera widget on LAN)')

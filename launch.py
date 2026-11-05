@@ -117,7 +117,9 @@ def generate_self_signed_cert(lan_ip=None):
         with open(cert_file, "wb") as f:
             f.write(cert.public_bytes(serialization.Encoding.PEM))
 
-        with open(key_file, "wb") as f:
+        # Private key: readable by this user only (where the OS honours it).
+        fd = os.open(key_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "wb") as f:
             f.write(key.private_bytes(
                 encoding=serialization.Encoding.PEM,
                 format=serialization.PrivateFormat.TraditionalOpenSSL,
@@ -274,6 +276,8 @@ def main():
     try:
         # Import and run the Flask app with SocketIO
         from app import socketio, app
+        from server.sessions import clear_orphaned_uploads
+        clear_orphaned_uploads()
         print(f"{Colors.GREEN}Server is running! Press Ctrl+C to quit.{Colors.ENDC}\n")
         print(f"{Colors.BOLD}{Colors.CYAN}Presenter:{Colors.ENDC} {primary_url}")
         print()

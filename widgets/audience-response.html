@@ -3631,7 +3631,7 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
           <input class="ar-in" id="ed-model" type="text" list="ed-models" placeholder="none" autocomplete="off" spellcheck="false" title="The AI model that summarises the responses (blank for none)">
         </label>
         <label class="ar-field">API Key
-          <input class="ar-in" id="ed-key" type="password" placeholder="optional" autocomplete="off">
+          <input class="ar-in" id="ed-key" type="password" placeholder="optional" autocomplete="off" title="Kept in this browser only — never saved in the presentation">
         </label>
         <datalist id="ed-models"></datalist>
       </span>
@@ -3838,6 +3838,7 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
   const _qs       = new URLSearchParams(location.search);
   const CFG0      = window.WIDGET_CONFIG || {};
   let   cfg       = { ...CFG0 };
+  adoptLegacyAiKey();
   let   WIDGET_ID = CFG0.id || CFG0.widgetId || 'audience-response';
   let   IS_VIEWER = CFG0.role === 'viewer' || _qs.get('viewer') === '1';
 
@@ -5667,7 +5668,8 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
     if (S.type === 'open') {
       body.model         = aiOn() ? cfg.model : null;
       body.num_summaries = parseInt(cfg.numSummaries, 10) || 3;
-      if (cfg.apiKey) body.api_key = cfg.apiKey;
+      const key = aiKey();
+      if (key) body.api_key = key;
     }
     return body;
   }
@@ -6004,6 +6006,7 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
     if (!c) return;
     const prevAuto = cfg.autoStart !== false;
     cfg       = { ...cfg, ...c };
+    adoptLegacyAiKey();
     WIDGET_ID = cfg.id || cfg.widgetId || WIDGET_ID;
     IS_VIEWER = cfg.role === 'viewer' || IS_VIEWER;
 
@@ -6142,6 +6145,27 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
   // while typing: the text is already on screen, and redrawing the element
   // being typed in would lose the caret — so only our copy is updated, and
   // the field commits (not silently) when it loses focus.
+  // The AI key belongs to the presenter, not the deck: it is kept in this
+  // browser (localStorage, one per model) and never put in the widget's
+  // config, which is saved inside the presentation ZIP and travels with it.
+  function aiKeySlot() { return 'beamer.aiKey.' + (String(cfg.model || '').trim() || 'default'); }
+  function aiKey() {
+    // A key typed before a model was chosen sits in the 'default' slot.
+    try { return localStorage.getItem(aiKeySlot()) || localStorage.getItem('beamer.aiKey.default') || ''; }
+    catch (_) { return ''; }
+  }
+  function setAiKey(v) {
+    try { v ? localStorage.setItem(aiKeySlot(), v) : localStorage.removeItem(aiKeySlot()); } catch (_) { /* storage off */ }
+  }
+  // A deck saved before this kept the key in its config: move it to this
+  // browser. The host drops it from the deck at the next save.
+  function adoptLegacyAiKey() {
+    if (!cfg.apiKey) return;
+    if (!aiKey()) setAiKey(String(cfg.apiKey).trim());
+    const { apiKey, ...rest } = cfg;
+    cfg = rest;
+  }
+
   function setting(patch, silent = false) {
     if (silent) cfg = { ...cfg, ...patch };
     if (window.BeamerWidget?.edit) BeamerWidget.edit.set(patch, [], { silent });
@@ -6285,7 +6309,7 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
     if (t === 'open') {
       setVal(edModel, String(cfg.model || ''));
       setVal(edNsum,  String(parseInt(cfg.numSummaries, 10) || 3));
-      setVal(edKey,   String(cfg.apiKey || ''));
+      setVal(edKey,   aiKey());
       loadModels();
     }
   }
@@ -6531,7 +6555,11 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
   // The plot's axis names and end labels, typed where they show.
   [['x', 'plotX'], ['y', 'plotY'], ['xLow', 'plotXLow'], ['xHigh', 'plotXHigh'], ['yLow', 'plotYLow'], ['yHigh', 'plotYHigh']]
     .forEach(([k, key]) => wireText(plLabels[k], key, { read: el => typedText(el).trim() }));
-  wireText(edKey,   'apiKey',       { read: el => el.value.trim() });
+  // Not a setting: the key goes to this browser's storage (see aiKey).
+  for (const ev of ['input', 'change']) {
+    edKey.addEventListener(ev, () => { if (editing()) setAiKey(edKey.value.trim()); });
+  }
+  edKey.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); edKey.blur(); } });
   wireText(edAllow, 'filterAllow',  { read: el => el.value });
   wireText(edBlock, 'filterBlock',  { read: el => el.value });
 
