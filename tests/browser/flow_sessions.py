@@ -54,7 +54,10 @@ def run():
         menu = lambda key: (page.evaluate(LIB.format("savePresentation")) if key == "save"
                             else page.evaluate(LIB.format("openPresentation")) if key == "open"
                             else page.click(BTN[key]))
-        shown = lambda: page.eval_on_selector_all("#top-right-controls button", "els => els.filter(e => e.getClientRects().length).map(e => e.id)")
+        # The session's buttons sit at the foot of the slide navigator.
+        shown = lambda: page.eval_on_selector_all("#slide-nav-foot button", "els => els.filter(e => e.getClientRects().length).map(e => e.id)")
+        # Reloading with a deck open asks first (beforeunload): say Leave.
+        page.on("dialog", lambda d: d.accept())
 
         # 1. The start page: New Session and Try Demo.
         page.goto(BASE); page.wait_for_timeout(600)
@@ -81,22 +84,25 @@ def run():
         check("…a file chosen: the session opens with it (6 slides)", page.evaluate("() => window.beamerState.totalSlides") == 6)
         check("…no window in the way", page.locator(".custom-modal-overlay").count() == 0)
         print("   buttons:", shown())
-        check("…top-right: Edit and Close session", shown() == ["session-edit-btn", "session-close-btn"])
-        check("record button in the corner", page.locator("#record-btn").is_visible())
+        check("…navigator foot: Edit and Close session", shown() == ["session-edit-btn", "session-close-btn"])
+        check("record button at the top of the navigator", page.locator("#slide-nav-top #record-btn").is_visible())
         check("tab title", page.title() == f"{DECK} · Beamer+")
 
-        # 3. A session with nothing open (reloaded): the empty stage's Open a File….
-        page.reload(); page.wait_for_timeout(2800)
-        shot("s02-empty")
-        check("reloaded, nothing open: no window, the stage offers Open a File…",
-              page.locator(".custom-modal-overlay").count() == 0 and not page.evaluate("() => !!window.beamerState.zipFile")
-              and page.inner_text("#stage-empty .stage-empty-title").strip() == "Nothing here yet…"
-              and page.inner_text("#stage-open-btn").strip() == "Open a File…")
-        check("…top-right: Close session only", shown() == ["session-close-btn"])
+        # 3. Reloaded: the deck lived only in that tab, so the session has
+        #    ended; closing the message goes back to the start page.
+        page.reload(); page.wait_for_timeout(3500)
+        shot("s02-ended")
+        check("reloaded: the session has ended",
+              "This Session Has Ended" in page.inner_text(".custom-modal-overlay")
+              and not page.evaluate("() => !!window.beamerState?.zipFile"))
+        check("…navigator foot: Close session only", shown() == ["session-close-btn"])
+        page.locator(".custom-modal-buttons .btn", has_text="Close").click()
+        page.wait_for_url(BASE, timeout=10000); page.wait_for_timeout(600)
+        check("…Close: back on the start page", page.locator("#welcome-new-btn").is_visible())
         page.evaluate("p => { window.__open = p; }", f"Courses/{L}/{DECK}.zip")
-        page.click("#stage-open-btn"); page.wait_for_timeout(2500)
-        check("…which opens the file window, then the deck", page.evaluate("() => window.beamerState.totalSlides") == 6
-              and page.locator("#stage-empty").is_hidden())
+        page.click("#welcome-new-btn"); page.wait_for_url("**/s/**")
+        page.wait_for_function("() => window.beamerState?.totalSlides === 6", timeout=15000); page.wait_for_timeout(1500)
+        check("…and New Session opens the deck again", page.evaluate("() => window.beamerState.totalSlides") == 6)
 
         # 4. Go to slide 3 (Save keeps the slide you're on).
         page.keyboard.press("ArrowRight"); page.keyboard.press("ArrowRight"); page.wait_for_timeout(800)
