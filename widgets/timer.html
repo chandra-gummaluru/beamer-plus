@@ -1242,7 +1242,6 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
     }
     function canEdit() {
         if (cfg().role === 'viewer' || window.BEAMER_PRINT || cfg().printMode) return false;
-        try { if (new URLSearchParams(location.search).get('viewer') === '1') return false; } catch (e) {}
         return inlineEdit();
     }
 
@@ -2236,11 +2235,10 @@ body.bw-overlay #bar { width: 84cqw; margin-top: 7cqh; }
   'use strict';
 
   // ── Config ──────────────────────────────────────────────────────────────────
-  const _qs   = new URLSearchParams(location.search);
   const CFG0  = window.WIDGET_CONFIG || {};
   let   cfg   = { ...CFG0 };
   let   WIDGET_ID = CFG0.id || CFG0.widgetId || 'timer';
-  let   IS_VIEWER = CFG0.role === 'viewer' || _qs.get('viewer') === '1';
+  let   IS_VIEWER = CFG0.role === 'viewer';
 
   const MAX_MS = 6 * 3600000;
   const MIN_MS = 5000;

@@ -497,10 +497,9 @@ function _revokePendingAssetUrls() {
  * @param {object}  slideConfig  - slide config object with .widgets array
  * @param {Element} container    - DOM container to place iframes in
  * @param {object}  zipFile      - JSZip instance (may be null for built-ins)
- * @param {boolean} viewerMode
  * @param {string|null} slideKey - unique key for this slide+pane combo
  */
-export function renderWidgets(slideConfig, container, zipFile, viewerMode = false, slideKey = null) {
+export function renderWidgets(slideConfig, container, zipFile, slideKey = null) {
     if (!slideConfig.widgets || slideConfig.widgets.length === 0) {
         return Promise.resolve();
     }
@@ -589,7 +588,6 @@ export function renderWidgets(slideConfig, container, zipFile, viewerMode = fals
         iframe.dataset.widgetId    = w.id;
         iframe.dataset.widgetSlide = slideKey ?? '';   // which slide owns this iframe
         iframe.dataset.widgetSig   = _configSignature(w);
-        iframe.dataset.widgetRole  = viewerMode ? 'viewer' : 'presenter';
 
         iframe.dataset.widgetX      = w.x;
         iframe.dataset.widgetY      = w.y;
@@ -642,7 +640,7 @@ export function renderWidgets(slideConfig, container, zipFile, viewerMode = fals
                 ...w,
                 ...(fullOnly ? _FULL_GEOM : {}),
                 ...widgetSessionConfig(),
-                role: viewerMode ? 'viewer' : 'presenter',
+                role: 'presenter',
                 ...(notebookContent !== null ? { notebookContent } : {}),
             });
             const _injectedHtml = _buildSrcdoc(htmlContent, _configPayload);
@@ -965,7 +963,7 @@ export function pushWidgetConfig(widgetId, item) {
             ...item,
             ...(iframe.dataset.widgetFull === 'true' ? _FULL_GEOM : {}),
             ...widgetSessionConfig(),
-            role: iframe.dataset.widgetRole || 'presenter',
+            role: 'presenter',
         });
         try {
             iframe.contentWindow?.postMessage({ type: 'widget-config', config, live: true }, '*');

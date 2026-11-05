@@ -1236,7 +1236,6 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
     }
     function canEdit() {
         if (cfg().role === 'viewer' || window.BEAMER_PRINT || cfg().printMode) return false;
-        try { if (new URLSearchParams(location.search).get('viewer') === '1') return false; } catch (e) {}
         return inlineEdit();
     }
 
@@ -2200,7 +2199,6 @@ html, body { height: 100%; overflow: hidden; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* The audience sees the page, not a notice about it. */
-#viewer-badge { display: none !important; }
 
 /* Viewer role: strip every control, keep a quiet page readout. */
 #page-readout {
@@ -2367,7 +2365,6 @@ body.bw-editing #pdf-pages, body.is-viewer #pdf-pages { display: none; }
     <button class="bw-btn bw-edit-only" type="button" id="pe-choose">Choose a File…</button>
     <span class="bw-status bw-run-only" id="page-readout"></span>
     <div class="bw-spacer"></div>
-    <span class="bw-status" id="viewer-badge">view only</span>
   </div>
 
   <div id="canvas-area">

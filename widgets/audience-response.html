@@ -1241,7 +1241,6 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
     }
     function canEdit() {
         if (cfg().role === 'viewer' || window.BEAMER_PRINT || cfg().printMode) return false;
-        try { if (new URLSearchParams(location.search).get('viewer') === '1') return false; } catch (e) {}
         return inlineEdit();
     }
 
@@ -2192,7 +2191,6 @@ body.bw-editing .bw-topbar-title + .bw-sep,
 .ar-group[hidden] { display: none; }
 .ar-field { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; color: var(--text-3); white-space: nowrap; }
 .ar-sep { flex: 0 0 auto; width: 1px; height: 16px; background: var(--border-med); }
-#viewer-badge { display: none; }
 /* Small fields typed in the bar (open-ended: the AI settings). */
 .ar-in {
   width: 12ch;
@@ -3652,7 +3650,6 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
       </span>
     </span>
     <div class="bw-spacer"></div>
-    <span class="bw-status" id="viewer-badge">View only</span>
     <!-- One button walks the poll forward: start, close, show results, reveal. -->
     <button class="bw-btn bw-run-only" id="step-btn" type="button"></button>
   </div>
@@ -3835,12 +3832,11 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
   'use strict';
 
   // ── Config ──────────────────────────────────────────────────────────────────
-  const _qs       = new URLSearchParams(location.search);
   const CFG0      = window.WIDGET_CONFIG || {};
   let   cfg       = { ...CFG0 };
   adoptLegacyAiKey();
   let   WIDGET_ID = CFG0.id || CFG0.widgetId || 'audience-response';
-  let   IS_VIEWER = CFG0.role === 'viewer' || _qs.get('viewer') === '1';
+  let   IS_VIEWER = CFG0.role === 'viewer';
 
   const LETTERS  = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   const letter   = i => LETTERS[i] || String(i + 1);
@@ -3901,7 +3897,6 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
   const $ = id => document.getElementById(id);
   const stage       = $('stage');
   const titleEl     = $('wtitle');
-  const viewerBadge = $('viewer-badge');
   const stepBtn     = $('step-btn');
   const qrSlot      = $('qr-slot');
   const qrCue       = $('qr-cue');
@@ -4885,7 +4880,6 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
 
   let stepGo = null;
   function renderToolbar(preview) {
-    viewerBadge.style.display = IS_VIEWER ? 'inline-flex' : 'none';
     if (IS_VIEWER || preview) { stepBtn.style.display = 'none'; stepGo = null; qrSlot.classList.remove('is-go'); return; }
     const st = nextStep();
     stepGo = st.go;

@@ -1242,7 +1242,6 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
     }
     function canEdit() {
         if (cfg().role === 'viewer' || window.BEAMER_PRINT || cfg().printMode) return false;
-        try { if (new URLSearchParams(location.search).get('viewer') === '1') return false; } catch (e) {}
         return inlineEdit();
     }
 
@@ -2684,8 +2683,6 @@ body.tb-tight .bw-topbar-actions > .bw-sep:first-child,
 
 
 /* ── Viewer badge ───────────────────────────────────────────── */
-#view-badge { display: none; }
-body.is-viewer #view-badge { display: inline-flex; }
 body.is-viewer .presenter-only { display: none !important; }
 body.is-viewer #mm-head .modeswitch,
 body.is-viewer #drawTools { display: none !important; }
@@ -3218,7 +3215,6 @@ body.bw-editing #gutter { cursor: pointer; }
     <span class="ws-ed-sep bw-edit-only" aria-hidden="true"></span>
     <button class="bw-btn bw-edit-only" type="button" id="ed-more" aria-haspopup="true" aria-expanded="false" title="The workspace's other settings">Settings</button>
     <div class="bw-spacer"></div>
-    <span class="bw-status" id="view-badge">View only</span>
     <input type="file" id="file-input" accept=".py,.txt,text/x-python,text/plain">
   </div>
 
@@ -7280,11 +7276,10 @@ function setWidgetState(st){
   const PV = window.PythonVisualizer;
 
   // ── Config ──────────────────────────────────────────────────────────────────
-  const _qs       = new URLSearchParams(location.search);
   const CFG0      = window.WIDGET_CONFIG || {};
   let   cfg       = { ...CFG0 };
   let   WIDGET_ID = CFG0.id || CFG0.widgetId || 'python-workspace';
-  let   IS_VIEWER = CFG0.role === 'viewer' || _qs.get('viewer') === '1';
+  let   IS_VIEWER = CFG0.role === 'viewer';
 
   const PYODIDE_URL = 'https://cdn.jsdelivr.net/pyodide/v0.25.0/full/';
   const MAX_ENTRIES = 400;

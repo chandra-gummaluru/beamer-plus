@@ -120,7 +120,7 @@ export async function renderMedia(config, container, rect, isRight, slideKey = n
         }
     }
     if (config.widgets) {
-        await renderWidgets(config, container, _state.zipFile, false, slideKey);
+        await renderWidgets(config, container, _state.zipFile, slideKey);
         setWidgetInteractivityForSpotlight(_state.annotationTool === 'spotlight');
     }
 }

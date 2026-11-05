@@ -1236,7 +1236,6 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
     }
     function canEdit() {
         if (cfg().role === 'viewer' || window.BEAMER_PRINT || cfg().printMode) return false;
-        try { if (new URLSearchParams(location.search).get('viewer') === '1') return false; } catch (e) {}
         return inlineEdit();
     }
 
@@ -2587,11 +2586,10 @@ html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
   'use strict';
 
   // ── Config ──────────────────────────────────────────────────────────────────
-  const _qs       = new URLSearchParams(location.search);
   const CFG0      = window.WIDGET_CONFIG || {};
   let   cfg       = { ...CFG0 };
   let   WIDGET_ID = CFG0.id || CFG0.widgetId || 'randomizer';
-  let   IS_VIEWER = CFG0.role === 'viewer' || _qs.get('viewer') === '1';
+  let   IS_VIEWER = CFG0.role === 'viewer';
 
   const MODES     = ['dice', 'coin', 'bag', 'spinner', 'cards', 'number', 'list'];
   const VERB      = { dice: 'Roll', coin: 'Flip', bag: 'Draw', spinner: 'Spin', cards: 'Draw',

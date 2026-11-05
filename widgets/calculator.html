@@ -1241,7 +1241,6 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
     }
     function canEdit() {
         if (cfg().role === 'viewer' || window.BEAMER_PRINT || cfg().printMode) return false;
-        try { if (new URLSearchParams(location.search).get('viewer') === '1') return false; } catch (e) {}
         return inlineEdit();
     }
 
@@ -2264,7 +2263,6 @@ body.no-history .split-handle { display: none; }
   transition: background 0.1s;
 }
 .hist-item:hover { background: var(--sn-node); }
-#shell.is-viewer .hist-item { cursor: default; }
 
 .hist-expr {
   font-family: var(--font-mono);
@@ -2510,10 +2508,8 @@ body.bw-overlay .cbtn { font-size: clamp(12px, min(5.4cqw, 6cqh), 30px); }
   'use strict';
 
   // ── Config ──────────────────────────────────────────────────────────────────
-  const _qs       = new URLSearchParams(location.search);
   const CFG       = window.WIDGET_CONFIG || {};
   const WIDGET_ID = CFG.id     || 'calculator';
-  const IS_VIEWER = !!(CFG.viewer || _qs.get('viewer') === '1');
 
   // ── State ───────────────────────────────────────────────────────────────────
   const exprEl   = document.getElementById('expr-input');
@@ -2679,7 +2675,6 @@ body.bw-overlay .cbtn { font-size: clamp(12px, min(5.4cqw, 6cqh), 30px); }
 
   // ── UI actions ───────────────────────────────────────────────────────────────
   function insert(text) {
-    if (IS_VIEWER) return;
     const s = exprEl.selectionStart, e = exprEl.selectionEnd, v = exprEl.value;
     exprEl.value = v.slice(0, s) + text + v.slice(e);
     const pos = s + text.length;
@@ -2689,7 +2684,6 @@ body.bw-overlay .cbtn { font-size: clamp(12px, min(5.4cqw, 6cqh), 30px); }
   }
 
   function backspace() {
-    if (IS_VIEWER) return;
     const s = exprEl.selectionStart, e = exprEl.selectionEnd, v = exprEl.value;
     if (s !== e) {
       exprEl.value = v.slice(0, s) + v.slice(e);
@@ -2703,14 +2697,12 @@ body.bw-overlay .cbtn { font-size: clamp(12px, min(5.4cqw, 6cqh), 30px); }
   }
 
   function clear() {
-    if (IS_VIEWER) return;
     exprEl.value = '';
     showResult('', false);
     exprEl.focus();
   }
 
   function calculate() {
-    if (IS_VIEWER) return;
     const expr = exprEl.value.trim();
     if (!expr) return;
     const { value, ok } = evaluate(expr);
@@ -2751,7 +2743,6 @@ body.bw-overlay .cbtn { font-size: clamp(12px, min(5.4cqw, 6cqh), 30px); }
 
     list.querySelectorAll('.hist-item').forEach(el => {
       el.addEventListener('click', () => {
-        if (IS_VIEWER) return;
         const entry = history.find(h => h.id === +el.dataset.id);
         if (!entry) return;
         exprEl.value = entry.expr;
@@ -2777,7 +2768,6 @@ body.bw-overlay .cbtn { font-size: clamp(12px, min(5.4cqw, 6cqh), 30px); }
   document.getElementById('btn-eq').addEventListener('click', calculate);
   document.getElementById('btn-ans').addEventListener('click', () => insert(lastAnswer));
   document.getElementById('btn-frac').addEventListener('click', () => {
-    if (IS_VIEWER) return;
     const expr = exprEl.value.trim();
     const result = expr ? evaluate(expr) : null;
     const numerator = (result?.ok && result.value) ? result.value : (expr || '0');
@@ -2797,24 +2787,13 @@ body.bw-overlay .cbtn { font-size: clamp(12px, min(5.4cqw, 6cqh), 30px); }
 
   exprEl.addEventListener('input', onInput);
   exprEl.addEventListener('keydown', e => {
-    if (IS_VIEWER) return;
     if (e.key === 'Enter') { e.preventDefault(); calculate(); }
   });
-
-  // ── Viewer mode ───────────────────────────────────────────────────────────────
-  function setViewerMode() {
-    document.getElementById('shell').classList.add('is-viewer');
-    exprEl.readOnly = true;
-    document.getElementById('btn-clear-hist').style.display = 'none';
-    document.getElementById('btn-history').style.display = 'none';
-    document.querySelectorAll('.cbtn').forEach(b => b.disabled = true);
-  }
 
   // ── Config / postMessage ──────────────────────────────────────────────────────
   function applyConfig(cfg) {
     if (!cfg) return;
-    if (cfg.viewer || IS_VIEWER) setViewerMode();
-    if (cfg.defaultExpression && !IS_VIEWER) {
+    if (cfg.defaultExpression) {
       exprEl.value = cfg.defaultExpression;
       onInput();
     }
@@ -2844,7 +2823,6 @@ body.bw-overlay .cbtn { font-size: clamp(12px, min(5.4cqw, 6cqh), 30px); }
   }
 
   // ── Boot ──────────────────────────────────────────────────────────────────────
-  if (IS_VIEWER) setViewerMode();
   applyConfig(CFG);
   renderHistory();
 

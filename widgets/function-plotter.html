@@ -1242,7 +1242,6 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
     }
     function canEdit() {
         if (cfg().role === 'viewer' || window.BEAMER_PRINT || cfg().printMode) return false;
-        try { if (new URLSearchParams(location.search).get('viewer') === '1') return false; } catch (e) {}
         return inlineEdit();
     }
 
@@ -2397,7 +2396,6 @@ body.splitting, body.splitting * { cursor: col-resize !important; user-select: n
 
 #plot-canvas { display: block; cursor: crosshair; }
 #plot-canvas.dragging { cursor: grabbing; }
-#plot-canvas.viewer   { cursor: default; }
 body.mode-3d #plot-canvas { cursor: grab; }
 body.mode-3d #plot-canvas.dragging { cursor: grabbing; }
 
@@ -2472,18 +2470,6 @@ body.bw-overlay #coord-display { display: none !important; }
 .ov-slider { display: flex; align-items: center; gap: 8px; }
 .ov-slider input { flex: 1; min-width: 0; accent-color: var(--text); }
 .ov-slider .ov-val { min-width: 4.5ch; text-align: right; font-variant-numeric: tabular-nums; color: var(--text); }
-
-/* The audience gets the graph, nothing to press. */
-body.is-viewer #mode-seg,
-body.is-viewer #btn-grid,
-body.is-viewer #btn-labels,
-body.is-viewer #btn-reset,
-body.is-viewer .bw-toolbar .bw-sep { display: none !important; }
-body.is-viewer #expr-panel,
-body.is-viewer .split-handle,
-body.is-viewer #zoom-btns,
-body.is-viewer #coord-display,
-body.is-viewer #trace-tip { display: none !important; }
 
 /* ── Slide-native look ───────────────────────────────────────
    The graph is drawn like a pgfplots figure (see readStyle()); the list
@@ -2639,10 +2625,8 @@ body.is-viewer #trace-tip { display: none !important; }
 // ─────────────────────────────────────────────────────────
 // Config
 // ─────────────────────────────────────────────────────────
-const _qs      = new URLSearchParams(location.search);
 const CFG      = window.WIDGET_CONFIG || {};
 const WIDGET_ID = CFG.id     || 'function-plotter';
-const IS_VIEWER = !!(CFG.viewer || _qs.get('viewer') === '1');
 
 // ─────────────────────────────────────────────────────────
 // Palette
@@ -2711,7 +2695,7 @@ function addExpression(expr = '', colorOverride = null, focusOnAdd = false) {
   };
   expressions.push(row);
   renderList();
-  if (!IS_VIEWER && row._focusOnAdd) {
+  if (row._focusOnAdd) {
     requestAnimationFrame(() => {
       document.getElementById(`ei-${id}`)?.focus();
     });
@@ -2812,7 +2796,6 @@ function buildColorPop() {
 }
 
 function openColorPicker(id, anchor) {
-  if (IS_VIEWER) return;
   const row = expressions.find(e => e.id === id);
   if (!row) return;
   if (!colorPop) buildColorPop();
@@ -2953,8 +2936,7 @@ function renderOverlay() {
       const rng = document.createElement('input');
       rng.className = 'slider-range';
       Object.assign(rng, { type: 'range', min: row.sliderMin, max: row.sliderMax,
-                           step: (row.sliderMax - row.sliderMin) / 400, value: row.sliderVal,
-                           disabled: IS_VIEWER });
+                           step: (row.sliderMax - row.sliderMin) / 400, value: row.sliderVal });
       const out = document.createElement('span');
       out.className = 'ov-val';
       out.id = `ov-sv-${row.id}`;
@@ -3051,7 +3033,7 @@ function renderList() {
         <div class="color-swatch" id="sw-${row.id}"
              style="background:${swatch(row.color)}"
              title="Choose a colour"
-             ${IS_VIEWER ? '' : `onclick="openColorPicker(${row.id}, this)"`}></div>
+             onclick="openColorPicker(${row.id}, this)"></div>
 
         <input class="expr-input${row.visible ? '' : ' hidden-expr'}"
                id="ei-${row.id}"
@@ -3060,11 +3042,9 @@ function renderList() {
                placeholder="${mode === '3d' ? 'z = f(x, y), a = 3…' : 'y = f(x), a = 3, (1,2)…'}"
                spellcheck="false"
                autocomplete="off"
-               autocorrect="off"
-               ${IS_VIEWER ? 'disabled' : ''} />
+               autocorrect="off" />
         <div class="expr-tex" id="et-${row.id}" aria-hidden="true"></div>
 
-        ${IS_VIEWER ? '' : `
         <div class="expr-actions">
           <button class="expr-btn${row.visible ? '' : ' is-off'}" id="vis-${row.id}"
                   onclick="toggleVisible(${row.id})"
@@ -3072,7 +3052,7 @@ function renderList() {
           <button class="expr-btn del"
                   onclick="removeExpression(${row.id})"
                   title="Delete">${DEL_ICON}</button>
-        </div>`}
+        </div>
       </div>
       <div class="expr-error" id="ee-${row.id}"></div>
       ${isSlider ? `
@@ -3082,7 +3062,6 @@ function renderList() {
                    min="${row.sliderMin}" max="${row.sliderMax}"
                    step="${(row.sliderMax - row.sliderMin) / 400}"
                    value="${row.sliderVal}"
-                   ${IS_VIEWER ? 'disabled' : ''}
                    oninput="onSliderMove(${row.id}, this.value)" />
             <span class="slider-val" id="sv-${row.id}">${row.sliderVal.toFixed(3)}</span>
           </div>
@@ -3090,12 +3069,10 @@ function renderList() {
             <span class="slider-bound-lbl">min</span>
             <input type="number" class="slider-bound-inp"
                    value="${row.sliderMin}" step="1"
-                   ${IS_VIEWER ? 'disabled' : ''}
                    onchange="onSliderBound(${row.id}, 'sliderMin', this.value)" />
             <span class="slider-bound-lbl">max</span>
             <input type="number" class="slider-bound-inp"
                    value="${row.sliderMax}" step="1"
-                   ${IS_VIEWER ? 'disabled' : ''}
                    onchange="onSliderBound(${row.id}, 'sliderMax', this.value)" />
           </div>
         </div>` : ''}
@@ -3104,15 +3081,13 @@ function renderList() {
     list.appendChild(div);
     paintRowTex(row);
 
-    if (!IS_VIEWER) {
-      const inp = document.getElementById(`ei-${row.id}`);
-      // Typed as source; set in LaTeX again once the cursor leaves.
-      inp.addEventListener('blur', () => paintRowTex(row));
-      inp.addEventListener('input', () => onExprInput(row.id, inp.value));
-      inp.addEventListener('keydown', e => {
-        if (e.key === 'Enter') plot();
-      });
-    }
+    const inp = document.getElementById(`ei-${row.id}`);
+    // Typed as source; set in LaTeX again once the cursor leaves.
+    inp.addEventListener('blur', () => paintRowTex(row));
+    inp.addEventListener('input', () => onExprInput(row.id, inp.value));
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') plot();
+    });
   }
 }
 
@@ -3794,7 +3769,6 @@ function drawTrace({ sx, sy, gx, gy, color }) {
 // Canvas events
 // ─────────────────────────────────────────────────────────
 canvas.addEventListener('mousemove', (e) => {
-  if (IS_VIEWER) return;
   const rect = canvas.getBoundingClientRect();
   const mx   = e.clientX - rect.left;
   const my   = e.clientY - rect.top;
@@ -3844,7 +3818,6 @@ canvas.addEventListener('mouseleave', () => {
 });
 
 canvas.addEventListener('mousedown', (e) => {
-  if (IS_VIEWER) return;
   isDragging = true;
   canvas.classList.add('dragging');
   const rect = canvas.getBoundingClientRect();
@@ -3862,7 +3835,6 @@ canvas.addEventListener('mouseup', () => {
 });
 
 canvas.addEventListener('wheel', (e) => {
-  if (IS_VIEWER) return;
   e.preventDefault();
   if (mode === '3d') { zoom3D(e.deltaY > 0 ? 1 / 1.1 : 1.1); return; }
   const rect = canvas.getBoundingClientRect();
@@ -3881,7 +3853,6 @@ canvas.addEventListener('wheel', (e) => {
 
 // Touch
 canvas.addEventListener('touchstart', (e) => {
-  if (IS_VIEWER) return;
   if (e.touches.length === 1) {
     isDragging = true;
     const rect = canvas.getBoundingClientRect();
@@ -3904,7 +3875,6 @@ function zoom3D(f) {
 }
 
 canvas.addEventListener('touchmove', (e) => {
-  if (IS_VIEWER) return;
   e.preventDefault();
   if (e.touches.length === 1 && isDragging) {
     const rect = canvas.getBoundingClientRect();
@@ -4112,11 +4082,6 @@ let appliedFunctions = null, appliedRange = null, appliedExprs = null,
     appliedBox = null, appliedMode = null;
 function applyConfig(cfg) {
   if (!cfg) return;
-  if (cfg.viewer || IS_VIEWER) {
-    document.body.classList.add('is-viewer');
-    canvas.classList.add('viewer');
-    resize();
-  }
   const exprKey = JSON.stringify([cfg.expressions || null, cfg.colors || null]);
   if (cfg.expressions?.length && exprKey !== appliedExprs) {
     appliedExprs = exprKey;
@@ -4190,11 +4155,6 @@ if (document.fonts) {
     document.fonts.load(`16px 'BW CM Sans'`),
   ]).then(() => plot(), () => {});
   document.fonts.ready.then(() => plot(), () => {});
-}
-
-if (IS_VIEWER) {
-  document.body.classList.add('is-viewer');
-  canvas.classList.add('viewer');
 }
 
 // Start with a single blank row so there's somewhere to type — no preset functions.

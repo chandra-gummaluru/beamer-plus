@@ -1236,7 +1236,6 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
     }
     function canEdit() {
         if (cfg().role === 'viewer' || window.BEAMER_PRINT || cfg().printMode) return false;
-        try { if (new URLSearchParams(location.search).get('viewer') === '1') return false; } catch (e) {}
         return inlineEdit();
     }
 
@@ -2495,22 +2494,6 @@ body {
 }
 .add-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); }
 
-/* ── Viewer badge ──────────────────────────────────────────────── */
-#viewer-toast {
-  position: fixed;
-  bottom: 14px;
-  right: 14px;
-  background: var(--text);
-  color: #fff;
-  font-size: 11.5px;
-  font-family: var(--font-ui);
-  padding: 5px 12px;
-  border-radius: 5px;
-  opacity: 0.8;
-  pointer-events: none;
-  display: none;
-}
-
 /* ── Scrollbar ─────────────────────────────────────────────────── */
 #notebook-area::-webkit-scrollbar { width: 5px; }
 #notebook-area::-webkit-scrollbar-track { background: transparent; }
@@ -2537,8 +2520,7 @@ body {
   /* The widget's own bar, the one the settings kit builds around it, and
      every per-cell control: furniture, not content. */
   #toolbar,
-  .bw-topbar,
-  #viewer-toast { display: none !important; }
+  .bw-topbar { display: none !important; }
 
   /* The kit wraps the widget's body in .bw-topbar-body, which is a flex
      child sized to what the bar leaves — on paper it has to be the page. */
@@ -3159,14 +3141,12 @@ body.bw-editing .fp-edit-only { display: inline-flex !important; }
 </div><!-- #nb-main -->
 
 <!-- ── Viewer overlay ─────────────────────────────────────────────────── -->
-<div id="viewer-toast" data-bw-print-hide>View only</div>
 
 <script>
 // ─────────────────────────────────────────────────────────────────────────────
 // CONFIG
 // Beamer+ injects window.WIDGET_CONFIG before loading this widget.
 // Falls back to URL params for standalone testing:
-//   ?viewer=1          → viewer mode
 //   ?notebook=path     → load notebook file
 //   ?packages=a,b,c    → extra packages to install at boot
 //   ?autoImport=0      → disable per-cell import detection
@@ -3176,7 +3156,7 @@ const CFG      = window.WIDGET_CONFIG || {};
 const WIDGET_ID      = CFG.id              || 'jupyter-notebook';
 const NOTEBOOK_PATH  = CFG.notebook        || _qs.get('notebook') || null;
 const NOTEBOOK_OBJ   = CFG.notebookContent || null;  // pre-loaded by renderer
-const IS_VIEWER      = !!(CFG.viewer || CFG.role === 'viewer' || _qs.get('viewer') === '1');
+const IS_VIEWER      = CFG.role === 'viewer';
 
 // ── Package configuration ───────────────────────────────────────────────────
 // Always loaded — the widget's matplotlib capture helper depends on them.
@@ -5299,7 +5279,6 @@ if (IS_VIEWER) {
    'btn-download'].forEach(id => {
       document.getElementById(id)?.remove();
     });
-    document.getElementById('viewer-toast').style.display = 'block';
   });
 }
 

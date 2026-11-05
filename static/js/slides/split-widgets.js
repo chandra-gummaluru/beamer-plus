@@ -214,7 +214,7 @@ async function sync() {
             // needs a rebuild): build it. renderWidgets also restores the
             // state the deck saved for it.
             _told.delete(id);
-            await renderWidgets({ widgets: [w] }, _layer, _state.zipFile, false, _key(id));
+            await renderWidgets({ widgets: [w] }, _layer, _state.zipFile, _key(id));
             f = findIframe(id);
             if (!f) continue;
             f.classList.add('widget-iframe--split');
