@@ -153,6 +153,7 @@ def test_widget_catalog_lists_every_widget_with_its_schema(client):
     assert by_type['timer']['portable'] and by_type['calculator']['portable']
     assert by_type['timer']['overlaySize'] == {'width': 0.26, 'height': 0.2}
     assert not by_type['python-workspace']['portable']
+    assert not by_type['function-plotter']['portable']   # opted out
 
 
 def test_widget_schemas_declare_valid_modes():

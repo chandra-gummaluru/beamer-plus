@@ -2192,6 +2192,14 @@ body.bw-overlay #clock       { font-size: min(22cqw, 60cqh); }
 body.bw-overlay #clock.is-long { font-size: min(15cqw, 56cqh); }
 body.bw-overlay #bar { width: 84cqw; margin-top: 7cqh; }
 .bw-overlay-controls svg { width: 14px; height: 14px; }
+
+/* Hold to reset: the clock fades while the press is held (HOLD_MS). */
+#clock { transition: opacity 0.15s; }
+#clock.is-holding { opacity: 0.3; transition: opacity 0.6s linear; }
+
+/* Portable (opened from Beamer+'s toolbar, not placed on a slide): there is
+   no slide to open, so it always starts by hand — no Starting Mode. */
+body.tm-portable .tm-auto { display: none !important; }
 </style>
 </head>
 <body>
@@ -2205,8 +2213,8 @@ body.bw-overlay #bar { width: 84cqw; margin-top: 7cqh; }
         <button class="bw-btn" type="button" data-v="countdown">Countdown</button>
         <button class="bw-btn" type="button" data-v="stopwatch">Stopwatch</button>
       </div>
-      <span class="tm-sep" aria-hidden="true"></span>
-      <span class="tm-field">Starting Mode
+      <span class="tm-sep tm-auto" aria-hidden="true"></span>
+      <span class="tm-field tm-auto">Starting Mode
         <span class="bw-seg" id="ed-auto" title="Manual: click the timer to start it. Automatic: it starts when its slide opens.">
           <button class="bw-btn" type="button" data-v="0">Manual</button>
           <button class="bw-btn" type="button" data-v="1">Automatic</button>
@@ -2520,12 +2528,31 @@ body.bw-overlay #bar { width: 84cqw; margin-top: 7cqh; }
   // a digit being set before the start is left to edit it.
   app.addEventListener('click', e => {
     if (IS_VIEWER || editing()) return;
+    if (heldReset) { heldReset = false; return; }   // that press was a hold
     if (e.target.closest('.bw-overlay-controls')) return;
     if (editable() && e.target.closest('.unit')) return;
     if (S.expired) reset();
     else if (S.running) pause();
     else start();
   });
+  // Press and hold anywhere on the clock to reset it. The click that ends
+  // the hold is swallowed, so it doesn't start the fresh clock again.
+  const HOLD_MS = 600;
+  let holdTimer = null, heldReset = false;
+  const endHold = () => {
+    clearTimeout(holdTimer); holdTimer = null;
+    clock.classList.remove('is-holding');
+  };
+  app.addEventListener('pointerdown', e => {
+    heldReset = false;
+    if (IS_VIEWER || editing() || e.button !== 0 || isIdle()) return;
+    if (e.target.closest('.bw-overlay-controls')) return;
+    clock.classList.add('is-holding');
+    holdTimer = setTimeout(() => { endHold(); heldReset = true; reset(); }, HOLD_MS);
+  });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(t => app.addEventListener(t, endHold));
+  app.addEventListener('contextmenu', e => { if (holdTimer || heldReset) e.preventDefault(); });
+
   const segValue = (e) => e.target.closest('[data-v]')?.dataset.v;
   edMode  .addEventListener('click', e => { const v = segValue(e); if (v) setMode(v); });
   edAuto  .addEventListener('click', e => { const v = segValue(e); if (v) setting({ autoStart: v === '1' }); });
@@ -2610,6 +2637,9 @@ body.bw-overlay #bar { width: 84cqw; margin-top: 7cqh; }
     if (c.id != null || c.widgetId != null) OWN_KEYS.forEach(k => { if (!(k in c)) delete cfg[k]; });
     WIDGET_ID = cfg.id || cfg.widgetId || WIDGET_ID;
     IS_VIEWER = cfg.role === 'viewer' || IS_VIEWER;
+    // A portable timer is always manual.
+    if (cfg.portable) delete cfg.autoStart;
+    document.body.classList.toggle('tm-portable', !!cfg.portable);
     // Settings arrive live from edit mode, and the whole config is
     // re-sent on every edit — so only a setting that actually changed is
     // adopted, and re-sent config never interrupts a running clock. The first
