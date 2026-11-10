@@ -148,6 +148,11 @@ def test_widget_catalog_lists_every_widget_with_its_schema(client):
     by_type = {w['type']: w for w in catalog}
     assert by_type['python-workspace']['category'] == 'Computer Science'
     assert all(w['label'] and w['category'] for w in catalog)
+    # Portable (opened from the annotation toolbar): any widget with an
+    # overlay mode, unless its schema says otherwise.
+    assert by_type['timer']['portable'] and by_type['calculator']['portable']
+    assert by_type['timer']['overlaySize'] == {'width': 0.26, 'height': 0.2}
+    assert not by_type['python-workspace']['portable']
 
 
 def test_widget_schemas_declare_valid_modes():

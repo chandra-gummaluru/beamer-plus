@@ -20,6 +20,7 @@ import { initThumbnails } from './slides/thumbnails.js';
 import { initSlideStructure, getSlideLabels, slideUid, configKeyOf, realSlideCount } from './slides/structure.js';
 import { initNavDrawer, isNavCollapsed, setNavCollapsed } from './slides/drawer.js';
 import { initSplitWidgets, splitHalves } from './slides/split-widgets.js';
+import { initPortableWidgets } from './slides/portable-widgets.js';
 import { initReveals, renderReveals, resetRevealsOnArrival, stepReveal, updateStepBadge } from './slides/reveals.js';
 import { applyPaper } from './slides/paper.js';
 import { initSpotlight, hideSpotlight, renderSpotlight,
@@ -182,6 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initMedia(state);
     initToolbar(state);
     initPenSlots(state);
+    initPortableWidgets();
     initTextAnnotations(state);
     initUploader(state);
     initEditor(state);
@@ -1443,7 +1445,8 @@ const STAGE_CONTROL_SELECTOR = [
     '#edit-duplicate-btn',
     '#bookmark-btn',
     // New page lives in the annotation toolbar but stays live: it's a way out.
-    '#floating-annotation-toolbar button:not(#add-blank-btn)',
+    // Portable widgets (a timer, a calculator) need no slide either.
+    '#floating-annotation-toolbar button:not(#add-blank-btn):not(#portable-widgets-btn)',
 ].join(', ');
 
 function setStageControlsEnabled(enabled) {

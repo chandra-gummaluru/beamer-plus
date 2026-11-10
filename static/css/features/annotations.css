@@ -48,6 +48,7 @@
 #tool-container,
 #annotation-undo-redo,
 #annotation-clear,
+#annotation-portable,
 #annotation-slide-actions,
 #annotation-stage-actions {
     display: flex;
@@ -66,6 +67,7 @@
 
 /* Section divider between tool group and undo/redo (normal/vertical view) */
 #annotation-undo-redo,
+#annotation-portable,
 #annotation-slide-actions,
 #annotation-stage-actions {
     border-top: var(--line-hairline);
@@ -95,6 +97,7 @@ body.split-view-active #floating-annotation-toolbar {
 body.split-view-active #tool-container,
 body.split-view-active #annotation-undo-redo,
 body.split-view-active #annotation-clear,
+body.split-view-active #annotation-portable,
 body.split-view-active #annotation-slide-actions,
 body.split-view-active #annotation-stage-actions {
     flex-direction: row;
@@ -107,6 +110,7 @@ body.split-view-active #pen-slots {
 }
 
 body.split-view-active #annotation-undo-redo,
+body.split-view-active #annotation-portable,
 body.split-view-active #annotation-slide-actions,
 body.split-view-active #annotation-stage-actions {
     border-top: none;
@@ -509,12 +513,14 @@ body.magnify-lens-on #main-content { cursor: none; }
     #floating-annotation-toolbar #pen-slots,
     #floating-annotation-toolbar #annotation-clear,
     #floating-annotation-toolbar #annotation-undo-redo,
+    #floating-annotation-toolbar #annotation-portable,
     #floating-annotation-toolbar #annotation-slide-actions,
     #floating-annotation-toolbar #annotation-stage-actions {
         flex-direction: row;
         align-items: center;
     }
     #floating-annotation-toolbar #annotation-undo-redo,
+    #floating-annotation-toolbar #annotation-portable,
     #floating-annotation-toolbar #annotation-slide-actions,
     #floating-annotation-toolbar #annotation-stage-actions {
         border-top: none;
@@ -527,3 +533,109 @@ body.magnify-lens-on #main-content { cursor: none; }
 
 }
 
+
+/* ============================================================
+   Portable widgets (slides/portable-widgets.js) — the toolbar's menu of
+   small tools, and the floating windows they open in.
+   ============================================================ */
+#portable-flyout {
+    display: none;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--sp-2);
+    min-width: 168px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px) saturate(1.4);
+    -webkit-backdrop-filter: blur(12px) saturate(1.4);
+    border: var(--line-hairline);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-3);
+    position: fixed;
+    z-index: 560;
+}
+#portable-flyout .portable-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: var(--hit-min);
+    padding: 0 12px 0 8px;
+    justify-content: flex-start;
+    border: 1px solid transparent;
+    border-radius: var(--r-md);
+    background: transparent;
+    color: var(--ink-1);
+    font-size: var(--fs-sm);
+    font-weight: 400;
+    white-space: nowrap;
+}
+#portable-flyout .portable-item:hover,
+#portable-flyout .portable-item:focus-visible { background: #f7c548; border-color: var(--ink-1); outline: none; }
+.portable-item-icon, .portable-bar-icon { display: inline-flex; width: 18px; height: 18px; flex-shrink: 0; }
+.portable-item-icon svg, .portable-bar-icon svg { width: 100%; height: 100%; }
+.portable-empty { padding: 6px 10px; color: var(--ink-3); font-size: var(--fs-sm); }
+
+.portable-win {
+    position: fixed;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border: 2px solid var(--ink-1);
+    border-radius: 7px;
+    box-shadow: 0 12px 36px rgb(0 0 0 / .22);
+    overflow: hidden;
+    z-index: 552;
+}
+.portable-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 30px;
+    flex-shrink: 0;
+    padding: 0 4px 0 10px;
+    background: #f7c548;
+    border-bottom: 1.5px solid var(--ink-1);
+    color: var(--ink-1);
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+}
+.portable-bar .portable-bar-icon { width: 15px; height: 15px; }
+.portable-bar-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', var(--font-sans);
+    font-size: 14px;
+}
+.portable-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--ink-1);
+    cursor: pointer;
+}
+.portable-close:hover { background: #fff; border-color: var(--ink-1); }
+.portable-body { position: relative; flex: 1; min-height: 0; }
+.portable-body iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; background: transparent; }
+.portable-grip {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 16px;
+    height: 16px;
+    cursor: nwse-resize;
+    touch-action: none;
+    background: linear-gradient(135deg, transparent 50%, var(--ink-3) 50%, var(--ink-3) 58%, transparent 58%, transparent 70%, var(--ink-3) 70%, var(--ink-3) 78%, transparent 78%);
+}
+body.portable-dragging .portable-bar { cursor: grabbing; }
+body.portable-dragging iframe { pointer-events: none !important; }
+@media print { .portable-win, #portable-flyout { display: none !important; } }

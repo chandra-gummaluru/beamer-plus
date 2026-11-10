@@ -581,7 +581,9 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
     border-radius: var(--r-lg);
     box-shadow: var(--shadow-pop);
     width: min(620px, 92vw);
-    max-height: 80vh;
+    /* A fixed height, not just a cap: the modal keeps its size while the
+       search narrows the grid (it used to shrink around fewer cards). */
+    height: min(560px, 80vh);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -605,48 +607,6 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
     letter-spacing: -0.01em;
 }
 
-/* ─── Widget category filter row ─────────────────────────────── */
-
-.widget-modal-cats {
-    display: flex;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    gap: 5px;
-    padding: var(--sp-3) var(--sp-3);
-    border-bottom: var(--line-hairline);
-    flex-shrink: 0;
-    scrollbar-width: none;
-}
-.widget-modal-cats::-webkit-scrollbar { display: none; }
-
-.widget-cat-btn {
-    padding: 2px 11px;
-    font-size: var(--fs-sm);
-    font-family: var(--font-sans);
-    font-weight: 500;
-    border: 1px solid var(--line-2);
-    border-radius: var(--r-pill);
-    background: transparent;
-    color: var(--ink-2);
-    cursor: pointer;
-    white-space: nowrap;
-    flex-shrink: 0;
-    line-height: 1.35;
-    transition: background var(--dur-fast), border-color var(--dur-fast), color var(--dur-fast);
-}
-
-.widget-cat-btn:hover {
-    background: var(--surface-cream-2);
-    border-color: var(--ink-4);
-    color: var(--ink-1);
-}
-
-.widget-cat-btn.is-active {
-    background: var(--ink-1);
-    border-color: var(--ink-1);
-    color: var(--ink-on-accent);
-}
-
 .widget-modal-search-row {
     padding: var(--sp-3) var(--sp-4);
     border-bottom: var(--line-hairline);
@@ -665,6 +625,16 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
     padding: var(--sp-3) var(--sp-3) var(--sp-4);
     overflow-y: auto;
     flex: 1;
+    min-height: 0;
+    /* Rows keep their height when a search leaves only a few cards. */
+    align-content: start;
+}
+.widget-modal-empty {
+    grid-column: 1 / -1;
+    padding: var(--sp-5) 0;
+    text-align: center;
+    color: var(--ink-3);
+    font-size: var(--fs-sm);
 }
 
 .widget-card {
@@ -727,8 +697,7 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
 
 /* ── Add Widget, drawn like Beamer+'s dialogs ──────────────────────
    A white card with an ink outline, in the slides' face and one weight;
-   the title on the highlighter yellow; categories are toggles (ink
-   outline, yellow when chosen); a card gets an ink outline when pointed
+   the title on the highlighter yellow; a card gets an ink outline when pointed
    at and fills yellow under the pointer. */
 .widget-modal {
     background: #fff;
@@ -745,17 +714,6 @@ body.edit-mode .slide-nav-ghost.is-away { opacity: 0.45 !important; transform: s
     font-size: 24px; letter-spacing: 0; line-height: 1.35;
     background: #f7c548; padding: 0 .18em;
 }
-.widget-modal-cats { border-bottom: 0; gap: 6px; padding: var(--sp-2) var(--sp-4); }
-.widget-cat-btn {
-    font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', var(--font-sans);
-    padding: 3px 11px;
-    border: 1.5px solid var(--ink-1);
-    border-radius: 5px;
-    background: #fff;
-    color: var(--ink-1);
-}
-.widget-cat-btn:hover { background: #f7c548; border-color: var(--ink-1); color: var(--ink-1); }
-.widget-cat-btn.is-active { background: #f7c548; border-color: var(--ink-1); color: var(--ink-1); }
 .widget-modal-search-row { border-bottom: 0; padding-top: var(--sp-2); }
 .widget-modal-search {
     font-family: 'BW CM Sans', 'CMU Sans Serif', 'Latin Modern Sans', var(--font-sans);

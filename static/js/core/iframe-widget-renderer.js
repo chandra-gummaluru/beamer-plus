@@ -762,6 +762,18 @@ function _buildSrcdoc(htmlContent, configPayload, prelude = '') {
     );
 }
 
+/**
+ * A built-in widget's page, ready for an iframe's srcdoc: the same injection
+ * (base theme, config, settings kit, key bridge) a slide's widget gets. For
+ * iframes Beamer+ places itself, outside any slide (portable widgets).
+ */
+export async function builtinWidgetSrcdoc(type, config) {
+    const res = await fetch(`/widgets/${encodeURIComponent(type)}.html`);
+    if (!res.ok) throw new Error(`Built-in widget not found: ${type} (${res.status})`);
+    const payload = { ...config, ...widgetSessionConfig(), role: 'presenter' };
+    return { srcdoc: _buildSrcdoc(await res.text(), payload), config: payload };
+}
+
 /** The schema block a widget declares, or null. */
 function _readSchema(html) {
     const m = /<script\b[^>]*\bid=["']widget-schema["'][^>]*>([\s\S]*?)<\/script>/i.exec(html || '');

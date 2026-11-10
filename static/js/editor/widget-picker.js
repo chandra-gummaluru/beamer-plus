@@ -1,6 +1,6 @@
-// "Add Widget" picker — lists every widget in the server's widgets/ folder,
-// groups them into categories, and adds the chosen widget (or a custom
-// uploaded .html file) to the current slide.
+// "Add Widget" picker — lists every widget in the server's widgets/ folder
+// (with a search box) and adds the chosen widget (or a custom uploaded .html
+// file) to the current slide.
 //
 // A widget's name and category come from its own schema block, read by the
 // server (/api/widgets/catalog):
@@ -36,18 +36,6 @@ const WIDGET_ICONS = {
 // opens; the properties panel reads it for the widget-type badge.
 export const WIDGET_LABELS = {};
 
-// Preferred tab order. A category a widget declares that isn't listed here
-// still gets a tab, just before "Other".
-const WIDGET_CATEGORY_ORDER = [
-    'Mathematics',
-    'Computer Science',
-    'Biology',
-    'Engineering',
-    'Audience Response',
-    'Tools',
-    'Other',
-];
-
 async function _loadCatalog() {
     try {
         const res = await fetch('/api/widgets/catalog');
@@ -71,7 +59,7 @@ function _refreshCatalog() {
 }
 let _catalogReady = _refreshCatalog();
 
-/** Every widget the server offers: { type, label, category, split }. */
+/** Every widget the server offers: { type, label, category, split, portable, overlaySize }. */
 export async function widgetCatalog() {
     return _catalog || await _catalogReady;
 }
@@ -115,14 +103,6 @@ function _showWidgetModal(widgets, opts = {}) {
         : (type) => (type === '__custom__' ? _pickCustomWidget() : _doAddWidget(type));
     document.getElementById('widget-modal-overlay')?.remove();
 
-    // Determine which categories actually have widgets (so we don't show empty tabs).
-    const usedCats = new Set(widgets.map(w => w.category || 'Other'));
-    const extraCats = [...usedCats]
-        .filter(c => !WIDGET_CATEGORY_ORDER.includes(c))
-        .sort();
-    const order = [...WIDGET_CATEGORY_ORDER.slice(0, -1), ...extraCats, 'Other'];
-    const visibleCats = order.filter(c => usedCats.has(c));
-
     const overlay = document.createElement('div');
     overlay.id = 'widget-modal-overlay';
     overlay.className = 'widget-modal-overlay';
@@ -133,10 +113,6 @@ function _showWidgetModal(widgets, opts = {}) {
                 <button class="btn btn--ghost btn--icon btn--sm widget-modal-close" id="widget-modal-close" title="Close">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
-            </div>
-            <div class="widget-modal-cats" id="widget-modal-cats">
-                <button class="widget-cat-btn is-active" data-cat="all">All</button>
-                ${visibleCats.map(c => `<button class="widget-cat-btn" data-cat="${escHtml(c)}">${escHtml(c)}</button>`).join('')}
             </div>
             <div class="widget-modal-search-row">
                 <input class="field widget-modal-search" type="search"
@@ -149,19 +125,8 @@ function _showWidgetModal(widgets, opts = {}) {
 
     const grid   = document.getElementById('widget-modal-grid');
     const search = document.getElementById('widget-modal-search');
-    let activeCat = 'all';
-
-    const refresh = () => _populateWidgetGrid(grid, widgets, search?.value ?? '', activeCat, pick, opts.custom !== false);
+    const refresh = () => _populateWidgetGrid(grid, widgets, search?.value ?? '', pick, opts.custom !== false);
     refresh();
-
-    document.getElementById('widget-modal-cats')?.addEventListener('click', e => {
-        const btn = e.target.closest('.widget-cat-btn');
-        if (!btn) return;
-        activeCat = btn.dataset.cat;
-        document.querySelectorAll('#widget-modal-cats .widget-cat-btn').forEach(b =>
-            b.classList.toggle('is-active', b === btn));
-        refresh();
-    });
 
     search?.addEventListener('input', refresh);
 
@@ -174,23 +139,28 @@ function _showWidgetModal(widgets, opts = {}) {
     setTimeout(() => search?.focus(), 40);
 }
 
-function _populateWidgetGrid(grid, widgets, filter, category = 'all', pick, custom = true) {
+function _populateWidgetGrid(grid, widgets, filter, pick, custom = true) {
     grid.innerHTML = '';
     const q = filter.trim().toLowerCase();
 
-    // Custom upload card — shown in All and Other only (no category)
-    const showCustom = custom && (category === 'all' || category === 'Other')
-        && (!q || 'custom upload html file'.includes(q));
-    if (showCustom) {
+    // Custom upload card first. The search still matches a widget's
+    // category ("tools", "mathematics"), though there are no category tabs.
+    if (custom && (!q || 'custom upload html file'.includes(q))) {
         grid.appendChild(_makeWidgetCard('__custom__', 'Custom', WIDGET_ICONS.__custom__, pick, true));
     }
 
     widgets.forEach(({ type, label, category: cat = 'Other' }) => {
-        if (category !== 'all' && cat !== category) return;
         const q2 = `${label} ${type} ${cat}`.toLowerCase();
         if (q && !q2.includes(q)) return;
         grid.appendChild(_makeWidgetCard(type, label, WIDGET_ICONS[type] || WIDGET_ICONS.__default__, pick));
     });
+
+    if (!grid.children.length) {
+        const none = document.createElement('div');
+        none.className = 'widget-modal-empty';
+        none.textContent = 'No widgets match.';
+        grid.appendChild(none);
+    }
 }
 
 function _makeWidgetCard(type, label, iconSvg, pick, isCustom = false) {

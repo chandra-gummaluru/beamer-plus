@@ -35,6 +35,13 @@ def _default_label(widget_type):
     return re.sub(r'[-_]+', ' ', widget_type).strip().title() or widget_type
 
 
+def _is_portable(schema):
+    if isinstance(schema.get('portable'), bool):
+        return schema['portable']
+    modes = schema.get('modes')
+    return isinstance(modes, list) and 'overlay' in modes
+
+
 @widgets_bp.route('/api/widgets/catalog')
 def widget_catalog():
     """Every widget in widgets/, with the name and category its schema declares.
@@ -60,6 +67,11 @@ def widget_catalog():
             # Can be added to a split view, one half on each of its slides:
             # which panes may go on each side ({left: [...], right: [...]}).
             'split': schema.get('split') if isinstance(schema.get('split'), dict) else None,
+            # Can be opened from the annotation toolbar as a small floating
+            # window (portable widgets): "portable": true/false in the schema,
+            # or by default any widget that has an overlay mode.
+            'portable': _is_portable(schema),
+            'overlaySize': schema.get('overlaySize') if isinstance(schema.get('overlaySize'), dict) else None,
         })
     return jsonify(out)
 
