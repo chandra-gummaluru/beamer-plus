@@ -68,15 +68,18 @@ Custom models).
 Save (see below) can write two files, plus any screen recordings:
 
 - **Presentation (ZIP)** — everything above, to reopen and keep presenting.
-- **Notes (PDF)** — one flat PDF to hand out. Every visible slide (hidden and
-  split-view slides are skipped) with pen annotations drawn on; each widget as it
+- **Notes (PDF)** — one flat PDF to hand out. Every visible slide (hidden
+  slides are skipped; a split view prints its two slides) with pen annotations
+  drawn on; a split widget's two halves, each on its own slide; each widget as it
   stands at that moment; videos as a still frame, 3D models as a rendered picture,
   audio as a labelled bar; and poll results. A widget can add pages of its own
   right after its slide (the circuit sandbox prints its board; the notebook prints every cell; the Python workspace
   prints its program, shell transcript and memory diagram; an open-ended poll
-  lists every answer). Widgets that don't describe how to print appear as a labelled
-  placeholder box. Built in the browser with pdf-lib; PDF slides are copied as
-  vector pages, so their text stays selectable.
+  lists every answer). Widgets that don't describe how to print are printed as a
+  plain snapshot of their content. Built in the browser with pdf-lib; PDF slides are copied as
+  vector pages, so their text stays selectable. The pages Beamer+ sets itself
+  use the slides' Computer Modern faces (`static/vendor/fonts`, the TTF form of
+  the subset in `fonts-cm.css`; fontkit embeds them) and the widgets' palette.
 
 ## Sessions
 
@@ -242,7 +245,12 @@ A widget opts in with `"split": { "left": [...], "right": [...] }` in its
 schema (which panes may go on each side). The host lays the iframe over both
 slides, clipped to them, and tells the widget where each half is:
 `{ type: 'widget-split', live, left: {x, y, w, h} | null, right: … }` in the
-iframe's own pixels (`static/js/slides/split-widgets.js`).
+iframe's own pixels (`static/js/slides/split-widgets.js`). In the notes PDF a split
+widget is printed once, laid out across both slides at their on-stage size
+(the print request carries `split: { left, right }`, and the handler is called
+with `{ scale, split }`); its image must be the whole frame, which the host cuts
+into the two halves. The kit substitutes `BeamerWidget.print.snapshotFrame()`
+unless the handler returns `{ image, frame: true }`.
 
 Every widget is self-contained, so it also works opened straight from disk:
 `python tools/stamp_widgets.py` copies the current `widget-base.css` and kit

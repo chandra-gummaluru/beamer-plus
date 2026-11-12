@@ -789,7 +789,7 @@ function _readSchema(html) {
 // must never broadcast (a fresh presenter copy would push its starting state
 // to every phone) or open polls.
 //
-// Protocol, host → widget:  { type: 'widget-print', requestId, scale }
+// Protocol, host → widget:  { type: 'widget-print', requestId, scale, state, split? }
 //           widget → host:  { type: 'widget-print-result', requestId, ok, image?, pages?, reason? }
 // The settings kit (injected into every widget) answers on the widget's
 // behalf: ok:false / 'unsupported' unless the widget registered a handler
@@ -844,8 +844,10 @@ function isPrintWindow(win) { return !!win && _printWindows.has(win); }
  *   { ok: true,  image?, pages?, label }   — the widget answered
  *   { ok: false, reason, label }           — unsupported, failed or timed out
  * `box` is the widget's size in CSS px; `state` is the state to show.
+ * `split` ({ left, right }: rects in the box's px) prints a split widget laid
+ * out across both halves; its image is then the whole box.
  */
-export async function printWidget(w, { zipFile, box, fullBox = null, state, scale = 2, host = document.body,
+export async function printWidget(w, { zipFile, box, fullBox = null, state, split = null, scale = 2, host = document.body,
                                        loadTimeoutMs = 30000, printTimeoutMs = 45000 } = {}) {
     let label = w?.type || 'Widget';
     let loaded;
@@ -911,7 +913,7 @@ export async function printWidget(w, { zipFile, box, fullBox = null, state, scal
                 resolve(tag(res));
             };
             const ask = () => {
-                try { win.postMessage({ type: 'widget-print', requestId, scale, state }, '*'); }
+                try { win.postMessage({ type: 'widget-print', requestId, scale, state, ...(split ? { split } : {}) }, '*'); }
                 catch (err) { done({ ok: false, reason: err.message }); }
             };
             function onMsg(e) {
@@ -927,7 +929,8 @@ export async function printWidget(w, { zipFile, box, fullBox = null, state, scal
                     timer = setTimeout(() => done({ ok: false, reason: 'timed out' }), printTimeoutMs);
                 }
                 if (d.type !== 'widget-print-result') return;
-                if (d.ok) done({ ok: true, image: d.image || null, pages: Array.isArray(d.pages) ? d.pages : [] });
+                if (d.ok) done({ ok: true, image: d.image || null, pages: Array.isArray(d.pages) ? d.pages : [],
+                                 replaceSlide: !!d.replaceSlide, note: d.note || null });
                 else      done({ ok: false, reason: d.reason || 'unsupported' });
             }
             window.addEventListener('message', onMsg);

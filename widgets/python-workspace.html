@@ -1792,12 +1792,24 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
     //   BeamerWidget.print.register(async ({ scale }) => ({
     //       image: await BeamerWidget.print.snapshot(),   // drawn in the widget's box
     //       pages: [ { title, blocks: [ … ] } ],           // optional, after the slide
-    //   }));
+    //       replaceSlide: true,   // optional: the pages stand in for the slide
+    //   }));                      // (a full-slide widget that is its pages)
     //
-    // A widget that registers nothing is drawn as a labelled placeholder box.
+    // A widget with nothing to show on paper returns { image: null, note }:
+    // the host draws its usual labelled box, with `note` under the name.
+    //
+    // A widget that registers nothing is printed as a plain snapshot of its
+    // content; one that can't be snapshotted is drawn as a labelled box.
     // The host asks a throwaway copy (role 'viewer', printMode true, sockets
     // stubbed), already set to the live widget's state — so a handler only
     // has to draw what's in front of it. Images may be data URLs or canvases.
+    //
+    // A split widget is printed laid out across both halves: the copy is
+    // sent the same widget-split message the stage sends (live), and the
+    // handler is called with { scale, split }. Its image must then be the
+    // whole frame, which the host cuts into the two halves — so unless the
+    // handler says it drew the frame itself ({ image, frame: true }), the kit
+    // replaces its image with a picture of the whole frame (snapshotFrame).
     var _printHandler = null;
     // html2canvas-pro: a maintained html2canvas fork that understands modern
     // colour syntax (oklch, color(), color-mix) — the base stylesheet uses it,
@@ -1838,6 +1850,37 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
      * match `opts.ignore`, the top bar itself, and anything marked
      * data-bw-print-hide are left out.
      */
+    // html2canvas draws a text field's value on its top edge rather than in
+    // its middle, and nothing at all for a slider's thumb. In the copy it
+    // photographs, text fields become plain boxes with their value set as
+    // text (same size, border and type); a widget can do more through
+    // opts.onclone(doc), which runs after.
+    function freezeFields(doc, extra) {
+        var win = doc.defaultView;
+        [].slice.call(doc.querySelectorAll('input:not([type]), input[type=text], input[type=number], input[type=search]'))
+            .forEach(function (inp) {
+                var cs = win.getComputedStyle(inp);
+                if (cs.display === 'none' || cs.visibility === 'hidden') return;
+                var r = inp.getBoundingClientRect();
+                var box = doc.createElement('span');
+                var props = ['font', 'color', 'background', 'border', 'borderRadius', 'padding', 'margin',
+                             'boxSizing', 'flex', 'letterSpacing', 'fontVariantNumeric', 'verticalAlign'];
+                props.forEach(function (k) { box.style[k] = cs[k]; });
+                box.style.display = 'inline-flex';
+                box.style.alignItems = 'center';
+                box.style.justifyContent = cs.textAlign === 'right' || cs.textAlign === 'end' ? 'flex-end'
+                                         : cs.textAlign === 'center' ? 'center' : 'flex-start';
+                box.style.width = r.width + 'px';
+                box.style.height = r.height + 'px';
+                box.style.overflow = 'hidden';
+                box.style.whiteSpace = 'nowrap';
+                box.textContent = inp.value || '';
+                if (!inp.value && inp.placeholder) { box.textContent = inp.placeholder; box.style.opacity = '0.5'; }
+                inp.parentNode.replaceChild(box, inp);
+            });
+        if (typeof extra === 'function') { try { extra(doc); } catch (e) { console.warn('[widget] onclone failed', e); } }
+    }
+
     function snapshot(target, opts) {
         opts = opts || {};
         var el = typeof target === 'string' ? document.querySelector(target)
@@ -1854,6 +1897,30 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
                 ignoreElements: function (n) {
                     try { return n.matches && n.matches(ignoreSel); } catch (e) { return false; }
                 },
+                onclone: function (doc) { freezeFields(doc, opts.onclone); },
+            });
+        }).then(function (canvas) { return canvas.toDataURL('image/png'); });
+    }
+
+    /** The whole frame, as a PNG data URL (a split widget's print). The
+     *  bar and data-bw-print-hide elements are left out, as in snapshot(). */
+    function snapshotFrame(opts) {
+        opts = opts || {};
+        var w = window.innerWidth, h = window.innerHeight;
+        var scale = opts.scale || _printScale || 2;
+        var ignoreSel = '.bw-topbar, [data-bw-print-hide]' + (opts.ignore ? ', ' + opts.ignore : '');
+        return loadHtml2Canvas().then(function (h2c) {
+            return h2c(document.body, {
+                scale: scale,
+                backgroundColor: opts.background || cssVar('--bg', '#ffffff'),
+                logging: false,
+                useCORS: true,
+                x: 0, y: 0, width: w, height: h,
+                windowWidth: w, windowHeight: h,
+                ignoreElements: function (n) {
+                    try { return n.matches && n.matches(ignoreSel); } catch (e) { return false; }
+                },
+                onclone: function (doc) { freezeFields(doc, opts.onclone); },
             });
         }).then(function (canvas) { return canvas.toDataURL('image/png'); });
     }
@@ -1877,10 +1944,13 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
                     var w = b.width, h = b.height;
                     if (b.src && b.src.width && !w) { w = b.src.width; h = b.src.height; }
                     var src = toDataUrl(b.src);
-                    return src ? { type: 'image', src: src, width: w || null, height: h || null } : null;
+                    return src ? { type: 'image', src: src, width: w || null, height: h || null, fit: !!b.fit } : null;
                 }
-                return { type: b.type || 'text', text: String(b.text == null ? '' : b.text),
-                         mono: !!b.mono, tone: b.tone || null };
+                var runs = Array.isArray(b.runs) ? b.runs.filter(function (r) { return r && r.text != null; })
+                    .map(function (r) { return { text: String(r.text), tone: r.tone || null }; }) : null;
+                return { type: b.type || 'text',
+                         text: String(b.text == null ? (runs ? runs.map(function (r) { return r.text; }).join('\n') : '') : b.text),
+                         mono: !!b.mono, tone: b.tone || null, runs: runs && runs.length ? runs : undefined };
             }).filter(Boolean) : [];
             return { title: p.title ? String(p.title) : '', blocks: blocks,
                      columnWidth: +p.columnWidth > 0 ? +p.columnWidth : null };
@@ -1964,7 +2034,12 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
         _printScale = d.scale || 2;
         var root = document.documentElement;
 
+        var split = d.split && (d.split.left || d.split.right) ? d.split : null;
         whenLoaded().then(whenStyled).then(whenFonts).then(function () {
+            if (split) {
+                // Laid out across both halves, as on stage with both showing.
+                try { window.postMessage({ type: 'widget-split', live: true, left: split.left || null, right: split.right || null }, '*'); } catch (e) {}
+            }
             if (d.state !== undefined) {
                 // To ourselves, so it reaches the widget's own listener like
                 // any host message would.
@@ -1973,14 +2048,21 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
             // Let the state apply and any re-render it starts settle.
             return wait(350);
         }).then(nextFrames).then(function () {
-            if (!_printHandler) { reply({ ok: false, reason: 'unsupported' }); return; }
+            // No handler of its own: print the widget as it stands (its
+            // content, the bar left out) — better than a blank placeholder.
+            // A widget whose picture can't be taken this way (cross-origin
+            // frames, live video) registers a handler instead.
+            var handler = _printHandler || function () { return { image: snapshot() }; };
             root.classList.add('bw-printing');
             return nextFrames().then(function () {
-                return _printHandler({ scale: _printScale });
+                return handler({ scale: _printScale, split: split });
             }).then(function (res) {
                 res = res || {};
-                return Promise.resolve(res.image).then(function (image) {
-                    reply({ ok: true, image: toDataUrl(image), pages: normalisePages(res.pages) });
+                var image = split && !res.frame ? snapshotFrame() : res.image;
+                return Promise.resolve(image).then(function (image) {
+                    reply({ ok: true, image: toDataUrl(image), pages: normalisePages(res.pages),
+                            replaceSlide: !!res.replaceSlide,
+                            note: res.note ? String(res.note) : undefined });
                 });
             });
         }).catch(function (err) {
@@ -1992,6 +2074,7 @@ input[type="search"]::-webkit-search-results-button { -webkit-appearance: none; 
     var printApi = {
         register: function (fn) { _printHandler = typeof fn === 'function' ? fn : null; },
         snapshot: snapshot,
+        snapshotFrame: snapshotFrame,
         /** The vendored html2canvas, loaded on first use. */
         html2canvas: loadHtml2Canvas,
         /** True inside the copy the host makes for printing. */
@@ -9495,16 +9578,20 @@ def _debug_file(src, fname, limit):
   // html2canvas captures the panes but can't see the stylesheet that colours
   // the diagram, so the diagram is left out of that pass and painted in
   // afterwards from the engine's own style-inlined copy.
-  async function printPanes(scale) {
+  // Split, the whole frame (both halves, the bar left out); else the panes.
+  async function printPanes(scale, frame = false) {
     const h2c  = await BeamerWidget.print.html2canvas();
     const s    = Math.max(1, scale || 2);
-    const base = panesEl.getBoundingClientRect();
+    const el   = frame ? document.body : panesEl;
+    const base = frame ? { left: 0, top: 0 } : panesEl.getBoundingClientRect();
     const svgs = [$('diagram'), $('canvas')].filter(el => el && el.getClientRects().length);
     const bg   = getComputedStyle(root).backgroundColor || '#ffffff';
-    const cv = await h2c(panesEl, {
+    const cv = await h2c(el, {
       scale: s, backgroundColor: bg, logging: false, useCORS: true,
+      ...(frame ? { x: 0, y: 0, width: innerWidth, height: innerHeight,
+                    windowWidth: innerWidth, windowHeight: innerHeight } : {}),
       ignoreElements: n => svgs.includes(n) || n.id === 'cellEditor' ||
-                           !!(n.matches && n.matches('[data-bw-print-hide]')),
+                           !!(n.matches && n.matches('[data-bw-print-hide], .bw-topbar')),
     });
     const ctx = cv.getContext('2d');
     // html2canvas leaves its own scale on the context; work in raw pixels.
@@ -9538,17 +9625,15 @@ def _debug_file(src, fname, limit):
 
     if (S.entries.length) {
       blocks.push({ type: 'heading', text: 'Shell' });
-      // Consecutive lines of the same tone share a block, so the transcript
-      // reads as one console with errors set apart in red.
-      let cur = null;
-      for (const e of S.entries) {
-        const tone = e.k === 'err' ? 'error' : e.k === 'sys' ? 'muted' : null;
-        const text = e.k === 'in'
+      // One box, as on stage: the whole transcript as one console, each
+      // entry in its own tone (banner grey, errors red).
+      const runs = S.entries.map(e => ({
+        tone: e.k === 'err' ? 'error' : e.k === 'sys' ? 'muted' : null,
+        text: e.k === 'in'
           ? e.s.split('\n').map((l, i) => (i ? PS2 : (e.p || PS1)) + l).join('\n')
-          : e.s.replace(/\n+$/, '');
-        if (cur && cur.tone === tone) cur.text += '\n' + text;
-        else blocks.push(cur = { type: 'text', mono: true, tone, text });
-      }
+          : e.s.replace(/\n+$/, ''),
+      }));
+      blocks.push({ type: 'text', mono: true, runs });
     }
 
     try {
@@ -9556,7 +9641,7 @@ def _debug_file(src, fname, limit):
       if (d) {
         blocks.push({ type: 'heading', text: d.mode === 'draw' ? 'Memory model (drawing)'
                                                                : `Memory model (step ${d.step})` });
-        blocks.push({ type: 'image', src: d.canvas, width: d.w, height: d.h });
+        blocks.push({ type: 'image', src: d.canvas, width: d.w, height: d.h, fit: true });
       }
     } catch (err) { console.warn('[workspace] diagram export failed', err); }
 
@@ -9564,13 +9649,13 @@ def _debug_file(src, fname, limit):
   }
 
   if (window.BeamerWidget?.print) {
-    BeamerWidget.print.register(async ({ scale }) => {
+    BeamerWidget.print.register(async ({ scale, split }) => {
       openMenu(false);
       openAddMenu(false);
       renderLayout();
       PV.render();
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-      return { image: await printPanes(scale), pages: await printPages() };
+      return { image: await printPanes(scale, !!split), frame: !!split, replaceSlide: true, pages: await printPages() };
     });
   }
 
