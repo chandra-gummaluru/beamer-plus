@@ -3185,7 +3185,8 @@ body.bw-editing #ed-qr {
 /* Not open yet: no code to show, so the edit stand-in holds its place, faint. */
 #join-sub-waiting[hidden] { display: none; }
 #join.is-waiting #qr-wrap { display: none; }
-body:not(.bw-editing) #join.is-waiting #ed-qr {
+body:not(.bw-editing) #join.is-waiting #ed-qr,
+body.ar-paper #ed-qr {
   flex: 0 0 auto;
   display: flex !important;
   align-items: center;
@@ -3197,8 +3198,10 @@ body:not(.bw-editing) #join.is-waiting #ed-qr {
   border-radius: 5px;
   color: var(--ar-faint);
 }
-#join.is-waiting #ed-qr span { display: none; }
-#join.is-waiting #ed-qr svg { width: calc(34px * var(--u)); height: calc(34px * var(--u)); }
+#join.is-waiting #ed-qr span,
+body.ar-paper #ed-qr span { display: none; }
+#join.is-waiting #ed-qr svg,
+body.ar-paper #ed-qr svg { width: calc(34px * var(--u)); height: calc(34px * var(--u)); }
 #join.is-waiting #join-n { color: var(--ar-faint); }
 .join-sub { font-size: var(--fs-body); color: var(--ar-cap); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #join-link { font-family: var(--ar-tt); color: var(--ar-ink); }
@@ -3593,14 +3596,13 @@ body.ar-split #stage { position: absolute; inset: 0; display: block; padding: 0;
 #ar-split-right #prompt { padding-bottom: 0; }
 body.ar-static .ar-split-pane { pointer-events: none; }
 /* On paper (the notes PDF; see the print handler) the slide keeps the
-   stage's layout and size. The banner keeps its box, but of what's in it
-   only the response count means anything on paper: the QR and its words
-   keep their room (so the box is the size the room saw), unseen; the clock
-   goes. A poll that never ran has no banner at all. */
-body.ar-paper #qr-slot,
+   stage's layout and size, banner included, whether or not the poll ran.
+   The QR's place is held by its faint stand-in (a code for a session that's
+   over would scan to nothing); the words keep their room, unseen, so the box
+   is the size the room saw; the count stays; the clock goes. */
+body.ar-paper #qr-wrap { display: none !important; }
 body.ar-paper #join-text { visibility: hidden; }
 body.ar-paper #timer { display: none !important; }
-body.ar-paper-bare #side { display: none !important; }
 /* The QR beside the answers, not under them. Under them it is one strip
    across half a slide, sized by the shared --u, and the split's fit shrinks
    it to a thumbnail. Beside them it gets a column of its own, the height of
@@ -6838,7 +6840,6 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
       if (!S.question) return { image: null };   // nothing set up: just the placeholder
       if (S.phase === 'collect' || S.phase === 'closed') S.phase = S.total > 0 ? 'results' : 'idle';
       document.body.classList.add('ar-paper');
-      document.body.classList.toggle('ar-paper-bare', S.phase === 'idle');
       stopTicking();
       render();
       fitStage();

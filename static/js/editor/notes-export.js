@@ -578,20 +578,20 @@ async function splitHalvesIn(structure, slides) {
 // by side in the split view on stage, then cut into its two halves:
 // { label, halves: { left, right } (PNG data URLs or null), pages }.
 async function printSplit(w, view, state, refW, refH, aspect) {
-    // The view's slides as big as they'd be on stage: the split takes the
-    // whole stage area, each slide fitted in its share of it. A half laid out
-    // at a smaller size would shrink its text to fit (as the widget does on a
-    // small pane) and come out too small on its page.
+    // Each half is laid out as big as a slide on its own would be on stage,
+    // whatever the split's ratio. Each half fills a page, so a half laid out
+    // at its on-stage share would be blown up on paper: the narrower slide's
+    // 2px lines came out several times thicker than the other half's, and its
+    // text much bigger. At full size both pages match a full-slide widget.
     const GAP = 12;
     const area = document.getElementById('main-content')?.getBoundingClientRect();
     const AW = area?.width  > 200 ? area.width - 2 * GAP  : refW;
     const AH = area?.height > 150 ? area.height - 2 * GAP : refH;
-    const share = Math.min(0.8, Math.max(0.2, (Number(view.ratio) || 50) / 100));
     const fit = (paneW) => {
         const sw = Math.min(paneW, AH / aspect);
         return { w: sw, h: sw * aspect };
     };
-    const L = fit((AW - GAP) * share), R = fit((AW - GAP) * (1 - share));
+    const L = fit(AW), R = fit(AW);
     const H = Math.max(L.h, R.h);
     const left  = { x: 0, y: (H - L.h) / 2, w: L.w, h: L.h };
     const right = { x: L.w + GAP, y: (H - R.h) / 2, w: R.w, h: R.h };
