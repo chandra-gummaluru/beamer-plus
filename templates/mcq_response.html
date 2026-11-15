@@ -166,6 +166,11 @@ body {
   border-left: 2px solid var(--border-med); color: var(--text-2); text-align: left;
 }
 .question-text img { max-width: 100%; }
+.question-text img.fig-inline, .option-label img.fig-inline {
+  display: inline-block; height: 1.7em; width: auto; max-width: none;
+  vertical-align: middle; margin: -0.15em 0.08em;
+}
+.question-text img.fig-block { display: block; max-width: 100%; max-height: 40vh; width: auto; margin: 0.4em auto; }
 .question-text.has-block { font-size: 1.1rem; text-align: left; }
 </style>
 <link rel="stylesheet" href="/static/css/respond.css">
@@ -226,6 +231,19 @@ function disableAll() {
   document.querySelectorAll('.option-btn').forEach(b => { b.disabled = true; });
 }
 
+// An answer as the slide draws it: inline Markdown, maths and pictures.
+function setOptionLabel(el, text) {
+  el._src = text;
+  if (!window.marked?.parseInline) { el.textContent = text; return; }
+  el.innerHTML = marked.parseInline(withFigures(text));
+  markFigures(el);
+  if (window.renderMathInElement) {
+    renderMathInElement(el, { delimiters: [
+      { left: '$', right: '$', display: false }, { left: '\\(', right: '\\)', display: false },
+    ], throwOnError: false });
+  }
+}
+
 function renderOptions(options) {
   const container = document.getElementById('options-container');
   container.innerHTML = '';
@@ -235,8 +253,9 @@ function renderOptions(options) {
     btn.className = 'option-btn';
     btn.innerHTML = `
       <span class="option-letter">${letter}</span>
-      <span class="option-label">${escHtml(text)}</span>
+      <span class="option-label"></span>
     `;
+    setOptionLabel(btn.querySelector('.option-label'), text);
     btn.addEventListener('click', () => submitVote(letter, btn));
     container.appendChild(btn);
   });
@@ -266,6 +285,25 @@ async function submitVote(letter, btnEl) {
   }
 }
 
+// Pictures in the question or answers: ![cave](fig:id) in the text, the
+// picture itself sent alongside (data.figures). One alone on its line is a
+// figure; any other sits in the text like a word, as on the slide.
+let FIGS = {};
+// A picture alone on its line is a figure: its own paragraph, so a single
+// line break before it is enough (as it is while editing). Code is left be.
+const lonePictures = src => String(src).split(/(```[\s\S]*?```)/).map((part, i) => i % 2 ? part
+  : part.replace(/^[ \t]*(!\[[^\]\n]*\]\([^)\s]+\))[ \t]*$/gm, '\n$1\n')).join('');
+function withFigures(src) {
+  return lonePictures(String(src || '')).replace(/\]\(fig:([\w-]+)\)/g, (m, id) => FIGS[id] ? `](${FIGS[id]})` : m);
+}
+function markFigures(root) {
+  root.querySelectorAll('img').forEach(img => {
+    const p = img.parentElement;
+    const alone = p && p !== root && p.nodeName === 'P' && p.childElementCount === 1 && !p.textContent.trim();
+    img.classList.add(alone ? 'fig-block' : 'fig-inline');
+  });
+}
+
 // The question as the presenter wrote it: Markdown, $LaTeX$ and code blocks.
 // Falls back to plain text when the CDN can't be reached, so a phone on a
 // captive network still sees the question.
@@ -273,7 +311,8 @@ function setQuestion(src) {
   const el = document.getElementById('question-text');
   el._src = src = src || '';
   if (!window.marked) { el.textContent = src; return; }
-  el.innerHTML = marked.parse(src, { breaks: false });
+  el.innerHTML = marked.parse(withFigures(src), { breaks: false });
+  markFigures(el);
   if (window.decorateCode) decorateCode(el);
   el.classList.toggle('has-block', !!el.querySelector('pre, ul, ol, blockquote'));
   if (window.renderMathInElement) {
@@ -291,6 +330,7 @@ function setQuestion(src) {
 window.addEventListener('load', () => {
   const el = document.getElementById('question-text');
   if (el && el._src) setQuestion(el._src);
+  document.querySelectorAll('.option-label').forEach(l => { if (l._src != null) setOptionLabel(l, l._src); });
 });
 
 async function load() {
@@ -303,6 +343,7 @@ async function load() {
     }
     const data = await res.json();
     if (data.active === false) { showCard('closed-card'); return; }
+    FIGS = data.figures || {};
     setQuestion(data.question || 'Please select an option:');
     renderOptions(data.options || []);
     document.getElementById('loading-area').style.display = 'none';

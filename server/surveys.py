@@ -75,6 +75,32 @@ def _clean_meta(meta):
     return out
 
 
+# Pictures written into a question or its answers: ![cave](fig:k3x9q) in the
+# text, the picture itself here as a data: URL, so a phone shows what the
+# slide shows. Images only, and capped: a handful of icons or figures, not a
+# file store.
+_FIG_ID = re.compile(r'^[A-Za-z0-9_-]{1,24}$')
+_FIG_URL = re.compile(r'^data:image/(png|jpeg|gif|webp|svg\+xml);base64,[A-Za-z0-9+/=]+$')
+_FIG_MAX_EACH = 1_500_000
+_FIG_MAX_TOTAL = 6_000_000
+
+
+def _clean_figures(figs):
+    if not isinstance(figs, dict):
+        return {}
+    out, total = {}, 0
+    for k, v in list(figs.items())[:32]:
+        if not (isinstance(k, str) and _FIG_ID.match(k) and isinstance(v, str)):
+            continue
+        if len(v) > _FIG_MAX_EACH or not _FIG_URL.match(v):
+            continue
+        total += len(v)
+        if total > _FIG_MAX_TOTAL:
+            break
+        out[k] = v
+    return out
+
+
 @surveys_bp.route('/s/<session_id>/api/survey/create', methods=['POST'])
 @require_presenter
 def create_survey(session_id, sess):
@@ -106,6 +132,7 @@ def create_survey(session_id, sess):
         'options': options,
         'kind': kind,
         'meta': _clean_meta(data.get('meta')),
+        'figures': _clean_figures(data.get('figures')),
         # Free-text answers go through the content filter unless the
         # presenter turned it off for this question.
         'filter': data.get('filter') is not False,
@@ -137,6 +164,7 @@ def get_survey(session_id, survey_id):
         'options': s.get('options'),
         'kind': s.get('kind', 'open'),
         'meta': _public_meta(s.get('meta', {})),
+        'figures': s.get('figures') or {},
         'active': s.get('active', False),
     })
 

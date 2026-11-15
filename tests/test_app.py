@@ -387,6 +387,19 @@ def test_fill_in_the_blanks_survey_carries_its_template(client):
     assert meta['template'] == long_tpl[:8000]
 
 
+def test_survey_carries_its_figures_to_the_phones(client):
+    session_id = create_session(client)
+    png = 'data:image/png;base64,iVBORw0KGgo='
+    sid = create_survey(client, session_id, question='From the ![cave](fig:cave1) to the ![tree](fig:tree2)?',
+                        options=['![a](fig:cave1)', 'B'], kind='choice',
+                        figures={'cave1': png, 'tree2': png,
+                                 'bad id!': png,                                   # not an id
+                                 'html': 'data:text/html;base64,PHNjcmlwdD4=',     # not a picture
+                                 'web': 'https://example.com/x.png'})['survey_id']  # not inline
+    data = client.get(f'{session_prefix(session_id)}/api/survey/{sid}').get_json()
+    assert data['figures'] == {'cave1': png, 'tree2': png}
+
+
 def test_create_survey_with_unknown_model_rejected(client):
     session_id = create_session(client)
     resp = client.post(f'{session_prefix(session_id)}/api/survey/create', json={'question': 'Q', 'model': 'nope'})

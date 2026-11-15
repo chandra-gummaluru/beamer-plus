@@ -282,6 +282,11 @@ textarea::placeholder { color: var(--text-3); }
   border-left: 2px solid var(--border-med); color: var(--text-2); text-align: left;
 }
 .question-text img { max-width: 100%; }
+.question-text img.fig-inline, .option-label img.fig-inline {
+  display: inline-block; height: 1.7em; width: auto; max-width: none;
+  vertical-align: middle; margin: -0.15em 0.08em;
+}
+.question-text img.fig-block { display: block; max-width: 100%; max-height: 40vh; width: auto; margin: 0.4em auto; }
 .question-text.has-block { font-size: 1.1rem; text-align: left; }
 </style>
 <link rel="stylesheet" href="/static/css/respond.css">
@@ -717,6 +722,25 @@ function blankInput(spec, k, inCode) {
   return group;
 }
 
+// Pictures in the question or answers: ![cave](fig:id) in the text, the
+// picture itself sent alongside (data.figures). One alone on its line is a
+// figure; any other sits in the text like a word, as on the slide.
+let FIGS = {};
+// A picture alone on its line is a figure: its own paragraph, so a single
+// line break before it is enough (as it is while editing). Code is left be.
+const lonePictures = src => String(src).split(/(```[\s\S]*?```)/).map((part, i) => i % 2 ? part
+  : part.replace(/^[ \t]*(!\[[^\]\n]*\]\([^)\s]+\))[ \t]*$/gm, '\n$1\n')).join('');
+function withFigures(src) {
+  return lonePictures(String(src || '')).replace(/\]\(fig:([\w-]+)\)/g, (m, id) => FIGS[id] ? `](${FIGS[id]})` : m);
+}
+function markFigures(root) {
+  root.querySelectorAll('img').forEach(img => {
+    const p = img.parentElement;
+    const alone = p && p !== root && p.nodeName === 'P' && p.childElementCount === 1 && !p.textContent.trim();
+    img.classList.add(alone ? 'fig-block' : 'fig-inline');
+  });
+}
+
 // The question as the presenter wrote it: Markdown, $LaTeX$ and code blocks.
 // Falls back to plain text when the CDN can't be reached, so a phone on a
 // captive network still sees the question.
@@ -729,7 +753,8 @@ function setQuestion(src) {
 // Markdown, code listings and maths into `el`. Plain text without marked.
 function renderRich(el, src, breaks = false) {
   if (!window.marked) { el.textContent = src; return; }
-  el.innerHTML = marked.parse(src, { breaks });
+  el.innerHTML = marked.parse(withFigures(src), { breaks });
+  markFigures(el);
   if (window.decorateCode) decorateCode(el);
   if (window.renderMathInElement) {
     renderMathInElement(el, {
@@ -764,6 +789,7 @@ async function load() {
     if (!res.ok) { showCard('error-card'); return; }
     const data = await res.json();
     if (!data.active) { showCard('closed-card'); return; }
+    FIGS = data.figures || {};
     setQuestion(data.question || 'Share your thoughts');
     buildInput(data);
     document.getElementById('loading-area').style.display = 'none';

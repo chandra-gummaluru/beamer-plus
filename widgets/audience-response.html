@@ -2497,6 +2497,32 @@ html.ar-dark {
 #question h1, #question h2, #question h3 { font-size: 1em; font-weight: 600; }
 #question img { max-width: 100%; }
 
+/* ── Figures in the text ─────────────────────────────── */
+/* A picture written into the question or an answer ( ![cave](fig:…) ) sits
+   in the line like a word, as the slides set their little icons: a bit taller
+   than the capitals, centred on the text. One on a line of its own is a
+   figure, drawn larger and centred. */
+img.fig-inline {
+  display: inline-block;
+  height: 1.7em;
+  width: auto;
+  max-width: none;
+  vertical-align: middle;
+  margin: -0.15em 0.08em;
+}
+img.fig-block {
+  display: block;
+  max-width: 100%;
+  max-height: calc(200px * var(--u));
+  width: auto;
+  margin: 0.3em auto;
+}
+.choice-label img.fig-block { max-height: calc(110px * var(--u)); margin: 0.15em 0; }
+.md-tok.is-fig { display: inline-block; vertical-align: middle; }
+.md-tok.is-fig.is-block { display: block; }
+.md-tok.is-fig.is-block img.fig-block { margin: 0.3em 0; }
+#question.is-drop, .choice-label.is-drop { outline: 2px dashed var(--edit-line) !important; outline-offset: 4px; }
+
 /* A question with a listing keeps its size: the prose reads as it does
    everywhere else, and the listing sits a step under it, the way a code block
    sits in a slide's body text. (fitStage() still shrinks a question too tall
@@ -3734,6 +3760,9 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
         <span class="ar-sep" aria-hidden="true"></span>
         <button class="bw-btn" id="ed-filter-btn" type="button" aria-haspopup="dialog" aria-expanded="false" title="Content filter: turn away answers with profanity or abuse"><span id="ed-filter-label">Filter: On</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></button>
       </span>
+      <span class="ar-sep" aria-hidden="true"></span>
+      <button class="bw-btn" type="button" id="ed-fig" title="Put a picture in the question or an answer, at the caret (or paste or drop one there)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><polyline points="21 16 15.5 11 6 20"/></svg><span>Figure</span></button>
+      <input type="file" id="ed-fig-file" accept="image/*" multiple hidden>
       <span class="ar-group" id="ed-blank-wrap" hidden>
         <span class="ar-sep" aria-hidden="true"></span>
         <span class="ar-field">Insert blank
@@ -4114,6 +4143,103 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
     catch (_) { return parentOrigin(); }
   }
 
+  // ── Figures ─────────────────────────────────────────────────────────────────
+  // Pictures pasted, dropped or picked into the question or an answer. The
+  // text refers to each by a short id — ![cave](fig:k3x9q) — and the picture
+  // itself is kept once, in cfg.figures, as a data: URL. So the source stays
+  // readable while it's typed, the deck carries the pictures with the slide,
+  // and the phones are sent the same pictures with the question (no asset
+  // URL a phone on another network couldn't reach).
+  const FIG_REF = /\]\(fig:([\w-]+)\)/g;
+  const FIG_MAX = 640;       // longest side kept, px — plenty for a figure, small for an icon
+  const figures = () => (cfg.figures && typeof cfg.figures === 'object' ? cfg.figures : {});
+  const figKey  = () => Object.keys(figures()).join(',');
+  // A picture alone on its line is a figure: its own paragraph, so a single
+  // line break before it is enough (as it is while editing). Code is left be.
+  const lonePictures = src => String(src).split(/(```[\s\S]*?```)/).map((part, i) => i % 2 ? part
+    : part.replace(/^[ \t]*(!\[[^\]\n]*\]\([^)\s]+\))[ \t]*$/gm, '\n$1\n')).join('');
+  function withFigures(src) {
+    const f = figures();
+    return lonePictures(src).replace(FIG_REF, (m, id) => f[id] ? `](${f[id]})` : m);
+  }
+  // The ids a piece of text uses.
+  function figIds(src) {
+    const out = [];
+    String(src || '').replace(FIG_REF, (m, id) => { out.push(id); return m; });
+    return out;
+  }
+  // Every figure still written somewhere in the question or the answers.
+  function usedFigures() {
+    const f = figures(), used = {};
+    const texts = [cfg.question, cfg.template, ...(Array.isArray(cfg.options) ? cfg.options : String(cfg.options || '').split('\n'))];
+    texts.forEach(t => figIds(t).forEach(id => { if (f[id]) used[id] = f[id]; }));
+    return used;
+  }
+  // An image is a figure when nothing else is on its line, otherwise it
+  // sits in the text.
+  function markFigures(root) {
+    root.querySelectorAll('img').forEach(img => {
+      const p = img.parentElement;
+      const alone = p && p !== root && p.nodeName === 'P' && p.childElementCount === 1 && !p.textContent.trim();
+      img.classList.add(alone ? 'fig-block' : 'fig-inline');
+      img.draggable = false;
+    });
+    refitOnLoad(root);
+  }
+  // A picture takes its size only once decoded: fit the slide again then.
+  function refitOnLoad(root) {
+    root.querySelectorAll('img').forEach(img => {
+      if (!img.complete) img.addEventListener('load', () => requestAnimationFrame(fitStage), { once: true });
+    });
+  }
+  // A picture file, made small enough to keep in the deck's config.
+  async function figureFromFile(file) {
+    const raw = await new Promise((ok, bad) => {
+      const r = new FileReader();
+      r.onload = () => ok(String(r.result)); r.onerror = () => bad(r.error);
+      r.readAsDataURL(file);
+    });
+    // A small SVG stays a drawing — sharp at any size.
+    if (file.type === 'image/svg+xml' && raw.length < 200000) return raw;
+    const img = await new Promise((ok, bad) => {
+      const i = new Image();
+      i.onload = () => ok(i); i.onerror = () => bad(new Error('not an image this browser can read'));
+      i.src = raw;
+    });
+    const w0 = img.naturalWidth || 300, h0 = img.naturalHeight || 300;
+    const k  = Math.min(1, FIG_MAX / Math.max(w0, h0));
+    if (k === 1 && raw.length < 150000 && file.type !== 'image/svg+xml') return raw;
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(w0 * k)); c.height = Math.max(1, Math.round(h0 * k));
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    // WebP keeps transparency at a fraction of PNG's size; a browser that
+    // can't write it hands back a PNG instead.
+    const webp = c.toDataURL('image/webp', 0.9);
+    return webp.startsWith('data:image/webp') ? webp : c.toDataURL('image/png');
+  }
+  const figAlt = name => String(name || '').replace(/\.[a-z0-9]+$/i, '').replace(/[\[\]()\n]/g, ' ').trim().slice(0, 40) || 'figure';
+  // Kept with the slide; resolves with the Markdown that shows it.
+  async function addFigure(file) {
+    const url = await figureFromFile(file);
+    let id;
+    do { id = Math.random().toString(36).slice(2, 7); } while (figures()[id]);
+    setting({ figures: { ...figures(), [id]: url } });
+    return `![${figAlt(file.name)}](fig:${id})`;
+  }
+  const imageFiles = list => [...(list || [])].filter(f => f && /^image\//.test(f.type));
+  // Put pictures into one of the live editors, at the caret.
+  async function insertFigures(ed, files) {
+    if (IS_VIEWER || !editing() || !ed) return;
+    try {
+      for (const f of files) ed.insert(await addFigure(f), { word: true });
+    } catch (e) {
+      S.error = `Couldn't add that picture — ${e.message || 'unreadable file'}.`;
+      render();
+    }
+  }
+  // The editor typed in last: where the Figure button puts its picture.
+  let lastEd = null;
+
   // Markdown + KaTeX for the question and answer options. Falls back to plain
   // text when the CDN is unreachable, rather than showing nothing.
   function setMd(el, src, answers) {
@@ -4122,12 +4248,15 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
     // arrives after it was first drawn without. A fill-in-the-blanks question
     // also redraws when the answers in its blanks change.
     const libs = (window.marked ? 1 : 0) + (window.renderMathInElement ? 2 : 0) +
-                 (answers ? '|' + JSON.stringify(answers) : '');
+                 (answers ? '|' + JSON.stringify(answers) : '') +
+                 (src.includes('](fig:') ? '|' + figKey() : '');
     if (el._md === src && el._mdLibs === libs) return;
     el._md = src; el._mdLibs = libs;
     if (!src) { el.textContent = ''; el.classList.remove('has-code'); return; }
     if (answers) src = subBlanks(src);
     if (!window.marked) { el.textContent = src; if (answers) blankify(el, answers); return; }
+    // After the blanks: a picture's data is never mistaken for a BLANK.
+    src = withFigures(src);
     // Presenter-authored config, not audience input — responses never come
     // through here; they're set with textContent.
     // Trimmed: the trailing newline marked adds shows as a blank line in edit
@@ -4135,6 +4264,7 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
     // A fill-in-the-blanks question keeps its lines as typed ("Description:
     // ___" over "passwd: ___"), as a form would; elsewhere Markdown joins them.
     el.innerHTML = marked.parse(src, { breaks: !!answers }).trim();
+    markFigures(el);
     decorateCode(el);
     el.classList.toggle('has-code', !!el.querySelector('pre'));
     if (window.renderMathInElement) {
@@ -4241,10 +4371,10 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
   // the DOM (text as typed, a rendered piece as the source it stands for),
   // works out where the caret is in that source, and redraws, putting the
   // caret back at the same place.
-  const MD_TOKEN = /```[\s\S]*?```|```[\s\S]*$|\$\$[\s\S]+?\$\$|\$[^$\n]+?\$|`[^`\n]+`|\*\*[^*\n]+?\*\*|\*[^*\s][^*\n]*?\*|(?<![\w])_[^_\s][^_\n]*?_(?![\w])|\[[^\]\n]+\]\([^)\s]+\)/g;
+  const MD_TOKEN = /```[\s\S]*?```|```[\s\S]*$|\$\$[\s\S]+?\$\$|\$[^$\n]+?\$|`[^`\n]+`|\*\*[^*\n]+?\*\*|\*[^*\s][^*\n]*?\*|(?<![\w])_[^_\s][^_\n]*?_(?![\w])|!\[[^\]\n]*\]\([^)\s]+\)|\[[^\]\n]+\]\([^)\s]+\)/g;
 
   // With blanks on, a BLANK (or ___) is a piece of its own, drawn as the gap.
-  const MD_TOKEN_BLANKS = /```[\s\S]*?```|```[\s\S]*$|\bBLANK\((?=[^()\n]*(?:\^|\||\sX?OR\s))[^()\n]*\)|\bBLANK\b|_{3,}|\$\$[\s\S]+?\$\$|\$[^$\n]+?\$|`[^`\n]+`|\*\*[^*\n]+?\*\*|\*[^*\s][^*\n]*?\*|(?<![\w])_[^_\s][^_\n]*?_(?![\w])|\[[^\]\n]+\]\([^)\s]+\)/g;
+  const MD_TOKEN_BLANKS = /```[\s\S]*?```|```[\s\S]*$|\bBLANK\((?=[^()\n]*(?:\^|\||\sX?OR\s))[^()\n]*\)|\bBLANK\b|_{3,}|\$\$[\s\S]+?\$\$|\$[^$\n]+?\$|`[^`\n]+`|\*\*[^*\n]+?\*\*|\*[^*\s][^*\n]*?\*|(?<![\w])_[^_\s][^_\n]*?_(?![\w])|!\[[^\]\n]*\]\([^)\s]+\)|\[[^\]\n]+\]\([^)\s]+\)/g;
   function mdSegments(src) {
     const out = [];
     let last = 0, m;
@@ -4282,6 +4412,12 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
     if (t.startsWith('`'))  return `<code>${escHtml(t.slice(1, -1))}</code>`;
     if (t.startsWith('**')) return `<strong>${escHtml(t.slice(2, -2))}</strong>`;
     if (t.startsWith('*') || t.startsWith('_')) return `<em>${escHtml(t.slice(1, -1))}</em>`;
+    const pic = t.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+    if (pic) {
+      const id  = pic[2].match(/^fig:([\w-]+)$/);
+      const url = id ? figures()[id[1]] : pic[2];
+      return url ? `<img class="fig-inline" alt="${escHtml(pic[1])}" src="${escHtml(url)}" draggable="false">` : null;
+    }
     const link = t.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
     return link ? `<a>${escHtml(link[1])}</a>` : null;   // not followed while editing
   }
@@ -4309,6 +4445,9 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
     let src = '', openAt = null, composing = false;
     const history = [];
     let lastPush = 0;
+    // Where the caret was last: a picture chosen with the Figure button goes
+    // there, though picking the file took the focus away.
+    let lastCaret = null;
 
     // The source a node stands for.
     function srcOf(n) {
@@ -4378,6 +4517,13 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
           span.innerHTML = html;
           span.contentEditable = 'false';
           if (sg.tok.startsWith('```') || sg.tok.startsWith('$$')) span.classList.add('is-block');
+          if (sg.tok.startsWith('![')) {
+            span.classList.add('is-fig');
+            const alone = (sg.start === 0 || src[sg.start - 1] === '\n') &&
+                          /^[ \t]*(\n|$)/.test(src.slice(sg.end));
+            if (alone) { span.classList.add('is-block'); span.firstChild?.classList.replace('fig-inline', 'fig-block'); }
+          }
+          refitOnLoad(span);
         }
         el.appendChild(span);
       }
@@ -4476,10 +4622,13 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
       }
     });
 
-    // Pasted text arrives as text, never as markup.
+    // Pasted text arrives as text, never as markup. A pasted picture is
+    // kept as a figure and written in where the caret is.
     el.addEventListener('paste', e => {
       if (!editing()) return;
       e.preventDefault();
+      const pics = imageFiles(e.clipboardData?.files);
+      if (pics.length) { insertFigures(api, pics); return; }
       const text = (e.clipboardData?.getData('text/plain') || '').replace(/\r\n?/g, '\n');
       const r = range() || [src.length, src.length];
       commitEdit(src.slice(0, r[0]) + text + src.slice(r[1]), r[0] + text.length);
@@ -4496,13 +4645,39 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
       else openAt = r[1];
     });
 
+    el.addEventListener('focus', () => { lastEd = api; });
     el.addEventListener('blur', () => {
       if (!editing()) return;
+      const r = range();
+      if (r) lastCaret = r[1];
       draw(null);
       onChange(src, true);
     });
 
-    return {
+    // A picture dragged in from the desktop or another page goes where it's
+    // dropped.
+    el.addEventListener('dragover', e => {
+      if (!editing() || ![...(e.dataTransfer?.types || [])].includes('Files')) return;
+      e.preventDefault();
+      el.classList.add('is-drop');
+    });
+    el.addEventListener('dragleave', () => el.classList.remove('is-drop'));
+    el.addEventListener('drop', e => {
+      el.classList.remove('is-drop');
+      if (!editing()) return;
+      const pics = imageFiles(e.dataTransfer?.files);
+      if (!pics.length) return;
+      e.preventDefault();
+      let at = null;
+      const pos = document.caretPositionFromPoint?.(e.clientX, e.clientY);
+      const rg  = pos ? null : document.caretRangeFromPoint?.(e.clientX, e.clientY);
+      const node = pos ? pos.offsetNode : rg?.startContainer, off = pos ? pos.offset : rg?.startOffset;
+      if (node && el.contains(node)) at = offsetOf(node, off);
+      if (at != null) lastCaret = at;
+      insertFigures(api, pics);
+    });
+
+    const api = {
       // Shown from outside (the setting changed, or on entering edit mode):
       // only while it isn't being typed in.
       set(next) {
@@ -4514,18 +4689,24 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
         draw(null);
       },
       get: () => src,
-      // Typed in at the caret (or at the end, if the caret isn't here).
-      insert(text) {
-        const r = document.activeElement === el ? range() : null;
+      // Typed in at the caret (or where it last was, or at the end).
+      // `word`: set apart by spaces, like a word — a picture, say, which
+      // then shows drawn rather than as the source the caret would open.
+      insert(text, { word = false } = {}) {
+        let r = document.activeElement === el ? range() : null;
+        if (!r && lastCaret != null && lastCaret <= src.length) r = [lastCaret, lastCaret];
+        lastCaret = null;
         const [a, b] = r || [src.length, src.length];
-        const pad = !r && src && !/\s$/.test(src) ? ' ' : '';
+        const pad = (word ? a > 0 : !r && src) && !/\s$/.test(src.slice(0, a)) ? ' ' : '';
+        const after = word && !/^\s/.test(src.slice(b)) ? ' ' : '';
         el.focus();
         // Its own undo step, on both sides.
         lastPush = 0;
-        commitEdit(src.slice(0, a) + pad + text + src.slice(b), a + pad.length + text.length);
+        commitEdit(src.slice(0, a) + pad + text + after + src.slice(b), a + pad.length + text.length + after.length);
         lastPush = 0;
       },
     };
+    return api;
   }
 
   // Count a number up (or down) to its new value instead of snapping — reads
@@ -5746,6 +5927,9 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
     // The phone draws the template as the slide does — Markdown, code
     // listings — with an input per blank, so it gets the whole source.
     if (S.type === 'fill')      body.meta = { template: S.question.trim() };
+    // The pictures the question and answers show, for the phones to show too.
+    const figs = usedFigures();
+    if (Object.keys(figs).length) body.figures = figs;
     if (S.type === 'plot')      body.meta = { xLabel: S.plot.x, yLabel: S.plot.y, xLow: S.plot.xLow, xHigh: S.plot.xHigh,
                                               yLow: S.plot.yLow, yHigh: S.plot.yHigh };
     if (FILTERED.has(S.type)) {
@@ -6572,6 +6756,22 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
     onChange: (src, commit) => setting(cfg.template ? { question: src, template: '' } : { question: src }, !commit),
   });
 
+  // ── Figure button: a picture from a file, where the caret was ─────────────
+  const edFig = $('ed-fig'), edFigFile = $('ed-fig-file');
+  edFig.addEventListener('mousedown', e => e.preventDefault());   // keep the caret where it is
+  edFig.addEventListener('click', () => {
+    if (!editing()) return;
+    // Into the field being typed in, or the one typed in last, or the question.
+    if (!lastEd || (lastEd !== questionEd && !choiceRows.some(r => r.label._ed === lastEd))) lastEd = questionEd;
+    const target = lastEd;
+    edFigFile.onchange = () => {
+      const pics = imageFiles(edFigFile.files);
+      edFigFile.value = '';
+      if (pics.length) insertFigures(target, pics);
+    };
+    edFigFile.click();
+  });
+
   // ── Fill in the blanks: a blank goes in where the caret is ────────────────
   // The button mustn't take the focus from the question.
   [['ed-blank', 'BLANK'], ['ed-blank-one', 'BLANK(*Option A ^ Option B)'], ['ed-blank-any', 'BLANK(*Option A | Option B | *Option C)']]
@@ -6790,6 +6990,7 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
       return;
     }
     tidyOptions();
+    if (Object.keys(figures()).length !== Object.keys(usedFigures()).length) setting({ figures: usedFigures() }, true);
     // Done: the slide is back to the question, ready — or, set to start by
     // itself, already collecting, as it would be on opening the slide.
     if (S.phase === 'idle' && ready() && cfg.autoStart !== false) startPoll();
