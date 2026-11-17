@@ -3746,10 +3746,10 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
           <input class="ar-in ar-in--num" id="ed-nsum" type="number" min="1" max="20" step="1" autocomplete="off" title="How many AI summaries to make of the responses">
         </label>
         <label class="ar-field">Model
-          <input class="ar-in" id="ed-model" type="text" list="ed-models" placeholder="none" autocomplete="off" spellcheck="false" title="The AI model that summarises the responses (blank for none)">
+          <input class="ar-in" id="ed-model" type="text" list="ed-models" placeholder="none" autocomplete="off" spellcheck="false" title="The Ollama model that summarises the responses, e.g. llama3.1 (blank for no summaries)">
         </label>
-        <label class="ar-field">API Key
-          <input class="ar-in" id="ed-key" type="password" placeholder="optional" autocomplete="off" title="Kept in this browser only — never saved in the presentation">
+        <label class="ar-field">Ollama
+          <input class="ar-in" id="ed-ollama" type="text" placeholder="localhost:11434" autocomplete="off" spellcheck="false" title="Where Ollama runs (blank for this computer)">
         </label>
         <datalist id="ed-models"></datalist>
       </span>
@@ -3957,7 +3957,7 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
   // ── Config ──────────────────────────────────────────────────────────────────
   const CFG0      = window.WIDGET_CONFIG || {};
   let   cfg       = { ...CFG0 };
-  adoptLegacyAiKey();
+  dropLegacyAiKey();
   let   WIDGET_ID = CFG0.id || CFG0.widgetId || 'audience-response';
   let   IS_VIEWER = CFG0.role === 'viewer';
 
@@ -4947,7 +4947,7 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
     return (String(tpl).match(BLANK_RE) || []).length;
   }
   const ready = () => !missing();
-  // Open-ended answers are summarised by AI whenever a model is named.
+  // Open-ended answers are summarised by a local Ollama model whenever one is named.
   const aiOn = () => !!String(cfg.model || '').trim();
 
   // ── Preview data ────────────────────────────────────────────────────────────
@@ -5937,12 +5937,6 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
       body.filter_allow = wordList(cfg.filterAllow);
       body.filter_block = wordList(cfg.filterBlock);
     }
-    if (S.type === 'open') {
-      body.model         = aiOn() ? cfg.model : null;
-      body.num_summaries = parseInt(cfg.numSummaries, 10) || 3;
-      const key = aiKey();
-      if (key) body.api_key = key;
-    }
     return body;
   }
 
@@ -6017,19 +6011,110 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
     render();
   }
 
+  // ── AI summary (Ollama) ─────────────────────────────────────────────────────
+  // Summaries come from Ollama on the presenter's own computer, asked straight
+  // from this page. No key, no account, and the answers never leave the room;
+  // the Beamer+ server has no AI in it at all. Only the presenter asks: the
+  // viewers get the finished themes with the rest of the state.
+  const OLLAMA_DEFAULT = 'localhost:11434';
+  const SUM_MAX_ANSWERS = 300;    // the most recent; a small model's context is short
+  const SUM_MAX_CHARS   = 300;    // per answer
+  const SUM_TIMEOUT_MS  = 180000; // a cold model can take a while to load
+
+  function ollamaBase() {
+    let u = String(cfg.ollamaUrl || '').trim() || OLLAMA_DEFAULT;
+    if (!/^https?:\/\//i.test(u)) u = 'http://' + u;
+    return u.replace(/\/+$/, '');
+  }
+
+  function summaryRequest(texts, n) {
+    const numbered = texts.map((t, i) => `${i + 1}. ${t}`).join('\n');
+    const question = String(S.question || '').replace(/\s+/g, ' ').trim();
+    const prompt =
+      `A class answered ${question ? `the question "${question}"` : 'an open-ended question'}. ` +
+      `Here are their ${texts.length} answers:\n\n${numbered}\n\n` +
+      `Group the answers into exactly ${n} distinct themes, most common first. For each theme, ` +
+      `write a one- or two-sentence summary addressed to the class, and count how many answers ` +
+      `belong to it. An answer belongs to at most one theme.`;
+    return {
+      model: String(cfg.model).trim(),
+      messages: [{ role: 'user', content: prompt }],
+      stream: false,
+      // Ollama's structured output: the reply has to parse as this shape.
+      format: {
+        type: 'object',
+        properties: {
+          themes: {
+            type: 'array', minItems: n, maxItems: n,
+            items: {
+              type: 'object',
+              properties: { summary: { type: 'string' }, count: { type: 'integer' } },
+              required: ['summary', 'count'],
+            },
+          },
+        },
+        required: ['themes'],
+      },
+      // Room for the answers plus the reply: Ollama's default context is short
+      // enough to cut a big class off silently. (~3 characters a token.)
+      options: { temperature: 0.2, num_ctx: Math.min(32768, Math.max(4096, Math.ceil(prompt.length / 3) + 2048)) },
+    };
+  }
+
+  // Ollama's own errors, said in terms of what to do about them.
+  function ollamaError(status, msg, model, base) {
+    if (status === 404 || /not found/i.test(msg)) return `Ollama doesn't have the model "${model}". Run: ollama pull ${model}`;
+    if (status === 403) return `Ollama refused this page. Start Ollama with OLLAMA_ORIGINS=${parentOrigin()}`;
+    return msg || `Ollama at ${base} answered HTTP ${status}.`;
+  }
+
   async function loadSummary() {
-    if (IS_VIEWER || S.sumBusy || S.summaries || !S.surveyId) return;
+    if (IS_VIEWER || S.sumBusy || S.summaries || !S.surveyId || !aiOn()) return;
+    const sid   = S.surveyId;
+    const all   = S.responses.map(r => String(r?.text ?? r ?? '').replace(/\s+/g, ' ').trim()).filter(Boolean);
+    const texts = all.slice(-SUM_MAX_ANSWERS).map(t => t.slice(0, SUM_MAX_CHARS));
+    if (!texts.length) { S.sumError = 'No answers to summarise yet.'; render(); return; }
+    const n     = Math.min(texts.length, Math.min(20, parseInt(cfg.numSummaries, 10) || 3));
+    const base  = ollamaBase();
+    const model = String(cfg.model).trim();
+
     S.sumBusy = true; S.sumError = ''; render();
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), SUM_TIMEOUT_MS);
     try {
-      const res  = await fetch(`${serverUrl()}/api/survey/${S.surveyId}/analyze`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-      });
+      let res;
+      try {
+        res = await fetch(`${base}/api/chat`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(summaryRequest(texts, n)), signal: abort.signal,
+        });
+      } catch (e) {
+        if (e.name === 'AbortError') throw new Error(`Ollama took too long to answer (model "${model}").`);
+        // A refused connection and a CORS refusal look the same from here.
+        throw new Error(`Couldn't reach Ollama at ${base}. Is it running? If it is, start it with ` +
+                        `OLLAMA_ORIGINS=${parentOrigin()} so it accepts this page.`);
+      }
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      S.summaries = data; S.sIdx = 0;
+      if (!res.ok) throw new Error(ollamaError(res.status, data.error, model, base));
+
+      let themes;
+      try { themes = JSON.parse(data.message?.content || '').themes; } catch (_) { themes = null; }
+      if (!Array.isArray(themes) || !themes.length) throw new Error(`"${model}" didn't return themes. Try a larger model.`);
+      const total = texts.length;
+      const list = themes
+        .filter(t => t && typeof t.summary === 'string' && t.summary.trim())
+        .slice(0, n)
+        .map(t => ({ summary: t.summary.trim(),
+                     num_respondents: Math.max(0, Math.min(total, Math.round(Number(t.count) || 0))) }))
+        .sort((a, b) => b.num_respondents - a.num_respondents);
+      if (!list.length) throw new Error(`"${model}" didn't return themes. Try a larger model.`);
+      if (sid !== S.surveyId) return;   // the poll was reset while we waited
+      S.summaries = { summaries: list, model, num_responses: total };
+      S.sIdx = 0;
     } catch (e) {
-      S.sumError = `Couldn't summarise: ${e.message}`;
+      if (sid === S.surveyId) S.sumError = `Couldn't summarise: ${e.message}`;
     } finally {
+      clearTimeout(timer);
       S.sumBusy = false; render();
     }
   }
@@ -6278,7 +6363,7 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
     if (!c) return;
     const prevAuto = cfg.autoStart !== false;
     cfg       = { ...cfg, ...c };
-    adoptLegacyAiKey();
+    dropLegacyAiKey();
     WIDGET_ID = cfg.id || cfg.widgetId || WIDGET_ID;
     IS_VIEWER = cfg.role === 'viewer' || IS_VIEWER;
 
@@ -6409,7 +6494,7 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
   const edAdd       = $('ed-add');
   const edModel     = $('ed-model');
   const edNsum      = $('ed-nsum');
-  const edKey       = $('ed-key');
+  const edOllama    = $('ed-ollama');
   const edBlank     = $('ed-blank');
 
   // A change made on the widget is a setting: saved with the slide (inside
@@ -6417,26 +6502,19 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
   // while typing: the text is already on screen, and redrawing the element
   // being typed in would lose the caret — so only our copy is updated, and
   // the field commits (not silently) when it loses focus.
-  // The AI key belongs to the presenter, not the deck: it is kept in this
-  // browser (localStorage, one per model) and never put in the widget's
-  // config, which is saved inside the presentation ZIP and travels with it.
-  function aiKeySlot() { return 'beamer.aiKey.' + (String(cfg.model || '').trim() || 'default'); }
-  function aiKey() {
-    // A key typed before a model was chosen sits in the 'default' slot.
-    try { return localStorage.getItem(aiKeySlot()) || localStorage.getItem('beamer.aiKey.default') || ''; }
-    catch (_) { return ''; }
+  // Summaries once went to Claude or OpenAI with a key, kept in the deck's
+  // config (older decks) or in this browser. Neither is used any more: drop
+  // the one in the config (the host strips it at the next save) and forget
+  // any this browser still holds.
+  function dropLegacyAiKey() {
+    if ('apiKey' in cfg) { const { apiKey, ...rest } = cfg; cfg = rest; }
   }
-  function setAiKey(v) {
-    try { v ? localStorage.setItem(aiKeySlot(), v) : localStorage.removeItem(aiKeySlot()); } catch (_) { /* storage off */ }
-  }
-  // A deck saved before this kept the key in its config: move it to this
-  // browser. The host drops it from the deck at the next save.
-  function adoptLegacyAiKey() {
-    if (!cfg.apiKey) return;
-    if (!aiKey()) setAiKey(String(cfg.apiKey).trim());
-    const { apiKey, ...rest } = cfg;
-    cfg = rest;
-  }
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('beamer.aiKey.')) localStorage.removeItem(k);
+    }
+  } catch (_) { /* storage off */ }
 
   function setting(patch, silent = false) {
     if (silent) cfg = { ...cfg, ...patch };
@@ -6581,7 +6659,7 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
     if (t === 'open') {
       setVal(edModel, String(cfg.model || ''));
       setVal(edNsum,  String(parseInt(cfg.numSummaries, 10) || 3));
-      setVal(edKey,   aiKey());
+      setVal(edOllama, String(cfg.ollamaUrl || ''));
       loadModels();
     }
   }
@@ -6840,35 +6918,30 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
   });
   wireText(edNsum,  'numSummaries', { read: el => Math.min(20, intAtLeast(1, 3)(el)) });
   wireText(edModel, 'model',        { read: el => el.value.trim() });
+  wireText(edOllama, 'ollamaUrl',   { read: el => el.value.trim() });
   // The plot's axis names and end labels, typed where they show.
   [['x', 'plotX'], ['y', 'plotY'], ['xLow', 'plotXLow'], ['xHigh', 'plotXHigh'], ['yLow', 'plotYLow'], ['yHigh', 'plotYHigh']]
     .forEach(([k, key]) => wireText(plLabels[k], key, { read: el => typedText(el).trim() }));
-  // Not a setting: the key goes to this browser's storage (see aiKey).
-  for (const ev of ['input', 'change']) {
-    edKey.addEventListener(ev, () => { if (editing()) setAiKey(edKey.value.trim()); });
-  }
-  edKey.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); edKey.blur(); } });
   wireText(edAllow, 'filterAllow',  { read: el => el.value });
   wireText(edBlock, 'filterBlock',  { read: el => el.value });
 
-  // The models the server offers, as suggestions; any name can be typed (and
-  // must be, opened as a file, where there's no server to ask).
-  let modelsAsked = false;
+  // The models this computer's Ollama has pulled, as suggestions; any name
+  // can be typed (Ollama may not be running while the slide is edited).
+  let modelsFrom = null;
   function loadModels() {
-    if (modelsAsked) return;
-    modelsAsked = true;
-    const base = cfg.serverUrl || window.BeamerWidget?.serverOrigin?.() || '';
-    if (!/^https?:/.test(base)) return;
-    fetch(base.replace(/\/+$/, '') + '/api/models')
+    const base = ollamaBase();
+    if (modelsFrom === base) return;
+    modelsFrom = base;
+    fetch(base + '/api/tags')
       .then(r => r.json())
       .then(data => {
         const list = $('ed-models');
         list.textContent = '';
         (data?.models || []).forEach(m => {
-          const o = document.createElement('option'); o.value = m; list.appendChild(o);
+          const o = document.createElement('option'); o.value = m.name || m.model; list.appendChild(o);
         });
       })
-      .catch(() => {});
+      .catch(() => { modelsFrom = null; /* not running: ask again next time */ });
   }
 
   // ── Segmented choices ───────────────────────────────────────────────────────

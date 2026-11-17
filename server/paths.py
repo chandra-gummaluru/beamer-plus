@@ -13,4 +13,3 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 WIDGETS_DIR = os.path.join(BASE_PATH, 'widgets')
 os.makedirs(WIDGETS_DIR, exist_ok=True)
 
-AI_MODELS_DIR = os.path.join(BASE_PATH, 'ai')

@@ -65,7 +65,6 @@ const state = {
     slideConfigs: {},
     mediaCache: {},
     annotations: {},
-    availableModels: [],
     annCvs: null,
     pdfCvs: null,
     annCvs2: null,
@@ -215,11 +214,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // annotation sync + active-pane tracking
     state.activeAnnCvs = state.annCvs;
     wireAnnCanvasActivation(state.annCvs);
-
-    // load available AI models
-    fetch(sessionUrl('/api/models')).then(r => r.json()).then(d => {
-        state.availableModels = d.models || [];
-    }).catch(() => { state.availableModels = []; });
 
     // Upload bus handlers
     bus.on('upload:zip', async (file) => {

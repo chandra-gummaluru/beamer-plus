@@ -5,7 +5,6 @@ Module map:
 - paths.py         BASE_PATH and derived folders
 - state.py         shared limits (MAX_RESPONSES_PER_SURVEY, …)
 - sessions.py      per-presenter session registry + create API
-- ai_models.py     survey-summarization model loading (server ai/ folder only)
 - pages.py         HTML pages and PWA files
 - presentation.py  upload, ZIP assets, demo packaging
 - widgets.py       built-in widget serving, embeddability probe
@@ -23,7 +22,6 @@ load_env()   # before anything reads the environment
 from .core import app, socketio  # noqa: E402
 
 from . import sockets  # noqa: F401  (registers Socket.IO handlers on import)
-from .ai_models import init_builtin_models  # noqa: E402
 from . import moderation  # noqa: E402
 from .pages import pages_bp
 from .presentation import presentation_bp
@@ -37,7 +35,6 @@ app.register_blueprint(widgets_bp)
 app.register_blueprint(surveys_bp)
 app.register_blueprint(sessions_bp)
 
-init_builtin_models()
 moderation.init()
 
 # Idle sessions are swept while the server runs. (Old decks left in uploads/

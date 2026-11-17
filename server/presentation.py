@@ -64,8 +64,8 @@ def _save_and_load(sess, session_id, file):
     sess.temp_assets.clear()
     filepath = os.path.join(sess.upload_dir(session_id), 'current.zip')
     file.save(filepath)
-    # Summarizer models come only from the server's own ai/ folder. Code
-    # inside an uploaded ZIP is never run (a deck can come from anywhere).
+    # Nothing inside an uploaded ZIP is ever run on the server (a deck can
+    # come from anywhere).
     sess.current_presentation['file'] = filepath
     return filepath
 
@@ -76,12 +76,7 @@ def upload(session_id, sess):
     if 'file' not in request.files:
         return jsonify({'error': 'No file'}), 400
     _save_and_load(sess, session_id, request.files['file'])
-    available_models = sess.current_presentation.get('available_models', [])
-    return jsonify({
-        'success': True,
-        'models': available_models,
-        'models_found': len(available_models),
-    })
+    return jsonify({'success': True})
 
 
 @presentation_bp.route('/api/demo-zip')
@@ -157,9 +152,3 @@ def upload_asset(session_id, sess):
             return jsonify({'error': 'The server is out of room for uploaded files. Try again later.'}), 413
         sess.temp_assets[path] = data
     return jsonify({'path': path, 'url': f'/s/{session_id}/api/zip-asset/{path}'})
-
-
-@presentation_bp.route('/s/<session_id>/api/models')
-@require_presenter
-def get_models(session_id, sess):
-    return jsonify({'models': sess.current_presentation.get('available_models', [])})

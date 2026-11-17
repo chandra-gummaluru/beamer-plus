@@ -1,11 +1,13 @@
-"""Survey API: creation, audience responses, and AI summarization (per session)."""
-import inspect
+"""Survey API: creation and audience responses (per session).
+
+AI summaries are not made here: the audience-response widget asks Ollama on
+the presenter's own computer directly, so the server holds no AI code or keys.
+"""
 import json
 import os
 import re
 import secrets
 import time
-import traceback
 import uuid
 
 from flask import Blueprint, jsonify, request
@@ -108,13 +110,6 @@ def create_survey(session_id, sess):
     if not isinstance(data, dict):
         return jsonify({'error': 'Invalid request body'}), 400
     survey_id = str(uuid.uuid4())[:8]
-    model_name = data.get('model')
-    if model_name and model_name not in sess.current_presentation.get('models', {}):
-        return jsonify({'error': f'Model "{model_name}" not found'}), 400
-    try:
-        num_summaries = max(1, min(20, int(data.get('num_summaries', 3))))
-    except (TypeError, ValueError):
-        num_summaries = 3
     options = data.get('options')
     if options is not None:
         if not isinstance(options, list) or not all(isinstance(o, str) for o in options):
@@ -126,9 +121,6 @@ def create_survey(session_id, sess):
         'question': str(data.get('question', 'What do you think?')),
         'created_at': time.time(),
         'active': True,
-        'model': model_name,
-        'api_key': data.get('api_key') or None,
-        'num_summaries': num_summaries,
         'options': options,
         'kind': kind,
         'meta': _clean_meta(data.get('meta')),
@@ -273,45 +265,6 @@ def get_responses(session_id, survey_id, sess):
         after = 0
     all_responses = sess.survey_responses[survey_id]
     return jsonify({'responses': all_responses[after:], 'total': len(all_responses)})
-
-
-@surveys_bp.route('/s/<session_id>/api/survey/<survey_id>/analyze', methods=['POST'])
-@require_presenter
-def analyze_survey(session_id, survey_id, sess):
-    if survey_id not in sess.surveys:
-        return jsonify({'error': 'Survey not found'}), 404
-    survey = sess.surveys[survey_id]
-    responses = sess.survey_responses[survey_id]
-    if not responses:
-        return jsonify({'error': 'No responses to analyze'}), 400
-    model_name = survey.get('model')
-    if not model_name:
-        return jsonify({'error': 'No model specified'}), 400
-    model_func = sess.current_presentation.get('models', {}).get(model_name)
-    if not model_func:
-        return jsonify({'error': f'Model "{model_name}" not loaded'}), 404
-    try:
-        num_summaries = survey.get('num_summaries', 3)
-        api_key = survey.get('api_key')
-        call_kwargs = {'api_key': api_key} if api_key and 'api_key' in inspect.signature(model_func).parameters else {}
-        summaries = model_func([r['text'] for r in responses], num_summaries, **call_kwargs)
-        if not isinstance(summaries, list) or len(summaries) != num_summaries:
-            return jsonify({'error': f'Model must return a list of {num_summaries} summaries'}), 500
-        for i, item in enumerate(summaries):
-            if not isinstance(item, tuple) or len(item) != 2 or not isinstance(item[0], str) or not isinstance(item[1], int):
-                return jsonify({'error': f'Summary {i} must be a (str, int) tuple'}), 500
-        return jsonify({
-            'summaries': [{'summary': s[0], 'num_respondents': s[1]} for s in summaries],
-            'model': model_name,
-            'num_responses': len(responses),
-        })
-    except RuntimeError as e:
-        # The models' own messages for the presenter ("No API key provided …").
-        traceback.print_exc()
-        return jsonify({'error': str(e)[:300]}), 500
-    except Exception:
-        traceback.print_exc()
-        return jsonify({'error': 'The summary failed. See the server log for details.'}), 500
 
 
 @surveys_bp.route('/s/<session_id>/api/survey/<survey_id>/close', methods=['POST'])

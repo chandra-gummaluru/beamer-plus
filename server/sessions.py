@@ -24,7 +24,6 @@ from functools import wraps
 
 from flask import Blueprint, abort, jsonify, request
 
-from . import ai_models
 from .paths import UPLOAD_FOLDER
 
 # Readable codes — omit 0/O and 1/I to reduce confusion when read aloud.
@@ -75,8 +74,6 @@ class SessionState:
     survey_ip_counts: dict = field(default_factory=lambda: defaultdict(lambda: defaultdict(int)))
     current_presentation: dict = field(default_factory=lambda: {
         'file': None,
-        'models': {},
-        'available_models': [],
     })
     temp_assets: dict[str, bytes] = field(default_factory=dict)
     # Guards the check-then-append of answers and assets.
@@ -180,9 +177,6 @@ def create_session(creator_ip: str = '') -> tuple[str, SessionState]:
     with _lock:
         session_id = _generate_session_id()
         sess = SessionState(created_at=time.time(), creator_ip=creator_ip)
-        builtin_models, builtin_available = ai_models.get_builtin_models()
-        sess.current_presentation['models'] = dict(builtin_models)
-        sess.current_presentation['available_models'] = list(builtin_available)
         _sessions[session_id] = sess
     return session_id, sess
 
