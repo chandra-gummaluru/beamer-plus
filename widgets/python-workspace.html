@@ -2385,8 +2385,13 @@ body.is-viewer .splitter::after { display: none; }
    so both must share every metric that affects where a glyph lands.
    Textareas don't inherit font from their parent, and the host base may style
    pre/textarea differently, so every metric is pinned explicitly on both. */
+/* Code is set in JetBrains Mono rather than the slide's CM Typewriter: the
+   typewriter face is a hairline at editor sizes and reads soft on a
+   projector. --pw-code stacks back to the slide face where the web font is
+   unreachable (offline, standalone). */
+#editor-pane, #shell-body { --pw-code: 'JetBrains Mono', 'BW CM Typewriter', ui-monospace, 'Cascadia Mono', Consolas, monospace; }
 #code-hl, #code, #gutter, #code-measure {
-  font-family: var(--font-mono);
+  font-family: var(--pw-code);
   font-size: calc(10px * var(--u, 1) * var(--ws));
   font-weight: 400;
   font-style: normal;
@@ -2461,6 +2466,13 @@ body.is-viewer .splitter::after { display: none; }
 }
 .line-mark.is-on { display: block; }
 #mark-cur { background: var(--accent-bg); box-shadow: inset 3px 0 0 var(--text); }
+/* The line the caret is on: a faint band, under every other marker, shown
+   only while the editor has focus and nothing is selected. */
+#mark-caret { background: color-mix(in srgb, var(--text) 5%, transparent); }
+#code-wrap > #mark-caret { z-index: 0; }
+/* The bracket next to the caret and its partner. */
+.t-bm { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 45%, transparent); border-radius: 2px; background: color-mix(in srgb, var(--text) 7%, transparent); }
+.t-bx { box-shadow: inset 0 -2px 0 var(--err); }
 #mark-err { background: var(--err-bg);    box-shadow: inset 3px 0 0 var(--err); }
 
 /* ── Debugger ───────────────────────────────────────────────── */
@@ -2629,7 +2641,7 @@ body.is-viewer .dbg-stack li { cursor: default; }
   padding: 10px 12px;
   background: var(--bg-output);
   cursor: text;
-  font-family: var(--font-mono);
+  font-family: var(--pw-code);
   font-size: calc(10px * var(--u, 1) * var(--ws));
   line-height: 1.5;
   tab-size: 4;
@@ -3118,7 +3130,7 @@ body.ws-static #files-pane { pointer-events: none; }
 #gutter .is-cur, #gutter .is-dbg { color: var(--sn-ink); font-weight: 700; }
 #code-hl { color: var(--sn-ink); }
 #code { caret-color: var(--sn-ink); }
-#code::selection { background: color-mix(in srgb, var(--sn-hl) 45%, transparent); color: transparent; }
+#code::selection { background: color-mix(in srgb, var(--sn-hl) 55%, transparent); color: transparent; }
 
 #mark-cur { background: color-mix(in srgb, var(--sn-hl) 55%, transparent); box-shadow: none; }
 #mark-dbg { background: color-mix(in srgb, var(--sn-hl) 55%, transparent); box-shadow: inset 3px 0 0 var(--sn-ink); }
@@ -3322,6 +3334,7 @@ body.bw-editing #gutter { cursor: pointer; }
           <span class="pane-label">Editor</span>
           <input class="pane-file" id="filename" value="main.py" spellcheck="false" aria-label="File name" title="The open file. Type to rename it.">
           <div class="bw-spacer"></div>
+          <button class="bw-btn bw-btn--icon" id="copy-code-btn" type="button" title="Copy this file's code" aria-label="Copy code"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg></button>
           <span id="mm-tools" class="presenter-only bw-run-only" hidden>
             <span id="traceTools">
               <button class="bw-btn bw-btn--icon" id="btnReset" type="button" title="Back to the start of the trace (R)" aria-label="Back to the start of the trace">
@@ -3354,6 +3367,7 @@ body.bw-editing #gutter { cursor: pointer; }
         <div id="editor-body">
           <div id="gutter">1</div>
           <div id="code-wrap">
+            <div class="line-mark" id="mark-caret"></div>
             <div class="line-mark" id="mark-cur"></div>
             <div class="line-mark" id="mark-err"></div>
             <div class="line-mark" id="mark-dbg"></div>
@@ -6417,6 +6431,11 @@ function syncCode(code){
    [start, end) must be refused, and gives the quiet nudge. */
 function editBlocked(start, end, inputType){
   if (!MM.visible || app.mode !== 'trace' || !isLive()) return false;
+  /* A paste, a cut, a drop or an undo is a deliberate whole edit, not a slip
+     of the keyboard: let it through, and codeChanged() starts the trace over
+     when it rewrites a line that has already run. Refusing these silently
+     made copy and paste look broken whenever a trace was on screen. */
+  if (/^(insertFromPaste|insertFromDrop|insertReplacementText|deleteByCut|deleteByDrag|historyUndo|historyRedo)$/.test(inputType || '')) return false;
   var lockEnd = offsetOfLineEnd(lockedThrough());
   if (lockEnd <= 0) return false;
   if (start === end && /^delete/.test(inputType || '') && /Backward/.test(inputType || '')) start--;
@@ -7426,6 +7445,8 @@ print(shopping)
   const splitB     = $('split-b');
   const markCur    = $('mark-cur');
   const markErr    = $('mark-err');
+  const markCaret  = $('mark-caret');
+  let   bm         = null;   // the bracket at the caret and its match: [i, j], or [i, -1] unmatched
   const mmPaneEl   = $('mm-pane');
   const mmTools    = $('mm-tools');
   const paneEls    = { editor: $('editor-pane'), shell: $('shell-pane'), memory: mmPaneEl, debug: $('dbg-pane') };
@@ -7500,11 +7521,24 @@ print(shopping)
     '|\\b(0[xXoObB][\\da-fA-F_]+|\\d[\\d_]*\\.?\\d*(?:[eE][+-]?\\d+)?j?)\\b',
     'g');
 
+  // Plain code between tokens; the matched brackets (bm) get a box.
+  function plain(src, a, b) {
+    if (!bm) return escHtml(src.slice(a, b));
+    let out = '', k = a;
+    for (const p of bm) {
+      if (p < a || p >= b || p < k) continue;
+      out += escHtml(src.slice(k, p)) + `<span class="${bm[1] < 0 ? 't-bx' : 't-bm'}">${escHtml(src[p])}</span>`;
+      k = p + 1;
+    }
+    return out + escHtml(src.slice(k, b));
+  }
+
   function highlight(src) {
     let out = '', last = 0, m;
     TOK.lastIndex = 0;
+    if (bm && bm[1] >= 0 && bm[1] < bm[0]) bm = [bm[1], bm[0]];
     while ((m = TOK.exec(src))) {
-      out += escHtml(src.slice(last, m.index));
+      out += plain(src, last, m.index);
       if      (m[1]) out += span('com', m[1]);
       else if (m[2]) out += span('str', m[2]);
       else if (m[3]) out += span('kw', m[3]) + m[4] + span('def', m[5]);
@@ -7517,7 +7551,7 @@ print(shopping)
     }
     // Trailing newline gets a spacer, otherwise the <pre> is a line shorter
     // than the textarea and the two drift apart when scrolled to the end.
-    return out + escHtml(src.slice(last)) + '\n ';
+    return out + plain(src, last, src.length) + '\n ';
   }
   const span = (c, s) => `<span class="t-${c}">${escHtml(s)}</span>`;
 
@@ -7620,6 +7654,7 @@ print(shopping)
 
   function placeMarks() {
     const m = lineMetrics();
+    placeCaretMark();
     placeMark(markCur, marks?.current, m);
     placeMark(markErr, marks?.err, m);
     const v = DBG.view;
@@ -7657,9 +7692,9 @@ print(shopping)
   // ── Editor editing ──────────────────────────────────────────────────────────
   // execCommand keeps the browser's undo stack intact; setRangeText is the
   // fallback where it's gone.
-  function insertText(text) {
+  function insertText(text, inputType = 'insertText') {
     codeEl.focus();
-    if (PV.editBlocked(codeEl.selectionStart, codeEl.selectionEnd, 'insertText')) return;
+    if (PV.editBlocked(codeEl.selectionStart, codeEl.selectionEnd, inputType)) return;
     if (!document.execCommand || !document.execCommand('insertText', false, text)) {
       codeEl.setRangeText(text, codeEl.selectionStart, codeEl.selectionEnd, 'end');
       onCodeInput();
@@ -7701,6 +7736,31 @@ print(shopping)
     if (codeEl.readOnly) return;
     if (mod && e.key === '/') { e.preventDefault(); toggleComment(); return; }
 
+    // Alt+↑/↓ moves the line (or the selected lines); Shift+Alt+↑/↓ copies it.
+    if (e.altKey && !mod && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+      e.preventDefault();
+      if (e.shiftKey) duplicateLines(e.key === 'ArrowDown'); else moveLines(e.key === 'ArrowUp' ? -1 : 1);
+      return;
+    }
+
+    // Home goes to the first character of the code, then to the line start.
+    if (e.key === 'Home' && !mod && !e.altKey) {
+      const pos = codeEl.selectionDirection === 'backward' ? codeEl.selectionStart : codeEl.selectionEnd;
+      const a   = lineStartOf(pos);
+      const ind = a + (codeEl.value.slice(a).match(/^[ \t]*/) || [''])[0].length;
+      const to  = pos === ind ? a : ind;
+      e.preventDefault();
+      if (e.shiftKey) {
+        const anchor = codeEl.selectionDirection === 'backward' ? codeEl.selectionEnd : codeEl.selectionStart;
+        codeEl.setSelectionRange(Math.min(anchor, to), Math.max(anchor, to), to < anchor ? 'backward' : 'forward');
+      } else codeEl.setSelectionRange(to, to);
+      caretMoved();
+      return;
+    }
+
+    // Brackets and quotes close themselves; typing the closer steps over it.
+    if (!mod && !e.altKey && e.key.length === 1 && autoPair(e.key)) { e.preventDefault(); return; }
+
     if (e.key === 'Tab') {
       e.preventDefault();
       const multi = codeEl.value.slice(codeEl.selectionStart, codeEl.selectionEnd).includes('\n');
@@ -7722,6 +7782,17 @@ print(shopping)
       else if (/^\s*(return|pass|break|continue|raise)\b/.test(line)) indent = indent.slice(0, -4);
       insertText('\n' + indent);
       return;
+    }
+
+    // Backspace between a pair the editor just made takes both halves.
+    if (e.key === 'Backspace' && codeEl.selectionStart === codeEl.selectionEnd) {
+      const pos = codeEl.selectionStart, v = codeEl.value;
+      if (pos > 0 && PAIRS[v[pos - 1]] === v[pos] && v[pos] !== undefined) {
+        e.preventDefault();
+        codeEl.setSelectionRange(pos - 1, pos + 1);
+        insertText('', 'deleteContentBackward');
+        return;
+      }
     }
 
     // Backspace in leading whitespace removes a whole indent level.
@@ -7750,6 +7821,203 @@ print(shopping)
     }).join('\n');
     codeEl.setSelectionRange(a, b);
     insertText(next);
+  }
+
+  // ── Pairs, moving lines, paste ─────────────────────────────────────────────
+  const PAIRS = { '(': ')', '[': ']', '{': '}', '"': '"', "'": "'" };
+  const CLOSERS = new Set([')', ']', '}', '"', "'"]);
+
+  // Returns true when it handled the key.
+  function autoPair(ch) {
+    const v = codeEl.value, a = codeEl.selectionStart, b = codeEl.selectionEnd;
+    const next = v[b] || '', prev = v[a - 1] || '';
+    // Typing the closer that is already there steps over it.
+    if (a === b && CLOSERS.has(ch) && next === ch) {
+      if (ch === '"' || ch === "'" ) {
+        // …but only a quote the editor itself opened: count this line's.
+        const line = v.slice(lineStartOf(a), a);
+        if ((line.split(ch).length - 1) % 2 === 0) return false;
+      }
+      codeEl.setSelectionRange(a + 1, a + 1); caretMoved(); return true;
+    }
+    if (!PAIRS[ch]) return false;
+    const quote = ch === '"' || ch === "'";
+    if (a !== b) {
+      // A selection gets wrapped, and stays selected.
+      const sel = v.slice(a, b);
+      if (sel.includes('\n') && quote) return false;
+      insertText(ch + sel + PAIRS[ch]);
+      codeEl.setSelectionRange(a + 1, b + 1);
+      caretMoved();
+      return true;
+    }
+    // Close only where it can't be mid-word: before space, a closer or the
+    // line's end; a quote also not straight after a letter (it's, f'…' aside).
+    if (next && !/[\s)\]}:,;]/.test(next)) return false;
+    if (quote && /[\w]/.test(prev) && !/(^|[^\w])[rbfuRBFU]{1,2}$/.test(v.slice(lineStartOf(a), a))) return false;
+    if (quote) {
+      // Inside a string or a comment on this line, a quote is just a quote.
+      const line = v.slice(lineStartOf(a), a);
+      if (/#/.test(line.replace(/(["'])(?:\\.|(?!\1).)*\1/g, ''))) return false;
+      if ((line.split(ch).length - 1) % 2 === 1) return false;
+    }
+    insertText(ch + PAIRS[ch]);
+    codeEl.setSelectionRange(a + 1, a + 1);
+    caretMoved();
+    return true;
+  }
+
+  // The whole lines the selection touches: [start, end) without the last \n.
+  function selectedLines() {
+    const v = codeEl.value;
+    const a = lineStartOf(codeEl.selectionStart);
+    let   b = codeEl.selectionEnd;
+    if (b > codeEl.selectionStart && v[b - 1] === '\n') b--;
+    let   e = v.indexOf('\n', b); if (e < 0) e = v.length;
+    return { a, e };
+  }
+
+  function moveLines(dir) {
+    const v = codeEl.value, { a, e } = selectedLines();
+    const s0 = codeEl.selectionStart - a, s1 = codeEl.selectionEnd - a;
+    const block = v.slice(a, e);
+    if (dir < 0) {
+      if (a === 0) return;
+      const pa = lineStartOf(a - 1);
+      const prev = v.slice(pa, a - 1);
+      codeEl.setSelectionRange(pa, e);
+      insertText(block + '\n' + prev);
+      codeEl.setSelectionRange(pa + s0, pa + s1);
+    } else {
+      if (e >= v.length) return;
+      let ne = v.indexOf('\n', e + 1); if (ne < 0) ne = v.length;
+      const next = v.slice(e + 1, ne);
+      codeEl.setSelectionRange(a, ne);
+      insertText(next + '\n' + block);
+      const at = a + next.length + 1;
+      codeEl.setSelectionRange(at + s0, at + s1);
+    }
+    caretMoved();
+  }
+
+  function duplicateLines(down) {
+    const v = codeEl.value, { a, e } = selectedLines();
+    const s0 = codeEl.selectionStart - a, s1 = codeEl.selectionEnd - a;
+    const block = v.slice(a, e);
+    codeEl.setSelectionRange(e, e);
+    insertText('\n' + block);
+    const at = down ? e + 1 : a;
+    codeEl.setSelectionRange(at + s0, at + s1);
+    caretMoved();
+  }
+
+  // Pasted code lands at the caret's indentation: a block copied from deep
+  // inside a function, pasted at the top level (or the other way round),
+  // keeps its own shape but moves as a whole. Tabs become four spaces, and
+  // Windows line ends go.
+  function shapePaste(raw) {
+    let t = PV.cleanSource(raw).replace(/\r\n?/g, '\n').replace(/\t/g, '    ');
+    const v = codeEl.value, a = codeEl.selectionStart;
+    const before = v.slice(lineStartOf(a), a);
+    if (!t.includes('\n') || !/^[ ]*$/.test(before)) return t;
+    const lines = t.split('\n');
+    // The first line's own indent is often lost when copying from mid-line,
+    // so the common indent is taken over the lines after it, when there are.
+    const rest = lines.slice(1).filter(l => l.trim());
+    const ind  = l => (l.match(/^ */) || [''])[0].length;
+    const first = lines[0].trim() ? ind(lines[0]) : Infinity;
+    const restMin = rest.length ? Math.min(...rest.map(ind)) : Infinity;
+    let base;
+    if (first === Infinity || first > 0 || !rest.length) base = Math.min(first, restMin);
+    // An unindented first line may have lost its indent (copied from
+    // mid-line). If it heads a block (ends in ':') its body is one level in.
+    else base = lines[0].trimEnd().endsWith(':') ? Math.max(0, restMin - 4) : restMin;
+    if (!isFinite(base)) return t;
+    const pad  = before;   // the caret already sits after this indent
+    const lead = first === Infinity ? 0 : Math.max(0, first - base);
+    return lines.map((l, i) => {
+      if (i === 0) return ' '.repeat(lead) + l.trimStart();
+      return l.trim() ? pad + l.slice(Math.min(base, ind(l))) : '';
+    }).join('\n');
+  }
+
+  // ── Copy the code ──────────────────────────────────────────────────────────
+  async function copyCode() {
+    const text = codeEl.value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; }
+    catch (_) {
+      // The host may not grant clipboard-write to the frame: the old way
+      // still works from a click.
+      const t = document.createElement('textarea');
+      t.value = text; t.style.position = 'fixed'; t.style.opacity = '0';
+      document.body.appendChild(t); t.select();
+      try { ok = document.execCommand('copy'); } catch (_) {}
+      t.remove();
+      codeEl.focus({ preventScroll: true });
+    }
+    const btn = $('copy-code-btn');
+    btn.title = ok ? 'Copied' : 'Couldn\'t copy: select the code and press Ctrl+C';
+    btn.classList.toggle('is-done', ok);
+    clearTimeout(btn._t);
+    btn._t = setTimeout(() => { btn.title = 'Copy this file\'s code'; btn.classList.remove('is-done'); }, 1500);
+  }
+
+  // ── Caret line and bracket match ───────────────────────────────────────────
+  const OPEN = '([{', CLOSE = ')]}';
+
+  // Positions of brackets that are code, not inside strings or comments:
+  // walk the source once with the same token rules as the highlighter.
+  function codeBrackets(src) {
+    const out = new Map();
+    let last = 0, m;
+    TOK.lastIndex = 0;
+    const scan = (from, to) => { for (let k = from; k < to; k++) if (OPEN.includes(src[k]) || CLOSE.includes(src[k])) out.set(k, src[k]); };
+    while ((m = TOK.exec(src))) {
+      scan(last, m.index);
+      last = TOK.lastIndex;
+      if (m[0] === '') TOK.lastIndex++;
+    }
+    scan(last, src.length);
+    return out;
+  }
+
+  function findMatch() {
+    if (document.activeElement !== codeEl || codeEl.selectionStart !== codeEl.selectionEnd) return null;
+    const v = codeEl.value, pos = codeEl.selectionStart;
+    if (v.length > 60000) return null;
+    const br = codeBrackets(v);
+    // The bracket just before the caret wins, then the one after it.
+    let at = -1;
+    if (br.has(pos - 1)) at = pos - 1; else if (br.has(pos)) at = pos;
+    if (at < 0) return null;
+    const ch = br.get(at);
+    const fwd = OPEN.includes(ch);
+    const want = fwd ? CLOSE[OPEN.indexOf(ch)] : OPEN[CLOSE.indexOf(ch)];
+    const keys = [...br.keys()];
+    let i = keys.indexOf(at), depth = 0;
+    for (i += fwd ? 1 : -1; i >= 0 && i < keys.length; i += fwd ? 1 : -1) {
+      const c = br.get(keys[i]);
+      if (c === ch) depth++;
+      else if (c === want) { if (depth === 0) return [at, keys[i]]; depth--; }
+    }
+    return [at, -1];
+  }
+
+  function caretMoved() {
+    const next = findMatch();
+    if (JSON.stringify(next) !== JSON.stringify(bm)) {
+      bm = next;
+      hlEl.innerHTML = highlight(codeEl.value);
+    }
+    placeCaretMark();
+  }
+
+  function placeCaretMark() {
+    const show = document.activeElement === codeEl && codeEl.selectionStart === codeEl.selectionEnd && !codeEl.readOnly;
+    if (!show) { markCaret.classList.remove('is-on'); return; }
+    const line = codeEl.value.slice(0, codeEl.selectionStart).split('\n').length;
+    placeMark(markCaret, line, lineMetrics());
   }
 
   // ── Files ──────────────────────────────────────────────────────────────────
@@ -7811,7 +8079,20 @@ print(shopping)
     saveFilesIfEditing();
   }
   // The open tab's name field is as wide as the name.
-  function sizeFileEl() { fileEl.style.width = `calc(${Math.max(6, fileEl.value.length)}ch + 12px)`; }
+  // Measured, not counted in ch: ch is taken from whichever face had loaded
+  // when it ran, and a late web font cut the name short ("aliasin").
+  let fileCtx = null;
+  function sizeFileEl() {
+    const cs = getComputedStyle(fileEl);
+    fileCtx = fileCtx || document.createElement('canvas').getContext('2d');
+    fileCtx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const text = fileCtx.measureText(fileEl.value || ' ').width;
+    const box  = ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth']
+      .reduce((n, k) => n + (parseFloat(cs[k]) || 0), 0);
+    fileEl.style.width = Math.ceil(text + box + 3) + 'px';
+  }
+  document.fonts?.ready?.then(() => sizeFileEl());
+  document.fonts?.addEventListener?.('loadingdone', () => sizeFileEl());
   // ── Files pane ─────────────────────────────────────────────────────────────
   // The Python Notebook's pane: Files in the bar opens a list down the left;
   // a click opens that file in the editor, + adds one, the upload arrow reads
@@ -9686,14 +9967,19 @@ def _debug_file(src, fname, limit):
   // rejects them, so swap them on the way in rather than leave a program
   // that silently refuses to run.
   codeEl.addEventListener('paste', e => {
-    if (IS_VIEWER) return;
+    if (IS_VIEWER || codeEl.readOnly) return;
     const raw   = e.clipboardData?.getData('text/plain');
     if (raw == null) return;
-    const clean = PV.cleanSource(raw);
+    const clean = shapePaste(raw);
     if (clean === raw) return;
     e.preventDefault();
-    insertText(clean);
+    insertText(clean, 'insertFromPaste');
   });
+  // The caret line and the bracket match follow the caret.
+  document.addEventListener('selectionchange', () => { if (document.activeElement === codeEl) caretMoved(); });
+  codeEl.addEventListener('focus', caretMoved);
+  codeEl.addEventListener('blur',  () => { if (bm) { bm = null; hlEl.innerHTML = highlight(codeEl.value); } placeCaretMark(); });
+  $('copy-code-btn').addEventListener('click', copyCode);
   inputEl.addEventListener('keydown', onShellKey);
   inputEl.addEventListener('input',   autoGrow);
 

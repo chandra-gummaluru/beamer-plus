@@ -608,7 +608,7 @@ export function renderWidgets(slideConfig, container, zipFile, slideKey = null) 
         iframe.style.pointerEvents = w.interactive !== false ? 'auto' : 'none';
         iframe.style.opacity       = '1';
 
-        iframe.allow = 'autoplay; fullscreen; camera; microphone';
+        iframe.allow = 'autoplay; fullscreen; camera; microphone; clipboard-read; clipboard-write';
 
         // A copy of this widget may already be running in the other pane
         // (the slide was shown there first): start from its state, not the

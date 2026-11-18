@@ -3438,11 +3438,38 @@ body.bw-editing #choices.is-tf .choice:not(.is-correct) .opt:hover { background:
 body.bw-editing .choice-label { cursor: text; }
 .choice-label[contenteditable] { min-width: 6ch; min-height: 1.3em; outline-offset: 3px !important; }
 .opt { position: relative; }
-/* Out of the flow, in the box's corner: the answer's text keeps the width it
-   has on the slide, so editing never re-wraps it. */
-.ed-remove { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; opacity: 0; }
-.opt:hover .ed-remove, .ed-remove:focus-visible { opacity: 0.6; }
-.ed-remove svg { width: 13px; height: 13px; }
+
+/* The answer being edited: a highlighter ring drawn inside its border (an
+   inset shadow takes no space and the answers' scroll box can't clip it),
+   and a small toolbar on its top edge. Edit mode adds nothing to the layout:
+   what you see while editing is the slide the room will see. */
+body.bw-editing .choice.is-focused .opt { box-shadow: inset 0 0 0 3px var(--sn-hl); }
+body.bw-editing .choice.is-focused.is-correct .opt { box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--ar-ink) 25%, var(--sn-hl)); }
+#ans-tools {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: var(--bg);
+  border: 1px solid var(--border-med);
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  font-family: var(--font-chrome);
+  font-size: var(--fs-chrome);
+  color: var(--ar-ink);
+  white-space: nowrap;
+}
+#ans-tools[hidden] { display: none; }
+#ans-tools .bw-btn { height: 26px; border-color: transparent; background: none; gap: 5px; padding: 0 8px; font-family: inherit; font-size: inherit; }
+#ans-tools .bw-btn:hover:not(:disabled) { border-color: var(--ar-ink); background: var(--sn-node); }
+#ans-tools .bw-btn--icon { width: 28px; padding: 0; }
+#ans-tools .bw-btn:disabled { opacity: 0.35; cursor: default; }
+#ans-tools .bw-btn[aria-pressed="true"] { font-weight: 700; border-color: var(--ar-ink); background: var(--sn-hl); color: var(--ar-on-hl); }
+#ans-tools svg { width: 14px; height: 14px; flex: 0 0 auto; }
+#ans-tools .at-sep { width: 1px; height: 18px; background: var(--border-med); margin: 0 2px; }
+#ans-tools .at-sep[hidden], #ans-tools .bw-btn[hidden] { display: none; }
 
 /* Blocks standing in for the results each type will show. */
 .ed-block { display: none; }
@@ -3689,7 +3716,7 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
     <span class="bw-edit-only" style="display:contents">
       <button class="bw-btn" id="ed-type" type="button" aria-haspopup="listbox" title="Question type"><span id="ed-type-label">Multiple choice</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></button>
       <span class="ar-sep" aria-hidden="true"></span>
-      <span class="ar-field">Collecting Mode
+      <span class="ar-field">Collecting
         <span class="bw-seg" id="ed-auto" title="Manual: open the poll with the button in the bar. Automatic: it opens when the slide does.">
           <button class="bw-btn" type="button" data-v="0">Manual</button>
           <button class="bw-btn" type="button" data-v="1">Automatic</button>
@@ -3702,16 +3729,12 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
           <button class="bw-btn" type="button" data-v="down">On</button>
         </span>
       </span>
-      <span class="ar-group" id="ed-add-wrap" hidden>
-        <span class="ar-sep" aria-hidden="true"></span>
-        <button class="bw-btn" type="button" id="ed-add" title="Add an answer (or press Enter at the end of the last one)">+ Add answer</button>
-      </span>
       <span class="ar-group" id="ed-layout-wrap" hidden>
         <span class="ar-sep" aria-hidden="true"></span>
         <span class="ar-field">Answers
           <span class="bw-seg" id="ed-layout">
-            <button class="bw-btn" type="button" data-v="horizontal">Horizontal</button>
-            <button class="bw-btn" type="button" data-v="vertical">Vertical</button>
+            <button class="bw-btn" type="button" data-v="horizontal" title="Side by side, as many to a row as fit">Grid</button>
+            <button class="bw-btn" type="button" data-v="vertical" title="One under another">List</button>
           </span>
         </span>
       </span>
@@ -6490,8 +6513,6 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
   const edBlock     = $('ed-block');
   const edLayout    = $('ed-layout');
   const edLayoutWrap = $('ed-layout-wrap');
-  const edAddWrap   = $('ed-add-wrap');
-  const edAdd       = $('ed-add');
   const edModel     = $('ed-model');
   const edNsum      = $('ed-nsum');
   const edOllama    = $('ed-ollama');
@@ -6595,8 +6616,6 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
     // The settings only some types have sit in the bar after the shared ones.
     edLayoutWrap.hidden = t !== 'choice';
     // The phone page letters answers to J: ten at most.
-    edAddWrap.hidden = t !== 'choice';
-    edAdd.disabled = editOptions().length >= 10;
     pick(edLayout, S.choiceLayout);
     edAiWrap.hidden    = t !== 'open';
     edRmaxWrap.hidden  = t !== 'rating';
@@ -6696,13 +6715,6 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
         } else {
           makeEditable(label, true, 'Option ' + letter(i));
           label._ed = liveMd(label, { onChange: (src, commit) => optionTyped(i, src, commit) });
-          const rm = document.createElement('button');
-          rm.type = 'button';
-          rm.className = 'bw-btn bw-btn--quiet bw-btn--icon ed-remove';
-          rm.title = 'Remove this answer';
-          rm.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
-          rm.style.visibility = opts.length > 2 ? '' : 'hidden';   // two answers is the least a poll has
-          node.appendChild(rm);
         }
         choicesEl.appendChild(li);
         return { li, badge, label, i };
@@ -6717,6 +6729,7 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
       r.badge.setAttribute('aria-pressed', ok ? 'true' : 'false');
     });
     layoutChoices(false);
+    syncAnsTools();
   }
 
   function focusOption(i, atEnd = true) {
@@ -6743,6 +6756,21 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
     opts.splice(i, 1);
     const c = editCorrect();
     setting({ options: opts, correctAnswer: c == null || c === i ? null : (c > i ? c : c + 1) });
+  }
+
+  // One place earlier (-1) or later (+1); the right answer goes with its row.
+  function moveOption(i, d) {
+    // Leave the text first, so what was being typed is committed before the
+    // rows swap.
+    if (choicesEl.contains(document.activeElement)) document.activeElement.blur();
+    const opts = editOptions();
+    const j = i + d;
+    if (j < 0 || j >= opts.length) return;
+    [opts[i], opts[j]] = [opts[j], opts[i]];
+    const c = editCorrect();
+    const nc = c === i ? j : c === j ? i : c;
+    setting({ options: opts, correctAnswer: nc == null ? null : nc + 1 });
+    focusOption(j);
   }
 
   function markCorrect(i) {
@@ -6778,7 +6806,6 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
     const li = e.target.closest('.choice');
     if (!li) return;
     const i = Number(li.dataset.i);
-    if (e.target.closest('.ed-remove')) { removeOption(i); return; }
     // True/false: anywhere on the answer marks it right. Otherwise the letter
     // does, and anywhere else on the answer is for typing in it: a click
     // beside or around the text puts the caret at its end (a click in the
@@ -6786,6 +6813,138 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
     if (S.type === 'truefalse' || e.target.closest('.ed-mark')) { markCorrect(i); return; }
     if (!e.target.closest('.choice-label')) focusOption(i);
   });
+
+  // ── The answer you're in: its toolbar ──────────────────────────────────────
+  // Floats on the top edge of the answer being typed in (true/false: the one
+  // pointed at, as there's nothing to type): mark it right, move it, add one
+  // after it, remove it. Fixed to the window rather than inside the answer,
+  // so the answers' scroll box never clips it and nothing on the slide moves.
+  const AT_ICON = {
+    left:  '<path d="m15 6-6 6 6 6"/>',  right: '<path d="m9 6 6 6-6 6"/>',
+    up:    '<path d="m6 15 6-6 6 6"/>',  down:  '<path d="m6 9 6 6 6-6"/>',
+    check: '<path d="M20 6 9 17l-5-5"/>', plus: '<path d="M12 5v14M5 12h14"/>',
+    trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>'
+  };
+  const atSvg = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${AT_ICON[k]}</svg>`;
+  const ansTools = document.createElement('div');
+  ansTools.id = 'ans-tools';
+  ansTools.className = 'bw-edit-only';
+  ansTools.setAttribute('role', 'toolbar');
+  ansTools.setAttribute('aria-label', 'Answer');
+  ansTools.hidden = true;
+  ansTools.innerHTML =
+    `<button class="bw-btn" type="button" data-act="mark" aria-pressed="false" title="Mark as the right answer (click again for no right answer)">${atSvg('check')}<span>Right answer</span></button>` +
+    `<span class="at-sep" data-grp="edit"></span>` +
+    `<button class="bw-btn bw-btn--icon" type="button" data-act="prev" data-grp="edit"></button>` +
+    `<button class="bw-btn bw-btn--icon" type="button" data-act="next" data-grp="edit"></button>` +
+    `<span class="at-sep" data-grp="edit"></span>` +
+    `<button class="bw-btn" type="button" data-act="add" data-grp="edit" title="Add an answer after this one (or press Enter at the end of the last)">${atSvg('plus')}<span>Add after</span></button>` +
+    `<span class="at-sep" data-grp="edit"></span>` +
+    `<button class="bw-btn bw-btn--icon" type="button" data-act="remove" data-grp="edit" title="Remove this answer (or Backspace in an empty one)" aria-label="Remove this answer">${atSvg('trash')}</button>`;
+  document.body.appendChild(ansTools);
+  const atBtn = a => ansTools.querySelector(`[data-act="${a}"]`);
+  let atFor = -1, atHide = 0;
+
+  function showAnsTools(i) {
+    clearTimeout(atHide);
+    if (!editing() || IS_VIEWER || !choiceRows[i]) return;
+    atFor = i;
+    syncAnsTools();
+  }
+  function hideAnsTools() {
+    clearTimeout(atHide);
+    atFor = -1;
+    ansTools.hidden = true;
+    choiceRows.forEach(r => r.li.classList.remove('is-focused'));
+  }
+  function hideAnsToolsSoon() {
+    clearTimeout(atHide);
+    atHide = setTimeout(() => {
+      const a = document.activeElement;
+      if (choicesEl.contains(a) && a !== choicesEl) return;        // still in an answer
+      if (S.type === 'truefalse' && (choicesEl.matches(':hover') || ansTools.matches(':hover'))) return;
+      hideAnsTools();
+    }, 120);
+  }
+  // Brings the toolbar up to date with its answer and puts it over it.
+  function syncAnsTools() {
+    const tf = S.type === 'truefalse';
+    if (atFor < 0 || !editing() || !(tf || S.type === 'choice') || !choiceRows[atFor]) {
+      if (!ansTools.hidden || atFor >= 0) hideAnsTools();
+      return;
+    }
+    const i = atFor, n = choiceRows.length;
+    choiceRows.forEach(r => r.li.classList.toggle('is-focused', r.i === i));
+    atBtn('mark').setAttribute('aria-pressed', editCorrect() === i ? 'true' : 'false');
+    ansTools.querySelectorAll('[data-grp="edit"]').forEach(el => { el.hidden = tf; });
+    if (!tf) {
+      // Arrows that point the way the answers run on the slide.
+      const a = choiceRows[0]?.li.getBoundingClientRect(), b = choiceRows[1]?.li.getBoundingClientRect();
+      const across = a && b && Math.abs(a.top - b.top) < 4;
+      const prev = atBtn('prev'), next = atBtn('next');
+      prev.innerHTML = atSvg(across ? 'left' : 'up');
+      next.innerHTML = atSvg(across ? 'right' : 'down');
+      prev.title = prev.ariaLabel = across ? 'Move left' : 'Move up';
+      next.title = next.ariaLabel = across ? 'Move right' : 'Move down';
+      prev.setAttribute('aria-label', prev.title); next.setAttribute('aria-label', next.title);
+      prev.disabled = i === 0;
+      next.disabled = i === n - 1;
+      atBtn('add').disabled = n >= 10;
+      atBtn('remove').disabled = n <= 2;   // two answers is the least a poll has
+    }
+    ansTools.hidden = false;
+    placeAnsTools();
+  }
+  function placeAnsTools() {
+    if (ansTools.hidden || atFor < 0) return;
+    const opt = choiceRows[atFor]?.li.querySelector('.opt');
+    if (!opt) return;
+    const r = opt.getBoundingClientRect();
+    const w = ansTools.offsetWidth, h = ansTools.offsetHeight;
+    const barBottom = (document.getElementById('toolbar')?.getBoundingClientRect().bottom) || 0;
+    // Astride the box's top edge: clear of the answer's text (centred in its
+    // box) and of the question above, however tight the gap between them.
+    let top = r.top - Math.round(h / 2) - 2;
+    if (top < barBottom + 4) top = r.bottom - Math.round(h / 2) + 2;   // no room above: astride the bottom
+    const left = Math.max(8, Math.min(r.left + r.width / 2 - w / 2, innerWidth - w - 8));
+    ansTools.style.left = left + 'px';
+    ansTools.style.top  = top + 'px';
+  }
+
+  // Clicking a tool keeps the caret where it was.
+  ansTools.addEventListener('pointerdown', e => { if (e.target.closest('button')) e.preventDefault(); });
+  ansTools.addEventListener('click', e => {
+    const b = e.target.closest('button[data-act]');
+    if (!b || b.disabled || !editing() || atFor < 0) return;
+    const i = atFor;
+    switch (b.dataset.act) {
+      case 'mark':   markCorrect(i); break;
+      case 'prev':   moveOption(i, -1); break;
+      case 'next':   moveOption(i, +1); break;
+      case 'add':    addOption(i); break;
+      case 'remove': {
+        if (choicesEl.contains(document.activeElement)) document.activeElement.blur();
+        removeOption(i);
+        focusOption(Math.max(0, i - 1));
+        break;
+      }
+    }
+  });
+  choicesEl.addEventListener('focusin', e => {
+    const li = e.target.closest('.choice');
+    if (li && editing()) showAnsTools(Number(li.dataset.i));
+  });
+  choicesEl.addEventListener('focusout', hideAnsToolsSoon);
+  // True/false has nothing to type in, so its toolbar follows the pointer.
+  choicesEl.addEventListener('pointerover', e => {
+    if (S.type !== 'truefalse' || !editing()) return;
+    const li = e.target.closest('.choice');
+    if (li) showAnsTools(Number(li.dataset.i));
+  });
+  choicesEl.addEventListener('pointerleave', () => { if (S.type === 'truefalse') hideAnsToolsSoon(); });
+  ansTools.addEventListener('pointerleave', () => { if (S.type === 'truefalse') hideAnsToolsSoon(); });
+  choicesEl.addEventListener('scroll', placeAnsTools, { passive: true });
+  window.addEventListener('resize', placeAnsTools);
 
   // An answer typed in (live editor): saved as it's typed, committed when
   // left. A pasted list becomes one answer per line.
@@ -6951,7 +7110,6 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
   edTimer .addEventListener('click', e => { const v = segValue(e); if (v) setting({ timerMode: v }); });
   edRmax  .addEventListener('click', e => { const v = segValue(e); if (v) setting({ ratingMax: v }); });
   edLayout.addEventListener('click', e => { const v = segValue(e); if (v) setting({ choiceLayout: v }); });
-  edAdd.addEventListener('click', () => { if (editing()) addOption(null); });
   edWords .addEventListener('click', e => { const v = segValue(e); if (v) setting({ wordsPerResponse: v }); });
 
   // ── The kind of question: a menu off the bar ────────────────────────────────
@@ -7052,6 +7210,7 @@ body.ar-split #stage.is-bare:not(.is-data) #ar-split-right #side {
     if (IS_VIEWER) return;
     closeTypeMenu();
     closeFilterPop();
+    hideAnsTools();
     if (e.detail.editing) {
       // A new poll that was waiting for typing to pause waits for Done instead.
       clearTimeout(restartTimer); restartTimer = null;
